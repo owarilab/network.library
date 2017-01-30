@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=0">
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>WebsocketClient</title>
+<meta name="description" content="WebsocketClient">
+<meta name="keywords" content="WebsocketClient">
+<meta http-equiv="Content-Style-Type" content="text/css">
+<meta http-equiv="Content-Script-Type" content="text/javascript">
+<script type="text/javascript">
+	var socket = null;
+	var status = 0;
+	
+	window.onload = function()
+	{
+		createSocket( "localhost", 1024 );
+	};
+	
+	function createSocket( hostName, port )
+	{
+		if( socket == null ){
+			socket = new WebSocket('ws:/'+'/' + hostName + ':'+ port +'/echo',['chat','superchat']);
+			socket.onopen 		= onSockOpen;
+			socket.onerror 		= onSockError;
+			socket.onmessage 	= onSockMessage;
+		}
+	};
+	function onSockOpen()
+	{
+		console.log( "connect websocket now" );
+		status = 1;
+		sendSockMessage("TEST_MESSAGE:LOGIN!!");
+	};
+	
+	function onSockMessage( e )
+	{
+		console.log( "websocket recv : " + e.data );
+		var recvwindow = document.getElementById('recv_msg');
+		if( recvwindow != null ){
+			if( recvwindow.innerHTML != "" ){
+				recvwindow.innerHTML = "<br>\n" + recvwindow.innerHTML;
+			}
+			recvwindow.innerHTML = e.data + "\n" + recvwindow.innerHTML;
+		}
+	};
+	
+	function onSockError( error )
+	{
+		console.log( "websocket error : " + error );
+	};
+	
+	function sendSockMessage( message )
+	{
+		if( socket != null && status > 0 )
+		{
+			socket.send( message );
+		}
+	};
+	function onSendButton()
+	{
+		var sendelm = document.getElementById('id_send');
+		if( sendelm != null ){
+			sendSockMessage( "TEST_MESSAGE:" + sendelm.value );
+		}
+	};
+</script>
+
+</head>
+<body bgcolor="#ffffff">
+<form style="width: 100%; height: 80%">
+	<input type="text" id="id_send" name="send_msg" value="dummy" />
+	<input type="button" name="send_button" onclick="onSendButton();" value="送信">
+</form>
+<div id="recv_msg"></div>
+</body>
+</html>
