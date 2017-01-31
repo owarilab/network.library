@@ -1,0 +1,74 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="source">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="header">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="source\main.c">
+      <Filter>source</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\core\header\gdt_memory_allocator.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\header\gdt_node.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\header\gdt_queue.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\header\gdt_random.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\header\gdt_script.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\header\gdt_sha1.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\header\gdt_sha2.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\header\gdt_socket.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\header\gdt_string.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\header\gdt_system.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\header\gdt_timeout.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\header\gdt_token_analyzer.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\header\gdt_array.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\header\gdt_base64.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\header\gdt_core.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\header\gdt_hash.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\header\gdt_io.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\core\header\gdt_json.h">
+      <Filter>header</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
