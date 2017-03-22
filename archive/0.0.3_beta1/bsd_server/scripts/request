@@ -1,0 +1,74 @@
+/*
+ * Accept-Encoding: gzip,compress,deflate,identity
+ * Content-Encoding: gzip or compress or deflate
+ */
+
+document_root = "/tmp/www";
+file_path = document_root + _HEADER['REQUEST'];
+if( _HEADER['REQUEST'] == '/' ){
+    file_path = document_root + "/index.html";
+}
+
+//echo( "file_path : " + file_path + "\n" );
+body = file_get( file_path );
+html = make_http_response( body );
+
+def default_html()
+{
+    //echo(_HEADER);
+    //echo(_GET);
+    //echo(_POST);
+    //echo(html);
+    content = 
+        "<h1>gdt_server</h1>\r\n" + 
+        "a = " + _GET['a'] + "<br>\r\n" +
+        "hoge = " + _GET['hoge'] + "<br>\r\n" +
+        "<form action=\"http://localhost:1024/?a=0\" method=\"post\">" +
+        "<input type=\"hidden\" name=\"id\" value=\"トトロ\">" +
+        "<input type=\"submit\" value=\"送信\">" +
+        "</form>\r\n"
+    ;
+
+    body = make_html_core( content );
+    html = make_http_response( body );
+    return html;
+}
+
+def make_html_core( html_body )
+{
+    html_core =
+        "<!DOCTYPE html>\r\n" + 
+        "<html lang=\"ja\">\r\n" + 
+        "<head>\r\n" + 
+        '<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=0">' + "\r\n" + 
+        '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">' + "\r\n" + 
+        '<meta http-equiv="Content-Style-Type" content="text/css">' + "\r\n" + 
+        '<meta http-equiv="Content-Script-Type" content="text/javascript">' + "\r\n" + 
+        "<title>gdt_server</title>\r\n" + 
+        "</head>\r\n" + 
+        "<body>\r\n" + 
+        html_body +
+        "</body>\r\n" +
+        "</html>\r\n"
+    ;
+    return html_core;
+}
+
+def make_http_response( body )
+{
+    body_length = count( body );
+    date = gmtime();
+    //echo( "body_length : " + body_length + "byte\n" );
+    header = "HTTP/1.1 200 OK\r\n";
+    header = header + "Server: gdt-httpd\r\n";
+    header = header + "Content-Type: text/html\r\n";
+    header = header + "Connection: close\r\n";
+    header = header + "Date: "+date+"\r\n";
+    header = header + "Content-Length: "+body_length+"\r\n";
+    header = header + "\r\n";
+    if( _HEADER['HTTP_METHOD']=='HEAD'){
+        body = "";
+    }
+    html = header + body;
+    return html;
+}
