@@ -4,7 +4,7 @@ DEFINE  = -D"_BSD_UNIX"
 CFLAG   = -g -Wall -O
 #CFLAG   = -Wall -O2
 INCDIR  = -I ../../header
-LIBDIR  = ""
+LIBDIR  = 
 LIBA = ../bsd/libgdt_core.a
 MYSOCKETOBJGROUP = main.o $(LIBA)
 
