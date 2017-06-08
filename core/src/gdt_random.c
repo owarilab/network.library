@@ -132,12 +132,16 @@ void gdt_uniqid_r32( char* idbuf, size_t size )
 	uint32_t r = 0;
 	while( i < size )
 	{
-		r = gdt_rand_32() % 35;
+		//r = gdt_rand_32() % 35;
+		r = gdt_rand_32() % 61;
 		if( r < 10 ){
 			idbuf[i++] = 48 + r; // 0-9
 		}
-		else{
+		else if( r < 35 ){
 			idbuf[i++] = 97 + ( r - 9 ); // a-z
+		}
+		else{
+			idbuf[i++] = 65 + ( r - 35 ); // A-Z
 		}
 	}
 	idbuf[i] = '\0';

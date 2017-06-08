@@ -402,8 +402,8 @@ size_t gdt_strlen( const char* src )
 	const char* ps = src;
 	if( *ps != '\0' ){
 		while( *(ps++) != '\0' ){}
+		s = ( ( ps - src ) -1 );
 	}
-	s = ( ( ps - src ) -1 );
 	return s;
 }
 
@@ -420,7 +420,7 @@ uint32_t gdt_ihash( const char* s, uint32_t range )
 	{
 		while( *ps != '\0' )
 		{
-			v += ((*ps)*(ps-s));
+			v += ((*ps)*((ps-s)+v));
 			ps++;
 		}
 	}

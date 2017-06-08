@@ -39,7 +39,7 @@ int32_t gdt_create_array( GDT_MEMORY_POOL* _ppool, size_t allocsize, size_t buff
 		}
 		parray = (GDT_ARRAY*)GDT_POINTER( _ppool, tmpmunit );
 		parray->max_size = allocsize;
-		if( buffer_size < NUMERIC_BUFFER_SIZE ){
+		if( buffer_size != 0 && buffer_size < NUMERIC_BUFFER_SIZE ){
 			buffer_size = NUMERIC_BUFFER_SIZE;
 		}
 		parray->buffer_size = buffer_size;
@@ -54,7 +54,9 @@ int32_t gdt_create_array( GDT_MEMORY_POOL* _ppool, size_t allocsize, size_t buff
 		{
 			(elm+i)->id = 0;
 			(elm+i)->munit = -1;//gdt_create_munit( _ppool, sizeof( char ) * parray->buffer_size, MEMORY_TYPE_DEFAULT );
-			(elm+i)->buf_munit = gdt_create_munit( _ppool, sizeof( char ) * parray->buffer_size, MEMORY_TYPE_DEFAULT );
+			if( buffer_size > 0 ){
+				(elm+i)->buf_munit = gdt_create_munit( _ppool, sizeof( char ) * parray->buffer_size, MEMORY_TYPE_DEFAULT );
+			}
 		}
 	}while( false );
 	return tmpmunit;
@@ -85,7 +87,7 @@ int32_t gdt_resize_array( GDT_MEMORY_POOL* _ppool, int32_t munit )
 {
 	if( munit <= 0 )
 	{
-		if( 0 >= ( munit = gdt_create_array( _ppool, 8, 1024 ) ) ){
+		if( 0 >= ( munit = gdt_create_array( _ppool, 8, NUMERIC_BUFFER_SIZE ) ) ){
 			printf("gdt_resize_array parray->len >= parray->max_size\n");
 			return munit;
 		}

@@ -41,6 +41,7 @@ extern "C"{
 #include "gdt_queue.h"
 #include "gdt_timeout.h"
 #include "gdt_hash.h"
+#include "gdt_memory_allocator.h"
 
 #ifdef __WINDOWS__
 #include <process.h>
@@ -105,6 +106,7 @@ extern "C"{
 // client mode
 #define SOCKET_MODE_SIMPLE_TERM 100
 #define SOCKET_MODE_CLIENT_THREAD 101
+#define SOCKET_MODE_CLIENT_NONBLOCKING 102
 
 // status
 #define PROTOCOL_STATUS_DEFAULT 0
@@ -152,57 +154,6 @@ extern "C"{
 	{"Connection:","CONNECTION","64"}, \
 }; \
 
-// event callback
-typedef void* (*GDT_CALLBACK)( void* args );
-// recv call callback
-typedef int (*GDT_USER_RECV)( void* connection, GDT_SOCKET_ID id, char* buf, size_t buffer_size, int flag );
-// send call callback
-typedef int(*GDT_USER_SEND)( void* connection, GDT_SOCKET_ID id, char *buf, size_t buffer_size, int flag );
-
-typedef struct GDT_SOCKET_OPTION
-{
-	int inetflag;					// flags( 0:ipv4, 1:ipv6 )
-	int32_t host_name_munit;		// host name( char* )
-	int32_t port_num_munit;			// port num( char* )
-	int32_t connection_munit;		// connection array ( GDT_SERVER_CONNECTION_INFO* )
-	int32_t lock_file_munit;		// lock file name( char* )
-	int lock_file_fd;				// accept lock fd
-#ifdef __WINDOWS__
-	WSADATA wsdata;
-	HOSTENT *phostent;
-	IN_ADDR inaddr;
-	struct hostent *host;
-	struct sockaddr_in serveraddr;
-	char hbuf[256];
-	char ipbuf[256];
-	HANDLE	accept_lock;					// mutex
-#else
-	pthread_mutex_t accept_lock;			// mutex
-#endif
-	GDT_SOCKET_ID sockid;					// sokcet fd
-	GDT_SOCKET_ID sockid6;					// ipv6 socket fd
-	int64_t t_lock_id;						// thread lock id
-	char recvtimeoutmode;					// recv timeout mode( TIMEOUT_MODE_* )
-	size_t maxconnection;					// max connection length
-	uint8_t socket_type;					// socket type( SOKET_TYPE_SERVER_TCP: server socket, SOKET_TYPE_CLIENT_TCP: client socket )
-	uint8_t mode;							// connect mode( SOCKET_MODE_SINGLE:single task, SOCKET_MODE_PREFORK:prefork, SOCKET_MODE_THREAD:thread)
-	uint8_t protocol;						// PROTOCOL_*
-	int32_t t_usec;							// connection timeout (usec)
-	int32_t t_sec;							// connection timeout (sec)
-	int32_t s_sec;							// timeout( select, pool, epool )
-	int32_t s_usec;							// timeout( select, pool, epool )
-	GDT_CALLBACK connection_start_callback;	// callback pointer
-	GDT_CALLBACK send_finish_callback;		// callback pointer
-	GDT_CALLBACK recv_callback;				// callback pointer
-	GDT_CALLBACK close_callback;			// callback pointer
-	GDT_CALLBACK timeout_callback;			// callback pointer
-	GDT_USER_RECV user_recv_function;		// user call recv
-	GDT_USER_SEND user_send_function;		// user call send
-	size_t recvbuffer_size;						// recv buffer size
-	size_t msgbuffer_size;						// message buffer size
-	GDT_MEMORY_POOL* memory_pool;					// memory pool
-	GDT_MEMORY_POOL* mmap_memory_pool;				// mmap memory pool
-} GDT_SOCKET_OPTION;
 
 typedef struct GDT_SOCKPARAM
 {
@@ -250,7 +201,8 @@ typedef struct GDT_SERVER_CONNECTION_INFO
 	int32_t recvinfo_munit;
 	int32_t recvmsg_munit;
 	int32_t user_data_munit;
-	GDT_SOCKET_OPTION *option;
+	//GDT_SOCKET_OPTION *gdt_socket_option;
+	void *gdt_socket_option;
 	GDT_SOCKPARAM sockparam;
 } GDT_SERVER_CONNECTION_INFO;
 
@@ -268,6 +220,68 @@ typedef struct GDT_SEND_INFO
 	ssize_t sendlen;
 } GDT_SEND_INFO;
 
+
+// event callback
+typedef void* (*GDT_CALLBACK)( void* args );
+typedef int32_t (*GDT_ON_RECV)(uint32_t payload_type, uint8_t* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info );
+// recv call callback
+typedef int (*GDT_USER_RECV)( void* connection, GDT_SOCKET_ID id, char* buf, size_t buffer_size, int flag );
+// send call callback
+typedef int(*GDT_USER_SEND)( void* connection, GDT_SOCKET_ID id, char *buf, size_t buffer_size, int flag );
+
+typedef struct GDT_SOCKET_OPTION
+{
+	int inetflag;					// flags( 0:ipv4, 1:ipv6 )
+	int32_t host_name_munit;		// host name( char* )
+	int32_t port_num_munit;			// port num( char* )
+	int32_t connection_munit;		// connection array ( GDT_SERVER_CONNECTION_INFO* )
+	int32_t lock_file_munit;		// lock file name( char* )
+	int lock_file_fd;				// accept lock fd
+#ifdef __WINDOWS__
+	WSADATA wsdata;
+	HOSTENT *phostent;
+	IN_ADDR inaddr;
+	struct hostent *host;
+	struct sockaddr_in serveraddr;
+	char hbuf[256];
+	char ipbuf[256];
+	HANDLE	accept_lock;					// mutex
+#else
+	pthread_mutex_t accept_lock;			// mutex
+#endif
+	GDT_SOCKET_ID sockid;					// sokcet fd
+	GDT_SOCKET_ID sockid6;					// ipv6 socket fd
+	int64_t t_lock_id;						// thread lock id
+	char recvtimeoutmode;					// recv timeout mode( TIMEOUT_MODE_* )
+	size_t maxconnection;					// max connection length
+	uint8_t socket_type;					// socket type( SOKET_TYPE_SERVER_TCP: server socket, SOKET_TYPE_CLIENT_TCP: client socket )
+	uint8_t mode;							// connect mode( SOCKET_MODE_SINGLE:single task, SOCKET_MODE_PREFORK:prefork, SOCKET_MODE_THREAD:thread)
+	uint8_t protocol;						// PROTOCOL_*
+	int32_t t_usec;							// connection timeout (usec)
+	int32_t t_sec;							// connection timeout (sec)
+	int32_t s_sec;							// timeout( select, pool, epool )
+	int32_t s_usec;							// timeout( select, pool, epool )
+	GDT_CALLBACK connection_start_callback;	// callback pointer
+	GDT_CALLBACK send_finish_callback;		// callback pointer
+	GDT_CALLBACK plane_recv_callback;		// callback pointer
+	GDT_CALLBACK close_callback;			// callback pointer
+	GDT_CALLBACK timeout_callback;			// callback pointer
+	GDT_ON_RECV payload_recv_callback;
+	GDT_USER_RECV user_recv_function;		// user call recv
+	GDT_USER_SEND user_send_function;		// user call send
+	size_t recvbuffer_size;					// recv buffer size
+	size_t msgbuffer_size;					// message buffer size
+	GDT_MEMORY_POOL* memory_pool;			// memory pool
+	GDT_MEMORY_POOL* mmap_memory_pool;		// mmap memory pool
+} GDT_SOCKET_OPTION;
+
+GDT_SOCKET_OPTION* gdt_create_tcp_server(char* hostname, char* portnum);
+GDT_SOCKET_OPTION* gdt_create_udp_server(char* hostname, char* portnum);
+GDT_SOCKET_OPTION* gdt_create_tcp_client(char* hostname, char* portnum);
+ssize_t gdt_send_message(uint32_t payload_type, char* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info);
+ssize_t gdt_send_message_broadcast(uint32_t payload_type, char* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info);
+ssize_t gdt_client_send_message(uint32_t payload_type, char* payload, size_t payload_len, GDT_SOCKET_OPTION *option);
+
 int gdt_initialize_socket_option( 
 	  GDT_SOCKET_OPTION *option
 	, char* hostname
@@ -278,14 +292,15 @@ int gdt_initialize_socket_option(
 	, size_t maxconnection
 	, GDT_MEMORY_POOL* memory_pool
 	, GDT_MEMORY_POOL* mmap_memory_pool
-	, GDT_CALLBACK connection_start_callback
-	, GDT_CALLBACK send_finish_callback
-	, GDT_CALLBACK recv_callback
-	, GDT_CALLBACK close_callback
 );
 
+void set_on_connect_event( GDT_SOCKET_OPTION *option, GDT_CALLBACK func );
+void set_on_sent_event( GDT_SOCKET_OPTION *option, GDT_CALLBACK func );
+void set_on_packet_recv_event( GDT_SOCKET_OPTION *option, GDT_CALLBACK func );
+void set_on_payload_recv_event( GDT_SOCKET_OPTION *option, GDT_ON_RECV func );
+void set_on_close_event( GDT_SOCKET_OPTION *option, GDT_CALLBACK func );
 void set_user_recv_event( GDT_SOCKET_OPTION *option, GDT_USER_RECV func );
-void set_user_send_event(GDT_SOCKET_OPTION *option, GDT_USER_SEND func);
+void set_user_send_event( GDT_SOCKET_OPTION *option, GDT_USER_SEND func);
 void gdt_set_timeout_event( GDT_SOCKET_OPTION *option, GDT_CALLBACK func );
 void gdt_set_select_timeout( GDT_SOCKET_OPTION *option, int32_t sec, int32_t usec );
 
@@ -308,6 +323,8 @@ void gdt_single_task_server( GDT_SOCKET_OPTION *option );
 void gdt_select_server( GDT_SOCKET_OPTION *option );
 void gdt_nonblocking_server(GDT_SOCKET_OPTION *option);
 void gdt_server_update(GDT_SOCKET_OPTION *option);
+void gdt_nonblocking_client(GDT_SOCKET_OPTION *option);
+void gdt_client_update(GDT_SOCKET_OPTION *option);
 
 #ifdef __WINDOWS__
 #else

@@ -49,6 +49,7 @@ extern "C"{
 #define MEMORY_ALLOCATE_TYPE_MMAP 1
 #define MEMORY_ALLOCATE_TYPE_MINI 2
 
+#define MEMORY_INFO_BUFFER sizeof(uint8_t) * 128
 
 // byte order
 #define GDT_LITTLE_ENDIAN 1
@@ -166,6 +167,7 @@ uint16_t gdt_pop_little_to_host_bit16( GDT_BYTE_BUFFER* pbuffer );
 uint16_t gdt_pop_big_to_host_bit16( GDT_BYTE_BUFFER* pbuffer );
 uint32_t gdt_pop_little_to_host_bit32( GDT_BYTE_BUFFER* pbuffer );
 uint32_t gdt_pop_big_to_host_bit32( GDT_BYTE_BUFFER* pbuffer );
+int32_t gdt_create_memory_info( GDT_MEMORY_POOL* _ppool, GDT_BYTE_BUFFER* pbuffer );
 // private
 GDT_MEMORY_UNIT* gdt_find_freemunit( GDT_MEMORY_POOL* _ppool, size_t size );
 int gdt_resize_garbage(GDT_MEMORY_POOL* _ppool,GDT_MEMORY_UNIT* garbageunit,GDT_MEMORY_UNIT* freeunit, size_t size);

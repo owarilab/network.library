@@ -205,17 +205,21 @@ size_t gdt_fread( char* file_name, char* dest, size_t size )
 #endif
 		{
 			printf("[gdt_lstate]lstat error\n");
+			fclose( f );
 			break;
 		}
 
 		if (st.st_size >= size) {
 			printf("[gdt_fread_bin] buffer size over %zd , %zd\n", st.st_size, size);
+			fclose( f );
 			break;
 		}
 		
-		if( (fseek(f, 0L, SEEK_SET)) != 0 )
+		fpos_t pos = 0;
+		if( (fsetpos(f,&pos)) != 0 )
 		{
-			printf( "[gdt_fread] fseek error\n" );
+			printf( "[gdt_fread] fsetpos error\n" );
+			fclose( f );
 			break;
 		}
 		while( ( c = fgetc( f ) ) != EOF )
@@ -256,7 +260,8 @@ size_t gdt_fread_bin( char* file_name, char* dest, size_t size )
 		if (lstat(file_name, &st) < 0)
 #endif
 		{
-			printf("[gdt_lstate]lstat error\n");
+			printf("[gdt_fread_bin]lstat error\n");
+			fclose( f );
 			break;
 		}
 		retsize = st.st_size;
@@ -266,9 +271,11 @@ size_t gdt_fread_bin( char* file_name, char* dest, size_t size )
 			retsize = size;
 		}
 
-		if( (fseek(f, 0L, SEEK_SET)) != 0 )
+		fpos_t pos = 0;
+		if( (fsetpos(f,&pos)) != 0 )
 		{
-			printf( "[gdt_fread_bin] fseek\n" );
+			printf( "[gdt_fread_bin] fsetpos error\n" );
+			fclose( f );
 			break;
 		}
 		
@@ -277,6 +284,53 @@ size_t gdt_fread_bin( char* file_name, char* dest, size_t size )
 			printf("fread error %d, %d\n", (int)size, (int)rsize);
 			retsize = 0;
 		}
+		fclose( f );
+	}while( false );
+	return retsize;
+}
+
+size_t gdt_fread_bin_range( char* file_name, char* dest, fpos_t pos, size_t size )
+{
+	size_t retsize = 0;
+	struct stat st;
+	FILE* f;
+	size_t rsize = 0;
+	do{
+#ifdef __WINDOWS__
+		if (0 != fopen_s(&f, file_name, "rb"))
+#else
+		if (!(f = fopen(file_name, "rb")))
+#endif
+		{
+			printf( "[gdt_fread_bin] fopen error = %s\n", file_name );
+			break;
+		}
+
+#ifdef __WINDOWS__
+		if (stat(file_name, &st) < 0)
+#else
+		if (lstat(file_name, &st) < 0)
+#endif
+		{
+			printf("[gdt_fread_bin]lstat error\n");
+			fclose( f );
+			break;
+		}
+		retsize = st.st_size;
+
+		if( (fsetpos(f,&pos)) != 0 )
+		{
+			printf( "[gdt_fread_bin] fsetpos error\n" );
+			fclose( f );
+			break;
+		}
+		
+		rsize = fread( dest, sizeof(char), size, f );
+		if( rsize != size ){
+			printf("fread error %d, %d\n", (int)size, (int)rsize);
+			retsize = 0;
+		}
+		retsize = rsize;
 		fclose( f );
 	}while( false );
 	return retsize;
@@ -340,6 +394,27 @@ int gdt_fwrite_bin( char* file_name, char* out, size_t size )
 		if (0 != fopen_s(&fp, file_name, "wb"))
 #else
 		if (!(fp = fopen(file_name, "wb")))
+#endif
+		{
+			printf( "gdt_fwrite_a : fopen error.\n" );
+			error_code = -1;
+			break;
+		}
+		error_code = ( int )fwrite(( void * )out , sizeof( char ) , size , fp );
+		fclose(fp);
+	}while( false );
+	return error_code;
+}
+
+int gdt_fwrite_bin_a( char* file_name, char* out, size_t size )
+{
+	int error_code = 0;
+	do{
+		FILE *fp;
+#ifdef __WINDOWS__
+		if (0 != fopen_s(&fp, file_name, "ab"))
+#else
+		if (!(fp = fopen(file_name, "ab")))
 #endif
 		{
 			printf( "gdt_fwrite_a : fopen error.\n" );

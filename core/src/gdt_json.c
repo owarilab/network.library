@@ -70,6 +70,50 @@ int32_t gdt_json_encode( GDT_MEMORY_POOL* _ppool, GDT_NODE* node, size_t buf_siz
 	return buf_munit;
 }
 
+int32_t gdt_json_encode_b( GDT_MEMORY_POOL* _ppool, GDT_NODE* node, int32_t buf_munit )
+{
+	int i;
+	GDT_NODE* childnode;
+	GDT_NODE* workelemlist;
+	do{
+		if( buf_munit == -1 )
+		{
+			printf("[debug] null buffer\n");
+			break;
+		}
+		if( node->element_munit == -1 )
+		{
+			printf("[debug] gdt_elementdumpchild node->element_munit == -1[%d]\n",node->id);
+			break;
+		}
+		workelemlist = ( GDT_NODE* )GDT_POINTER( _ppool, node->element_munit );
+		if( workelemlist == NULL )
+		{
+			printf("[debug] gdt_elementdumpchild workelemlist == NULL\n");
+			break;
+		}
+		for( i = 0; i < node->pos; i++ )
+		{
+			if( workelemlist[i].id == ELEMENT_CHILD ){
+				childnode = (GDT_NODE*)GDT_POINTER( _ppool, workelemlist[i].element_munit );
+				gdt_json_encode_b( _ppool, childnode, buf_munit );
+			}else{
+				if( workelemlist[i].id == ELEMENT_ARRAY){
+					gdt_json_encode_parser_array( _ppool, buf_munit, workelemlist[i].element_munit );
+				}
+				else if( workelemlist[i].id == ELEMENT_HASH ){
+					gdt_json_encode_parser_hash( _ppool, buf_munit, workelemlist[i].element_munit );
+				}
+				else{
+					printf("invalid element[%d][%d] : %s\n" , workelemlist[i].element_munit, workelemlist[i].id, (char*)GDT_POINTER( _ppool, workelemlist[i].element_munit ) );
+				}
+			}
+		}
+		gdt_add_json_element(_ppool, buf_munit, "\0", 1, 0);
+	}while( false );
+	return buf_munit;
+}
+
 int32_t gdt_json_encode_parser_hash( GDT_MEMORY_POOL* _ppool, int32_t buf_munit, int32_t h_munit )
 {
 	struct GDT_HASH *hash;
@@ -192,9 +236,17 @@ int gdt_add_json_element( GDT_MEMORY_POOL* _ppool, int32_t buf_munit, char* src,
 			printf("null buf_munit\n");
 			break;
 		}
+		if( src_size == -1 ){
+			printf("src_size == -1\n");
+			return 0;
+		}
+		if( src_size == 0 ){
+			return 0;
+		}
 		GDT_MEMORY_UNIT* punit = gdt_get_munit( _ppool, buf_munit );
 		uint32_t buf_size = punit->size - (punit->top - punit->p)-1;
 		if( src_size > buf_size ){
+			//printf("buffer out of range %d: %d\n", src_size, (int)( punit->size ) );
 			printf("buffer out of range %d: %d\n", (int)( src_size + ( punit->top - punit->p ) ), (int)( punit->size ) );
 			break;
 		}

@@ -38,6 +38,7 @@ extern "C"{
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <time.h>
 #if defined(__LINUX__) || defined(__BSD_UNIX__) || defined(__ANDROID__) || defined(__IOS__)
 #include <dirent.h>
 #include <unistd.h>
@@ -56,9 +57,11 @@ int gdt_fout( char* file_name );
 int gdt_fout_line( char* file_name, uint32_t start, uint32_t line );
 size_t gdt_fread( char* file_name, char* dest, size_t size );
 size_t gdt_fread_bin( char* file_name, char* dest, size_t size );
+size_t gdt_fread_bin_range( char* file_name, char* dest, fpos_t pos, size_t size );
 int gdt_fwrite( char* file_name, char* out, size_t size );
 int gdt_fwrite_a( char* file_name, char* out, size_t size );
 int gdt_fwrite_bin( char* file_name, char* out, size_t size );
+int gdt_fwrite_bin_a( char* file_name, char* out, size_t size );
 int gdt_frename( const char* old_name, const char* new_name );
 int gdt_unlink( const char* file_name );
 int32_t gdt_lstate( GDT_MEMORY_POOL* _ppool, const char* path );

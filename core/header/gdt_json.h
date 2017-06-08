@@ -42,6 +42,7 @@ extern "C"{
 #include <string.h>
 
 int32_t gdt_json_encode( GDT_MEMORY_POOL* _ppool, GDT_NODE* node, size_t buf_size );
+int32_t gdt_json_encode_b( GDT_MEMORY_POOL* _ppool, GDT_NODE* node, int32_t buf_munit );
 int32_t gdt_json_encode_parser_hash( GDT_MEMORY_POOL* _ppool, int32_t buf_munit, int32_t h_munit );
 int32_t gdt_json_encode_parser_array( GDT_MEMORY_POOL* _ppool, int32_t buf_munit, int32_t a_munit );
 int gdt_add_json_element( GDT_MEMORY_POOL* _ppool, int32_t buf_munit, char* src, size_t src_size, uint8_t escape );

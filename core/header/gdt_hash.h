@@ -61,6 +61,8 @@ void gdt_add_hash_string( GDT_MEMORY_POOL* _ppool, int32_t h_munit, char* name, 
 void gdt_add_hash_value_kstring( GDT_MEMORY_POOL* _ppool, int32_t h_munit, char* name, int32_t data_munit, int32_t id );
 void gdt_add_hash_emptystring( GDT_MEMORY_POOL* _ppool, int32_t h_munit, char* name, size_t string_size );
 int32_t gdt_get_hash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, char* hashname );
+int32_t gdt_get_hash_fix_ihash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, char* hashname, uint32_t hashkey );
+int32_t gdt_get_hash_core( GDT_MEMORY_POOL* _ppool, struct GDT_HASH *hash, GDT_HASH *hashchild, char* hashname, uint32_t hashkey );
 void gdt_clear_hash_string( GDT_MEMORY_POOL* _ppool, int32_t h_munit, char* name );
 void gdt_replace_hash_string( GDT_MEMORY_POOL* _ppool, int32_t h_munit, char* name, char* value );
 int32_t gdt_get_hash_name( GDT_MEMORY_POOL* _ppool, int32_t h_munit, char* hashname );

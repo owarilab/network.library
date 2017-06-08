@@ -125,7 +125,7 @@ typedef int GDT_SOCKET_ID;
 #define MEMORY_ALIGNMENT_SIZE_BIT_64 ( SIZE_BYTE * 8 )
 #define MEMORY_ALIGNMENT_SIZE_BIT_32 ( SIZE_BYTE * 4 )
 
-#define NUMERIC_BUFFER_SIZE (32+sizeof(int32_t))
+#define NUMERIC_BUFFER_SIZE (20+sizeof(int32_t))
 
 #define GDT_MAX_FILE_DESCRIPTOR 1024
 

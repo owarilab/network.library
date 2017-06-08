@@ -848,7 +848,6 @@ void gdt_set_buffer( GDT_MEMORY_POOL* _ppool, int32_t id, GDT_BYTE_BUFFER* pbuff
 	pbuffer->buffer = ((uint8_t*)_ppool->memory + unit->p);
 	pbuffer->pos = pbuffer->buffer;
 	pbuffer->size = unit->size;
-
 }
 
 uint16_t gdt_pop_little_to_host_bit16( GDT_BYTE_BUFFER* pbuffer )
@@ -901,6 +900,42 @@ uint32_t gdt_pop_big_to_host_bit32( GDT_BYTE_BUFFER* pbuffer )
 	}
 	pbuffer->pos+=4;
 	return v;
+}
+
+int32_t gdt_create_memory_info( GDT_MEMORY_POOL* _ppool, GDT_BYTE_BUFFER* pbuffer )
+{
+	MEMORY_PUSH_BIT32_L( _ppool, pbuffer->pos, _ppool->end );
+	MEMORY_PUSH_BIT32_L( _ppool, pbuffer->pos, _ppool->top );
+	MEMORY_PUSH_BIT32_L( _ppool, pbuffer->pos, _ppool->bottom );
+	MEMORY_PUSH_BIT32_L( _ppool, pbuffer->pos, _ppool->size );
+	MEMORY_PUSH_BIT32_L( _ppool, pbuffer->pos, _ppool->max_size );
+	MEMORY_PUSH_BIT32_L( _ppool, pbuffer->pos, _ppool->alignment );
+	MEMORY_PUSH_BIT32_L( _ppool, pbuffer->pos, _ppool->memory_unit_size_one );
+	MEMORY_PUSH_BIT32_L( _ppool, pbuffer->pos, _ppool->min_realloc );
+	MEMORY_PUSH_BIT32_L( _ppool, pbuffer->pos, _ppool->fix_unit_size );
+	MEMORY_PUSH_BIT32_L( _ppool, pbuffer->pos, _ppool->unit_size );
+	MEMORY_PUSH_BIT32_L( _ppool, pbuffer->pos, _ppool->tail_munit );
+	MEMORY_PUSH_BIT32_L( _ppool, pbuffer->pos, _ppool->lock_munit );
+	MEMORY_PUSH_BIT32_L( _ppool, pbuffer->pos, _ppool->alloc_type );
+	MEMORY_PUSH_BIT32_L( _ppool, pbuffer->pos, _ppool->endian );
+//	pbuffer->pos = pbuffer->buffer;
+//	printf("pbuffer size : %dbyte\n",(int)pbuffer->size);
+//	printf("memory_pool->end : %d ?? %d\n", _ppool->end, gdt_pop_little_to_host_bit32( pbuffer ));
+//	printf("memory_pool->top : %d ?? %d\n", _ppool->top, gdt_pop_little_to_host_bit32( pbuffer ));
+//	printf("memory_pool->bottom : %d ?? %d\n", _ppool->bottom, gdt_pop_little_to_host_bit32( pbuffer ));
+//	printf("memory_pool->size : %d ?? %d\n", _ppool->size, gdt_pop_little_to_host_bit32( pbuffer ));
+//	printf("memory_pool->max_size : %d ?? %d\n", _ppool->max_size, gdt_pop_little_to_host_bit32( pbuffer ));
+//	printf("memory_pool->alignment : %d ?? %d\n", _ppool->alignment, gdt_pop_little_to_host_bit32( pbuffer ));
+//	printf("memory_pool->memory_unit_size_one : %d ?? %d\n", _ppool->memory_unit_size_one, gdt_pop_little_to_host_bit32( pbuffer ));
+//	printf("memory_pool->min_realloc : %d ?? %d\n", _ppool->min_realloc, gdt_pop_little_to_host_bit32( pbuffer ));
+//	printf("memory_pool->fix_unit_size : %d ?? %d\n", _ppool->fix_unit_size, gdt_pop_little_to_host_bit32( pbuffer ));
+//	printf("memory_pool->unit_size : %d ?? %d\n", _ppool->unit_size, gdt_pop_little_to_host_bit32( pbuffer ));
+//	printf("memory_pool->tail_munit : %d ?? %d\n", _ppool->tail_munit, gdt_pop_little_to_host_bit32( pbuffer ));
+//	printf("memory_pool->lock_munit : %d ?? %d\n", _ppool->lock_munit, gdt_pop_little_to_host_bit32( pbuffer ));
+//	printf("memory_pool->alloc_type : %d ?? %d\n", _ppool->alloc_type, gdt_pop_little_to_host_bit32( pbuffer ));
+//	printf("memory_pool->endian : %d ?? %d\n", _ppool->endian, gdt_pop_little_to_host_bit32( pbuffer ));
+//	pbuffer->pos = pbuffer->buffer;
+	return GDT_SYSTEM_OK;
 }
 
 void gdt_memory_info( GDT_MEMORY_POOL* _ppool )
