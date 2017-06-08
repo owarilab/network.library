@@ -57,7 +57,7 @@ int gdt_fout( char* file_name );
 int gdt_fout_line( char* file_name, uint32_t start, uint32_t line );
 size_t gdt_fread( char* file_name, char* dest, size_t size );
 size_t gdt_fread_bin( char* file_name, char* dest, size_t size );
-size_t gdt_fread_bin_range( char* file_name, char* dest, fpos_t pos, size_t size );
+size_t gdt_fread_bin_range( char* file_name, char* dest, size_t pos, size_t size );
 int gdt_fwrite( char* file_name, char* out, size_t size );
 int gdt_fwrite_a( char* file_name, char* out, size_t size );
 int gdt_fwrite_bin( char* file_name, char* out, size_t size );

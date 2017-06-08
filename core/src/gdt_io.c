@@ -215,13 +215,6 @@ size_t gdt_fread( char* file_name, char* dest, size_t size )
 			break;
 		}
 		
-		fpos_t pos = 0;
-		if( (fsetpos(f,&pos)) != 0 )
-		{
-			printf( "[gdt_fread] fsetpos error\n" );
-			fclose( f );
-			break;
-		}
 		while( ( c = fgetc( f ) ) != EOF )
 		{
 			*( ps++ ) = c;
@@ -270,14 +263,6 @@ size_t gdt_fread_bin( char* file_name, char* dest, size_t size )
 			printf( "[gdt_fread_bin] buffer size over %zd , %zd\n", retsize , size );
 			retsize = size;
 		}
-
-		fpos_t pos = 0;
-		if( (fsetpos(f,&pos)) != 0 )
-		{
-			printf( "[gdt_fread_bin] fsetpos error\n" );
-			fclose( f );
-			break;
-		}
 		
 		rsize = fread( dest, sizeof(char), size, f );
 		if( rsize > size ){
@@ -289,7 +274,7 @@ size_t gdt_fread_bin( char* file_name, char* dest, size_t size )
 	return retsize;
 }
 
-size_t gdt_fread_bin_range( char* file_name, char* dest, fpos_t pos, size_t size )
+size_t gdt_fread_bin_range( char* file_name, char* dest, size_t pos, size_t size )
 {
 	size_t retsize = 0;
 	struct stat st;
@@ -318,7 +303,7 @@ size_t gdt_fread_bin_range( char* file_name, char* dest, fpos_t pos, size_t size
 		}
 		retsize = st.st_size;
 
-		if( (fsetpos(f,&pos)) != 0 )
+		if( (fseek(f, pos, SEEK_SET)) != 0 )
 		{
 			printf( "[gdt_fread_bin] fsetpos error\n" );
 			fclose( f );
