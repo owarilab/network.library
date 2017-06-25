@@ -60,6 +60,7 @@ void gdt_create_message_queue( GDT_MEMORY_POOL* _ppool, int32_t *q_munit, size_t
 #ifdef __WINDOWS__
 			if( 0 >= ( pmq->mqlock_munit = gdt_create_munit( _ppool, sizeof( HANDLE ), MEMORY_TYPE_DEFAULT ) ) ){
 				printf("alloc error\n");
+				(*q_munit) = -1;
 				break;
 			}
 			pmutex = (HANDLE *)gdt_upointer( _ppool, pmq->mqlock_munit );
@@ -67,16 +68,19 @@ void gdt_create_message_queue( GDT_MEMORY_POOL* _ppool, int32_t *q_munit, size_t
 #else
 			if( 0 >= ( pmq->mqlock_munit = gdt_create_munit( _ppool, sizeof( pthread_mutex_t ), MEMORY_TYPE_DEFAULT ) ) ){
 				printf("alloc error\n");
+				(*q_munit) = -1;
 				break;
 			}
 			pmutex = (pthread_mutex_t *)gdt_upointer( _ppool, pmq->mqlock_munit );
 			if( pthread_mutex_init(pmutex, NULL) != 0 ){
 				printf( "gdt_create_message_queue:pthread_mutex_init : error \n" );
+				(*q_munit) = -1;
 				break;
 			}
 #endif
 			if( 0 >= ( pmq->queuemunit = gdt_create_munit( _ppool, sizeof( int32_t ) * pmq->queuelen, MEMORY_TYPE_DEFAULT ) ) ){
 				printf("create mu array error\n");
+				(*q_munit) = -1;
 				break;
 			}
 			mqlist = (int32_t *)gdt_upointer( _ppool, pmq->queuemunit );
@@ -85,11 +89,13 @@ void gdt_create_message_queue( GDT_MEMORY_POOL* _ppool, int32_t *q_munit, size_t
 			{
 				if( 0 >= ( mqlist[i] = gdt_create_munit( _ppool, sizeof( GDT_MSG_INFO ), MEMORY_TYPE_DEFAULT ) ) ){
 					printf("create msg info error\n");
+					(*q_munit) = -1;
 					continue;
 				}
 				pminf = (GDT_MSG_INFO *)gdt_upointer( _ppool, mqlist[i] );
 				if( 0 >= ( pminf->msgmunit = gdt_create_munit( _ppool, sizeof( char ) * size, MEMORY_TYPE_DEFAULT ) ) ){
 					printf("create msg queue buf error\n");
+					(*q_munit) = -1;
 					continue;
 				}
 				pmqbuf = (char *)gdt_upointer( _ppool, pminf->msgmunit );
@@ -109,7 +115,7 @@ void gdt_create_message_queue( GDT_MEMORY_POOL* _ppool, int32_t *q_munit, size_t
  * @param pbuf queueに格納するメッセージ
  * @param size メッセージサイズ
  */
-int gdt_push_queue( GDT_MEMORY_POOL* _ppool, int32_t q_munit, const char* pbuf, size_t size )
+int gdt_enqueue( GDT_MEMORY_POOL* _ppool, int32_t q_munit, const char* pbuf, size_t size )
 {
 	int addindex = -1;
 	GDT_MSGQUEUE *pmq;
@@ -160,7 +166,7 @@ int gdt_push_queue( GDT_MEMORY_POOL* _ppool, int32_t q_munit, const char* pbuf, 
  * @param pbuf queueに格納するメッセージ
  * @param size メッセージサイズ
  */
-int gdt_safe_push_queue( GDT_MEMORY_POOL* _ppool, int32_t q_munit, const char* pbuf, size_t size )
+int gdt_safe_enqueue( GDT_MEMORY_POOL* _ppool, int32_t q_munit, const char* pbuf, size_t size )
 {
 	int addindex = -1;
 	GDT_MSGQUEUE *pmq;
@@ -183,12 +189,12 @@ int gdt_safe_push_queue( GDT_MEMORY_POOL* _ppool, int32_t q_munit, const char* p
 #ifdef __WINDOWS__
 		pmutex = (HANDLE *)gdt_upointer( _ppool, pmq->mqlock_munit );
 		WaitForSingleObject( *pmutex, INFINITE );
-		addindex = gdt_push_queue( _ppool, q_munit, pbuf, size );
+		addindex = gdt_enqueue( _ppool, q_munit, pbuf, size );
 		ReleaseMutex( *pmutex );
 #else
 		pmutex = (pthread_mutex_t *)gdt_upointer( _ppool, pmq->mqlock_munit );
 		(void) pthread_mutex_lock( pmutex );
-		addindex = gdt_push_queue( _ppool, q_munit, pbuf, size );
+		addindex = gdt_enqueue( _ppool, q_munit, pbuf, size );
 		(void) pthread_mutex_unlock( pmutex );
 #endif
 	}while( false );

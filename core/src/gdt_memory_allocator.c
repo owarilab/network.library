@@ -76,6 +76,7 @@ size_t gdt_initialize_memory( GDT_MEMORY_POOL** _ppool, size_t allocate_size, si
 		(*_ppool)->unit_size		= ( free_memory_unit + fix_memory_unit );
 		(*_ppool)->tail_munit		= -1;
 		(*_ppool)->lock_munit		= -1;
+		(*_ppool)->memory_buf_munit	= -1;
 		(*_ppool)->alloc_type			= MEMORY_ALLOCATE_TYPE_MALLOC;
 		(*_ppool)->endian			= gdt_endian();
 		memory_unit_one_size = GDT_ALIGNUP( sizeof( GDT_MEMORY_UNIT ), alignment_size );
@@ -144,6 +145,7 @@ size_t gdt_initialize_mmapmemory( GDT_MEMORY_POOL** _ppool, size_t allocate_size
 		(*_ppool)->unit_size		= ( free_memory_unit + fix_memory_unit );
 		(*_ppool)->tail_munit		= -1;
 		(*_ppool)->lock_munit		= -1;
+		(*_ppool)->memory_buf_munit	= -1;
 		(*_ppool)->alloc_type			= MEMORY_ALLOCATE_TYPE_MMAP;
 		(*_ppool)->endian			= gdt_endian();
 		memory_unit_one_size = GDT_ALIGNUP( sizeof( GDT_MEMORY_UNIT ), alignment_size );
@@ -188,6 +190,7 @@ int32_t gdt_create_mini_memory( GDT_MEMORY_POOL* _ppool, size_t allocate_size )
 	tiny_pool->unit_size		= ( FIX_MUNIT_SIZE );
 	tiny_pool->tail_munit		= -1;
 	tiny_pool->lock_munit		= -1;
+	tiny_pool->memory_buf_munit = memory_buf_munit;
 	tiny_pool->alloc_type			= MEMORY_ALLOCATE_TYPE_MINI;
 	tiny_pool->endian			= gdt_endian();
 	uint32_t memory_unit_one_size = GDT_ALIGNUP( sizeof( GDT_MEMORY_UNIT ), _ppool->alignment );
@@ -228,7 +231,8 @@ int32_t gdt_create_clone_mini_memory( GDT_MEMORY_POOL* _ppool, GDT_MEMORY_POOL* 
 	tiny_pool->unit_size		= _mini_ppool->unit_size;
 	tiny_pool->tail_munit		= _mini_ppool->tail_munit;
 	tiny_pool->lock_munit		= _mini_ppool->lock_munit;
-	tiny_pool->alloc_type			= _mini_ppool->alloc_type;
+	tiny_pool->memory_buf_munit	= memory_buf_munit;
+	tiny_pool->alloc_type		= _mini_ppool->alloc_type;
 	tiny_pool->endian			= _mini_ppool->endian;
 	tiny_pool->memory_unit_size_one 	= _mini_ppool->memory_unit_size_one;
 	//gdt_memory_info( tiny_pool );
@@ -258,7 +262,7 @@ int32_t gdt_copy_mini_memory( GDT_MEMORY_POOL* _dest_ppool, GDT_MEMORY_POOL* _sr
 	_dest_ppool->unit_size		= _src_ppool->unit_size;
 	_dest_ppool->tail_munit		= _src_ppool->tail_munit;
 	_dest_ppool->lock_munit		= _src_ppool->lock_munit;
-	_dest_ppool->alloc_type			= _src_ppool->alloc_type;
+	_dest_ppool->alloc_type		= _src_ppool->alloc_type;
 	_dest_ppool->endian			= _src_ppool->endian;
 	_dest_ppool->memory_unit_size_one 	= _src_ppool->memory_unit_size_one;
 	//gdt_memory_info( _dest_ppool );

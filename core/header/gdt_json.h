@@ -48,8 +48,9 @@ int32_t gdt_json_encode_parser_array( GDT_MEMORY_POOL* _ppool, int32_t buf_munit
 int gdt_add_json_element( GDT_MEMORY_POOL* _ppool, int32_t buf_munit, char* src, size_t src_size, uint8_t escape );
 
 int32_t gdt_json_decode( GDT_MEMORY_POOL* _ppool, const char* src );
-int32_t gdt_json_decode_parser( GDT_MEMORY_POOL* _ppool, GDT_NODE* node, GDT_TOKENS *ptokens, GDT_TOKEN *token_list );
-int32_t gdt_json_decode_parser_hash( GDT_MEMORY_POOL* _ppool, GDT_NODE* node, GDT_TOKENS *ptokens, GDT_TOKEN *token_list );
+int32_t gdt_json_decode_h( GDT_MEMORY_POOL* _ppool, const char* src, int32_t hash_size );
+int32_t gdt_json_decode_parser( GDT_MEMORY_POOL* _ppool, GDT_NODE* node, GDT_TOKENS *ptokens, GDT_TOKEN *token_list, int32_t hash_size );
+int32_t gdt_json_decode_parser_hash( GDT_MEMORY_POOL* _ppool, GDT_NODE* node, GDT_TOKENS *ptokens, GDT_TOKEN *token_list, int32_t hash_size );
 int32_t gdt_json_decode_parser_array( GDT_MEMORY_POOL* _ppool, GDT_NODE* node, GDT_TOKENS *ptokens, GDT_TOKEN *token_list );
 
 int32_t gdt_make_json_root( GDT_MEMORY_POOL* _ppool, int32_t data_munit, int id ); 

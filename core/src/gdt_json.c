@@ -174,6 +174,14 @@ int32_t gdt_json_encode_parser_hash( GDT_MEMORY_POOL* _ppool, int32_t buf_munit,
 								gdt_add_json_element( _ppool, buf_munit, (char*)GDT_POINTER( _ppool, hashelement[i].elm_munit ), gdt_strlen((char*)GDT_POINTER( _ppool, hashelement[i].elm_munit )), 1 );
 								cnt++;
 							}
+							else{
+								gdt_add_json_element( _ppool, buf_munit, "\"", 1, 0);
+								gdt_add_json_element( _ppool, buf_munit, (char*)GDT_POINTER( _ppool, hashelement[i].hashname_munit ), gdt_strlen((char*)GDT_POINTER( _ppool, hashelement[i].hashname_munit )), 1 );
+								gdt_add_json_element( _ppool, buf_munit, "\":", 2, 0);
+								gdt_add_json_element( _ppool, buf_munit, "\"", 1, 0);
+								gdt_add_json_element( _ppool, buf_munit, "NULL", 4, 0 );
+								gdt_add_json_element( _ppool, buf_munit, "\"", 1, 0);
+							}
 						}
 					}
 				}
@@ -302,15 +310,38 @@ int32_t gdt_json_decode( GDT_MEMORY_POOL* _ppool, const char* src )
 		}
 		gdt_token_analyzer( _ppool, tokens_munit, (char*)src );
 		GDT_TOKENS *ptokens = (GDT_TOKENS*)GDT_POINTER(_ppool,tokens_munit);
+        if( ptokens->token_munit == -1 ){
+            break;
+        }
 		GDT_TOKEN *token_list = (GDT_TOKEN*)GDT_POINTER(_ppool,ptokens->token_munit);
 		rootnode_munit = gdt_createrootnode( _ppool );
 		GDT_NODE *rootnode = (GDT_NODE*)GDT_POINTER( _ppool, rootnode_munit );
-		gdt_json_decode_parser( _ppool, rootnode, ptokens, token_list );
+		//gdt_tokendump(_ppool,tokens_munit);
+		gdt_json_decode_parser( _ppool, rootnode, ptokens, token_list, 128 );
 	}while( false );
 	return rootnode_munit;
 }
 
-int32_t gdt_json_decode_parser( GDT_MEMORY_POOL* _ppool, GDT_NODE* node, GDT_TOKENS *ptokens, GDT_TOKEN *token_list )
+int32_t gdt_json_decode_h( GDT_MEMORY_POOL* _ppool, const char* src, int32_t hash_size )
+{
+	int32_t rootnode_munit = -1;
+	int32_t tokens_munit = -1;
+	do{
+		if( 0 >= ( tokens_munit = gdt_inittoken( _ppool ) ) ){
+			break;
+		}
+		gdt_token_analyzer( _ppool, tokens_munit, (char*)src );
+		GDT_TOKENS *ptokens = (GDT_TOKENS*)GDT_POINTER(_ppool,tokens_munit);
+		GDT_TOKEN *token_list = (GDT_TOKEN*)GDT_POINTER(_ppool,ptokens->token_munit);
+		rootnode_munit = gdt_createrootnode( _ppool );
+		GDT_NODE *rootnode = (GDT_NODE*)GDT_POINTER( _ppool, rootnode_munit );
+		//gdt_tokendump(_ppool,tokens_munit);
+		gdt_json_decode_parser( _ppool, rootnode, ptokens, token_list, hash_size );
+	}while( false );
+	return rootnode_munit;
+}
+
+int32_t gdt_json_decode_parser( GDT_MEMORY_POOL* _ppool, GDT_NODE* node, GDT_TOKENS *ptokens, GDT_TOKEN *token_list, int32_t hash_size )
 {
 	int32_t error = 0;
 	while( ptokens->workpos < ptokens->currentpos )
@@ -320,7 +351,7 @@ int32_t gdt_json_decode_parser( GDT_MEMORY_POOL* _ppool, GDT_NODE* node, GDT_TOK
 				node->id = ELEMENT_HASH;
 				ptokens->workpos++;
 				int32_t parser_child_munit = -1;
-				if( 0 >= ( parser_child_munit = gdt_json_decode_parser_hash( _ppool, node, ptokens, token_list ) ) ){
+				if( 0 >= ( parser_child_munit = gdt_json_decode_parser_hash( _ppool, node, ptokens, token_list, hash_size ) ) ){
 					break;
 				}
 				gdt_addelement( _ppool, node, ELEMENT_HASH, parser_child_munit );
@@ -347,14 +378,14 @@ int32_t gdt_json_decode_parser( GDT_MEMORY_POOL* _ppool, GDT_NODE* node, GDT_TOK
 	return error;
 }
 
-int32_t gdt_json_decode_parser_hash( GDT_MEMORY_POOL* _ppool, GDT_NODE* node, GDT_TOKENS *ptokens, GDT_TOKEN *token_list )
+int32_t gdt_json_decode_parser_hash( GDT_MEMORY_POOL* _ppool, GDT_NODE* node, GDT_TOKENS *ptokens, GDT_TOKEN *token_list, int32_t hash_size )
 {
 	int32_t working_munit = -1;
 	while( ptokens->workpos < ptokens->currentpos )
 	{
 		if( token_list[ptokens->workpos].type == ID_STR ) {
 			if( 0 >= working_munit ){
-				if( 0 >= ( working_munit = gdt_create_hash( _ppool, 128 ) ) ){
+				if( 0 >= ( working_munit = gdt_create_hash( _ppool, hash_size ) ) ){
 					printf( "create_hash is failed\n" );
 					break;
 				}
@@ -382,7 +413,7 @@ int32_t gdt_json_decode_parser_hash( GDT_MEMORY_POOL* _ppool, GDT_NODE* node, GD
 					int32_t parser_child_munit = -1;
 					int32_t hash_name_munit = token_list[ptokens->workpos].buf_munit;
 					ptokens->workpos+=3;
-					if( 0 >= ( parser_child_munit = gdt_json_decode_parser_hash( _ppool, node, ptokens, token_list ) ) ){
+					if( 0 >= ( parser_child_munit = gdt_json_decode_parser_hash( _ppool, node, ptokens, token_list, 4 ) ) ){
 						break;
 					}
 					gdt_add_hash( _ppool, working_munit, hash_name_munit, parser_child_munit, ELEMENT_HASH );
@@ -436,7 +467,7 @@ int32_t gdt_json_decode_parser_array( GDT_MEMORY_POOL* _ppool, GDT_NODE* node, G
 			else if( *((char*)GDT_POINTER(_ppool,token_list[ptokens->workpos].buf_munit)) == '{' ){
 				int32_t parser_child_munit = -1;
 				ptokens->workpos++;
-				if( 0 >= ( parser_child_munit = gdt_json_decode_parser_hash( _ppool, node, ptokens, token_list ) ) ){
+				if( 0 >= ( parser_child_munit = gdt_json_decode_parser_hash( _ppool, node, ptokens, token_list, 4 ) ) ){
 					break;
 				}
 				gdt_array_push( _ppool, &working_munit, ELEMENT_HASH, parser_child_munit );

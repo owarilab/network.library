@@ -2574,8 +2574,14 @@ void* gdt_script_system_function_json_encode( GDT_MEMORY_POOL* _ppool, void* arg
 			{
 				if( elm[0].id == ELEMENT_HASH || elm[0].id == ELEMENT_ARRAY )
 				{
-					int32_t r_munit = gdt_make_json_root( _ppool, elm[0].munit, elm[0].id ); 
+					int32_t r_munit = gdt_make_json_root( _ppool, elm[0].munit, elm[0].id );
+					if( r_munit == -1 ){
+						return pret;
+					}
 					int32_t variable_munit = gdt_json_encode( _ppool, (GDT_NODE*)GDT_POINTER( _ppool, r_munit ), 1024);
+					if( variable_munit == -1 ){
+						return pret;
+					}
 					pret->munit = variable_munit;
 					pret->id = ELEMENT_LITERAL_STR;
 				}

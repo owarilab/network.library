@@ -65,6 +65,7 @@ extern "C"{
 #define ELEMENT_HASH				22
 #define ELEMENT_HASH_OP				23
 #define ELEMENT_LITERAL_BIN			24
+#define ELEMENT_QUEUE				25
 
 typedef struct GDT_NODE
 {

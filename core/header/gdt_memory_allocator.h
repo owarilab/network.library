@@ -113,6 +113,7 @@ typedef struct GDT_MEMORY_POOL{
 	uint32_t unit_size;
 	int32_t	tail_munit;
 	int32_t lock_munit;
+	int32_t memory_buf_munit;
 	int alloc_type;
 	uint8_t endian;
 } GDT_MEMORY_POOL;

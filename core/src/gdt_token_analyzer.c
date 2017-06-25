@@ -167,8 +167,13 @@ int gdt_token_analyzer( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pst
 				if( ( *pstr >= (char)(0x81) && *pstr <= (char)(0x9f) ) || ( *pstr >= (char)(0xe0) && *pstr <= (char)(0xfc) ) )
 				{
 					int i;
-					for( i=0; i<2; i++ )
+					for( i=0; i<2; i++ ){
+						if( *pstr == '\"' ){
+							//printf( "%d %d\n",(uint8_t)(*(pstr-2)), (uint8_t)(*(pstr-1)) );
+							break;
+						}
 						*(ptoken+(tokensize++)) = *(pstr++);
+					}
 				}
 				else if( *pstr == '\\' )
 				{
@@ -214,8 +219,13 @@ int gdt_token_analyzer( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pst
 				// multi byte
 				if( ( *pstr >= (char)(0x81) && *pstr <= (char)(0x9f) ) || ( *pstr >= (char)(0xe0) && *pstr <= (char)(0xfc) ) ){
 					int i;
-					for( i=0; i<2; i++ )
+					for( i=0; i<2; i++ ){
+						if( *pstr == '\'' ){
+							printf( "%d %d\n",(uint8_t)(*(pstr-2)), (uint8_t)(*(pstr-1)) );
+							break;
+						}
 						*(ptoken+(tokensize++)) = *(pstr++);
+					}
 				}
 				else {
 					*(ptoken+(tokensize++)) = *(pstr++);
@@ -397,7 +407,7 @@ int gdt_token_analyzer( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pst
 
 int gdt_addtoken( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* tokenbuf, int* tokensize, int type )
 {
-	int allocsize = 1024;
+	int allocsize = 200000;
 	char *pbuf;
 	int tmptype;
 	int32_t tmpmunit;

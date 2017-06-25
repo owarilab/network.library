@@ -156,12 +156,16 @@ void gdt_uniqid_r64( char* idbuf, size_t size )
 	uint64_t r = 0;
 	while( i < size )
 	{
-		r = gdt_rand_64() % 35;
+		//r = gdt_rand_64() % 35;
+		r = gdt_rand_64() % 61;
 		if( r < 10 ){
 			idbuf[i++] = (int8_t)(48 + r); // 0-9
 		}
-		else{
+		else if( r < 35 ){
 			idbuf[i++] = (int8_t)(97 + ( r - 9 )); // a-z
+		}
+		else{
+			idbuf[i++] = (int8_t)(65 + ( r - 35 )); // A-Z
 		}
 	}
 	idbuf[i] = '\0';

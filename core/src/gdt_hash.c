@@ -299,6 +299,7 @@ void gdt_replace_hash_string( GDT_MEMORY_POOL* _ppool, int32_t h_munit, char* na
 	int32_t data_munit = gdt_get_hash( _ppool, h_munit, name );
 	if( data_munit > 0 ){
 		memcpy( (char*)GDT_POINTER(_ppool,data_munit), value, GDT_PUNIT_USIZE(_ppool,data_munit) );
+		*( ((char*)GDT_POINTER(_ppool,data_munit))+GDT_PUNIT_USIZE(_ppool,data_munit)-1 ) = '\0';
 	}
 }
 

@@ -1420,8 +1420,11 @@ void gdt_client_update(GDT_SOCKET_OPTION *option)
 				}
 			}
 			if (srlen == -1) {
+                //printf("srlen == -1\n");
 			}
 			else if (srlen == 0) {
+                perror("recv");
+                gdt_close_socket(&child->id, NULL);
 			}
 			else if (option->plane_recv_callback != NULL)
 			{
@@ -1477,11 +1480,11 @@ void gdt_client_update(GDT_SOCKET_OPTION *option)
 			}
 			if (child->id == -1)
 			{
+                gdt_free_sockparam(option, &child->sockparam);
 				if (option->close_callback != NULL)
 				{
 					option->close_callback((void*)child);
 				}
-				gdt_free_sockparam(option, &child->sockparam);
 			}
 		}
 	}
@@ -3640,7 +3643,7 @@ void gdt_free_sockparam( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam )
 	psockparam->tmpmsglen			= 0;
 	psockparam->tmpbitsift			= -1;
 	psockparam->appdata32bit = 0x00000000;
-	if( psockparam->buf_munit >= 0 ){
+	if( option->memory_pool != NULL && psockparam->buf_munit >= 0 ){
 		gdt_free_memory_unit( option->memory_pool, &psockparam->buf_munit );
 	}
 	psockparam->buf_munit			= -1;

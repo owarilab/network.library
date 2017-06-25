@@ -58,8 +58,8 @@ typedef struct GDT_MSG_INFO
 } GDT_MSG_INFO;
 
 void gdt_create_message_queue( GDT_MEMORY_POOL* _ppool, int32_t *q_munit, size_t qlen, size_t size );
-int gdt_push_queue( GDT_MEMORY_POOL* _ppool, int32_t q_munit, const char* pbuf, size_t size );
-int gdt_safe_push_queue( GDT_MEMORY_POOL* _ppool, int32_t q_munit, const char* pbuf, size_t size );
+int gdt_enqueue( GDT_MEMORY_POOL* _ppool, int32_t q_munit, const char* pbuf, size_t size );
+int gdt_safe_enqueue( GDT_MEMORY_POOL* _ppool, int32_t q_munit, const char* pbuf, size_t size );
 int32_t gdt_dequeue( GDT_MEMORY_POOL* _ppool, int32_t q_munit );
 
 #endif /*_GDT_QUEUE_H_*/
