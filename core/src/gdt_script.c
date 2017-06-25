@@ -32,34 +32,33 @@ int32_t gdt_init_script( GDT_MEMORY_POOL* _ppool, size_t valiablehash_size, size
 	GDT_SCRIPT *pscript;
 	int32_t munit = -1;
 	do{
-		munit = gdt_create_munit( _ppool, sizeof( GDT_SCRIPT ), MEMORY_TYPE_DEFAULT );
-		if( munit <= 0 ){
-			break;
+		if( 0 >= (munit = gdt_create_munit( _ppool, sizeof( GDT_SCRIPT ), MEMORY_TYPE_DEFAULT )) ){
+			return -1;
 		}
 		pscript = (GDT_SCRIPT *)GDT_POINTER( _ppool, munit );
 		pscript->self_munit = munit;
 		pscript->textbuf_munit = -1;
 		pscript->hash_alloc_size = 64;
 		if( 0 >= ( pscript->tokens_munit = gdt_inittoken( _ppool ) ) ){
-			break;
+			return -1;
 		}
 		if( 0 >= ( pscript->rootnode_munit = gdt_createrootnode( _ppool ) ) ){
-			break;
+			return -1;
 		}
 		if( 0 >= ( pscript->v_hash_munit = gdt_create_hash( _ppool, valiablehash_size ) ) ){
-			break;
+			return -1;
 		}
 		if( 0 >= ( pscript->f_hash_munit = gdt_create_hash( _ppool, functionhash_size ) ) ){
-			break;
+			return -1;
 		}
 		if( 0 >= ( pscript->s_hash_munit = gdt_create_array( _ppool, 128, NUMERIC_BUFFER_SIZE ) ) ){
-			break;
+			return -1;
 		}
 		if( 0 >= ( pscript->return_munit = gdt_create_munit( _ppool, sizeof( GDT_FUNCTION_RETURN ), MEMORY_TYPE_DEFAULT ) ) ){
-			break;
+			return -1;
 		}
 		if( 0 >= ( pscript->int_cache_munit = gdt_create_munit( _ppool, sizeof(int32_t) * 32, MEMORY_TYPE_DEFAULT ) ) ){
-			break;
+			return -1;
 		}
 	}while( false );
 	return munit;
@@ -377,7 +376,10 @@ int gdt_parse_array( GDT_MEMORY_POOL* _ppool, GDT_SCRIPT* pscript, GDT_NODE* nod
 		{
 			childmunit = gdt_addnodeelement( _ppool, node );
 			childnode = (GDT_NODE*)GDT_POINTER( _ppool, childmunit );
-			tmpmunit = gdt_create_munit( _ppool, 8, MEMORY_TYPE_DEFAULT );
+			if( 0 >= (tmpmunit = gdt_create_munit( _ppool, 8, MEMORY_TYPE_DEFAULT ))){
+				printf("alloc error\n");
+				return index;
+			}
 			pbuf = (char*)GDT_POINTER( _ppool, tmpmunit );
 			gdt_strcopy( pbuf, "array", GDT_PUNIT_USIZE( _ppool, tmpmunit ) );
 			gdt_addelement( _ppool, childnode, ELEMENT_ARRAY, tmpmunit );
@@ -1076,7 +1078,10 @@ int gdt_parse_if( GDT_MEMORY_POOL* _ppool, GDT_SCRIPT* pscript, GDT_NODE* node, 
 			index++;
 			if( token_list[index].type == ID_SYS_IF && token_list[index-1].type == ID_SYS_ELSE )
 			{
-				tmpmunit = gdt_create_munit( _ppool, 8, MEMORY_TYPE_DEFAULT );
+				if( 0 >= ( tmpmunit = gdt_create_munit( _ppool, 8, MEMORY_TYPE_DEFAULT ) ) ){
+					index = -1;
+					break;
+				}
 				pbuf = (char*)GDT_POINTER( _ppool, tmpmunit );
 				gdt_strcopy( pbuf, "elseif", GDT_PUNIT_USIZE( _ppool, tmpmunit ) );
 				childnode = (GDT_NODE*)GDT_POINTER( _ppool, childmunit );

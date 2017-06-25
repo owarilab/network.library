@@ -867,7 +867,6 @@ void gdt_single_task_server( GDT_SOCKET_OPTION *option )
 	char *pbuf;
 	struct GDT_SERVER_CONNECTION_INFO childinfo;
 	struct GDT_RECV_INFO* rinfo;
-	char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
 	struct sockaddr_storage from;
 	socklen_t len, srlen;
 	sock = option->sockid;
@@ -895,21 +894,14 @@ void gdt_single_task_server( GDT_SOCKET_OPTION *option )
 			}
 		}
 		else{
-			(void) getnameinfo( (struct sockaddr *) &from, len, hbuf, sizeof( hbuf ), sbuf, sizeof( sbuf ), NI_NUMERICHOST | NI_NUMERICSERV );
-#ifdef __GDT_DEBUG__
-//			printf( "accept:%s:%s\n", hbuf, sbuf );
-#endif
-			memcpy( childinfo.hbuf, hbuf, NI_MAXHOST );
-			memcpy( childinfo.sbuf, sbuf, NI_MAXSERV );
+			(void) getnameinfo( (struct sockaddr *) &from, len, childinfo.hbuf, sizeof( childinfo.hbuf ), childinfo.sbuf, sizeof( childinfo.sbuf ), NI_NUMERICHOST | NI_NUMERICSERV );
 			gdt_initialize_connection_info( option, &childinfo );
-			if( option->connection_start_callback != NULL )
-			{
+			if( option->connection_start_callback != NULL ){
 				option->connection_start_callback( (void*)&childinfo );
 			}
 			for(;;)
 			{
 				*pbuf = '\0';
-				//memset( pbuf, 0, buffer_size );
 				if( option->user_recv_function != NULL ){
 					if( -1 == ( srlen = option->user_recv_function( &childinfo, childinfo.id, pbuf, buffer_size, 0 ) ) ){
 						perror( "recv" );
@@ -968,7 +960,6 @@ void gdt_select_server( GDT_SOCKET_OPTION *option )
 	GDT_SOCKET_ID sock, acc;
 	int pfret;
 	size_t buffer_size = sizeof( char ) * ( option->recvbuffer_size );
-	char hbuf[NI_MAXHOST], sbuf[NI_MAXHOST];
 	GDT_SERVER_CONNECTION_INFO *child;
 	char* pbuf;
 	struct sockaddr_storage from;
@@ -1060,18 +1051,12 @@ void gdt_select_server( GDT_SOCKET_OPTION *option )
 							}
 						}
 						if( pos != -1 ){
-							(void) getnameinfo( (struct sockaddr *) &from, len, 
-									hbuf, sizeof( hbuf ), sbuf, sizeof( sbuf ), NI_NUMERICHOST | NI_NUMERICSERV );
-#ifdef __GDT_DEBUG__
-//							printf( "accept:%s:%s\n", hbuf, sbuf );
-#endif
 							child = (GDT_SERVER_CONNECTION_INFO*)gdt_offsetpointer( option->memory_pool,option->connection_munit, sizeof( GDT_SERVER_CONNECTION_INFO ), pos );
+							(void) getnameinfo( (struct sockaddr *) &from, len, 
+									child->hbuf, sizeof( child->hbuf ), child->sbuf, sizeof( child->sbuf ), NI_NUMERICHOST | NI_NUMERICSERV );
 							child->id = acc;
 							gdt_initialize_connection_info( option, child );
-							memcpy( child->hbuf, hbuf, NI_MAXHOST );
-							memcpy( child->sbuf, sbuf, NI_MAXSERV );
-							if( option->connection_start_callback != NULL )
-							{
+							if( option->connection_start_callback != NULL ){
 								option->connection_start_callback( (void*)child );
 							}
 						}
@@ -1086,7 +1071,6 @@ void gdt_select_server( GDT_SOCKET_OPTION *option )
 						{
 							pbuf = (char*)gdt_upointer( option->memory_pool, child->recvbuf_munit );
 							*pbuf = '\0';
-							//memset( pbuf, 0, buffer_size );
 							if( option->user_recv_function != NULL ){
 								if( -1 == ( srlen = option->user_recv_function( child, child->id, pbuf, buffer_size, 0 ) ) ){
 									perror( "recv" );
@@ -1166,7 +1150,6 @@ void gdt_server_update(GDT_SOCKET_OPTION *option)
 		return;
 	}
 	size_t buffer_size = sizeof(char) * (option->recvbuffer_size);
-	char hbuf[NI_MAXHOST], sbuf[NI_MAXHOST];
 	socklen_t srlen;
 	struct GDT_RECV_INFO *rinfo;
 	GDT_SERVER_CONNECTION_INFO *child;
@@ -1197,7 +1180,7 @@ void gdt_server_update(GDT_SOCKET_OPTION *option)
 				if (child->id == -1)
 				{
 					(void)getnameinfo((struct sockaddr *) &from, len,
-						hbuf, sizeof(hbuf), sbuf, sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV);
+						child->hbuf, sizeof(child->hbuf), child->sbuf, sizeof(child->sbuf), NI_NUMERICHOST | NI_NUMERICSERV);
 					child->id = acc;
 					child->sockparam.acc = child->id;
 					if (option->socket_type == SOKET_TYPE_SERVER_UDP){
@@ -1208,10 +1191,7 @@ void gdt_server_update(GDT_SOCKET_OPTION *option)
 					}
 					gdt_set_block(child->id, 0);
 					gdt_initialize_connection_info(option, child);
-					memcpy(child->hbuf, hbuf, NI_MAXHOST);
-					memcpy(child->sbuf, sbuf, NI_MAXSERV);
-					if (option->connection_start_callback != NULL)
-					{
+					if (option->connection_start_callback != NULL){
 						option->connection_start_callback((void*)child);
 					}
 					break;
@@ -1322,13 +1302,8 @@ void gdt_server_update(GDT_SOCKET_OPTION *option)
 		else if (option->plane_recv_callback != NULL)
 		{
 			(void)getnameinfo((struct sockaddr *) &child->sockparam.from, child->sockparam.fromlen,
-				hbuf, sizeof(hbuf), sbuf, sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV);
-#ifdef __GDT_DEBUG__
-			//printf( "recvfrom:%s:%s,len:%zu\n", hbuf, sbuf, len );
-#endif
+				child->hbuf, sizeof(child->hbuf), child->sbuf, sizeof(child->sbuf), NI_NUMERICHOST | NI_NUMERICSERV);
 			rinfo = (struct GDT_RECV_INFO *)gdt_upointer(option->memory_pool, child->recvinfo_munit);
-			memcpy(child->hbuf, hbuf, NI_MAXHOST);
-			memcpy(child->sbuf, sbuf, NI_MAXSERV);
 			rinfo->tinfo = child;
 			rinfo->recvbuf_munit = child->recvbuf_munit;
 			rinfo->recvlen = len;
@@ -1339,7 +1314,7 @@ void gdt_server_update(GDT_SOCKET_OPTION *option)
 				gdt_close_socket(&child->id, NULL);
 				break;
 			case 1:
-				option->payload_recv_callback(child->sockparam.payload_type, (uint8_t*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), rinfo->recvlen, rinfo);
+				option->plane_recv_callback((void*)rinfo);
 				if (child->sockparam.c_status == PROTOCOL_STATUS_DEFAULT)
 				{
 					gdt_close_socket(&child->id, NULL);
@@ -1352,13 +1327,8 @@ void gdt_server_update(GDT_SOCKET_OPTION *option)
 		else if (option->payload_recv_callback != NULL)
 		{
 			(void)getnameinfo((struct sockaddr *) &child->sockparam.from, child->sockparam.fromlen,
-				hbuf, sizeof(hbuf), sbuf, sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV);
-#ifdef __GDT_DEBUG__
-			//printf( "recvfrom:%s:%s,len:%zu\n", hbuf, sbuf, len );
-#endif
+				child->hbuf, sizeof(child->hbuf), child->sbuf, sizeof(child->sbuf), NI_NUMERICHOST | NI_NUMERICSERV);
 			rinfo = (struct GDT_RECV_INFO *)gdt_upointer(option->memory_pool, child->recvinfo_munit);
-			memcpy(child->hbuf, hbuf, NI_MAXHOST);
-			memcpy(child->sbuf, sbuf, NI_MAXSERV);
 			rinfo->tinfo = child;
 			rinfo->recvbuf_munit = child->recvbuf_munit;
 			rinfo->recvlen = len;

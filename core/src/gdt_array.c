@@ -55,7 +55,9 @@ int32_t gdt_create_array( GDT_MEMORY_POOL* _ppool, size_t allocsize, size_t buff
 			(elm+i)->id = 0;
 			(elm+i)->munit = -1;//gdt_create_munit( _ppool, sizeof( char ) * parray->buffer_size, MEMORY_TYPE_DEFAULT );
 			if( buffer_size > 0 ){
-				(elm+i)->buf_munit = gdt_create_munit( _ppool, sizeof( char ) * parray->buffer_size, MEMORY_TYPE_DEFAULT );
+				if( 0>= ( (elm+i)->buf_munit = gdt_create_munit( _ppool, sizeof( char ) * parray->buffer_size, MEMORY_TYPE_DEFAULT ) ) ){
+					break;
+				}
 			}
 		}
 	}while( false );
@@ -115,7 +117,10 @@ int32_t gdt_resize_array( GDT_MEMORY_POOL* _ppool, int32_t munit )
 			for( i = parray->max_size; i < parray->max_size + allocsize; i++ ){
 				(elm+i)->id = 0;
 				(elm+i)->munit = -1;
-				(elm+i)->buf_munit = gdt_create_munit( _ppool, sizeof( char ) * parray->buffer_size, MEMORY_TYPE_DEFAULT );
+				if( 0 >= ( (elm+i)->buf_munit = gdt_create_munit( _ppool, sizeof( char ) * parray->buffer_size, MEMORY_TYPE_DEFAULT ) ) ){
+					printf("gdt_resize_array error.\n");
+					break;
+				}
 				//(elm+1)->tmp_munit = -1;//gdt_create_munit( _ppool, sizeof( char ) * parray->buffer_size, MEMORY_TYPE_DEFAULT );
 			}
 			parray->max_size += allocsize;

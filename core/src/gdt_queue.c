@@ -58,11 +58,17 @@ void gdt_create_message_queue( GDT_MEMORY_POOL* _ppool, int32_t *q_munit, size_t
 			pmq->tail		= 0;
 			pmq->queuelen	= qlen;
 #ifdef __WINDOWS__
-			pmq->mqlock_munit = gdt_create_munit( _ppool, sizeof( HANDLE ), MEMORY_TYPE_DEFAULT );
+			if( 0 >= ( pmq->mqlock_munit = gdt_create_munit( _ppool, sizeof( HANDLE ), MEMORY_TYPE_DEFAULT ) ) ){
+				printf("alloc error\n");
+				break;
+			}
 			pmutex = (HANDLE *)gdt_upointer( _ppool, pmq->mqlock_munit );
 			*pmutex = CreateMutex( NULL, false , NULL );
 #else
-			pmq->mqlock_munit = gdt_create_munit( _ppool, sizeof( pthread_mutex_t ), MEMORY_TYPE_DEFAULT );
+			if( 0 >= ( pmq->mqlock_munit = gdt_create_munit( _ppool, sizeof( pthread_mutex_t ), MEMORY_TYPE_DEFAULT ) ) ){
+				printf("alloc error\n");
+				break;
+			}
 			pmutex = (pthread_mutex_t *)gdt_upointer( _ppool, pmq->mqlock_munit );
 			if( pthread_mutex_init(pmutex, NULL) != 0 ){
 				printf( "gdt_create_message_queue:pthread_mutex_init : error \n" );
