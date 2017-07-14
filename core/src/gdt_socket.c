@@ -343,12 +343,22 @@ ssize_t gdt_send( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, char *bu
 			if( ( len = gdt_send_udpmsg( option, psockparam, buf, size, payload_type, (struct sockaddr *)&psockparam->from, psockparam->fromlen ) ) == -1 )
 			{
 				perror( "send" );
+				if( option->close_callback != NULL )
+				{
+					option->close_callback( NULL );
+				}
+				gdt_free_sockparam( option, psockparam );
 			}
 		}
 		else{
 			if( ( len = gdt_sendto_all( psockparam->acc, buf, size, 0, (struct sockaddr *)&psockparam->from, psockparam->fromlen ) ) == -1 )
 			{
 				perror( "send" );
+				if( option->close_callback != NULL )
+				{
+					option->close_callback( NULL );
+				}
+				gdt_free_sockparam( option, psockparam );
 			}
 		}
 	}
@@ -360,12 +370,22 @@ ssize_t gdt_send( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, char *bu
 			if( ( len = gdt_send_msg( option, psockparam, buf, size, payload_type ) ) == -1 )
 			{
 				perror( "send" );
+				if( option->close_callback != NULL )
+				{
+					option->close_callback( NULL );
+				}
+				gdt_free_sockparam( option, psockparam );
 			}
 		}
 		else{
 			if( ( len = gdt_send_all( psockparam->acc, buf, size, 0 ) ) == -1 )
 			{
 				perror( "send" );
+				if( option->close_callback != NULL )
+				{
+					option->close_callback( NULL );
+				}
+				gdt_free_sockparam( option, psockparam );
 			}
 		}
 	}
@@ -375,6 +395,11 @@ ssize_t gdt_send( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, char *bu
 		if( ( len = gdt_send_all( psockparam->acc, buf, size, 0 ) ) == -1 )
 		{
 			perror( "send" );
+			if( option->close_callback != NULL )
+			{
+				option->close_callback( NULL );
+			}
+			gdt_free_sockparam( option, psockparam );
 		}
 	}
 	// websocket用のTCPパケットの送信
@@ -383,6 +408,11 @@ ssize_t gdt_send( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, char *bu
 		if( ( len = gdt_send_websocket_msg( option, psockparam, buf, size ) ) == -1 )
 		{
 			perror( "send" );
+			if( option->close_callback != NULL )
+			{
+				option->close_callback( NULL );
+			}
+			gdt_free_sockparam( option, psockparam );
 		}
 	}
 	else{
@@ -1229,6 +1259,8 @@ void gdt_server_update(GDT_SOCKET_OPTION *option)
 				if (srlen == -1) {
 				}
 				else if (srlen == 0) {
+					perror("recv");
+					gdt_close_socket(&child->id, NULL);
 				}
 				else if (option->plane_recv_callback != NULL)
 				{
@@ -1303,6 +1335,8 @@ void gdt_server_update(GDT_SOCKET_OPTION *option)
 		if (len == -1) {
 		}
 		else if (len == 0) {
+			perror("recv");
+			gdt_close_socket(&child->id, NULL);
 		}
 		else if (option->plane_recv_callback != NULL)
 		{
