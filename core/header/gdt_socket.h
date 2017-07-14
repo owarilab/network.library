@@ -270,6 +270,7 @@ typedef struct GDT_SOCKET_OPTION
 	GDT_USER_RECV user_recv_function;		// user call recv
 	GDT_USER_SEND user_send_function;		// user call send
 	size_t recvbuffer_size;					// recv buffer size
+	size_t sendbuffer_size;					// send buffer size
 	size_t msgbuffer_size;					// message buffer size
 	GDT_MEMORY_POOL* memory_pool;			// memory pool
 	GDT_MEMORY_POOL* mmap_memory_pool;		// mmap memory pool
@@ -301,6 +302,7 @@ void set_on_payload_recv_event( GDT_SOCKET_OPTION *option, GDT_ON_RECV func );
 void set_on_close_event( GDT_SOCKET_OPTION *option, GDT_CALLBACK func );
 void set_user_recv_event( GDT_SOCKET_OPTION *option, GDT_USER_RECV func );
 void set_user_send_event( GDT_SOCKET_OPTION *option, GDT_USER_SEND func);
+void set_message_buffer( GDT_SOCKET_OPTION *option, size_t buffer_size);
 void gdt_set_timeout_event( GDT_SOCKET_OPTION *option, GDT_CALLBACK func );
 void gdt_set_select_timeout( GDT_SOCKET_OPTION *option, int32_t sec, int32_t usec );
 

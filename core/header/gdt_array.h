@@ -54,13 +54,15 @@ typedef struct GDT_ARRAY_ELEMENT
 } GDT_ARRAY_ELEMENT;
 
 int32_t gdt_create_array( GDT_MEMORY_POOL* _ppool, size_t allocsize, size_t buffer_size );
+int32_t gdt_create_array_buffer( GDT_MEMORY_POOL* _ppool, size_t allocsize, size_t buffer_size );
 void gdt_reset_array( GDT_MEMORY_POOL* _ppool, int32_t munit );
 int32_t gdt_resize_array( GDT_MEMORY_POOL* _ppool, int32_t munit );
 int32_t gdt_next_push_munit( GDT_MEMORY_POOL* _ppool, int32_t munit );
 int32_t gdt_array_push( GDT_MEMORY_POOL* _ppool, int32_t* pmunit, int id, int32_t munit );
 int32_t gdt_array_push_integer( GDT_MEMORY_POOL* _ppool, int32_t* pmunit, int32_t value );
-GDT_ARRAY_ELEMENT* gdt_array_pop( GDT_MEMORY_POOL* _ppool, int32_t pmunit );
-int32_t gdt_array_length( GDT_MEMORY_POOL* _ppool, int32_t pmunit );
+GDT_ARRAY_ELEMENT* gdt_array_pop( GDT_MEMORY_POOL* _ppool, int32_t arraymunit );
+GDT_ARRAY_ELEMENT* gdt_array_get( GDT_MEMORY_POOL* _ppool, int32_t arraymunit, int index );
+int32_t gdt_array_length( GDT_MEMORY_POOL* _ppool, int32_t arraymunit );
 void gdt_array_dump( GDT_MEMORY_POOL* _ppool, int32_t munit, int index );
 #endif /*_GDT_ARRAY_H_*/
 

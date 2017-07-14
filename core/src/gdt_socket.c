@@ -155,7 +155,8 @@ int gdt_initialize_socket_option(
 	option->user_recv_function			= NULL;
 	option->user_send_function			= NULL;
 	option->recvbuffer_size				= 2048;
-	option->msgbuffer_size				= 2048;
+	option->sendbuffer_size				= 2048;
+	option->msgbuffer_size				= 4096;
 	option->connection_munit			= -1;
 	if( hostname == NULL ){
 		option->host_name_munit			= -1;
@@ -258,6 +259,10 @@ void gdt_set_select_timeout( GDT_SOCKET_OPTION *option, int32_t sec, int32_t use
 {
 	option->s_sec = sec;
 	option->s_usec = usec;
+}
+void set_message_buffer( GDT_SOCKET_OPTION *option, size_t buffer_size)
+{
+	option->msgbuffer_size = buffer_size;
 }
 
 int32_t gdt_make_connection_info( GDT_SOCKET_OPTION *option )
@@ -464,11 +469,11 @@ void gdt_set_sock_option( GDT_SOCKET_OPTION *option )
 		//printf( "default:SO_SNDBUF=%d\n", n );
 	}
 	(void) setsockopt( option->sockid, SOL_SOCKET, SO_RCVBUF, &option->recvbuffer_size, sizeof( option->recvbuffer_size ) );
-	(void) setsockopt( option->sockid, SOL_SOCKET, SO_SNDBUF, &option->msgbuffer_size, sizeof( option->msgbuffer_size ) );
+	(void) setsockopt( option->sockid, SOL_SOCKET, SO_SNDBUF, &option->sendbuffer_size, sizeof( option->sendbuffer_size ) );
 	(void) getsockopt( option->sockid, SOL_SOCKET, SO_RCVBUF, &option->recvbuffer_size, &len );
-	(void) getsockopt( option->sockid, SOL_SOCKET, SO_SNDBUF, &option->msgbuffer_size, &len );
+	(void) getsockopt( option->sockid, SOL_SOCKET, SO_SNDBUF, &option->sendbuffer_size, &len );
 	//printf( "default:SO_RCVBUF=%zd\n", option->recvbuffer_size );
-	//printf( "default:SO_SNDBUF=%zd\n", option->msgbuffer_size );
+	//printf( "default:SO_SNDBUF=%zd\n", option->sendbuffer_size );
 }
 
 /*
@@ -3076,16 +3081,16 @@ ssize_t gdt_parse_socket_binary( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psock
 			}
 			psockparam->payloadmask = 0x00000000;
 			startpos = psockparam->maskindex;
+			if( option->memory_pool->endian == GDT_LITTLE_ENDIAN ){
+				psockparam->payload_type = BYTE_SWAP_BIT32( *( (uint32_t*)(u8buf+psockparam->maskindex-4) ) );
+			}
+			else{
+				psockparam->payload_type = *( (uint32_t*)(u8buf+psockparam->maskindex-4) );
+			}
 		}
 		else{
 			startpos = 0;
 			cnt = psockparam->tmpmsglen;
-		}
-		if( option->memory_pool->endian == GDT_LITTLE_ENDIAN ){
-			psockparam->payload_type = BYTE_SWAP_BIT32( *( (uint32_t*)(u8buf+psockparam->maskindex-4) ) );
-		}
-		else{
-			psockparam->payload_type = *( (uint32_t*)(u8buf+psockparam->maskindex-4) );
 		}
 		for( i = startpos; i < size; i++ )
 		{

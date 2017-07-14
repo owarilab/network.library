@@ -64,6 +64,42 @@ int32_t gdt_create_array( GDT_MEMORY_POOL* _ppool, size_t allocsize, size_t buff
 	return tmpmunit;
 }
 
+int32_t gdt_create_array_buffer( GDT_MEMORY_POOL* _ppool, size_t allocsize, size_t buffer_size )
+{
+	GDT_ARRAY* parray;
+	GDT_ARRAY_ELEMENT* elm;
+	int32_t tmpmunit;
+	int i;
+	do{
+		if( 0 >= ( tmpmunit = gdt_create_munit( _ppool, sizeof( GDT_ARRAY ), MEMORY_TYPE_DEFAULT ) ) ){
+			break;
+		}
+		parray = (GDT_ARRAY*)GDT_POINTER( _ppool, tmpmunit );
+		parray->max_size = allocsize;
+		if( buffer_size != 0 && buffer_size < NUMERIC_BUFFER_SIZE ){
+			buffer_size = NUMERIC_BUFFER_SIZE;
+		}
+		parray->buffer_size = buffer_size;
+		parray->len = 0;
+		if( 0 >= ( parray->munit = gdt_create_munit( _ppool, sizeof( GDT_ARRAY_ELEMENT ) * allocsize, MEMORY_TYPE_DEFAULT ) ) ){
+			gdt_free_memory_unit( _ppool, &tmpmunit );
+			tmpmunit = -1;
+			break;
+		}
+		elm = (GDT_ARRAY_ELEMENT*)GDT_POINTER( _ppool, parray->munit );
+		for( i = 0; i < allocsize; i++ )
+		{
+			(elm+i)->id = ELEMENT_LITERAL_STR;
+			(elm+i)->munit = gdt_create_munit( _ppool, sizeof( char ) * parray->buffer_size, MEMORY_TYPE_DEFAULT );
+			parray->len++;
+			//char* pbuf = (char*)GDT_POINTER(_ppool,(elm+i)->munit);
+			//for( int j=0;j<parray->buffer_size-1;j++){*(pbuf+j) = '+';}
+			//*(pbuf+(parray->buffer_size-1)) = '\0';
+		}
+	}while( false );
+	return tmpmunit;
+}
+
 void gdt_reset_array( GDT_MEMORY_POOL* _ppool, int32_t munit )
 {
 	GDT_ARRAY* parray;
@@ -203,6 +239,20 @@ GDT_ARRAY_ELEMENT* gdt_array_pop( GDT_MEMORY_POOL* _ppool, int32_t arraymunit )
 	}
 	retelm = (GDT_ARRAY_ELEMENT*)GDT_POINTER( _ppool, parray->munit )+( parray->len-1 );
 	parray->len--;
+	return retelm;
+}
+
+GDT_ARRAY_ELEMENT* gdt_array_get( GDT_MEMORY_POOL* _ppool, int32_t arraymunit, int index )
+{
+	GDT_ARRAY_ELEMENT* retelm = NULL;
+	if( arraymunit <= 0 ){
+		return retelm;
+	}
+	GDT_ARRAY* parray = (GDT_ARRAY*)GDT_POINTER( _ppool, arraymunit );
+	if( parray == NULL || parray->len >= index ){
+		return retelm;
+	}
+	retelm = (GDT_ARRAY_ELEMENT*)GDT_POINTER( _ppool, parray->munit )+( index );
 	return retelm;
 }
 
