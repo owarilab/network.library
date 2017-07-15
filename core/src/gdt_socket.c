@@ -81,6 +81,24 @@ GDT_SOCKET_OPTION* gdt_create_tcp_client(char* hostname, char* portnum)
 	return option;
 }
 
+GDT_SOCKET_OPTION* gdt_create_udp_client(char* hostname, char* portnum)
+{
+	GDT_MEMORY_POOL* memory_pool = NULL;
+	GDT_SOCKET_OPTION *option;
+	size_t maxconnection = 1;
+	if (gdt_initialize_memory(&memory_pool, SIZE_MBYTE * 16, SIZE_MBYTE * 16, MEMORY_ALIGNMENT_SIZE_BIT_64, FIX_MUNIT_SIZE, 1, SIZE_KBYTE * 16) <= 0) {
+		printf("gdt_initialize_memory error\n");
+		return NULL;
+	}
+	int32_t option_munit = gdt_create_munit(memory_pool, sizeof(GDT_SOCKET_OPTION), MEMORY_TYPE_DEFAULT);
+	if (option_munit == -1) {
+		return NULL;
+	}
+	option = (GDT_SOCKET_OPTION*)GDT_POINTER(memory_pool, option_munit);
+	gdt_initialize_socket_option(option, hostname, portnum, SOKET_TYPE_CLIENT_UDP, SOCKET_MODE_CLIENT_NONBLOCKING, PROTOCOL_SIMPLE, maxconnection, memory_pool, NULL);
+	return option;
+}
+
 ssize_t gdt_send_message(uint32_t payload_type, char* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info)
 {
 	GDT_SOCKET_OPTION* option = (GDT_SOCKET_OPTION*)gdt_recv_info->tinfo->gdt_socket_option;
@@ -272,21 +290,34 @@ int32_t gdt_make_connection_info( GDT_SOCKET_OPTION *option )
 	{
 		int i;
 		GDT_SERVER_CONNECTION_INFO * child;
-		size_t buffer_size = sizeof( char ) * ( option->recvbuffer_size );
 		for( i = 0; i < option->maxconnection; i++ )
 		{
-			child					= (GDT_SERVER_CONNECTION_INFO *)gdt_offsetpointer( option->memory_pool, option->connection_munit, sizeof( GDT_SERVER_CONNECTION_INFO ), i );
-			child->id				= -1;
-			child->index			= i;
-			child->recvbuf_munit	= gdt_create_munit( option->memory_pool, buffer_size, MEMORY_TYPE_DEFAULT );
-			child->recvinfo_munit	= gdt_create_munit( option->memory_pool, sizeof( struct GDT_RECV_INFO ), MEMORY_TYPE_DEFAULT );
-			child->recvmsg_munit	= gdt_create_munit( option->memory_pool, sizeof( char) * ( option->msgbuffer_size ), MEMORY_TYPE_DEFAULT );
-			child->user_data_munit		= -1;
-			child->gdt_socket_option			= option;
-			gdt_init_socket_param( &child->sockparam );
+			child = (GDT_SERVER_CONNECTION_INFO *)gdt_offsetpointer( option->memory_pool, option->connection_munit, sizeof( GDT_SERVER_CONNECTION_INFO ), i );
+			gdt_make_connection_info_core(option,child,i);
 		}
 	}
 	return option->connection_munit;
+}
+
+int32_t gdt_make_connection_info_core( GDT_SOCKET_OPTION *option, GDT_SERVER_CONNECTION_INFO* tinfo, int index )
+{
+	size_t recvbuffer_size = sizeof( char ) * ( option->recvbuffer_size );
+	size_t msgbuffer_size = sizeof( char ) * ( option->msgbuffer_size );
+	tinfo->id				= -1;
+	tinfo->index			= index;
+	tinfo->user_data_munit	= -1;
+	tinfo->gdt_socket_option= option;
+	if( -1 == ( tinfo->recvbuf_munit = gdt_create_munit( option->memory_pool, recvbuffer_size, MEMORY_TYPE_DEFAULT ) ) ){
+		return GDT_SYSTEM_ERROR;
+	}
+	if( -1 == ( tinfo->recvinfo_munit = gdt_create_munit( option->memory_pool, sizeof( struct GDT_RECV_INFO ), MEMORY_TYPE_DEFAULT ) ) ){
+		return GDT_SYSTEM_ERROR;
+	}
+	if( -1 == ( tinfo->recvmsg_munit = gdt_create_munit( option->memory_pool, msgbuffer_size, MEMORY_TYPE_DEFAULT ) ) ){
+		return GDT_SYSTEM_ERROR;
+	}
+	gdt_init_socket_param( &tinfo->sockparam );
+	return GDT_SYSTEM_OK;
 }
 
 /*
@@ -338,9 +369,15 @@ ssize_t gdt_send( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, char *bu
 	// UDPパケットの送信
 	if( psockparam->type == SOCK_TYPE_NORMAL_UDP )
 	{
+		struct sockaddr* addr = NULL;
+		size_t fromlen = 0;
+		if (option->socket_type == SOKET_TYPE_SERVER_UDP) {
+			addr = (struct sockaddr *)&psockparam->from;
+			fromlen = psockparam->fromlen;
+		}
 		if( option->protocol == PROTOCOL_SIMPLE )
 		{
-			if( ( len = gdt_send_udpmsg( option, psockparam, buf, size, payload_type, (struct sockaddr *)&psockparam->from, psockparam->fromlen ) ) == -1 )
+			if( ( len = gdt_send_udpmsg( option, psockparam, buf, size, payload_type, addr, fromlen ) ) == -1 )
 			{
 				perror( "send" );
 				if( option->close_callback != NULL )
@@ -351,7 +388,7 @@ ssize_t gdt_send( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, char *bu
 			}
 		}
 		else{
-			if( ( len = gdt_sendto_all( psockparam->acc, buf, size, 0, (struct sockaddr *)&psockparam->from, psockparam->fromlen ) ) == -1 )
+			if( ( len = gdt_sendto_all( psockparam->acc, buf, size, 0, addr, fromlen ) ) == -1 )
 			{
 				perror( "send" );
 				if( option->close_callback != NULL )
@@ -465,6 +502,7 @@ ssize_t gdt_sendto_all(GDT_SOCKET_ID soc, char *buf, size_t size, int flag, stru
 		for( ptr = buf, lest = size; lest > 0; ptr += len, lest -= len )
 		{
 			if( ( len = sendto( soc, ptr, lest, flag, pfrom, fromlen ) ) == -1 )
+			//if( ( len = sendto( soc, ptr, lest, flag, NULL, 0 ) ) == -1 )
 			{
 				if( errno != EAGAIN )
 				{
@@ -890,10 +928,6 @@ void gdt_free_socket( GDT_SOCKET_OPTION *option )
 #endif
 }
 
-/*
- * single connection server mode
- * @param option
- */
 void gdt_single_task_server( GDT_SOCKET_OPTION *option )
 {
 	GDT_SOCKET_ID sock;
@@ -908,14 +942,7 @@ void gdt_single_task_server( GDT_SOCKET_OPTION *option )
 #ifdef __GDT_DEBUG__
 	printf( "gdt_single_task_server: soc=%d\n", (int)option->sockid );
 #endif
-	childinfo.id = -1;
-	childinfo.index = 0;
-	childinfo.recvbuf_munit = gdt_create_munit( option->memory_pool, buffer_size, MEMORY_TYPE_DEFAULT );
-	childinfo.recvinfo_munit = gdt_create_munit( option->memory_pool, sizeof( struct GDT_RECV_INFO ), MEMORY_TYPE_DEFAULT );
-	childinfo.recvmsg_munit = gdt_create_munit( option->memory_pool, sizeof( char) * ( option->msgbuffer_size ), MEMORY_TYPE_DEFAULT );
-	childinfo.user_data_munit = -1;
-	childinfo.gdt_socket_option			= option;
-	gdt_init_socket_param( &childinfo.sockparam );
+	gdt_make_connection_info_core(option,&childinfo,0);
 	rinfo = (struct GDT_RECV_INFO*)gdt_upointer( option->memory_pool, childinfo.recvinfo_munit );
 	pbuf = (char*)gdt_upointer( option->memory_pool, childinfo.recvbuf_munit );
 	for(;;)
@@ -986,10 +1013,6 @@ void gdt_single_task_server( GDT_SOCKET_OPTION *option )
 	}
 }
 
-/*
- * 通信処理( select多重モード )
- * @param option	: ソケットオプション
- */
 void gdt_select_server( GDT_SOCKET_OPTION *option )
 {
 	GDT_SOCKET_ID sock, acc;
@@ -1365,6 +1388,11 @@ void gdt_server_update(GDT_SOCKET_OPTION *option)
 		}
 		else if (option->payload_recv_callback != NULL)
 		{
+#ifdef __WINDOWS__
+#else
+			struct sockaddr_in* pfrom = (struct sockaddr_in*)&child->sockparam.from;
+			printf("(%d)%s:%d\n",(int)len,inet_ntoa(pfrom->sin_addr),ntohs(pfrom->sin_port));
+#endif
 			(void)getnameinfo((struct sockaddr *) &child->sockparam.from, child->sockparam.fromlen,
 				child->hbuf, sizeof(child->hbuf), child->sbuf, sizeof(child->sbuf), NI_NUMERICHOST | NI_NUMERICSERV);
 			rinfo = (struct GDT_RECV_INFO *)gdt_upointer(option->memory_pool, child->recvinfo_munit);
@@ -1527,17 +1555,83 @@ void gdt_client_update(GDT_SOCKET_OPTION *option)
 			}
 		}
 	}
-	else if (option->socket_type == SOKET_TYPE_SERVER_UDP)
+	else if (option->socket_type == SOKET_TYPE_CLIENT_UDP)
 	{
-		
+		child = (GDT_SERVER_CONNECTION_INFO*)gdt_offsetpointer(option->memory_pool, option->connection_munit, sizeof(GDT_SERVER_CONNECTION_INFO), 0);
+		child->sockparam.fromlen = sizeof(child->sockparam.from);
+		if ((srlen = recvfrom(option->sockid, (char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), buffer_size, 0, (struct sockaddr *)&child->sockparam.from, &child->sockparam.fromlen)) == -1)
+		{
+			if (errno != 0 && errno != EINTR && errno != EAGAIN) {
+				perror("recvfrom");
+			}
+			return;
+		}
+		if (srlen == -1) {
+		}
+		else if (srlen == 0) {
+			perror("recv");
+			gdt_close_socket(&child->id, NULL);
+		}
+		else if (option->plane_recv_callback != NULL)
+		{
+			(void)getnameinfo((struct sockaddr *) &child->sockparam.from, child->sockparam.fromlen,
+				child->hbuf, sizeof(child->hbuf), child->sbuf, sizeof(child->sbuf), NI_NUMERICHOST | NI_NUMERICSERV);
+			rinfo = (struct GDT_RECV_INFO *)gdt_upointer(option->memory_pool, child->recvinfo_munit);
+			rinfo->tinfo = child;
+			rinfo->recvbuf_munit = child->recvbuf_munit;
+			rinfo->recvlen = srlen;
+			rinfo->recvfrom = child->sockparam.acc;
+			switch (gdt_pre_packetfilter(option, rinfo, &child->sockparam, child->recvmsg_munit))
+			{
+			case -1:
+				gdt_close_socket(&child->id, NULL);
+				break;
+			case 1:
+				option->plane_recv_callback((void*)rinfo);
+				if (child->sockparam.c_status == PROTOCOL_STATUS_DEFAULT)
+				{
+					gdt_close_socket(&child->id, NULL);
+				}
+				break;
+			}
+			*((char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit)) = '\0';
+			//memset((char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), 0, buffer_size);
+		}
+		else if (option->payload_recv_callback != NULL)
+		{
+#ifdef __WINDOWS__
+#else
+			struct sockaddr_in* pfrom = (struct sockaddr_in*)&child->sockparam.from;
+			printf("(%d)%s:%d\n", (int)srlen, inet_ntoa(pfrom->sin_addr), ntohs(pfrom->sin_port));
+#endif
+			(void)getnameinfo((struct sockaddr *) &child->sockparam.from, child->sockparam.fromlen,
+				child->hbuf, sizeof(child->hbuf), child->sbuf, sizeof(child->sbuf), NI_NUMERICHOST | NI_NUMERICSERV);
+			rinfo = (struct GDT_RECV_INFO *)gdt_upointer(option->memory_pool, child->recvinfo_munit);
+			rinfo->tinfo = child;
+			rinfo->recvbuf_munit = child->recvbuf_munit;
+			rinfo->recvlen = srlen;
+			rinfo->recvfrom = child->sockparam.acc;
+			switch (gdt_pre_packetfilter(option, rinfo, &child->sockparam, child->recvmsg_munit))
+			{
+			case -1:
+				gdt_close_socket(&child->id, NULL);
+				break;
+			case 1:
+				option->payload_recv_callback(child->sockparam.payload_type, (uint8_t*)GDT_POINTER(option->memory_pool, rinfo->recvbuf_munit), rinfo->recvlen, rinfo);
+				if (child->sockparam.c_status == PROTOCOL_STATUS_DEFAULT)
+				{
+					gdt_close_socket(&child->id, NULL);
+				}
+				break;
+			}
+			*((char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit)) = '\0';
+			//memset((char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), 0, buffer_size);
+		}
 	}
 }
 
 #ifdef __WINDOWS__
 #else
-/*
- * 通信処理( pool多重モード )
- */
 void gdt_pool_server( GDT_SOCKET_OPTION *option )
 {
 #ifdef __GDT_DEBUG__
@@ -1718,9 +1812,6 @@ void gdt_pool_server( GDT_SOCKET_OPTION *option )
 	}
 }
 
-/*
- * 通信処理( epool多重モード )
- */
 void gdt_epool_server( GDT_SOCKET_OPTION *option )
 {
 #ifdef USE_EPOOL
@@ -2176,10 +2267,6 @@ void gdt_kqueue_server( GDT_SOCKET_OPTION *option )
 #endif
 }
 
-/*
- * サーバ通信処理( prefork )
- * @param option	: ソケットオプション
- */
 void gdt_prefork_server( GDT_SOCKET_OPTION *option )
 {
 #ifdef __GDT_DEBUG__
@@ -2250,10 +2337,6 @@ void gdt_prefork_server( GDT_SOCKET_OPTION *option )
 	}while( false );
 }
 
-/*
- * アクセプトループ(fork)
- * @param option	: ソケットオプション
- */
 void gdt_accept_loop_fork( GDT_SERVER_CONNECTION_INFO *forkinfo )
 {
 #ifdef __ANDROID__
@@ -2355,9 +2438,6 @@ void gdt_accept_loop_fork( GDT_SERVER_CONNECTION_INFO *forkinfo )
 #endif
 }
 
-/*
- * forkによる受信ループ
- */
 void gdt_recv_loop_fork( GDT_SERVER_CONNECTION_INFO *forkinfo )
 {
 #ifdef __GDT_DEBUG__
@@ -2424,9 +2504,6 @@ void gdt_recv_loop_fork( GDT_SERVER_CONNECTION_INFO *forkinfo )
 	}
 }
 
-/*
- * forkによるUDP受信ループ
- */
 void gdt_recvfrom_loop_fork( struct GDT_SERVER_CONNECTION_INFO *forkinfo )
 {
 	int pfret;
@@ -2493,10 +2570,6 @@ void gdt_recvfrom_loop_fork( struct GDT_SERVER_CONNECTION_INFO *forkinfo )
 }
 #endif
 
-/*
- * サーバ通信処理( スレッド )
- * @param option	: ソケットオプション
- */
 void gdt_thread_server( GDT_SOCKET_OPTION *option )
 {
 	int i;
@@ -2700,9 +2773,6 @@ void* gdt_accept_thread( void* arg )
 #endif
 }
 
-/*
- * threadによる受信ループ
- */
 void gdt_recv_loop_thread( struct GDT_SERVER_CONNECTION_INFO *tinfo )
 {
 	char *pbuf;
@@ -2757,9 +2827,6 @@ void gdt_recv_loop_thread( struct GDT_SERVER_CONNECTION_INFO *tinfo )
 	}
 }
 
-/*
- * threadによるUDP受信ループ
- */
 #ifdef __WINDOWS__
 unsigned __stdcall gdt_recvfrom_loop_thread( void* arg )
 #else
@@ -2887,8 +2954,9 @@ int gdt_pre_packetfilter( GDT_SOCKET_OPTION *option, struct GDT_RECV_INFO *rinfo
 				{
 					_tmpmsglen = gdt_parse_websocket_binary( option, psockparam, (uint8_t*)pbuf, rinfo->recvlen, recvmsg_munit );
 					msgpbuf = (char*)gdt_upointer( option->memory_pool, recvmsg_munit );
-					if( _tmpmsglen < 0 || msgpbuf[0] == 0x03 )
+					if( _tmpmsglen < 0 )
 					{
+						printf( "recv:EOF\n" );
 						ret = -1; // EOF
 					}
 					else{
@@ -2909,7 +2977,7 @@ int gdt_pre_packetfilter( GDT_SOCKET_OPTION *option, struct GDT_RECV_INFO *rinfo
 					{
 						_tmpmsglen = gdt_parse_socket_binary( option, psockparam, (uint8_t*)pbuf, rinfo->recvlen, recvmsg_munit );
 						msgpbuf = (char*)gdt_upointer( option->memory_pool, recvmsg_munit );
-						if( _tmpmsglen < 0 || msgpbuf[0] == 0x03 )
+						if( _tmpmsglen < 0 )
 						{
 							ret = -1; // EOF
 						}
@@ -3154,9 +3222,6 @@ ssize_t gdt_parse_socket_binary( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psock
 	return retsize;
 }
 
-/*
- * メッセージの送信
- */
 ssize_t gdt_send_msg( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, const char* msg, ssize_t size, uint32_t payload_type )
 {
 	void *sendbin;
@@ -3230,9 +3295,6 @@ ssize_t gdt_send_msg( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, cons
 	return len;
 }
 
-/*
- * UDPメッセージの送信
- */
 ssize_t gdt_send_udpmsg( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, const char* msg, ssize_t size, uint32_t payload_type, struct sockaddr *pfrom, socklen_t fromlen  )
 {
 	void *sendbin;
@@ -3466,9 +3528,6 @@ ssize_t gdt_parse_websocket_binary( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *ps
 	return retsize;
 }
 
-/*
- * websocketへメッセージの送信
- */
 ssize_t gdt_send_websocket_msg( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, const char* msg, ssize_t size )
 {
 	void *sendbin;
@@ -3623,7 +3682,6 @@ int gdt_send_handshake_param(GDT_SOCKET_ID socket, GDT_SOCKET_OPTION *option, GD
 		GDT_SERVER_CONNECTION_INFO connection;
 		connection.gdt_socket_option = option;
 		option->user_send_function(&connection, psockparam->acc, (char*)pbuffer, buffersize, 0);
-		printf("call user_send_function\n");
 	}
 	else{
 		sendlen = gdt_send_all( socket, (char*)pbuffer, buffersize, 0 );
@@ -3968,7 +4026,7 @@ void gdt_send_recv_client_term( GDT_SOCKET_OPTION *option )
 							{
 								_tmpmsglen = gdt_parse_socket_binary( option, &childinfo.sockparam, (uint8_t*)pbuf, rinfo->recvlen, childinfo.recvmsg_munit );
 								msgpbuf = (char*)gdt_upointer( option->memory_pool, childinfo.recvmsg_munit );
-								if( _tmpmsglen < 0 || msgpbuf[0] == 0x03 )
+								if( _tmpmsglen < 0 )
 								{
 									printf( "recv:EOF\n" );
 									end = 1;
@@ -4041,7 +4099,6 @@ void gdt_send_recv_client_term( GDT_SOCKET_OPTION *option )
 //	(void)system( "stty echo cooked -istrip" );
 #endif
 }
-
 
 #ifdef __WINDOWS__
 unsigned __stdcall gdt_input_thread_client( void* arg )

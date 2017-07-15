@@ -279,6 +279,7 @@ typedef struct GDT_SOCKET_OPTION
 GDT_SOCKET_OPTION* gdt_create_tcp_server(char* hostname, char* portnum);
 GDT_SOCKET_OPTION* gdt_create_udp_server(char* hostname, char* portnum);
 GDT_SOCKET_OPTION* gdt_create_tcp_client(char* hostname, char* portnum);
+GDT_SOCKET_OPTION* gdt_create_udp_client(char* hostname, char* portnum);
 ssize_t gdt_send_message(uint32_t payload_type, char* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info);
 ssize_t gdt_send_message_broadcast(uint32_t payload_type, char* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info);
 ssize_t gdt_client_send_message(uint32_t payload_type, char* payload, size_t payload_len, GDT_SOCKET_OPTION *option);
@@ -307,6 +308,7 @@ void gdt_set_timeout_event( GDT_SOCKET_OPTION *option, GDT_CALLBACK func );
 void gdt_set_select_timeout( GDT_SOCKET_OPTION *option, int32_t sec, int32_t usec );
 
 int32_t gdt_make_connection_info( GDT_SOCKET_OPTION *option );
+int32_t gdt_make_connection_info_core( GDT_SOCKET_OPTION *option, GDT_SERVER_CONNECTION_INFO* tinfo, int index );
 void gdt_initialize_connection_info( GDT_SOCKET_OPTION *option, GDT_SERVER_CONNECTION_INFO* tinfo );
 
 ssize_t gdt_send_broadcast( GDT_SOCKET_OPTION *option, char *buf, size_t size, uint32_t payload_type );
