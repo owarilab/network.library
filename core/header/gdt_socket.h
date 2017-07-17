@@ -87,6 +87,10 @@ extern "C"{
 #include <sys/types.h>
 #include <sys/stat.h>
 
+// inetflags
+#define INET_FLAG_BIT_IPV6 0x00000001
+#define INET_FLAG_BIT_CONNECT_UDP 0x00000002
+
 // sokcet type
 #define SOKET_TYPE_SERVER_TCP 1
 #define SOKET_TYPE_SERVER_UDP 2
@@ -200,9 +204,8 @@ typedef struct GDT_SERVER_CONNECTION_INFO
 	int32_t recvbuf_munit;
 	int32_t recvinfo_munit;
 	int32_t recvmsg_munit;
-	int32_t user_data_munit;
-	//GDT_SOCKET_OPTION *gdt_socket_option;
-	void *gdt_socket_option;
+	void* user_data;
+	void* gdt_socket_option;
 	GDT_SOCKPARAM sockparam;
 } GDT_SERVER_CONNECTION_INFO;
 
@@ -231,7 +234,7 @@ typedef int(*GDT_USER_SEND)( void* connection, GDT_SOCKET_ID id, char *buf, size
 
 typedef struct GDT_SOCKET_OPTION
 {
-	int inetflag;					// flags( 0:ipv4, 1:ipv6 )
+	int inetflag;					// bit flag( show inetflags )
 	int32_t host_name_munit;		// host name( char* )
 	int32_t port_num_munit;			// port num( char* )
 	int32_t connection_munit;		// connection array ( GDT_SERVER_CONNECTION_INFO* )
@@ -316,7 +319,8 @@ ssize_t gdt_send( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, char *bu
 ssize_t gdt_send_all(GDT_SOCKET_ID soc, char *buf, size_t size, int flag );
 ssize_t gdt_sendto_all(GDT_SOCKET_ID soc, char *buf, size_t size, int flag, struct sockaddr *pfrom, socklen_t fromlen );
 
-GDT_SOCKET_ID gdt_server_socket( GDT_SOCKET_OPTION *option, int inetflag );
+int gdt_get_sockaddr_info( GDT_SOCKET_OPTION *option, struct sockaddr_storage *saddr, socklen_t *addr_len );
+GDT_SOCKET_ID gdt_server_socket( GDT_SOCKET_OPTION *option, int is_ipv6 );
 GDT_SOCKET_ID gdt_client_socket( GDT_SOCKET_OPTION *option );
 void gdt_disconnect( GDT_SOCKPARAM *psockparam );
 void gdt_set_sock_option( GDT_SOCKET_OPTION *option );
@@ -353,15 +357,12 @@ void gdt_recv_loop_thread( struct GDT_SERVER_CONNECTION_INFO *tinfo );
 
 int gdt_set_block(GDT_SOCKET_ID fd, int flag );
 
-#ifdef __WINDOWS__
-#else
-int gdt_get_sockaddr_info( GDT_SOCKET_OPTION *option, struct sockaddr_storage *saddr, socklen_t *addr_len );
-#endif
 int gdt_pre_packetfilter( GDT_SOCKET_OPTION *option, struct GDT_RECV_INFO *rinfo, GDT_SOCKPARAM *psockparam, int32_t recvmsg_munit );
-
 int32_t gdt_socket_phase( GDT_SOCKET_OPTION *option, struct GDT_RECV_INFO *rinfo, GDT_SOCKPARAM *psockparam, int32_t recvmsg_munit );
 ssize_t gdt_parse_socket_binary( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, uint8_t* u8buf, size_t size, uint32_t basebuf_munit );
 ssize_t gdt_send_msg( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, const char* msg, ssize_t size, uint32_t payload_type );
+uint32_t gdt_make_size_header(uint8_t* head_ptr,ssize_t size);
+size_t gdt_make_udpmsg( void* sendbin, const char* msg, ssize_t size, uint32_t payload_type );
 ssize_t gdt_send_udpmsg( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, const char* msg, ssize_t size, uint32_t payload_type, struct sockaddr *pfrom, socklen_t fromlen );
 
 ssize_t gdt_parse_websocket_binary( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, uint8_t* u8buf, size_t size, uint32_t basebuf_munit );

@@ -92,6 +92,11 @@ extern "C"{
 	else{ *((uint32_t*)mem) = (v >> 24) | ( (v & 0x000000ff) << 24 ) | ( (v & 0x0000ff00) << 8 ) | ( (v & 0x00ff0000) >> 8 ); } \
 	mem+=4;
 
+#define MEMORY_PUSH_BIT32_B2( endian, mem, v ) \
+	if( endian==GDT_BIG_ENDIAN ){ *((uint32_t*)mem) = v; } \
+	else{ *((uint32_t*)mem) = (v >> 24) | ( (v & 0x000000ff) << 24 ) | ( (v & 0x0000ff00) << 8 ) | ( (v & 0x00ff0000) >> 8 ); } \
+	mem+=4;
+
 #define MEMORY_PUSH_CAST_BIT32_B( _ppool, mem, v ) \
 	if( _ppool->endian==GDT_BIG_ENDIAN ){ *((uint32_t*)mem) = *((uint32_t*)(&v)); } \
 	else{ *((uint32_t*)mem) = (*((uint32_t*)(&v)) >> 24) | ( (*((uint32_t*)(&v)) & 0x000000ff) << 24 ) | ( (*((uint32_t*)(&v)) & 0x0000ff00) << 8 ) | ( (*((uint32_t*)(&v)) & 0x00ff0000) >> 8 ); } \
