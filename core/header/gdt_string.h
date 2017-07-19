@@ -59,6 +59,7 @@ int gdt_utc_time( char* dest, size_t dest_size );
 int gdt_urlencode( char* dest, size_t dest_size, char* src );
 int gdt_urldecode( char* dest, size_t dest_size, char* src );
 int gdt_get_extension( char* dest, size_t dest_size, char* src );
+void gdt_print_hex( uint8_t* hex, size_t size, size_t view_max );
 
 #endif /*_GDT_STRING_H_*/
 

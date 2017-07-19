@@ -531,3 +531,18 @@ int gdt_get_extension( char* dest, size_t dest_size, char* src )
 	}
 	return error_code;
 }
+
+void gdt_print_hex( uint8_t* hex, size_t size, size_t view_max )
+{
+	if( size <= 0 || view_max <= 0 ){
+		return;
+	}
+	int i;
+	for( i = 0; i < view_max && i < size; i++ ){
+		printf("%c",*(((char*)hex)+i));
+	}
+	if( size > view_max ){
+		printf("...");
+	}
+	printf("\n");
+}

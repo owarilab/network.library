@@ -357,6 +357,7 @@ void gdt_recv_loop_thread( struct GDT_SERVER_CONNECTION_INFO *tinfo );
 
 int gdt_set_block(GDT_SOCKET_ID fd, int flag );
 
+void gdt_print_payload(uint32_t payload_type, uint8_t* payload, size_t payload_len,size_t view_max);
 int gdt_pre_packetfilter( GDT_SOCKET_OPTION *option, struct GDT_RECV_INFO *rinfo, GDT_SOCKPARAM *psockparam, int32_t recvmsg_munit );
 int32_t gdt_socket_phase( GDT_SOCKET_OPTION *option, struct GDT_RECV_INFO *rinfo, GDT_SOCKPARAM *psockparam, int32_t recvmsg_munit );
 ssize_t gdt_parse_socket_binary( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, uint8_t* u8buf, size_t size, uint32_t basebuf_munit );

@@ -3039,6 +3039,12 @@ int gdt_set_block(GDT_SOCKET_ID fd, int flag )
 	return error;
 }
 
+void gdt_print_payload(uint32_t payload_type, uint8_t* payload, size_t payload_len,size_t view_max)
+{
+	printf("(payload_type:%d,payload_len:%d)", (int)payload_type, (int)payload_len);
+	gdt_print_hex( payload, payload_len, view_max );
+}
+
 /*
  * parse recv packet
  * return int ( 0:continue, 1:call plane_recv_callback )
