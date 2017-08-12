@@ -47,9 +47,6 @@ size_t gdt_initialize_memory( GDT_MEMORY_POOL** _ppool, size_t allocate_size, si
 	GDT_MEMORY_UNIT* unit;
 	int i;
 	do{
-		if( fix_memory_unit < FIX_MUNIT_SIZE ){
-			fix_memory_unit = FIX_MUNIT_SIZE;
-		}
 		allocate_size = GDT_ALIGNUP( allocate_size, alignment_size );
 		if( ( (*_ppool) = ( GDT_MEMORY_POOL * )malloc( sizeof( GDT_MEMORY_POOL ) ) ) == NULL ){
 			printf( "_ppool allocate error\n" );
@@ -92,6 +89,11 @@ size_t gdt_initialize_memory( GDT_MEMORY_POOL** _ppool, size_t allocate_size, si
 		memory_size = (*_ppool)->size;
 	}while( FALSE );
 	return memory_size;
+}
+
+size_t gdt_initialize_memory_f64( GDT_MEMORY_POOL** _ppool, size_t allocate_size )
+{
+	return gdt_initialize_memory(_ppool, allocate_size, allocate_size, MEMORY_ALIGNMENT_SIZE_BIT_64, 0, 0, 0);
 }
 
 /*

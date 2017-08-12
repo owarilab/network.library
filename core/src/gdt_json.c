@@ -405,7 +405,8 @@ int32_t gdt_json_decode_parser_hash( GDT_MEMORY_POOL* _ppool, GDT_NODE* node, GD
 				ptokens->workpos+=2;
 			}
 			else if( token_list[ptokens->workpos+2].type == ID_NUM ){
-				gdt_add_hash( _ppool, working_munit, token_list[ptokens->workpos].buf_munit, token_list[ptokens->workpos+2].buf_munit, ELEMENT_LITERAL_STR );
+				gdt_add_hash_integer_kint(_ppool,working_munit,token_list[ptokens->workpos].buf_munit,atoi((char*)GDT_POINTER(_ppool,token_list[ptokens->workpos+2].buf_munit)));
+				//gdt_add_hash( _ppool, working_munit, token_list[ptokens->workpos].buf_munit, token_list[ptokens->workpos+2].buf_munit, ELEMENT_LITERAL_STR );
 				ptokens->workpos+=2;
 			}
 			else if( token_list[ptokens->workpos+2].type == ID_SIGN ){

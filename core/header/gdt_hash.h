@@ -54,9 +54,14 @@ typedef struct GDT_HASH_ELEMENT
 } GDT_HASH_ELEMENT;
 
 int32_t gdt_create_hash( GDT_MEMORY_POOL* _ppool, size_t hlen );
-void gdt_add_hash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, int32_t name_munit, int32_t data_munit, int32_t id );
+int32_t gdt_add_hash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, int32_t name_munit, int32_t data_munit, int32_t id );
+int32_t gdt_make_hash_name( GDT_MEMORY_POOL* _ppool, int32_t h_munit,char* name);
+void gdt_add_hash_array_string( GDT_MEMORY_POOL* _ppool, int32_t h_munit, char* name, char* value );
+void gdt_add_hash_array_empty_string( GDT_MEMORY_POOL* _ppool, int32_t h_munit, char* name, size_t size );
+void gdt_add_hash_binary( GDT_MEMORY_POOL* _ppool, int32_t h_munit, char* name, uint8_t* binary, size_t size );
 void gdt_add_hash_value( GDT_MEMORY_POOL* _ppool, int32_t h_munit, char* name, char* value, int32_t id );
 void gdt_add_hash_integer( GDT_MEMORY_POOL* _ppool, int32_t h_munit, char* name, int32_t value );
+void gdt_add_hash_integer_kint( GDT_MEMORY_POOL* _ppool, int32_t h_munit, int32_t name_munit, int32_t value );
 void gdt_add_hash_string( GDT_MEMORY_POOL* _ppool, int32_t h_munit, char* name, char* value );
 void gdt_add_hash_value_kstring( GDT_MEMORY_POOL* _ppool, int32_t h_munit, char* name, int32_t data_munit, int32_t id );
 void gdt_add_hash_emptystring( GDT_MEMORY_POOL* _ppool, int32_t h_munit, char* name, size_t string_size );
@@ -64,7 +69,7 @@ int32_t gdt_get_hash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, char* hashname )
 int32_t gdt_get_hash_fix_ihash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, char* hashname, uint32_t hashkey );
 int32_t gdt_get_hash_core( GDT_MEMORY_POOL* _ppool, struct GDT_HASH *hash, GDT_HASH *hashchild, char* hashname, uint32_t hashkey );
 void gdt_clear_hash_string( GDT_MEMORY_POOL* _ppool, int32_t h_munit, char* name );
-void gdt_replace_hash_string( GDT_MEMORY_POOL* _ppool, int32_t h_munit, char* name, char* value );
+int32_t gdt_replace_hash_string( GDT_MEMORY_POOL* _ppool, int32_t h_munit, char* name, char* value );
 int32_t gdt_get_hash_name( GDT_MEMORY_POOL* _ppool, int32_t h_munit, char* hashname );
 int32_t gdt_get_hash_id( GDT_MEMORY_POOL* _ppool, int32_t h_munit, char* hashname );
 void gdt_dump_hash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, int index );

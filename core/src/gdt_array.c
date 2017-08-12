@@ -139,7 +139,7 @@ int32_t gdt_resize_array( GDT_MEMORY_POOL* _ppool, int32_t munit )
 			GDT_ARRAY_ELEMENT* elm;
 			int32_t tmpmunit = gdt_create_munit( _ppool, sizeof( GDT_ARRAY_ELEMENT ) * ( parray->max_size + allocsize ), MEMORY_TYPE_DEFAULT );
 			if( tmpmunit <= 0 ){
-				printf("gdt_resize_array error.\n");
+				printf("gdt_resize_array error. %d\n",(int)(parray->max_size + allocsize));
 				return munit;
 			}
 			memcpy( 
@@ -153,10 +153,12 @@ int32_t gdt_resize_array( GDT_MEMORY_POOL* _ppool, int32_t munit )
 			for( i = parray->max_size; i < parray->max_size + allocsize; i++ ){
 				(elm+i)->id = 0;
 				(elm+i)->munit = -1;
-				if( 0 >= ( (elm+i)->buf_munit = gdt_create_munit( _ppool, sizeof( char ) * parray->buffer_size, MEMORY_TYPE_DEFAULT ) ) ){
-					printf("gdt_resize_array init error.\n");
-					munit = -1;
-					return munit;
+				if( parray->buffer_size > 0 ){
+					if( 0 >= ( (elm+i)->buf_munit = gdt_create_munit( _ppool, sizeof( char ) * parray->buffer_size, MEMORY_TYPE_DEFAULT ) ) ){
+						printf("gdt_resize_array init error.\n");
+						munit = -1;
+						return munit;
+					}
 				}
 				//(elm+1)->tmp_munit = -1;//gdt_create_munit( _ppool, sizeof( char ) * parray->buffer_size, MEMORY_TYPE_DEFAULT );
 			}
@@ -223,6 +225,65 @@ int32_t gdt_array_push_integer( GDT_MEMORY_POOL* _ppool, int32_t* pmunit, int32_
 	elm[parray->len].munit = elm[parray->len].buf_munit;
 	gdt_itoa( value, (char*)GDT_POINTER(_ppool,elm[parray->len].munit), gdt_usize(_ppool,elm[parray->len].munit) );
 	(*(int32_t*)(GDT_POINTER(_ppool,elm[parray->len].munit)+gdt_usize(_ppool,elm[parray->len].munit)-sizeof(int32_t))) = value;
+	parray->len++;
+	return GDT_SYSTEM_OK;
+}
+
+int32_t gdt_array_push_string( GDT_MEMORY_POOL* _ppool, int32_t* pmunit, char* value )
+{
+	GDT_ARRAY* parray;
+	GDT_ARRAY_ELEMENT* elm;
+	(*pmunit) = gdt_resize_array( _ppool, (*pmunit) );
+	parray = (GDT_ARRAY*)GDT_POINTER( _ppool, (*pmunit) );
+	elm = (GDT_ARRAY_ELEMENT*)GDT_POINTER( _ppool, parray->munit );
+	if( parray->len >= parray->max_size ){
+		return GDT_SYSTEM_ERROR;
+	}
+	elm[parray->len].id = ELEMENT_LITERAL_STR;
+	if( elm[parray->len].munit == -1 )
+	{
+		if( 0 >= ( elm[parray->len].munit = gdt_create_munit( _ppool, strlen(value)+1, MEMORY_TYPE_DEFAULT ) ) ){
+			return GDT_SYSTEM_ERROR;
+		}
+	}
+	else{
+		if( gdt_usize(_ppool,elm[parray->len].munit) <= strlen(value)+1 ){
+			if( 0 >= ( elm[parray->len].munit = gdt_create_munit( _ppool, strlen(value)+1, MEMORY_TYPE_DEFAULT ) ) ){
+				return GDT_SYSTEM_ERROR;
+			}
+		}
+	}
+	memcpy( (char*)GDT_POINTER(_ppool,elm[parray->len].munit),value,strlen(value));
+	*((char*)GDT_POINTER(_ppool,elm[parray->len].munit)+(strlen(value))) = '\0';
+	parray->len++;
+	return GDT_SYSTEM_OK;
+}
+
+int32_t gdt_array_push_empty_string( GDT_MEMORY_POOL* _ppool, int32_t* pmunit, size_t size )
+{
+	GDT_ARRAY* parray;
+	GDT_ARRAY_ELEMENT* elm;
+	(*pmunit) = gdt_resize_array( _ppool, (*pmunit) );
+	parray = (GDT_ARRAY*)GDT_POINTER( _ppool, (*pmunit) );
+	elm = (GDT_ARRAY_ELEMENT*)GDT_POINTER( _ppool, parray->munit );
+	if( parray->len >= parray->max_size ){
+		return GDT_SYSTEM_ERROR;
+	}
+	elm[parray->len].id = ELEMENT_LITERAL_STR;
+	if( elm[parray->len].munit == -1 )
+	{
+		if( 0 >= ( elm[parray->len].munit = gdt_create_munit( _ppool, size, MEMORY_TYPE_DEFAULT ) ) ){
+			return GDT_SYSTEM_ERROR;
+		}
+	}
+	else{
+		if( gdt_usize(_ppool,elm[parray->len].munit) <= size ){
+			if( 0 >= ( elm[parray->len].munit = gdt_create_munit( _ppool, size, MEMORY_TYPE_DEFAULT ) ) ){
+				return GDT_SYSTEM_ERROR;
+			}
+		}
+	}
+	*((char*)GDT_POINTER(_ppool,elm[parray->len].munit)) = '\0';
 	parray->len++;
 	return GDT_SYSTEM_OK;
 }

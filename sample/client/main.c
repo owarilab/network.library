@@ -26,23 +26,23 @@
  */
 
 #include "gdt_socket.h"
-void* on_connect(void* arg);
+int on_connect(GDT_SERVER_CONNECTION_INFO* connection);
 int32_t on_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info );
-void* on_close(void* arg);
+int on_close(GDT_SERVER_CONNECTION_INFO* connection);
 
 int main( int argc, char *argv[], char *envp[] )
 {
-	GDT_SOCKET_OPTION* option = gdt_create_tcp_client("localhost", "5001");
+	GDT_SOCKET_OPTION* option = gdt_create_tcp_client("localhost", "52001");
 	set_on_connect_event(option,on_connect);
 	set_on_payload_recv_event(option,on_recv);
 	set_on_close_event(option,on_close);
 	gdt_socket(option);
 	while(1){
-		usleep(1000);
+		usleep(10000);
 		gdt_client_send_message(0x01,"test",4,option);
-		usleep(1000);
+		usleep(10000);
 		gdt_client_send_message(0x02,"test",4,option);
-		usleep(1000);
+		usleep(10000);
 		gdt_client_send_message(0x03,"test",4,option);
 	}
 	gdt_free_socket(option);
@@ -50,9 +50,10 @@ int main( int argc, char *argv[], char *envp[] )
 	return 0;
 }
 
-void* on_connect(void* arg)
+int on_connect(GDT_SERVER_CONNECTION_INFO* connection)
 {
-	return (void*)NULL;
+	printf("on_connect\n");
+	return 0;
 }
 
 int32_t on_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info )
@@ -60,8 +61,9 @@ int32_t on_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, GDT
 	return 0;
 }
 
-void* on_close(void* arg)
+int on_close(GDT_SERVER_CONNECTION_INFO* connection)
 {
-	return (void*)NULL;
+	printf("on_close\n");
+	return 0;
 }
 

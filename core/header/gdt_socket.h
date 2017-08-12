@@ -226,11 +226,12 @@ typedef struct GDT_SEND_INFO
 
 // event callback
 typedef void* (*GDT_CALLBACK)( void* args );
+typedef int (*GDT_CONNECTION_EVENT_CALLBACK)( GDT_SERVER_CONNECTION_INFO* connection );
 typedef int32_t (*GDT_ON_RECV)(uint32_t payload_type, uint8_t* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info );
 // recv call callback
 typedef int (*GDT_USER_RECV)( void* connection, GDT_SOCKET_ID id, char* buf, size_t buffer_size, int flag );
 // send call callback
-typedef int(*GDT_USER_SEND)( void* connection, GDT_SOCKET_ID id, char *buf, size_t buffer_size, int flag );
+typedef int (*GDT_USER_SEND)( void* connection, GDT_SOCKET_ID id, char *buf, size_t buffer_size, int flag );
 
 typedef struct GDT_SOCKET_OPTION
 {
@@ -264,10 +265,10 @@ typedef struct GDT_SOCKET_OPTION
 	int32_t t_sec;							// connection timeout (sec)
 	int32_t s_sec;							// timeout( select, pool, epool )
 	int32_t s_usec;							// timeout( select, pool, epool )
-	GDT_CALLBACK connection_start_callback;	// callback pointer
+	GDT_CONNECTION_EVENT_CALLBACK connection_start_callback;	// callback pointer
 	GDT_CALLBACK send_finish_callback;		// callback pointer
 	GDT_CALLBACK plane_recv_callback;		// callback pointer
-	GDT_CALLBACK close_callback;			// callback pointer
+	GDT_CONNECTION_EVENT_CALLBACK close_callback;			// callback pointer
 	GDT_CALLBACK timeout_callback;			// callback pointer
 	GDT_ON_RECV payload_recv_callback;
 	GDT_USER_RECV user_recv_function;		// user call recv
@@ -285,6 +286,7 @@ GDT_SOCKET_OPTION* gdt_create_tcp_client(char* hostname, char* portnum);
 GDT_SOCKET_OPTION* gdt_create_udp_client(char* hostname, char* portnum);
 ssize_t gdt_send_message(uint32_t payload_type, char* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info);
 ssize_t gdt_send_message_broadcast(uint32_t payload_type, char* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info);
+ssize_t gdt_send_message_multicast(uint32_t payload_type, char* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info, GDT_MEMORY_POOL* array_memory, int32_t array_munit);
 ssize_t gdt_client_send_message(uint32_t payload_type, char* payload, size_t payload_len, GDT_SOCKET_OPTION *option);
 
 int gdt_initialize_socket_option( 
@@ -299,11 +301,11 @@ int gdt_initialize_socket_option(
 	, GDT_MEMORY_POOL* mmap_memory_pool
 );
 
-void set_on_connect_event( GDT_SOCKET_OPTION *option, GDT_CALLBACK func );
+void set_on_connect_event( GDT_SOCKET_OPTION *option, GDT_CONNECTION_EVENT_CALLBACK func );
 void set_on_sent_event( GDT_SOCKET_OPTION *option, GDT_CALLBACK func );
 void set_on_packet_recv_event( GDT_SOCKET_OPTION *option, GDT_CALLBACK func );
 void set_on_payload_recv_event( GDT_SOCKET_OPTION *option, GDT_ON_RECV func );
-void set_on_close_event( GDT_SOCKET_OPTION *option, GDT_CALLBACK func );
+void set_on_close_event( GDT_SOCKET_OPTION *option, GDT_CONNECTION_EVENT_CALLBACK func );
 void set_user_recv_event( GDT_SOCKET_OPTION *option, GDT_USER_RECV func );
 void set_user_send_event( GDT_SOCKET_OPTION *option, GDT_USER_SEND func);
 void set_message_buffer( GDT_SOCKET_OPTION *option, size_t buffer_size);

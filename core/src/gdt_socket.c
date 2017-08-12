@@ -101,13 +101,19 @@ GDT_SOCKET_OPTION* gdt_create_udp_client(char* hostname, char* portnum)
 
 ssize_t gdt_send_message(uint32_t payload_type, char* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info)
 {
+	ssize_t ret = 0;
 	GDT_SOCKET_OPTION* option = (GDT_SOCKET_OPTION*)gdt_recv_info->tinfo->gdt_socket_option;
 	if( option != NULL ){
 		if( gdt_recv_info->tinfo->sockparam.acc != -1 ){
-			return gdt_send(option, &gdt_recv_info->tinfo->sockparam, payload, payload_len, payload_type);
+			if( -1 == ( ret = gdt_send(option, &gdt_recv_info->tinfo->sockparam, payload, payload_len, payload_type) ) ){
+				if( option->close_callback != NULL ){
+					option->close_callback( gdt_recv_info->tinfo );
+				}
+				gdt_free_sockparam( option, &gdt_recv_info->tinfo->sockparam );
+			}
 		}
 	}
-	return 0;
+	return ret;
 }
 
 ssize_t gdt_send_message_broadcast(uint32_t payload_type, char* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info)
@@ -119,19 +125,65 @@ ssize_t gdt_send_message_broadcast(uint32_t payload_type, char* payload, size_t 
 	return 0;
 }
 
+ssize_t gdt_send_message_multicast(uint32_t payload_type, char* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info, GDT_MEMORY_POOL* array_memory, int32_t array_munit)
+{
+	ssize_t ret = 0;
+	if( array_munit == -1 ){
+		return ret;
+	}
+	GDT_SOCKET_OPTION *option = (GDT_SOCKET_OPTION*)gdt_recv_info->tinfo->gdt_socket_option;
+	if( option->connection_munit <= 0 ){
+		return ret;
+	}
+	GDT_ARRAY* parray;
+	GDT_ARRAY_ELEMENT* elm;
+	int i;
+	char* pbuf;
+	parray = (GDT_ARRAY*)GDT_POINTER( array_memory, array_munit );
+	elm = (GDT_ARRAY_ELEMENT*)GDT_POINTER( array_memory, parray->munit );
+	for( i = 0; i < parray->len; i++ )
+	{
+		pbuf = (char*)GDT_POINTER(array_memory,(elm+i)->munit);
+		if( strcmp(pbuf,"") ){
+			int offset = atoi(pbuf);
+			GDT_SERVER_CONNECTION_INFO *tmptinfo;
+			if( offset >= 0 && offset < option->maxconnection )
+			{
+				tmptinfo = gdt_offsetpointer( option->memory_pool, option->connection_munit, sizeof( GDT_SERVER_CONNECTION_INFO ), offset );
+				if( tmptinfo->sockparam.acc > 0 )
+				{
+					if( -1 == ( ret = gdt_send( option, &tmptinfo->sockparam, payload, payload_len, payload_type ) ) ){
+						if( option->close_callback != NULL ){
+							option->close_callback( tmptinfo );
+						}
+						gdt_free_sockparam( option, &tmptinfo->sockparam );
+					}
+				}
+			}
+		}
+	}
+	return ret;
+}
+
 ssize_t gdt_client_send_message(uint32_t payload_type, char* payload, size_t payload_len, GDT_SOCKET_OPTION *option)
 {
+	ssize_t ret = 0;
     if( option == NULL ){
-        return 0;
+        return ret;
     }
 	if( option->connection_munit != -1 )
 	{
 		GDT_SERVER_CONNECTION_INFO* gdt_connection_info = (GDT_SERVER_CONNECTION_INFO*)GDT_POINTER(option->memory_pool, option->connection_munit);
 		if( gdt_connection_info != NULL && gdt_connection_info->sockparam.acc != -1 ){
-			return gdt_send(option, &gdt_connection_info->sockparam, payload, payload_len, payload_type);
+			if( -1 == ( ret = gdt_send(option, &gdt_connection_info->sockparam, payload, payload_len, payload_type) ) ){
+				if( option->close_callback != NULL ){
+					option->close_callback( gdt_connection_info );
+				}
+				gdt_free_sockparam( option, &gdt_connection_info->sockparam );
+			}
 		}
 	}
-	return 0;
+	return ret;
 }
 
 /*
@@ -241,7 +293,7 @@ int gdt_initialize_socket_option(
 	return result;
 }
 
-void set_on_connect_event( GDT_SOCKET_OPTION *option, GDT_CALLBACK func )
+void set_on_connect_event( GDT_SOCKET_OPTION *option, GDT_CONNECTION_EVENT_CALLBACK func )
 {
 	option->connection_start_callback = func;
 }
@@ -257,7 +309,7 @@ void set_on_payload_recv_event( GDT_SOCKET_OPTION *option, GDT_ON_RECV func )
 {
 	option->payload_recv_callback = func;
 }
-void set_on_close_event( GDT_SOCKET_OPTION *option, GDT_CALLBACK func )
+void set_on_close_event( GDT_SOCKET_OPTION *option, GDT_CONNECTION_EVENT_CALLBACK func )
 {
 	option->close_callback = func;
 }
@@ -353,7 +405,12 @@ ssize_t gdt_send_broadcast( GDT_SOCKET_OPTION *option, char *buf, size_t size, u
 			tmptinfo = gdt_offsetpointer( option->memory_pool, option->connection_munit, sizeof( GDT_SERVER_CONNECTION_INFO ), i );
 			if( tmptinfo->sockparam.acc > 0 )
 			{
-				ret = gdt_send( option, &tmptinfo->sockparam, buf, size, payload_type );
+				if( -1 == ( ret = gdt_send( option, &tmptinfo->sockparam, buf, size, payload_type ) ) ){
+					if( option->close_callback != NULL ){
+						option->close_callback( tmptinfo );
+					}
+					gdt_free_sockparam( option, &tmptinfo->sockparam );
+				}
 			}
 		}
 	}
@@ -366,7 +423,7 @@ ssize_t gdt_send_broadcast( GDT_SOCKET_OPTION *option, char *buf, size_t size, u
 ssize_t gdt_send( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, char *buf, size_t size, uint32_t payload_type )
 {
 	ssize_t len = 0;
-	// UDPパケットの送信
+	int error_code = GDT_SYSTEM_OK;
 	if( psockparam->type == SOCK_TYPE_NORMAL_UDP )
 	{
 		struct sockaddr* addr = NULL;
@@ -393,26 +450,17 @@ ssize_t gdt_send( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, char *bu
 			if( ( len = gdt_send_udpmsg( option, psockparam, buf, size, payload_type, addr, fromlen ) ) == -1 )
 			{
 				perror( "gdt_send_udpmsg" );
-				if( option->close_callback != NULL )
-				{
-					option->close_callback( NULL );
-				}
-				gdt_free_sockparam( option, psockparam );
+				error_code = GDT_SYSTEM_ERROR;
 			}
 		}
 		else{
 			if( ( len = gdt_sendto_all( psockparam->acc, buf, size, 0, addr, fromlen ) ) == -1 )
 			{
 				perror( "gdt_sendto_all" );
-				if( option->close_callback != NULL )
-				{
-					option->close_callback( NULL );
-				}
-				gdt_free_sockparam( option, psockparam );
+				error_code = GDT_SYSTEM_ERROR;
 			}
 		}
 	}
-	// TCPパケットの送信
 	else if( psockparam->type == SOCK_TYPE_NORMAL )
 	{
 		if( option->protocol == PROTOCOL_SIMPLE )
@@ -420,59 +468,50 @@ ssize_t gdt_send( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, char *bu
 			if( ( len = gdt_send_msg( option, psockparam, buf, size, payload_type ) ) == -1 )
 			{
 				perror( "gdt_send_msg" );
-				if( option->close_callback != NULL )
-				{
-					option->close_callback( NULL );
-				}
-				gdt_free_sockparam( option, psockparam );
+				error_code = GDT_SYSTEM_ERROR;
 			}
 		}
 		else{
 			if( ( len = gdt_send_all( psockparam->acc, buf, size, 0 ) ) == -1 )
 			{
 				perror( "gdt_send_all" );
-				if( option->close_callback != NULL )
-				{
-					option->close_callback( NULL );
-				}
-				gdt_free_sockparam( option, psockparam );
+				error_code = GDT_SYSTEM_ERROR;
 			}
 		}
 	}
-	// http用のTCPパケットの送信
 	else if( psockparam->type == SOCK_TYPE_HTTP )
 	{
 		if( ( len = gdt_send_all( psockparam->acc, buf, size, 0 ) ) == -1 )
 		{
 			perror( "gdt_send_all" );
-			if( option->close_callback != NULL )
-			{
-				option->close_callback( NULL );
-			}
-			gdt_free_sockparam( option, psockparam );
+			error_code = GDT_SYSTEM_ERROR;
 		}
 	}
-	// websocket用のTCPパケットの送信
 	else if( psockparam->type == SOCK_TYPE_WEBSOCKET )
 	{
 		if( ( len = gdt_send_websocket_msg( option, psockparam, buf, size ) ) == -1 )
 		{
 			perror( "gdt_send_websocket_msg" );
-			if( option->close_callback != NULL )
-			{
-				option->close_callback( NULL );
-			}
-			gdt_free_sockparam( option, psockparam );
+			error_code = GDT_SYSTEM_ERROR;
 		}
 	}
 	else{
 		perror( "invalid send protocol" );
+		len = -1;
+		error_code = GDT_SYSTEM_ERROR;
 	}
-	// 送信完了完了コールバック関数の呼び出し
-	if( option->send_finish_callback != NULL )
-	{
-		option->send_finish_callback( (void*)psockparam );
+	if( error_code == GDT_SYSTEM_OK ){
+		if( option->send_finish_callback != NULL ){
+			option->send_finish_callback( (void*)psockparam );
+		}
 	}
+//	else{
+//		if( option->close_callback != NULL )
+//		{
+//			option->close_callback( NULL );
+//		}
+//		gdt_free_sockparam( option, psockparam );
+//	}
 	return len;
 }
 
@@ -1100,7 +1139,7 @@ void gdt_single_task_server( GDT_SOCKET_OPTION *option )
 			}
 			if( option->close_callback != NULL )
 			{
-				option->close_callback( (void*)&childinfo );
+				option->close_callback( &childinfo );
 			}
 			gdt_close_socket( &childinfo.id, NULL ); 
 			gdt_free_sockparam( option, &childinfo.sockparam );
@@ -1264,7 +1303,7 @@ void gdt_select_server( GDT_SOCKET_OPTION *option )
 						{
 							if( option->close_callback != NULL )
 							{
-								option->close_callback( (void*)child );
+								option->close_callback( child );
 							}
 							gdt_free_sockparam( option, &child->sockparam );
 						}
@@ -1432,7 +1471,7 @@ void gdt_server_update(GDT_SOCKET_OPTION *option)
 				{
 					if (option->close_callback != NULL)
 					{
-						option->close_callback((void*)child);
+						option->close_callback(child);
 					}
 					gdt_free_sockparam(option, &child->sockparam);
 				}
@@ -1642,10 +1681,10 @@ void gdt_client_update(GDT_SOCKET_OPTION *option)
 			}
 			if (child->id == -1)
 			{
-                gdt_free_sockparam(option, &child->sockparam);
+				gdt_free_sockparam(option, &child->sockparam);
 				if (option->close_callback != NULL)
 				{
-					option->close_callback((void*)child);
+					option->close_callback(child);
 				}
 			}
 		}
@@ -1907,7 +1946,7 @@ void gdt_pool_server( GDT_SOCKET_OPTION *option )
 						{
 							if( option->close_callback != NULL )
 							{
-								option->close_callback( (void*)&child[cpos] );
+								option->close_callback( &child[cpos] );
 							}
 							gdt_free_sockparam( option, &child[cpos].sockparam );
 						}
@@ -2127,7 +2166,7 @@ void gdt_epool_server( GDT_SOCKET_OPTION *option )
 						{
 							if( option->close_callback != NULL )
 							{
-								option->close_callback( (void*)&child[cpos] );
+								option->close_callback( &child[cpos] );
 							}
 							gdt_free_sockparam( option, &child[cpos].sockparam );
 						}
@@ -2359,7 +2398,7 @@ void gdt_kqueue_server( GDT_SOCKET_OPTION *option )
 						{
 							if( option->close_callback != NULL )
 							{
-								option->close_callback( (void*)&child[cpos] );
+								option->close_callback( &child[cpos] );
 							}
 							gdt_free_sockparam( option, &child[cpos].sockparam );
 						}
@@ -2606,7 +2645,7 @@ void gdt_recv_loop_fork( GDT_SERVER_CONNECTION_INFO *forkinfo )
 	}
 	if( option->close_callback != NULL )
 	{
-		option->close_callback( (void*)forkinfo );
+		option->close_callback( forkinfo );
 	}
 }
 
@@ -2670,7 +2709,7 @@ void gdt_recvfrom_loop_fork( struct GDT_SERVER_CONNECTION_INFO *forkinfo )
 		}
 		if( option->close_callback != NULL )
 		{
-			option->close_callback( (void*)forkinfo );
+			option->close_callback( forkinfo );
 		}
 	}
 }
@@ -2929,7 +2968,7 @@ void gdt_recv_loop_thread( struct GDT_SERVER_CONNECTION_INFO *tinfo )
 	}
 	if( option->close_callback != NULL )
 	{
-		option->close_callback( (void*)tinfo );
+		option->close_callback( tinfo );
 	}
 }
 
@@ -2997,7 +3036,7 @@ void* gdt_recvfrom_loop_thread( void* arg )
 	}
 	if( option->close_callback != NULL )
 	{
-		option->close_callback( (void*)tinfo );
+		option->close_callback( tinfo );
 	}
 	gdt_free_sockparam( option, &tinfo->sockparam );
 #ifdef __WINDOWS__
@@ -3932,7 +3971,9 @@ int gdt_parse_http( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, char* 
 				printf("call user_send_function\n");
 			}
 			else{
-				gdt_send( option, psockparam, msg, gdt_strlen( msg ), 0 );
+				if( -1 == gdt_send( option, psockparam, msg, gdt_strlen( msg ), 0 ) ){
+					printf("http send error\n");
+				}
 			}
 			method = -1;
 			break;
