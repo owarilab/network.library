@@ -39,7 +39,7 @@ int32_t gdt_init_script( GDT_MEMORY_POOL* _ppool, size_t valiablehash_size, size
 		pscript->self_munit = munit;
 		pscript->textbuf_munit = -1;
 		pscript->hash_alloc_size = 64;
-		if( 0 >= ( pscript->tokens_munit = gdt_inittoken( _ppool ) ) ){
+		if( 0 >= ( pscript->tokens_munit = gdt_inittoken( _ppool, 5000 ) ) ){
 			return -1;
 		}
 		if( 0 >= ( pscript->rootnode_munit = gdt_createrootnode( _ppool ) ) ){

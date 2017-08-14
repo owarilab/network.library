@@ -266,18 +266,54 @@ int gdt_add_json_element( GDT_MEMORY_POOL* _ppool, int32_t buf_munit, char* src,
 			for (i = 0; i < src_size; i++) {
 				switch (*(src + i))
 				{
-				case '\"':
+				case '"':
+					*(pbuf++) = '\\';
+					*(pbuf++) = '"';
+					addlen += 2;
+					break;
 				case '\'':
+					*(pbuf++) = '\\';
+					*(pbuf++) = '\'';
+					addlen += 2;
+					break;
 				case '\a':
+					*(pbuf++) = '\\';
+					*(pbuf++) = 'a';
+					addlen += 2;
+					break;
 				case '\b':
+					*(pbuf++) = '\\';
+					*(pbuf++) = 'b';
+					addlen += 2;
+					break;
 				case '\n':
+					*(pbuf++) = '\\';
+					*(pbuf++) = 'n';
+					addlen += 2;
+					break;
 				case '\r':
+					*(pbuf++) = '\\';
+					*(pbuf++) = 'r';
+					addlen += 2;
+					break;
 				case '\f':
+					*(pbuf++) = '\\';
+					*(pbuf++) = 'f';
+					addlen += 2;
+					break;
 				case '\t':
+					*(pbuf++) = '\\';
+					*(pbuf++) = 't';
+					addlen += 2;
+					break;
 				case '\v':
+					*(pbuf++) = '\\';
+					*(pbuf++) = 'v';
+					addlen += 2;
+					break;
 				case '\\':
 					*(pbuf++) = '\\';
-					*(pbuf++) = *(src + i);
+					*(pbuf++) = '\\';
 					addlen += 2;
 					break;
 				default:
@@ -305,7 +341,7 @@ int32_t gdt_json_decode( GDT_MEMORY_POOL* _ppool, const char* src )
 	int32_t rootnode_munit = -1;
 	int32_t tokens_munit = -1;
 	do{
-		if( 0 >= ( tokens_munit = gdt_inittoken( _ppool ) ) ){
+		if( 0 >= ( tokens_munit = gdt_inittoken( _ppool, 10000 ) ) ){
 			break;
 		}
 		gdt_token_analyzer( _ppool, tokens_munit, (char*)src );
@@ -327,7 +363,7 @@ int32_t gdt_json_decode_h( GDT_MEMORY_POOL* _ppool, const char* src, int32_t has
 	int32_t rootnode_munit = -1;
 	int32_t tokens_munit = -1;
 	do{
-		if( 0 >= ( tokens_munit = gdt_inittoken( _ppool ) ) ){
+		if( 0 >= ( tokens_munit = gdt_inittoken( _ppool, 10000 ) ) ){
 			break;
 		}
 		gdt_token_analyzer( _ppool, tokens_munit, (char*)src );

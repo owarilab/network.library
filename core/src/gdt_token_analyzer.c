@@ -30,7 +30,7 @@
 /*
  * allocate memory of GDT_TOKENS and initialize parameters
  */
-int32_t gdt_inittoken( GDT_MEMORY_POOL* _ppool )
+int32_t gdt_inittoken( GDT_MEMORY_POOL* _ppool, int32_t allocsize )
 {
 	int32_t tokens_munit = -1;
 	do{
@@ -42,6 +42,7 @@ int32_t gdt_inittoken( GDT_MEMORY_POOL* _ppool )
 		ptokens->size = 0;
 		ptokens->currentpos = 0;
 		ptokens->workpos = 0;
+		ptokens->allocsize = allocsize;
 	}while( false );
 	return tokens_munit;
 }
@@ -158,26 +159,16 @@ int gdt_token_analyzer( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pst
 			++pstr;
 			while(*pstr != '\"')
 			{
-				if( *pstr == '\0' || *pstr == '\n' || *pstr == '\r' )
+				//if( *pstr == '\0' || *pstr == '\n' || *pstr == '\r' )
+				if( *pstr == '\0' )
 				{
 					printf("syntax error : \"\n");
 					return 1;
 				}
-				// multi byte
-				if( ( *pstr >= (char)(0x81) && *pstr <= (char)(0x9f) ) || ( *pstr >= (char)(0xe0) && *pstr <= (char)(0xfc) ) )
-				{
-					int i;
-					for( i=0; i<2; i++ ){
-						if( *pstr == '\"' ){
-							//printf( "%d %d\n",(uint8_t)(*(pstr-2)), (uint8_t)(*(pstr-1)) );
-							break;
-						}
-						*(ptoken+(tokensize++)) = *(pstr++);
-					}
-				}
-				else if( *pstr == '\\' )
+				if( *pstr == '\\' )
 				{
 					++pstr;
+					printf("char : %c\n",*pstr);
 					if( *pstr == 'n' ){
 						*(ptoken+(tokensize++)) = '\n';
 						++pstr;
@@ -188,6 +179,18 @@ int gdt_token_analyzer( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pst
 						*(ptoken+(tokensize++)) = *(pstr++);
 					}
 				}
+				// multi byte
+				//else if( ( *pstr >= (char)(0x81) && *pstr <= (char)(0x9f) ) || ( *pstr >= (char)(0xe0) && *pstr <= (char)(0xfc) ) )
+				//{
+				//	int i;
+				//	for( i=0; i<2; i++ ){
+				//		if( *pstr == '\"' ){
+				//			printf( "%d %d\n",(uint8_t)(*(pstr-2)), (uint8_t)(*(pstr-1)) );
+				//			break;
+				//		}
+				//		*(ptoken+(tokensize++)) = *(pstr++);
+				//	}
+				//}
 				else {
 					*(ptoken+(tokensize++)) = *(pstr++);
 				}
@@ -212,7 +215,8 @@ int gdt_token_analyzer( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pst
 			token_type = ID_STR;
 			++pstr;
 			while(*pstr != '\''){
-				if( *pstr == '\0' || *pstr == '\n' ){
+				//if( *pstr == '\0' || *pstr == '\n' || *pstr == '\r' )
+				if( *pstr == '\0' ){
 					printf("syntax error : \'\n");
 					return 1;
 				}
@@ -407,7 +411,6 @@ int gdt_token_analyzer( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pst
 
 int gdt_addtoken( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* tokenbuf, int* tokensize, int type )
 {
-	int allocsize = 200000;
 	char *pbuf;
 	int tmptype;
 	int32_t tmpmunit;
@@ -415,15 +418,15 @@ int gdt_addtoken( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* tokenbuf,
 	GDT_TOKEN *ptoken = NULL;
 	if( ptokens->token_munit == -1 )
 	{
-		if( 0 >= ( ptokens->token_munit = gdt_create_munit( _ppool, sizeof( GDT_TOKEN ) * allocsize, MEMORY_TYPE_DEFAULT ) ) ){
+		if( 0 >= ( ptokens->token_munit = gdt_create_munit( _ppool, sizeof( GDT_TOKEN ) * ptokens->allocsize, MEMORY_TYPE_DEFAULT ) ) ){
 			return -1;
 		}
-		ptokens->size = allocsize;
+		ptokens->size = ptokens->allocsize;
 	}
 	else{
 		if( ptokens->currentpos >= ptokens->size )
 		{
-			if( 0 >= ( tmpmunit = gdt_create_munit( _ppool, sizeof( GDT_TOKEN ) * ( ptokens->size + allocsize ), MEMORY_TYPE_DEFAULT ) ) ){
+			if( 0 >= ( tmpmunit = gdt_create_munit( _ppool, sizeof( GDT_TOKEN ) * ( ptokens->size + ptokens->allocsize ), MEMORY_TYPE_DEFAULT ) ) ){
 				printf("realloc token memory error\n");
 				return -1;
 			}
@@ -434,7 +437,7 @@ int gdt_addtoken( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* tokenbuf,
 			);
 			gdt_free_memory_unit( _ppool, &ptokens->token_munit );
 			ptokens->token_munit = tmpmunit;
-			ptokens->size += allocsize;
+			ptokens->size += ptokens->allocsize;
 		}
 	}
 	ptoken = ( GDT_TOKEN* )GDT_POINTER(_ppool,ptokens->token_munit)+ptokens->currentpos;

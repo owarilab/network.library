@@ -32,7 +32,7 @@ GDT_SOCKET_OPTION* gdt_create_tcp_server(char* hostname, char* portnum)
 	GDT_MEMORY_POOL* memory_pool = NULL;
 	GDT_SOCKET_OPTION *option;
 	size_t maxconnection = 1024;
-	if (gdt_initialize_memory(&memory_pool, SIZE_MBYTE * 16, SIZE_MBYTE * 16, MEMORY_ALIGNMENT_SIZE_BIT_64, FIX_MUNIT_SIZE, 1, SIZE_KBYTE * 16) <= 0) {
+	if (gdt_initialize_memory(&memory_pool, SIZE_MBYTE * 128, SIZE_MBYTE * 128, MEMORY_ALIGNMENT_SIZE_BIT_64, FIX_MUNIT_SIZE, 1, SIZE_KBYTE * 16) <= 0) {
 		printf("gdt_initialize_memory error\n");
 		return NULL;
 	}
@@ -3385,12 +3385,13 @@ ssize_t gdt_send_msg( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, cons
 	do{
 		head1 = 0x80 | psockparam->ws_msg_mode; // 0x81:text mode, 0x82:binary mode
 		headersize = gdt_make_size_header(&head2,size);
+		size_t binsize = (size_t) ( ( sizeof( uint8_t ) * size ) + headersize );
 		if( psockparam->buf_munit < 0 || gdt_usize( option->memory_pool, psockparam->buf_munit ) <= size + headersize )
 		{
 			if( psockparam->buf_munit >= 0 ){
 				gdt_free_memory_unit( option->memory_pool, &psockparam->buf_munit );
 			}
-			if( ( psockparam->buf_munit = gdt_create_munit( option->memory_pool, sizeof( uint8_t ) * GDT_ALIGNUP( size + headersize, option->msgbuffer_size ), MEMORY_TYPE_DEFAULT ) ) == -1 )
+			if( ( psockparam->buf_munit = gdt_create_munit( option->memory_pool, binsize, MEMORY_TYPE_DEFAULT ) ) == -1 )
 			{
 				printf( "[gdt_send_msg]size over: %zd byte\n", size );
 				break;
@@ -3418,10 +3419,10 @@ ssize_t gdt_send_msg( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, cons
 		MEMORY_PUSH_BIT32_B( option->memory_pool, ptr, payload_type );
 		cptr = (char*)ptr;
 		memcpy( cptr, msg, size );
-		len = gdt_send_all( psockparam->acc, (char*)sendbin, (size_t) ( ( sizeof( char ) * size ) + headersize ), 0 );
-		if( size >= SIZE_KBYTE * 16 ){
+		len = gdt_send_all( psockparam->acc, (char*)sendbin, binsize, 0 );
+		if( size >= SIZE_KBYTE * 32 ){
 #ifdef __GDT_DEBUG__
-			printf( "free big buffer : %zd\n" , size );
+			printf( "free big buffer : %zd ,%zd, %zd\n" , binsize, size, len );
 #endif
 			gdt_free_memory_unit( option->memory_pool, &psockparam->buf_munit );
 		}

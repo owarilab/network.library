@@ -73,9 +73,10 @@ typedef struct GDT_TOKENS
 	size_t size;
 	uint32_t currentpos;
 	uint32_t workpos;
+	int32_t allocsize;
 } GDT_TOKENS;
 
-int32_t gdt_inittoken( GDT_MEMORY_POOL* _ppool );
+int32_t gdt_inittoken( GDT_MEMORY_POOL* _ppool, int32_t allocsize );
 int gdt_token_analyzer( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr );
 int  gdt_addtoken( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* tokenbuf, int* tokensize, int type );
 int  gdt_check_systemword( char* token );
