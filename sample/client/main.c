@@ -38,11 +38,12 @@ int main( int argc, char *argv[], char *envp[] )
 	set_on_close_event(option,on_close);
 	gdt_socket(option);
 	while(1){
-		usleep(10000);
+		gdt_client_update(option);
+		usleep(100000);
 		gdt_client_send_message(0x01,"test",4,option);
-		usleep(10000);
+		usleep(100000);
 		gdt_client_send_message(0x02,"test",4,option);
-		usleep(10000);
+		usleep(100000);
 		gdt_client_send_message(0x03,"test",4,option);
 	}
 	gdt_free_socket(option);
@@ -58,6 +59,7 @@ int on_connect(GDT_SERVER_CONNECTION_INFO* connection)
 
 int32_t on_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info )
 {
+	printf("on_recv(payload_type:%d,payload_len:%d)%s\n",payload_type,(int)payload_len,(char*)payload);
 	return 0;
 }
 
