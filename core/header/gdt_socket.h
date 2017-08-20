@@ -310,6 +310,7 @@ void set_user_recv_event( GDT_SOCKET_OPTION *option, GDT_USER_RECV func );
 void set_user_send_event( GDT_SOCKET_OPTION *option, GDT_USER_SEND func);
 void set_message_buffer( GDT_SOCKET_OPTION *option, size_t buffer_size);
 void gdt_set_timeout_event( GDT_SOCKET_OPTION *option, GDT_CALLBACK func );
+void gdt_set_connection_timeout( GDT_SOCKET_OPTION *option, int32_t sec, int32_t usec );
 void gdt_set_select_timeout( GDT_SOCKET_OPTION *option, int32_t sec, int32_t usec );
 
 int32_t gdt_make_connection_info( GDT_SOCKET_OPTION *option );

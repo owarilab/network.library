@@ -212,8 +212,8 @@ int gdt_initialize_socket_option(
 	option->socket_type			= socket_type;
 	option->mode				= mode;
 	option->protocol			= protocol;
-	option->t_sec				= 0;
-	option->t_usec				= 0;
+	option->t_sec				= 0;	// default 0sec
+	option->t_usec				= 0;	// default 0usec
 	option->s_sec				= 5;	// default 5sec
 	option->s_usec				= 0;	// default 0usec
 	option->connection_start_callback	= NULL;
@@ -272,23 +272,6 @@ int gdt_initialize_socket_option(
 			break;
 		}
 	}
-	else{
-		// TODO : support
-		//gethostname(option->hbuf, (int)sizeof(option->hbuf));
-		//option->phostent = gethostbyname( option->hbuf );
-		//memcpy(&option->inaddr, option->phostent->h_addr_list[0], 4);
-		//gdt_strcopy(option->ipbuf, inet_ntoa(option->inaddr), sizeof(option->ipbuf));
-		//gdt_strcopy(option->ipbuf, "dummy ip", sizeof(option->ipbuf));
-		//gdt_strcopy(option->hbuf, "dummy host", sizeof(option->ipbuf));
-		//printf("wVersion = %u\n", option->wsdata.wVersion);
-		//printf("wHighVersion = %u\n", option->wsdata.wHighVersion);
-		//printf("szDescription = %s\n", option->wsdata.szDescription);
-		//printf("szSystemStatus = %s\n", option->wsdata.szSystemStatus);
-		//printf("iMaxSockets = %d\n", option->wsdata.iMaxSockets);
-		//printf("iMaxUdpDg = %d\n", option->wsdata.iMaxUdpDg);
-		//printf("host name=%s\n", option->hbuf);
-		//printf("ip addr=%s\n", option->ipbuf);
-	}
 #endif
 	return result;
 }
@@ -324,6 +307,11 @@ void set_user_send_event(GDT_SOCKET_OPTION *option, GDT_USER_SEND func)
 void gdt_set_timeout_event( GDT_SOCKET_OPTION *option, GDT_CALLBACK func )
 {
 	option->timeout_callback = func;
+}
+void gdt_set_connection_timeout( GDT_SOCKET_OPTION *option, int32_t sec, int32_t usec )
+{
+	option->t_sec = sec;
+	option->t_usec = usec;
 }
 void gdt_set_select_timeout( GDT_SOCKET_OPTION *option, int32_t sec, int32_t usec )
 {
@@ -665,7 +653,7 @@ GDT_SOCKET_ID gdt_server_socket( GDT_SOCKET_OPTION *option, int is_ipv6 )
 	char* hostname = ( option->host_name_munit > 0 ) ? (char *)gdt_upointer( option->memory_pool,option->host_name_munit ) : NULL;
 	char* port = ( option->port_num_munit > 0 ) ? (char *)gdt_upointer( option->memory_pool,option->port_num_munit ) : NULL;
 #ifdef __GDT_DEBUG__
-	printf( "server_socket: port=%s, host=%s\n", port, hostname  );
+//	printf( "server_socket: port=%s, host=%s\n", port, hostname  );
 #endif
 	do{
 		(void) memset( &hints, 0, sizeof( hints ) );
@@ -714,19 +702,6 @@ GDT_SOCKET_ID gdt_server_socket( GDT_SOCKET_OPTION *option, int is_ipv6 )
 			freeaddrinfo( res0 );
 			break;
 		}
-//		if( option->socket_type == SOKET_TYPE_SERVER_UDP )
-//		{
-//			if( setsockopt( sock, IPPROTO_IP, IP_PKTINFO, &opt, opt_len ) == -1 ){
-//				gdt_close_socket( &sock, "setsockopt" );
-//				freeaddrinfo( res0 );
-//				break;
-//			}
-//			if( setsockopt( sock, IPPROTO_IP, IP_RECVDSTADDR, &opt, opt_len ) == -1 ){
-//				gdt_close_socket( &sock, "setsockopt" );
-//				freeaddrinfo( res0 );
-//				break;
-//			}
-//		}
 		if( bind( sock, res0->ai_addr, res0->ai_addrlen) == -1 )
 		{
 			gdt_close_socket( &sock, "bind" );
@@ -808,7 +783,6 @@ GDT_SOCKET_ID gdt_client_socket( GDT_SOCKET_OPTION *option )
 		if( option->socket_type == SOKET_TYPE_CLIENT_UDP )
 		{
 			if( ( option->inetflag & INET_FLAG_BIT_CONNECT_UDP ) == 0 ){
-				//printf("this udp socket is not connect call\n");
 				if( ( errcode = getaddrinfo( NULL , "0", &hints, &local_info ) ) != 0 ){
 					printf( "getaddrinfo():%s\n",gai_strerror( errcode ) );
 					break;

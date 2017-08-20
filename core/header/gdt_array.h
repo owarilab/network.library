@@ -38,6 +38,15 @@ extern "C"{
 #include "gdt_string.h"
 #include "gdt_hash.h"
 
+#include <sys/stat.h>
+#include <sys/types.h>
+#if defined(__LINUX__) || defined(__BSD_UNIX__) || defined(__ANDROID__) || defined(__IOS__)
+#include <dirent.h>
+#include <unistd.h>
+#include <utime.h>
+#endif
+
+
 typedef struct GDT_ARRAY
 {
 	int32_t munit;
@@ -65,6 +74,7 @@ int32_t gdt_array_push_empty_string( GDT_MEMORY_POOL* _ppool, int32_t* pmunit, s
 GDT_ARRAY_ELEMENT* gdt_array_pop( GDT_MEMORY_POOL* _ppool, int32_t arraymunit );
 GDT_ARRAY_ELEMENT* gdt_array_get( GDT_MEMORY_POOL* _ppool, int32_t arraymunit, int index );
 int32_t gdt_array_length( GDT_MEMORY_POOL* _ppool, int32_t arraymunit );
+int32_t gdt_opendir( GDT_MEMORY_POOL* _ppool, const char* path );
 void gdt_array_dump( GDT_MEMORY_POOL* _ppool, int32_t munit, int index );
 #endif /*_GDT_ARRAY_H_*/
 

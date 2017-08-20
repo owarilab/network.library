@@ -135,7 +135,7 @@ int32_t gdt_resize_array( GDT_MEMORY_POOL* _ppool, int32_t munit )
 		if( parray->len >= parray->max_size )
 		{
 			int i;
-			size_t allocsize = 8;
+			size_t allocsize = parray->max_size;
 			GDT_ARRAY_ELEMENT* elm;
 			int32_t tmpmunit = gdt_create_munit( _ppool, sizeof( GDT_ARRAY_ELEMENT ) * ( parray->max_size + allocsize ), MEMORY_TYPE_DEFAULT );
 			if( tmpmunit <= 0 ){
@@ -327,6 +327,67 @@ int32_t gdt_array_length( GDT_MEMORY_POOL* _ppool, int32_t arraymunit )
 		return -1;
 	}
 	return parray->len;
+}
+
+int32_t gdt_opendir( GDT_MEMORY_POOL* _ppool, const char* path )
+{
+	char tmppath[MAXPATHLEN];
+	char* pathstart = tmppath;
+	memcpy( pathstart, path, strlen(path) );
+	pathstart += strlen(path);
+	*pathstart = '\0';
+	DIR *dir;
+	struct dirent *dent;
+	struct stat st;
+	if( NULL == ( dir = opendir(path) ) )
+	{
+		printf("error : opendir\n");
+		return -1;
+	}
+	int32_t path_array_munit = gdt_create_array( _ppool, 128, 0 );
+	while( (dent = readdir(dir)) != NULL )
+	{
+		if( dent->d_name[0] == '.' ){
+			if( dent->d_name[1] == '\0' || dent->d_name[1] == '.' ){
+				continue;
+			}
+		}
+		memcpy( pathstart, dent->d_name, strlen(dent->d_name) );
+		*(pathstart+strlen(dent->d_name)) = '\0';
+#ifdef __WINDOWS__
+		if( stat( tmppath, &st ) < 0 )
+#else
+		if( lstat( tmppath, &st ) < 0 )
+#endif
+		{
+			closedir( dir );
+			printf("error : lstat\n");
+			return -1;
+		}
+		// file
+		if( S_ISREG(st.st_mode) ){
+			gdt_array_push_string(_ppool,&path_array_munit,tmppath);
+		}
+		// directory
+		if( S_ISDIR(st.st_mode) ){
+			*(pathstart+strlen(dent->d_name)) = '/';
+			*(pathstart+strlen(dent->d_name)+1) = '\0';
+			int32_t tmp_array = gdt_opendir( _ppool, tmppath );
+			if( -1 != tmp_array )
+			{
+				GDT_ARRAY* parray;
+				GDT_ARRAY_ELEMENT* elm;
+				int i;
+				parray = (GDT_ARRAY*)GDT_POINTER( _ppool, tmp_array );
+				elm = (GDT_ARRAY_ELEMENT*)GDT_POINTER( _ppool, parray->munit );
+				for( i = 0; i < parray->len; i++ ){
+					gdt_array_push(_ppool,&path_array_munit,ELEMENT_LITERAL_STR,(elm+i)->munit);
+				}
+			}
+		}
+	}
+	closedir( dir );
+	return path_array_munit;
 }
 
 void gdt_array_dump( GDT_MEMORY_POOL* _ppool, int32_t munit, int index )
