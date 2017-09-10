@@ -92,7 +92,9 @@ int32_t gdt_create_array_buffer( GDT_MEMORY_POOL* _ppool, size_t allocsize, size
 			(elm+i)->id = ELEMENT_LITERAL_STR;
 			(elm+i)->munit = gdt_create_munit( _ppool, sizeof( char ) * parray->buffer_size, MEMORY_TYPE_DEFAULT );
 			parray->len++;
-			//char* pbuf = (char*)GDT_POINTER(_ppool,(elm+i)->munit);
+			char* pbuf = (char*)GDT_POINTER(_ppool,(elm+i)->munit);
+			*pbuf = '\0';
+			//memset(pbuf,0,gdt_usize(_ppool, (elm + i)->munit));
 			//for( int j=0;j<parray->buffer_size-1;j++){*(pbuf+j) = '+';}
 			//*(pbuf+(parray->buffer_size-1)) = '\0';
 		}
@@ -229,7 +231,7 @@ int32_t gdt_array_push_integer( GDT_MEMORY_POOL* _ppool, int32_t* pmunit, int32_
 	return GDT_SYSTEM_OK;
 }
 
-int32_t gdt_array_push_string( GDT_MEMORY_POOL* _ppool, int32_t* pmunit, char* value )
+int32_t gdt_array_push_string( GDT_MEMORY_POOL* _ppool, int32_t* pmunit, const char* value )
 {
 	GDT_ARRAY* parray;
 	GDT_ARRAY_ELEMENT* elm;
@@ -336,42 +338,72 @@ int32_t gdt_opendir( GDT_MEMORY_POOL* _ppool, const char* path )
 	memcpy( pathstart, path, strlen(path) );
 	pathstart += strlen(path);
 	*pathstart = '\0';
+	struct stat st;
+#ifdef __WINDOWS__
+	WIN32_FIND_DATA fd;
+	HANDLE handle;
+	char tmpstr[MAXPATHLEN];
+	memset(tmpstr, 0, sizeof(tmpstr));
+	memcpy(tmpstr, path, strlen(path));
+	*(tmpstr + strlen(path)) = '*';
+	if (INVALID_HANDLE_VALUE == (handle = FindFirstFileEx(tmpstr, FindExInfoStandard, &fd, FindExSearchNameMatch, NULL, 0)))
+	{
+		printf("error : FindFirstFileEx %s\n",tmpstr);
+		return -1;
+	}
+#else
 	DIR *dir;
 	struct dirent *dent;
-	struct stat st;
-	if( NULL == ( dir = opendir(path) ) )
+	if (NULL == (dir = opendir(path)))
 	{
 		printf("error : opendir\n");
 		return -1;
 	}
+	dent = readdir(dir);
+#endif
 	int32_t path_array_munit = gdt_create_array( _ppool, 128, 0 );
-	while( (dent = readdir(dir)) != NULL )
-	{
-		if( dent->d_name[0] == '.' ){
-			if( dent->d_name[1] == '\0' || dent->d_name[1] == '.' ){
+	do{
+#ifdef __WINDOWS__
+		if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+			if (fd.cFileName[0] == '.') {
+				if (fd.cFileName[1] == '\0' || fd.cFileName[1] == '.') {
+					continue;
+				}
+			}
+		}
+		memcpy(pathstart, fd.cFileName, strlen(fd.cFileName));
+		*(pathstart + strlen(fd.cFileName)) = '\0';
+		if( stat( tmppath, &st ) < 0 )
+#else
+		if (dent->d_name[0] == '.') {
+			if (dent->d_name[1] == '\0' || dent->d_name[1] == '.') {
 				continue;
 			}
 		}
-		memcpy( pathstart, dent->d_name, strlen(dent->d_name) );
-		*(pathstart+strlen(dent->d_name)) = '\0';
-#ifdef __WINDOWS__
-		if( stat( tmppath, &st ) < 0 )
-#else
+		memcpy(pathstart, dent->d_name, strlen(dent->d_name));
+		*(pathstart + strlen(dent->d_name)) = '\0';
 		if( lstat( tmppath, &st ) < 0 )
 #endif
 		{
-			closedir( dir );
-			printf("error : lstat\n");
+#ifdef __WINDOWS__
+			FindClose(handle);
+#else
+			closedir(dir);
+#endif
+			printf("error : lstat %s\n",tmppath);
 			return -1;
 		}
-		// file
-		if( S_ISREG(st.st_mode) ){
-			gdt_array_push_string(_ppool,&path_array_munit,tmppath);
-		}
+#ifdef __WINDOWS__
 		// directory
-		if( S_ISDIR(st.st_mode) ){
-			*(pathstart+strlen(dent->d_name)) = '/';
-			*(pathstart+strlen(dent->d_name)+1) = '\0';
+		if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+			*(pathstart + strlen(fd.cFileName)) = '/';
+			*(pathstart + strlen(fd.cFileName) + 1) = '\0';
+#else
+		// directory
+		if (S_ISDIR(st.st_mode)) {
+			*(pathstart + strlen(dent->d_name)) = '/';
+			*(pathstart + strlen(dent->d_name) + 1) = '\0';
+#endif
 			int32_t tmp_array = gdt_opendir( _ppool, tmppath );
 			if( -1 != tmp_array )
 			{
@@ -385,8 +417,21 @@ int32_t gdt_opendir( GDT_MEMORY_POOL* _ppool, const char* path )
 				}
 			}
 		}
-	}
-	closedir( dir );
+#ifdef __WINDOWS__
+		else{
+#else
+		// file
+		else if (S_ISREG(st.st_mode)) {
+#endif
+			gdt_array_push_string(_ppool, &path_array_munit, tmppath);
+		}
+#ifdef __WINDOWS__
+		} while (FindNextFile(handle, &fd));
+		FindClose(handle);
+#else
+		} while ((dent = readdir(dir)) != NULL);
+		closedir(dir);
+#endif
 	return path_array_munit;
 }
 

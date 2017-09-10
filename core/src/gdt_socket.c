@@ -41,7 +41,9 @@ GDT_SOCKET_OPTION* gdt_create_tcp_server(char* hostname, char* portnum)
 		return NULL;
 	}
 	option = (GDT_SOCKET_OPTION*)GDT_POINTER(memory_pool,option_munit);
-	gdt_initialize_socket_option( option, hostname, portnum, SOKET_TYPE_SERVER_TCP, SOCKET_MODE_NONBLOCKING, PROTOCOL_SIMPLE, maxconnection, memory_pool, NULL );
+	if (0 != gdt_initialize_socket_option(option, hostname, portnum, SOKET_TYPE_SERVER_TCP, SOCKET_MODE_NONBLOCKING, PROTOCOL_SIMPLE, maxconnection, memory_pool, NULL)) {
+		return NULL;
+	}
 	return option;
 }
 
@@ -59,7 +61,9 @@ GDT_SOCKET_OPTION* gdt_create_udp_server(char* hostname, char* portnum)
 		return NULL;
 	}
 	option = (GDT_SOCKET_OPTION*)GDT_POINTER(memory_pool,option_munit);
-	gdt_initialize_socket_option( option, hostname, portnum, SOKET_TYPE_SERVER_UDP, SOCKET_MODE_NONBLOCKING, PROTOCOL_SIMPLE, maxconnection, memory_pool, NULL );
+	if (0 != gdt_initialize_socket_option(option, hostname, portnum, SOKET_TYPE_SERVER_UDP, SOCKET_MODE_NONBLOCKING, PROTOCOL_SIMPLE, maxconnection, memory_pool, NULL)){
+		return NULL;
+	}
 	return option;
 }
 
@@ -77,7 +81,9 @@ GDT_SOCKET_OPTION* gdt_create_tcp_client(char* hostname, char* portnum)
 		return NULL;
 	}
 	option = (GDT_SOCKET_OPTION*)GDT_POINTER(memory_pool, option_munit);
-	gdt_initialize_socket_option(option, hostname, portnum, SOKET_TYPE_CLIENT_TCP, SOCKET_MODE_CLIENT_NONBLOCKING, PROTOCOL_SIMPLE, maxconnection, memory_pool, NULL);
+	if (0 != gdt_initialize_socket_option(option, hostname, portnum, SOKET_TYPE_CLIENT_TCP, SOCKET_MODE_CLIENT_NONBLOCKING, PROTOCOL_SIMPLE, maxconnection, memory_pool, NULL)) {
+		return NULL;
+	}
 	return option;
 }
 
@@ -95,7 +101,9 @@ GDT_SOCKET_OPTION* gdt_create_udp_client(char* hostname, char* portnum)
 		return NULL;
 	}
 	option = (GDT_SOCKET_OPTION*)GDT_POINTER(memory_pool, option_munit);
-	gdt_initialize_socket_option(option, hostname, portnum, SOKET_TYPE_CLIENT_UDP, SOCKET_MODE_CLIENT_NONBLOCKING, PROTOCOL_SIMPLE, maxconnection, memory_pool, NULL);
+	if (0 != gdt_initialize_socket_option(option, hostname, portnum, SOKET_TYPE_CLIENT_UDP, SOCKET_MODE_CLIENT_NONBLOCKING, PROTOCOL_SIMPLE, maxconnection, memory_pool, NULL)) {
+		return NULL;
+	}
 	return option;
 }
 
@@ -1371,27 +1379,49 @@ void gdt_server_update(GDT_SOCKET_OPTION *option)
 			{
 				if (option->user_recv_function != NULL) {
 					if (-1 == (srlen = option->user_recv_function(child, child->id, (char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), buffer_size, 0))) {
+#ifdef __WINDOWS__
+						if (WSAGetLastError() != WSAEWOULDBLOCK) {
+							perror("recv");
+							gdt_close_socket(&child->id, NULL);
+						}
+#else
 						if (errno != 0 && errno != EAGAIN)
 						{
 							perror("recv");
 							gdt_close_socket(&child->id, NULL);
 						}
+#endif
 					}
 				}
 				else {
 					if ((srlen = recv(child->id, (char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), buffer_size, 0)) == -1) {
+#ifdef __WINDOWS__
+						if (WSAGetLastError() != WSAEWOULDBLOCK) {
+							perror("recv");
+							gdt_close_socket(&child->id, NULL);
+						}
+#else
 						if (errno != 0 && errno != EAGAIN)
 						{
 							perror("recv");
 							gdt_close_socket(&child->id, NULL);
 						}
+#endif
 					}
 				}
 				if (srlen == -1) {
 				}
 				else if (srlen == 0) {
+#ifdef __WINDOWS__
+					if (WSAGetLastError() != WSAEWOULDBLOCK) {
+						perror("recv 0byte");
+						gdt_close_socket(&child->id, NULL);
+					}
+#else
 					perror("recv");
 					gdt_close_socket(&child->id, NULL);
+#endif
+
 				}
 				else if (option->plane_recv_callback != NULL)
 				{
@@ -1534,6 +1564,12 @@ void gdt_nonblocking_client(GDT_SOCKET_OPTION *option)
 #endif
 	size_t buffer_size = sizeof(char) * (option->recvbuffer_size);
 	gdt_set_block(option->sockid, 0);
+#ifdef __WINDOWS__
+	struct linger l;
+	l.l_onoff=0;
+	l.l_linger=0;
+	(void) setsockopt( option->sockid, SOL_SOCKET, SO_LINGER, (const char*)&l, sizeof( l ) );
+#endif
 	option->connection_munit = gdt_create_munit( option->memory_pool, sizeof( GDT_SERVER_CONNECTION_INFO ), MEMORY_TYPE_DEFAULT );
 	if( option->connection_munit == -1 )
 	{
@@ -1587,11 +1623,18 @@ void gdt_client_update(GDT_SOCKET_OPTION *option)
 			}
 			else {
 				if ((srlen = recv(child->id, (char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), buffer_size, 0)) == -1) {
+#ifdef __WINDOWS__
+					if (WSAGetLastError() != WSAEWOULDBLOCK) {
+						perror("recv");
+						gdt_close_socket(&child->id, NULL);
+					}
+#else
 					if (errno != 0 && errno != EAGAIN)
 					{
 						perror("recv");
 						gdt_close_socket(&child->id, NULL);
 					}
+#endif
 				}
 			}
 			if (srlen == -1) {
@@ -3664,7 +3707,18 @@ ssize_t gdt_send_websocket_msg( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockp
 	ssize_t len = 0;
 	do{
 		head1 = 0x80 | psockparam->ws_msg_mode; // 0x81:text mode, 0x82:binary mode
-		headersize = gdt_make_size_header(&head2,size);
+		if( size < 125 ){
+			headersize = 2;
+			head2 = 0x00 | (uint8_t)size;
+		}
+		else if( size > 126 && size <= 65536 ){
+			headersize = 4;
+			head2 = 0x00 | 126;
+		}
+		else{
+			headersize = 10;
+			head2 = 0x00 | 127;
+		}
 		if( psockparam->buf_munit < 0 || gdt_usize( option->memory_pool, psockparam->buf_munit ) <= size + headersize )
 		{
 			if( psockparam->buf_munit >= 0 ){
@@ -3859,6 +3913,7 @@ int gdt_close_socket(GDT_SOCKET_ID* sock, char* error )
 {
 	int errorno = 0;
 #ifdef __WINDOWS__
+	shutdown(*sock, SD_BOTH);
 	closesocket( *sock );
 #else
 	(void) close( *sock );

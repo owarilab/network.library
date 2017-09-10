@@ -88,6 +88,9 @@ extern "C"{
 #include <stdint.h>
 #define NI_MAXHOST  1025
 #define NI_MAXSERV	32
+#ifndef MAXPATHLEN
+#define MAXPATHLEN MAX_PATH
+#endif
 #define ssize_t int64_t
 # define snprintf(s, n, format, ...) \
     _snprintf_s(s, n, _TRUNCATE, format, __VA_ARGS__)

@@ -168,7 +168,6 @@ int gdt_token_analyzer( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pst
 				if( *pstr == '\\' )
 				{
 					++pstr;
-					printf("char : %c\n",*pstr);
 					if( *pstr == 'n' ){
 						*(ptoken+(tokensize++)) = '\n';
 						++pstr;
@@ -225,7 +224,7 @@ int gdt_token_analyzer( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pst
 					int i;
 					for( i=0; i<2; i++ ){
 						if( *pstr == '\'' ){
-							printf( "%d %d\n",(uint8_t)(*(pstr-2)), (uint8_t)(*(pstr-1)) );
+							//printf( "%d %d\n",(uint8_t)(*(pstr-2)), (uint8_t)(*(pstr-1)) );
 							break;
 						}
 						*(ptoken+(tokensize++)) = *(pstr++);

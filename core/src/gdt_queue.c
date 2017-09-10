@@ -238,3 +238,25 @@ int32_t gdt_dequeue( GDT_MEMORY_POOL* _ppool, int32_t q_munit )
 	}while( false );
 	return munit;
 }
+
+int32_t gdt_get_queue_length( GDT_MEMORY_POOL* _ppool, int32_t q_munit )
+{
+	int32_t length = 0;
+	GDT_MSGQUEUE *pmq;
+	if( q_munit < 0 ){
+		return length;
+	}
+	pmq = (GDT_MSGQUEUE *)gdt_upointer( _ppool, q_munit );
+	if( pmq->tail == pmq->top ){
+		return length;
+	}
+	if( pmq->tail < pmq->top ){
+		length += pmq->queuelen - pmq->top;
+		length += pmq->tail+1;
+	}
+	else{
+		length += pmq->tail - pmq->top;
+	}
+	return length;
+}
+

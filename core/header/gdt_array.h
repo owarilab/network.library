@@ -69,7 +69,7 @@ int32_t gdt_resize_array( GDT_MEMORY_POOL* _ppool, int32_t munit );
 int32_t gdt_next_push_munit( GDT_MEMORY_POOL* _ppool, int32_t munit );
 int32_t gdt_array_push( GDT_MEMORY_POOL* _ppool, int32_t* pmunit, int id, int32_t munit );
 int32_t gdt_array_push_integer( GDT_MEMORY_POOL* _ppool, int32_t* pmunit, int32_t value );
-int32_t gdt_array_push_string( GDT_MEMORY_POOL* _ppool, int32_t* pmunit, char* value );
+int32_t gdt_array_push_string( GDT_MEMORY_POOL* _ppool, int32_t* pmunit, const char* value );
 int32_t gdt_array_push_empty_string( GDT_MEMORY_POOL* _ppool, int32_t* pmunit, size_t size );
 GDT_ARRAY_ELEMENT* gdt_array_pop( GDT_MEMORY_POOL* _ppool, int32_t arraymunit );
 GDT_ARRAY_ELEMENT* gdt_array_get( GDT_MEMORY_POOL* _ppool, int32_t arraymunit, int index );
