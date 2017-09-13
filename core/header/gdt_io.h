@@ -56,6 +56,7 @@ int gdt_fputchar_line( FILE* f, uint32_t start, uint32_t line );
 int gdt_fout( char* file_name );
 int gdt_fout_line( char* file_name, uint32_t start, uint32_t line );
 size_t gdt_fread( char* file_name, char* dest, size_t size );
+size_t gdt_fread_range( char* file_name, char* dest, size_t pos, size_t size );
 size_t gdt_fread_bin( char* file_name, char* dest, size_t size );
 size_t gdt_fread_bin_range( char* file_name, char* dest, size_t pos, size_t size );
 int gdt_fwrite( char* file_name, char* out, size_t size );
@@ -81,6 +82,8 @@ int gdt_symlink( const char* src, const char* dest );
 int32_t gdt_readlink( GDT_MEMORY_POOL* _ppool, const char* path );
 char* gdt_filetype2char( mode_t mode );
 #endif
+
+// freopen
 
 #endif /*_GDT_IO_H_*/
 

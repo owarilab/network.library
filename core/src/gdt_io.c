@@ -226,6 +226,58 @@ size_t gdt_fread( char* file_name, char* dest, size_t size )
 	return rsize;
 }
 
+size_t gdt_fread_range( char* file_name, char* dest, size_t pos, size_t size )
+{
+	size_t rsize = 0;
+	struct stat st;
+	FILE* f;
+	int8_t c;
+	char* ps = dest;
+	do{
+		if( dest == NULL ){
+			printf( "[gdt_fread] output pointer is null : %s\n", file_name );
+			break;
+		}
+
+#ifdef __WINDOWS__
+		if (0 != fopen_s(&f, file_name, "r"))
+#else
+		if (!(f = fopen(file_name, "r")))
+#endif
+		{
+			printf( "[gdt_fread] fopen error = %s\n", file_name );
+			break;
+		}
+		
+#ifdef __WINDOWS__
+		if (stat(file_name, &st) < 0)
+#else
+		if (lstat(file_name, &st) < 0)
+#endif
+		{
+			printf("[gdt_lstate]lstat error\n");
+			fclose( f );
+			break;
+		}
+
+		if( (fseek(f, pos, SEEK_SET)) != 0 )
+		{
+			printf( "[gdt_fread_bin] fsetpos error\n" );
+			fclose( f );
+			break;
+		}
+		
+		while( ( c = fgetc( f ) ) != EOF && rsize < size-1 )
+		{
+			*( ps++ ) = c;
+			++rsize;
+		}
+		*ps = '\0';
+		fclose( f );
+	}while( false );
+	return rsize;
+}
+
 size_t gdt_fread_bin( char* file_name, char* dest, size_t size )
 {
 	size_t retsize = 0;
@@ -301,7 +353,6 @@ size_t gdt_fread_bin_range( char* file_name, char* dest, size_t pos, size_t size
 			fclose( f );
 			break;
 		}
-		retsize = st.st_size;
 
 		if( (fseek(f, pos, SEEK_SET)) != 0 )
 		{
