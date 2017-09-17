@@ -48,6 +48,7 @@ extern "C"{
 typedef struct GDT_FILE_INFO
 {
 	size_t size;
+	int64_t update_usec;
 } GDT_FILE_INFO;
 
 int gdt_fget_info( char* file_name, GDT_FILE_INFO* info );

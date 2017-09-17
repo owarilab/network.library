@@ -180,6 +180,7 @@ typedef struct GDT_SOCKPARAM
 	ssize_t tmpmsglen;				// 受信メッセージサイズ( 受信途中の )
 	uint32_t appdata32bit;			// マスク処理で使う32bitのデータ
 	int8_t tmpbitsift;				// 途中のマスク処理
+	size_t continue_pos;
 	int32_t buf_munit;				// ソケットが持っているバッファ領域
 	struct sockaddr_in addr;		// UDP送信先
 	struct sockaddr_storage from;	// UDPの受信相手情報
@@ -288,6 +289,7 @@ ssize_t gdt_send_message(uint32_t payload_type, char* payload, size_t payload_le
 ssize_t gdt_send_message_broadcast(uint32_t payload_type, char* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info);
 ssize_t gdt_send_message_multicast(uint32_t payload_type, char* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info, GDT_MEMORY_POOL* array_memory, int32_t array_munit);
 ssize_t gdt_client_send_message(uint32_t payload_type, char* payload, size_t payload_len, GDT_SOCKET_OPTION *option);
+int32_t gdt_set_client_id(GDT_SOCKET_OPTION *option,uint32_t id);
 
 int gdt_initialize_socket_option( 
 	  GDT_SOCKET_OPTION *option

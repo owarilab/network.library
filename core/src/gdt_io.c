@@ -61,6 +61,10 @@ int gdt_fget_info( char* file_name, GDT_FILE_INFO* info )
 			break;
 		}
 		info->size = st.st_size;
+		//info->update_usec = st.st_atime;
+		//info->update_usec = st.st_ctime;
+		info->update_usec = st.st_mtime;
+		//info->update_usec = st.st_mtim.tv_nsec;
 		fclose( f );
 	}while( false );
 	return error_code;
@@ -360,12 +364,7 @@ size_t gdt_fread_bin_range( char* file_name, char* dest, size_t pos, size_t size
 			fclose( f );
 			break;
 		}
-		
 		rsize = fread( dest, sizeof(char), size, f );
-		if( rsize != size ){
-			printf("fread error %d, %d\n", (int)size, (int)rsize);
-			retsize = 0;
-		}
 		retsize = rsize;
 		fclose( f );
 	}while( false );
