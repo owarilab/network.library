@@ -39,7 +39,6 @@ extern "C"{
 #include "gdt_base64.h"
 #include "gdt_string.h"
 #include "gdt_queue.h"
-#include "gdt_timeout.h"
 #include "gdt_hash.h"
 #include "gdt_memory_allocator.h"
 
@@ -119,45 +118,13 @@ extern "C"{
 #define PROTOCOL_STATUS_HTTP 3
 #define PROTOCOL_STATUS_OTHER 10
 
-// socket phase
-#define SOCK_PHASE_MSG_SOCKET 1
-#define SOCK_PHASE_REQUEST_HTTP 2
-#define SOCK_PHASE_HANDSHAKE_WEBSOCKET 3
-#define SOCK_PHASE_MSG_WEBSOCKET 4
-
 // socket type
-#define SOCK_TYPE_NORMAL 1			// tcp socket
-#define SOCK_TYPE_WEBSOCKET 2		// websocket( tcp only )
-#define SOCK_TYPE_HTTP 3			// http
+#define SOCK_TYPE_NORMAL_TCP 1		// tcp socket
 #define SOCK_TYPE_NORMAL_UDP 4		// udp socket
 
 // protocol
 #define PROTOCOL_PLAIN 1			// plane
 #define PROTOCOL_SIMPLE 2			// simple protocol
-#define PROTOCOL_HTTP 3				// http protocol
-
-// WEBSOCKET MESSAGE MODE
-#define WS_MODE_TEXT 1
-#define WS_MODE_BINARY 2
-
-// HTTP method
-#define HTTP_METHOD_GET		1;
-#define HTTP_METHOD_HEAD	2;
-#define HTTP_METHOD_POST	3;
-
-#define HTTP_HEADER_STRINGS { \
-	{"GET_PARAMS","GET_PARAMS","2048"}, \
-	{"REQUEST","REQUEST","2048"}, \
-	{"HTTP_VERSION","HTTP_VERSION","32"}, \
-	{"HTTP_METHOD","HTTP_METHOD","32"}, \
-	{"Sec-WebSocket-Key:","SEC_WEBSOCKET_KEY","256"}, \
-	{"Host:","HOST","512"}, \
-	{"User-Agent:","USER_AGENT","512"}, \
-	{"Sec-WebSocket-Protocol:","SEC_WEBSOCKET_PROTOCOL","128"}, \
-	{"Content-Length:","CONTENT_LENGTH","64"}, \
-	{"Connection:","CONNECTION","64"}, \
-}; \
-
 
 typedef struct GDT_SOCKPARAM
 {
@@ -315,6 +282,10 @@ void gdt_set_timeout_event( GDT_SOCKET_OPTION *option, GDT_CALLBACK func );
 void gdt_set_connection_timeout( GDT_SOCKET_OPTION *option, int32_t sec, int32_t usec );
 void gdt_set_select_timeout( GDT_SOCKET_OPTION *option, int32_t sec, int32_t usec );
 
+void gdt_init_socket_param( GDT_SOCKPARAM *psockparam );
+void gdt_free_sockparam( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam );
+int gdt_close_socket(GDT_SOCKET_ID* sock, char* error );
+
 int32_t gdt_make_connection_info( GDT_SOCKET_OPTION *option );
 int32_t gdt_make_connection_info_core( GDT_SOCKET_OPTION *option, GDT_SERVER_CONNECTION_INFO* tinfo, int index );
 void gdt_initialize_connection_info( GDT_SOCKET_OPTION *option, GDT_SERVER_CONNECTION_INFO* tinfo );
@@ -324,6 +295,7 @@ ssize_t gdt_send( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, char *bu
 ssize_t gdt_send_all(GDT_SOCKET_ID soc, char *buf, size_t size, int flag );
 ssize_t gdt_sendto_all(GDT_SOCKET_ID soc, char *buf, size_t size, int flag, struct sockaddr *pfrom, socklen_t fromlen );
 
+int gdt_set_block(GDT_SOCKET_ID fd, int flag );
 int gdt_get_sockaddr_info( GDT_SOCKET_OPTION *option, struct sockaddr_storage *saddr, socklen_t *addr_len );
 GDT_SOCKET_ID gdt_server_socket( GDT_SOCKET_OPTION *option, int is_ipv6 );
 GDT_SOCKET_ID gdt_client_socket( GDT_SOCKET_OPTION *option );
@@ -332,67 +304,20 @@ void gdt_set_sock_option( GDT_SOCKET_OPTION *option );
 void* gdt_socket( GDT_SOCKET_OPTION *option );
 void gdt_free_socket( GDT_SOCKET_OPTION *option );
 
-void gdt_single_task_server( GDT_SOCKET_OPTION *option );
-void gdt_select_server( GDT_SOCKET_OPTION *option );
 void gdt_nonblocking_server(GDT_SOCKET_OPTION *option);
 void gdt_server_update(GDT_SOCKET_OPTION *option);
 void gdt_nonblocking_client(GDT_SOCKET_OPTION *option);
 void gdt_client_update(GDT_SOCKET_OPTION *option);
 
-#ifdef __WINDOWS__
-#else
-void gdt_pool_server( GDT_SOCKET_OPTION *option );
-void gdt_epool_server( GDT_SOCKET_OPTION *option );
-void gdt_kqueue_server( GDT_SOCKET_OPTION *option );
-void gdt_prefork_server( GDT_SOCKET_OPTION *option );
-void gdt_accept_loop_fork( struct GDT_SERVER_CONNECTION_INFO *forkinfo );
-void gdt_recv_loop_fork( struct GDT_SERVER_CONNECTION_INFO *forkinfo );
-void gdt_recvfrom_loop_fork( struct GDT_SERVER_CONNECTION_INFO *forkinfo );
-#endif
-
-void gdt_thread_server( GDT_SOCKET_OPTION *option );
-#ifdef __WINDOWS__
-unsigned __stdcall gdt_accept_thread( void* arg );
-unsigned __stdcall gdt_recvfrom_loop_thread( void* arg );
-#else
-void* gdt_accept_thread( void* arg );
-void* gdt_recvfrom_loop_thread( void* arg );
-#endif
-void gdt_recv_loop_thread( struct GDT_SERVER_CONNECTION_INFO *tinfo );
-
-int gdt_set_block(GDT_SOCKET_ID fd, int flag );
 
 void gdt_print_payload(uint32_t payload_type, uint8_t* payload, size_t payload_len,size_t view_max);
 int gdt_pre_packetfilter( GDT_SOCKET_OPTION *option, struct GDT_RECV_INFO *rinfo, GDT_SOCKPARAM *psockparam, int32_t recvmsg_munit );
-int32_t gdt_socket_phase( GDT_SOCKET_OPTION *option, struct GDT_RECV_INFO *rinfo, GDT_SOCKPARAM *psockparam, int32_t recvmsg_munit );
+
 ssize_t gdt_parse_socket_binary( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, uint8_t* u8buf, size_t size, uint32_t basebuf_munit );
 ssize_t gdt_send_msg( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, const char* msg, ssize_t size, uint32_t payload_type );
 uint32_t gdt_make_size_header(uint8_t* head_ptr,ssize_t size);
 size_t gdt_make_udpmsg( void* sendbin, const char* msg, ssize_t size, uint32_t payload_type );
 ssize_t gdt_send_udpmsg( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, const char* msg, ssize_t size, uint32_t payload_type, struct sockaddr *pfrom, socklen_t fromlen );
-
-ssize_t gdt_parse_websocket_binary( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, uint8_t* u8buf, size_t size, uint32_t basebuf_munit );
-ssize_t gdt_send_websocket_msg( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, const char* msg, ssize_t size );
-int gdt_send_handshake_param(GDT_SOCKET_ID socket, GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam );
-
-void gdt_init_socket_param( GDT_SOCKPARAM *psockparam );
-void gdt_free_sockparam( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam );
-int gdt_close_socket(GDT_SOCKET_ID* sock, char* error );
-
-int gdt_parse_http( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, char* target, int32_t recvmsg_munit );
-int gdt_parse_http_header( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, char* target, int32_t recvmsg_munit );
-void gdt_add_http_header( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, int headerindex, char* pbuf );
-
-void gdt_send_recv_client_term( GDT_SOCKET_OPTION *option );
-void gdt_thread_client( GDT_SOCKET_OPTION *option );
-
-#ifdef __WINDOWS__
-unsigned __stdcall gdt_input_thread_client( void* arg );
-unsigned __stdcall gdt_recv_thread_client( void* arg );
-#else
-void* gdt_input_thread_client( void* arg );
-void* gdt_recv_thread_client( void* arg );
-#endif
 
 #endif /*_GDT_SOCKET_H_*/
 
