@@ -1,0 +1,12 @@
+[
+    {
+	    "host":"localhost",
+	    "port":"37012",
+		"target":"date_log_debug"
+	},
+    {
+	    "host":"localhost",
+	    "port":"37012",
+		"target":"nginx_access_log"
+	}
+]
