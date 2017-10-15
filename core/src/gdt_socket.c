@@ -1277,7 +1277,9 @@ void gdt_server_update(GDT_SOCKET_OPTION *option)
 						gdt_close_socket(&child->id, NULL);
 					}
 #else
-					perror("recv");
+					if (errno != 0 && errno != EAGAIN && errno != EWOULDBLOCK){
+						perror("recv 0byte");
+					}
 					gdt_close_socket(&child->id, NULL);
 #endif
 

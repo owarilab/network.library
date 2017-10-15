@@ -33,21 +33,22 @@ int32_t gdt_create_hash( GDT_MEMORY_POOL* _ppool, size_t hlen )
 	if( hlen <= 0 ){
 		return -1;
 	}
-	if( 0 <= (h_munit = gdt_create_munit( _ppool, sizeof( struct GDT_HASH ), MEMORY_TYPE_DEFAULT )) )
+	if( -1 == (h_munit = gdt_create_munit( _ppool, sizeof( struct GDT_HASH ), MEMORY_TYPE_DEFAULT )) )
 	{
-		GDT_HASH *hash = (struct GDT_HASH *)GDT_POINTER( _ppool, h_munit );
-		hash->hash_size = hlen;
-		hash->hash_munit = gdt_create_munit( _ppool, sizeof( struct GDT_HASH ) * hlen, MEMORY_TYPE_DEFAULT );
-		if( 0 >= hash->hash_munit ){
-			return -1;
-		}
-		GDT_HASH *hashchild = (struct GDT_HASH *)GDT_POINTER( _ppool, hash->hash_munit );
-		uint32_t i;
-		for( i = 0; i < hlen; i++ )
-		{
-			hashchild[i].hash_size	= 0;
-			hashchild[i].hash_munit	= -1;
-		}
+		return -1;
+	}
+	GDT_HASH *hash = (struct GDT_HASH *)GDT_POINTER( _ppool, h_munit );
+	hash->hash_size = hlen;
+	hash->hash_munit = gdt_create_munit( _ppool, sizeof( struct GDT_HASH ) * hlen, MEMORY_TYPE_DEFAULT );
+	if( -1 == hash->hash_munit ){
+		return -1;
+	}
+	GDT_HASH *hashchild = (struct GDT_HASH *)GDT_POINTER( _ppool, hash->hash_munit );
+	uint32_t i;
+	for( i = 0; i < hlen; i++ )
+	{
+		hashchild[i].hash_size	= 0;
+		hashchild[i].hash_munit	= -1;
 	}
 	return h_munit;
 }
