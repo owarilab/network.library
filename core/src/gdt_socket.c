@@ -176,9 +176,9 @@ ssize_t gdt_send_message_multicast(uint32_t payload_type, char* payload, size_t 
 ssize_t gdt_client_send_message(uint32_t payload_type, char* payload, size_t payload_len, GDT_SOCKET_OPTION *option)
 {
 	ssize_t ret = 0;
-    if( option == NULL ){
-        return ret;
-    }
+	if( option == NULL ){
+		return ret;
+	}
 	if( option->connection_munit != -1 )
 	{
 		GDT_SERVER_CONNECTION_INFO* gdt_connection_info = (GDT_SERVER_CONNECTION_INFO*)GDT_POINTER(option->memory_pool, option->connection_munit);
@@ -196,8 +196,8 @@ ssize_t gdt_client_send_message(uint32_t payload_type, char* payload, size_t pay
 
 int32_t gdt_set_client_id(GDT_SOCKET_OPTION *option,uint32_t id)
 {
-    if( option == NULL ){
-        return GDT_SYSTEM_ERROR;
+	if( option == NULL ){
+		return GDT_SYSTEM_ERROR;
 	}
 	if( option->connection_munit != -1 )
 	{
@@ -590,7 +590,11 @@ ssize_t gdt_send_all(GDT_SOCKET_ID soc, char *buf, size_t size, int flag )
 					return (-1);
 				}
 				else{
+#ifdef __WINDOWS__
+
+#else
 					usleep(1000);
+#endif
 				}
 				len = 0;
 			}
@@ -715,7 +719,7 @@ int gdt_get_sockaddr_info( GDT_SOCKET_OPTION *option, struct sockaddr_storage *s
 		{
 			hints.ai_socktype = SOCK_DGRAM;
 		}
-		hints.ai_flags    = AI_PASSIVE;
+		hints.ai_flags	= AI_PASSIVE;
 		//hints.ai_flags = AI_NUMERICSERV;
 		if( ( errcode = getaddrinfo( (char *)gdt_upointer( option->memory_pool,option->host_name_munit ) , (char *)gdt_upointer( option->memory_pool,option->port_num_munit ), &hints, &res0 ) ) != 0 ){
 			printf( "getaddrinfo():%s\n",gai_strerror( errcode ) );
@@ -778,7 +782,7 @@ GDT_SOCKET_ID gdt_server_socket( GDT_SOCKET_OPTION *option, int is_ipv6 )
 		{
 			hints.ai_socktype = SOCK_DGRAM;	
 		}
-		hints.ai_flags    = AI_PASSIVE;
+		hints.ai_flags	= AI_PASSIVE;
 		if( ( errcode = getaddrinfo( hostname , port, &hints, &res0 ) ) != 0 ){
 			printf( "getaddrinfo():%s\n",gai_strerror( errcode ) );
 			break;
@@ -862,7 +866,7 @@ GDT_SOCKET_ID gdt_client_socket( GDT_SOCKET_OPTION *option )
 		{
 			hints.ai_socktype = SOCK_DGRAM;
 		}
-		hints.ai_flags    = AI_PASSIVE;
+		hints.ai_flags	= AI_PASSIVE;
 		//hints.ai_flags = AI_NUMERICSERV;
 		if( ( errcode = getaddrinfo( hostname , portnum, &hints, &res0 ) ) != 0 ){
 			printf( "getaddrinfo():%s\n",gai_strerror( errcode ) );
@@ -1333,7 +1337,11 @@ void gdt_server_update(GDT_SOCKET_OPTION *option)
 						*((char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit)) = '\0';
 						//memset((char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), 0, buffer_size);
 						if( child->sockparam.continue_pos > 0 ){
+#ifdef __WINDOWS__
+
+#else
 							usleep(1000);
+#endif
 							if( old_pos >= child->sockparam.continue_pos ){
 								printf("invalid packet\n");
 								break;
@@ -1471,10 +1479,10 @@ void gdt_client_update(GDT_SOCKET_OPTION *option)
 	if (option->mode != SOCKET_MODE_CLIENT_NONBLOCKING) {
 		return;
 	}
-    if( option->connection_munit == -1 )
-    {
-        return;
-    }
+	if( option->connection_munit == -1 )
+	{
+		return;
+	}
 	size_t buffer_size = sizeof(char) * (option->recvbuffer_size);
 	socklen_t srlen;
 	struct GDT_RECV_INFO *rinfo;
@@ -1509,40 +1517,51 @@ void gdt_client_update(GDT_SOCKET_OPTION *option)
 				}
 			}
 			if (srlen == -1) {
-                //printf("srlen == -1\n");
+				//printf("srlen == -1\n");
 			}
 			else if (srlen == 0) {
-                perror("recv");
-                gdt_close_socket(&child->id, NULL);
+				perror("recv");
+				gdt_close_socket(&child->id, NULL);
 			}
 			else if (option->plane_recv_callback != NULL)
 			{
-				if( *((char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit)) == '\0' )
-				{
+				if( *((char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit)) == '\0' ){
 					printf("gdt_recv invalid packet\n");
 					return;
 				}
 				rinfo = (struct GDT_RECV_INFO *)gdt_upointer(option->memory_pool, child->recvinfo_munit);
 				child->sockparam.acc = child->id;
 				rinfo->tinfo = child;
-				rinfo->recvlen = srlen;
-				rinfo->recvbuf_munit = child->recvbuf_munit;
-				rinfo->recvfrom = child->id;
-				switch (gdt_pre_packetfilter(option, rinfo, &child->sockparam, child->recvmsg_munit))
-				{
-				case -1:
-					gdt_close_socket(&child->id, NULL);
-					break;
-				case 1:
-					option->plane_recv_callback((void*)rinfo);
-					if (child->sockparam.c_status == PROTOCOL_STATUS_DEFAULT)
+				size_t old_pos = 0;
+				do{
+					rinfo->recvlen = srlen;
+					rinfo->recvbuf_munit = child->recvbuf_munit;
+					rinfo->recvfrom = child->id;
+					switch (gdt_pre_packetfilter(option, rinfo, &child->sockparam, child->recvmsg_munit))
 					{
-						gdt_close_socket(&child->id, NULL);
+					case -1:
+							gdt_close_socket(&child->id, NULL);
+							break;
+					case 1:
+							option->plane_recv_callback((void*)rinfo);
+							if (child->sockparam.c_status == PROTOCOL_STATUS_DEFAULT)
+							{
+									gdt_close_socket(&child->id, NULL);
+							}
+							break;
 					}
-					break;
-				}
-				*((char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit)) = '\0';
-				//memset((char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), 0, buffer_size);
+					*((char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit)) = '\0';
+					//memset((char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), 0, buffer_size);
+					if( child->sockparam.continue_pos > 0 ){
+						//usleep(10000);
+						if( old_pos >= child->sockparam.continue_pos ){
+							printf("invalid packet\n");
+							break;
+						}
+						// printf("continue_pos : %d, %d, %d\n",(int)child->sockparam.continue_pos,(int)child->sockparam.tmpmsglen,child->sockparam.fin);
+						old_pos = child->sockparam.continue_pos;
+					}
+				}while( child->sockparam.continue_pos > 0 && child->id > 0 );
 			}
 			else if (option->payload_recv_callback != NULL)
 			{
@@ -1567,13 +1586,16 @@ void gdt_client_update(GDT_SOCKET_OPTION *option)
 						}
 						break;
 					}
+					
 					*((char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit)) = '\0';
+					// memset((char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), 0, buffer_size);
 					if( child->sockparam.continue_pos > 0 ){
 						//usleep(10000);
 						if( old_pos >= child->sockparam.continue_pos ){
 							printf("invalid packet\n");
 							break;
 						}
+						// printf("continue_pos : %d, %d, %d\n",(int)child->sockparam.continue_pos,(int)child->sockparam.tmpmsglen,child->sockparam.fin);
 						old_pos = child->sockparam.continue_pos;
 					}
 				}while( child->sockparam.continue_pos > 0 && child->id > 0 );
@@ -1811,7 +1833,7 @@ ssize_t gdt_parse_socket_binary( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psock
 		{
 			msg[cnt++] = u8buf[i];
 			if( cnt == psockparam->payloadlen && i != size-1 ){
-				// printf("out of range : %d, %d, %d\n",(int)startpos,(int)psockparam->payloadlen,(int)size);
+				//printf("out of range : %d, %d, %d, %d\n",(int)startpos,(int)psockparam->payloadlen,(int)size, i);
 				psockparam->continue_pos += tmp_continue_pos+(i+1);
 				break;
 			}
@@ -1829,7 +1851,7 @@ ssize_t gdt_parse_socket_binary( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psock
 			psockparam->tmpmsglen			= 0;
 			psockparam->tmpbitsift			= -1;
 			psockparam->appdata32bit = 0x00000000;
-			//psockparam->continue_pos        = 0;
+			//psockparam->continue_pos		= 0;
 			msg[psockparam->payloadlen] = '\0';
 			retsize = psockparam->payloadlen;
 		}

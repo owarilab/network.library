@@ -31,20 +31,17 @@ int32_t gdt_createrootnode( GDT_MEMORY_POOL* _ppool )
 {
 	int32_t rootnode_munit = -1;
 	GDT_NODE *rootnode = NULL;
-	do{
-		rootnode_munit = gdt_create_munit( _ppool, sizeof( GDT_NODE ), MEMORY_TYPE_DEFAULT );
-		if( rootnode_munit <= 0 ){
-			break;
-		}
-		rootnode = (GDT_NODE*)GDT_POINTER( _ppool, rootnode_munit );
-		rootnode->id				= ELEMENT_ROOT;
-		rootnode->element_munit		= -1;
-		rootnode->element_munit		= -1;
-		rootnode->pos				= 0;
-		rootnode->elmsize			= 0;
-		rootnode->exec_tmp_munit = -1;
-		rootnode->exec_tmp_id = -1;
-	}while( false );
+	if( -1 == ( rootnode_munit = gdt_create_munit( _ppool, sizeof( GDT_NODE ), MEMORY_TYPE_DEFAULT ) ) ){
+		return rootnode_munit;
+	}
+	rootnode = (GDT_NODE*)GDT_POINTER( _ppool, rootnode_munit );
+	rootnode->id                = ELEMENT_ROOT;
+	rootnode->element_munit     = -1;
+	rootnode->element_munit     = -1;
+	rootnode->pos               = 0;
+	rootnode->elmsize           = 0;
+	rootnode->exec_tmp_munit    = -1;
+	rootnode->exec_tmp_id       = -1;
 	return rootnode_munit;
 }
 
@@ -52,23 +49,17 @@ int32_t gdt_addnodeelement( GDT_MEMORY_POOL* _ppool, GDT_NODE* node )
 {
 	int32_t element_munit;
 	GDT_NODE* childnode;
-	do{
-		element_munit = gdt_create_munit( _ppool, sizeof( GDT_NODE ), MEMORY_TYPE_DEFAULT );
-		if( element_munit < 0 )
-		{
-			printf("1element_munit < 0\n");
-			break;
-		}
-		childnode = (GDT_NODE*)GDT_POINTER( _ppool, element_munit );
-		childnode->id             = ELEMENT_CHILD_ARRAY;
-		childnode->element_munit  = -1;
-		childnode->pos            = 0;
-		childnode->elmsize        = 0;
-		childnode->exec_tmp_munit = -1;
-		childnode->exec_tmp_id = -1;
-		gdt_addelement( _ppool, node, ELEMENT_CHILD, element_munit );
-		childnode = (GDT_NODE*)GDT_POINTER( _ppool, element_munit );
-	}while( false );
+	if( -1 == ( element_munit = gdt_create_munit( _ppool, sizeof( GDT_NODE ), MEMORY_TYPE_DEFAULT ) ) ){
+		return element_munit;
+	}
+	childnode = (GDT_NODE*)GDT_POINTER( _ppool, element_munit );
+	childnode->id             = ELEMENT_CHILD_ARRAY;
+	childnode->element_munit  = -1;
+	childnode->pos            = 0;
+	childnode->elmsize        = 0;
+	childnode->exec_tmp_munit = -1;
+	childnode->exec_tmp_id = -1;
+	gdt_addelement( _ppool, node, ELEMENT_CHILD, element_munit );
 	return element_munit;
 }
 
@@ -77,47 +68,45 @@ int32_t gdt_addelement( GDT_MEMORY_POOL* _ppool, GDT_NODE* node, int id, int32_t
 	int allocsize = 8;
 	int32_t tmpmunit;
 	GDT_NODE* tmplist1, *tmplist2;
-	GDT_NODE* workelemlist;
+	GDT_NODE* workelemlist = NULL;
 	int i;
-	do{
-		if( node->element_munit == -1 )
-		{
-			node->element_munit = gdt_create_munit( _ppool, sizeof( GDT_NODE ) * allocsize, MEMORY_TYPE_DEFAULT );
-			node->elmsize = allocsize;
-			workelemlist = ( GDT_NODE* )GDT_POINTER( _ppool, node->element_munit );
-			for( i = 0; i < allocsize; i++ ){
-				workelemlist[i].element_munit = -1;
-				workelemlist[i].exec_tmp_munit = -1;
-				workelemlist[i].exec_tmp_id = -1;
+	if( node->element_munit == -1 ){
+		if( -1 == ( node->element_munit = gdt_create_munit( _ppool, sizeof( GDT_NODE ) * allocsize, MEMORY_TYPE_DEFAULT ) ) ){
+			return -1;
+		}
+		node->elmsize = allocsize;
+		workelemlist = ( GDT_NODE* )GDT_POINTER( _ppool, node->element_munit );
+		for( i = 0; i < allocsize; i++ ){
+			workelemlist[i].element_munit  = -1;
+			workelemlist[i].exec_tmp_munit = -1;
+			workelemlist[i].exec_tmp_id    = -1;
+		}
+	}
+	else{
+		if( node->pos >= node->elmsize ){
+			tmplist1 = ( GDT_NODE* )GDT_POINTER( _ppool, node->element_munit );
+			if( -1 == ( tmpmunit = gdt_create_munit( _ppool, sizeof( GDT_NODE ) * ( node->elmsize + allocsize ), MEMORY_TYPE_DEFAULT ) ) ){
+				return -1;
 			}
+			tmplist2 = ( GDT_NODE* )GDT_POINTER( _ppool, tmpmunit );
+			memcpy( tmplist2, tmplist1, sizeof( GDT_NODE ) * node->elmsize );
+			workelemlist = ( GDT_NODE* )GDT_POINTER( _ppool, tmpmunit );
+			for( i = node->elmsize; i < node->elmsize+allocsize; i++ ){
+				workelemlist[i].element_munit  = -1;
+				workelemlist[i].exec_tmp_munit = -1;
+				workelemlist[i].exec_tmp_id    = -1;
+			}
+			gdt_free_memory_unit( _ppool, &node->element_munit );
+			node->element_munit = tmpmunit;
+			node->elmsize += allocsize;
 		}
 		else{
-			if( node->pos >= node->elmsize )
-			{
-				tmplist1 = ( GDT_NODE* )GDT_POINTER( _ppool, node->element_munit );
-				tmpmunit = gdt_create_munit( _ppool, sizeof( GDT_NODE ) * ( node->elmsize + allocsize ), MEMORY_TYPE_DEFAULT );
-				tmplist2 = ( GDT_NODE* )GDT_POINTER( _ppool, tmpmunit );
-				memcpy( tmplist2, tmplist1, sizeof( GDT_NODE ) * node->elmsize );
-				workelemlist = ( GDT_NODE* )GDT_POINTER( _ppool, tmpmunit );
-				for( i = node->elmsize; i < node->elmsize+allocsize; i++ ){
-					workelemlist[i].element_munit = -1;
-					workelemlist[i].exec_tmp_munit = -1;
-					workelemlist[i].exec_tmp_id = -1;
-				}
-				gdt_free_memory_unit( _ppool, &node->element_munit );
-				node->element_munit = tmpmunit;
-				node->elmsize += allocsize;
-			}
+			workelemlist = ( GDT_NODE* )GDT_POINTER( _ppool, node->element_munit );
 		}
-		workelemlist = ( GDT_NODE* )GDT_POINTER( _ppool, node->element_munit );
-		if( workelemlist == NULL )
-		{
-			break;
-		}
-		workelemlist[node->pos].id = id;
-		workelemlist[node->pos].element_munit = data_munit;
-		node->pos++;
-	}while( false );
+	}
+	workelemlist[node->pos].id = id;
+	workelemlist[node->pos].element_munit = data_munit;
+	node->pos++;
 	return node->element_munit;
 }
 

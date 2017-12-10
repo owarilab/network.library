@@ -76,8 +76,7 @@ int gdt_token_analyzer( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pst
 		if( *pstr == '\0' )
 		{
 			if( tokensize > 0 ){
-				if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
-				{
+				if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) ){
 					printf( "add token error.\n" );
 					break;
 				}
@@ -85,9 +84,8 @@ int gdt_token_analyzer( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pst
 			break;
 		}
 		if( tokensize >= STRBUF_SIZE-8){
-			printf( "buffer size over\n" );
-			if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
-			{
+			printf( "token buffer size over\n" );
+			if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) ){
 				printf( "add token error.\n" );
 				break;
 			}
@@ -114,26 +112,24 @@ int gdt_token_analyzer( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pst
 			pstr+=2;
 			continue;
 		}
-		if( *pstr == '\n' )
-		{
-			if( tokensize > 0 )
-			{
-				if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
-				{
-					printf("add token error.\n");
-					break;
-				}
-				pstr++;
-				continue;
-			}
-			pstr++;
-		}
-		else if( !isascii(*pstr) )
-		{
-			printf("invalid char : %c\n", (*pstr) );
-			break;
-		}
-		else if( ( tokensize == 0 && isdigit( *pstr ) ) || ( tokensize > 0 && token_type == ID_NUM ) )
+//		if( *pstr == '\n' )
+//		{
+//			if( tokensize > 0 ){
+//				if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) ){
+//					printf("add token error.\n");
+//					break;
+//				}
+//				pstr++;
+//				continue;
+//			}
+//			pstr++;
+//		}
+//		else if( !isascii(*pstr) )
+//		{
+//			printf("invalid char : %c\n", (*pstr) );
+//			break;
+//		}
+		if( ( tokensize == 0 && isdigit( *pstr ) ) || ( tokensize > 0 && token_type == ID_NUM ) )
 		{
 			int dot = 0;
 			token_type = ID_NUM;
@@ -194,7 +190,7 @@ int gdt_token_analyzer( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pst
 					*(ptoken+(tokensize++)) = *(pstr++);
 				}
 				if( tokensize >= STRBUF_SIZE-8){
-					printf( "buffer size over\n" );
+					printf( "string buffer size over\n" );
 					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
 					{
 						printf( "add token error.\n" );
@@ -219,22 +215,22 @@ int gdt_token_analyzer( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pst
 					printf("syntax error : \'\n");
 					return 1;
 				}
-				// multi byte
-				if( ( *pstr >= (char)(0x81) && *pstr <= (char)(0x9f) ) || ( *pstr >= (char)(0xe0) && *pstr <= (char)(0xfc) ) ){
-					int i;
-					for( i=0; i<2; i++ ){
-						if( *pstr == '\'' ){
-							//printf( "%d %d\n",(uint8_t)(*(pstr-2)), (uint8_t)(*(pstr-1)) );
-							break;
-						}
-						*(ptoken+(tokensize++)) = *(pstr++);
-					}
-				}
-				else {
+//				// multi byte
+//				if( ( *pstr >= (char)(0x81) && *pstr <= (char)(0x9f) ) || ( *pstr >= (char)(0xe0) && *pstr <= (char)(0xfc) ) ){
+//					int i;
+//					for( i=0; i<2; i++ ){
+//						if( *pstr == '\'' ){
+//							//printf( "%d %d\n",(uint8_t)(*(pstr-2)), (uint8_t)(*(pstr-1)) );
+//							break;
+//						}
+//						*(ptoken+(tokensize++)) = *(pstr++);
+//					}
+//				}
+//				else {
 					*(ptoken+(tokensize++)) = *(pstr++);
-				}
+//				}
 				if( tokensize >= STRBUF_SIZE-8){
-					printf( "buffer size over\n" );
+					printf( "string buffer size over\n" );
 					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
 					{
 						printf( "add token error.\n" );
@@ -252,8 +248,7 @@ int gdt_token_analyzer( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pst
 		}
 		else if( *pstr == '\n' || isspace(*pstr)){
 			if( tokensize > 0 ){
-				if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
-				{
+				if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) ){
 					printf("add token error.\n");
 					break;
 				}
@@ -308,6 +303,19 @@ int gdt_token_analyzer( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pst
 					}
 					continue;
 				}
+				else if( *pstr == ':' ){
+					token_type = ID_SIGN;
+					*(ptoken+(tokensize++)) = *(pstr++);
+					if( *pstr == ':' ){
+						*(ptoken+(tokensize++)) = *(pstr++);
+					}
+					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
+					{
+						printf("add token error.\n");
+						break;
+					}
+					continue;
+				}
 				else{
 					token_type = ID_SIGN;
 					*(ptoken+(tokensize++)) = *(pstr++);
@@ -319,88 +327,98 @@ int gdt_token_analyzer( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pst
 					continue;
 				}
 			}
-			else if( *pstr =='(' || *pstr == '{' || *pstr == '[' ){
-				if( tokensize > 0 ){
+			else{
+				if( isalpha(*pstr) || *pstr == '_'){
+					
+				}
+				else if( *pstr =='(' || *pstr == '{' || *pstr == '[' ){
+					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) ){
+						printf("add token error.\n");
+						break;
+					}
+					token_type = ID_SIGN;
+					*(ptoken+(tokensize++)) = *(pstr++);
 					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
 					{
 						printf("add token error.\n");
 						break;
 					}
+					continue;
 				}
-				token_type = ID_SIGN;
-				*(ptoken+(tokensize++)) = *(pstr++);
-				if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
-				{
-					printf("add token error.\n");
-					break;
-				}
-				continue;
-			}
-			else if( *pstr ==';' || *pstr == ')' || *pstr == '}' || *pstr == ']' || *pstr == ',' ){
-				if( tokensize > 0 ){
+				else if( *pstr ==';' || *pstr == ')' || *pstr == '}' || *pstr == ']' || *pstr == ',' ){
+					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) ){
+						printf("add token error.\n");
+						break;
+					}
+					token_type = ID_SIGN;
+					*(ptoken+(tokensize++)) = *(pstr++);
 					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
 					{
 						printf("add token error.\n");
 						break;
 					}
+					continue;
 				}
-				token_type = ID_SIGN;
-				*(ptoken+(tokensize++)) = *(pstr++);
-				if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
-				{
-					printf("add token error.\n");
-					break;
-				}
-				continue;
-			}
-			else if( *pstr == '+' || *pstr == '-' || *pstr == '=' || *pstr == '<' || *pstr == '>' || *pstr == '|' || *pstr == '&' ){
-				char c = ' ';
-				if( tokensize > 0 ){
+				else if( *pstr == '+' || *pstr == '-' || *pstr == '=' || *pstr == '<' || *pstr == '>' || *pstr == '|' || *pstr == '&' ){
+					char c = ' ';
+					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) ){
+						printf("add token error.\n");
+						break;
+					}
+					token_type = ID_OP;
+					c = *pstr;
+					*(ptoken+(tokensize++)) = *(pstr++);
+					if( *pstr == '=' && c != '|' && c != '&' ){
+						*(ptoken+(tokensize++)) = *(pstr++);
+					}
+					else if( c == *pstr ){
+						*(ptoken+(tokensize++)) = *(pstr++);
+					}
+					else if( c == '-' && *pstr == '>' ){
+						*(ptoken+(tokensize++)) = *(pstr++);
+					}
 					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
 					{
 						printf("add token error.\n");
 						break;
 					}
+					continue;
 				}
-				token_type = ID_OP;
-				c = *pstr;
-				*(ptoken+(tokensize++)) = *(pstr++);
-				if( *pstr == '=' && c != '|' && c != '&' ){
-					*(ptoken+(tokensize++)) = *(pstr++);
-				}
-				else if( c == *pstr ){
-					*(ptoken+(tokensize++)) = *(pstr++);
-				}
-				else if( c == '-' && *pstr == '>' ){
-					*(ptoken+(tokensize++)) = *(pstr++);
-				}
-				if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
+				else if( *pstr == '*' || *pstr == '/' || *pstr == '%' || *pstr == '!' || *pstr == '^' )
 				{
-					printf("add token error.\n");
-					break;
-				}
-				continue;
-			}
-			else if( *pstr == '*' || *pstr == '/' || *pstr == '%' || *pstr == '!' || *pstr == '^' )
-			{
-				if( tokensize > 0 ){
 					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
 					{
 						printf("add token error.\n");
 						break;
 					}
-				}
-				token_type = ID_OP;
-				*(ptoken+(tokensize++)) = *(pstr++);
-				if( *pstr == '=' ){
+					token_type = ID_OP;
 					*(ptoken+(tokensize++)) = *(pstr++);
+					if( *pstr == '=' ){
+						*(ptoken+(tokensize++)) = *(pstr++);
+					}
+					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
+					{
+						printf("add token error.\n");
+						break;
+					}
+					continue;
 				}
-				if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
-				{
-					printf("add token error.\n");
-					break;
+				else if( *pstr == ':' ){
+					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) ){
+						printf("add token error.\n");
+						break;
+					}
+					token_type = ID_SIGN;
+					*(ptoken+(tokensize++)) = *(pstr++);
+					if( *pstr == ':' ){
+						*(ptoken+(tokensize++)) = *(pstr++);
+					}
+					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) ){
+						printf("add token error.\n");
+						break;
+					}
+					continue;
 				}
-				continue;
 			}
 			*(ptoken+(tokensize++)) = *(pstr++);
 		}
@@ -410,8 +428,8 @@ int gdt_token_analyzer( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pst
 
 int gdt_addtoken( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* tokenbuf, int* tokensize, int type )
 {
-	char *pbuf;
-	int tmptype;
+	char *pbuf = NULL;
+	int tmptype = 0;
 	int32_t tmpmunit;
 	GDT_TOKENS *ptokens = (GDT_TOKENS*)GDT_POINTER( _ppool, tokens_munit );
 	GDT_TOKEN *ptoken = NULL;
@@ -460,7 +478,9 @@ int gdt_addtoken( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* tokenbuf,
 		ptoken->size = (*tokensize);
 		memcpy(pbuf,tokenbuf,(*tokensize));
 	}
-	tmptype = gdt_check_systemword( pbuf );
+	if( type == ID_SYMBOL ){
+		tmptype = gdt_check_systemword( pbuf );
+	}
 	if( tmptype != 0 ){
 		ptoken->type = tmptype;
 	}
