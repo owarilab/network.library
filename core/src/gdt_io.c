@@ -29,65 +29,41 @@
 
 int gdt_fget_info( char* file_name, GDT_FILE_INFO* info )
 {
-	int error_code = GDT_SYSTEM_OK;
 	struct stat st;
-	FILE* f;
-	do{
-		if( info == NULL ){
-			printf( "[gdt_fget_info] GDT_FILE_INFO is null\n" );
-			error_code = GDT_SYSTEM_ERROR;
-			break;
-		}
-		
+	if( info == NULL ){
+		printf( "[gdt_fget_info] GDT_FILE_INFO is null\n" );
+		return GDT_SYSTEM_ERROR;
+	}
 #ifdef __WINDOWS__
-		if (0 != fopen_s(&f, file_name, "r"))
+	if (stat(file_name, &st) < 0)
 #else
-		if (!(f = fopen(file_name, "r")))
+	if (lstat(file_name, &st) < 0)
 #endif
-		{
-			//printf( "[gdt_fget_info] fopen error = %s\n", file_name );
-			error_code = GDT_SYSTEM_ERROR;
-			break;
-		}
-		
-#ifdef __WINDOWS__
-		if (stat(file_name, &st) < 0)
-#else
-		if (lstat(file_name, &st) < 0)
-#endif
-		{
-			printf("[gdt_lstate]lstat error\n");
-			error_code = GDT_SYSTEM_ERROR;
-			break;
-		}
-		info->size = st.st_size;
-		//info->update_usec = st.st_atime;
-		//info->update_usec = st.st_ctime;
-		info->update_usec = st.st_mtime;
-		//info->update_usec = st.st_mtim.tv_nsec;
-		fclose( f );
-	}while( false );
-	return error_code;
+	{
+		printf("[gdt_lstate]lstat error\n");
+		return GDT_SYSTEM_ERROR;
+	}
+	info->size = st.st_size;
+	//info->update_usec = st.st_atime;
+	//info->update_usec = st.st_ctime;
+	info->update_usec = st.st_mtime;
+	//info->update_usec = st.st_mtim.tv_nsec;
+	return GDT_SYSTEM_OK;
 }
 
 int gdt_fputchar( FILE* f )
 {
-	int error_code = 0;
 	char c;
-	do{
-		if( f == NULL || !f )
-		{
-			printf( "[gdt_fputchar] FILE get error\n" );
-			break;
+	if( f == NULL || !f ){
+		printf( "[gdt_fputchar] FILE get error\n" );
+		return GDT_SYSTEM_ERROR;
+	}
+	while( ( c = fgetc( f ) ) != EOF ){
+		if( putchar( c ) < 0 ){
+			return GDT_SYSTEM_ERROR;
 		}
-		while( ( c = fgetc( f ) ) != EOF )
-		{
-			if( putchar( c ) < 0 ){
-				exit( 1 );
-			}
-		}
-	}while( false );
-	return error_code;
+	}
+	return GDT_SYSTEM_OK;
 }
 
 int gdt_fputchar_line( FILE* f, uint32_t start, uint32_t line )
