@@ -34,57 +34,58 @@ extern "C"{
 
 #include "gdt_core.h"
 #include "gdt_system.h"
-#include "gdt_io.h"
-#include "gdt_sha1.h"
-#include "gdt_base64.h"
 #include "gdt_string.h"
-#include "gdt_queue.h"
 #include "gdt_hash.h"
 #include "gdt_memory_allocator.h"
+
+//#include <stdio.h>
+//#include <string.h>
+//#include <stdlib.h>
+//#include <errno.h>
+//#include <ctype.h>
+//#include <fcntl.h>
+//#include <time.h>
+//#include <sys/types.h>
+//#include <sys/stat.h>
 
 #ifdef __WINDOWS__
 #include <process.h>
 #else
-#include <stdint.h>
-#include <semaphore.h>
-#include <pthread.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <poll.h>
-#include <sysexits.h>
-#include <unistd.h>
-#include <syslog.h>
-#include <sys/ioctl.h>
-#include <arpa/inet.h>
-#ifdef USE_EPOOL
-#include <sys/epoll.h>
-#endif
-#ifdef USE_KQUEUE
-#include <sys/event.h>
-#endif
 #include <sys/socket.h>
-#include <sys/wait.h>
-#include <sys/param.h>
-#include <sys/file.h>
-#ifndef __IOS__
-#include <arpa/telnet.h>
-#endif
-#include <arpa/inet.h>
-#include <sys/time.h>
-#include <sys/resource.h>
-#include <net/if.h>
-#include <ifaddrs.h>
-#endif
+#include <netdb.h>
+#include <netinet/in.h>
 
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <ctype.h>
-#include <fcntl.h>
-#include <time.h>
-#include <sys/types.h>
-#include <sys/stat.h>
+// thread
+//#include <pthread.h>
+//#include <semaphore.h>
+
+// poll
+//#include <poll.h>
+
+// fork
+//#include <unistd.h>
+//#include <syslog.h>
+//#include <sys/ioctl.h>
+//#include <arpa/inet.h>
+
+// epoll
+//#ifdef USE_EPOOL
+//#include <sys/epoll.h>
+//#endif
+
+// kqueue
+//#ifdef USE_KQUEUE
+//#include <sys/event.h>
+//#endif
+
+//#include <sys/wait.h>
+//#include <sys/param.h>
+//#include <sys/file.h>
+//#include <sys/time.h>
+//#include <sys/resource.h>
+//#include <net/if.h>
+//#include <ifaddrs.h>
+#endif
 
 // inetflags
 #define INET_FLAG_BIT_IPV6 0x00000001
@@ -139,19 +140,19 @@ typedef struct GDT_SOCKPARAM
 	uint8_t rsv;					// RSV flag
 	uint8_t opcode;					// opcode( 0:connection, 1:test, 2:binary, 3-7reserved for further, 8:close, 9:ping, a:pong b-f:reserved for further )
 	uint8_t mask;					// mask flag( 1:mask enable )
-	uint8_t ckpayloadlen;			// payloadサイズ( 1-125:そのままデータサイズ, 126:以降16ビットがデータサイズ, 127:以降64ビットがデータサイズ )
+	uint8_t ckpayloadlen;			// payload size( 1-125: size, 126: after 16bit, 127: after 64bit )
 	uint32_t payload_type;			// payload type
-	uint64_t payloadlen;			// 実際のpayloadサイズ
-	uint32_t maskindex;				// maskキーの格納場所( 1-125:2, 126:4, 127:8 )
+	uint64_t payloadlen;			// payload size
+	uint32_t maskindex;				// mask( 1-125:2, 126:4, 127:8 )
 	uint32_t payloadmask;			// mask(32bit)
-	ssize_t tmpmsglen;				// 受信メッセージサイズ( 受信途中の )
-	uint32_t appdata32bit;			// マスク処理で使う32bitのデータ
-	int8_t tmpbitsift;				// 途中のマスク処理
+	ssize_t tmpmsglen;				// tmp recv msg size
+	uint32_t appdata32bit;			// 32bit mask
+	int8_t tmpbitsift;				// tmp mask
 	size_t continue_pos;
-	int32_t buf_munit;				// ソケットが持っているバッファ領域
-	struct sockaddr_in addr;		// UDP送信先
-	struct sockaddr_storage from;	// UDPの受信相手情報
-	socklen_t fromlen;				// UDPのfromのサイズ
+	int32_t buf_munit;				// socket buffer
+	struct sockaddr_in addr;		// UDP addr
+	struct sockaddr_storage from;	// UDP from
+	socklen_t fromlen;				// UDP from size
 } GDT_SOCKPARAM;
 
 typedef struct GDT_SERVER_CONNECTION_INFO
@@ -191,14 +192,10 @@ typedef struct GDT_SEND_INFO
 	ssize_t sendlen;
 } GDT_SEND_INFO;
 
-
-// event callback
 typedef void* (*GDT_CALLBACK)( void* args );
 typedef int (*GDT_CONNECTION_EVENT_CALLBACK)( GDT_SERVER_CONNECTION_INFO* connection );
 typedef int32_t (*GDT_ON_RECV)(uint32_t payload_type, uint8_t* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info );
-// recv call callback
 typedef int (*GDT_USER_RECV)( void* connection, GDT_SOCKET_ID id, char* buf, size_t buffer_size, int flag );
-// send call callback
 typedef int (*GDT_USER_SEND)( void* connection, GDT_SOCKET_ID id, char *buf, size_t buffer_size, int flag );
 
 typedef struct GDT_SOCKET_OPTION
@@ -303,6 +300,8 @@ void gdt_disconnect( GDT_SOCKPARAM *psockparam );
 void gdt_set_sock_option( GDT_SOCKET_OPTION *option );
 void* gdt_socket( GDT_SOCKET_OPTION *option );
 void gdt_free_socket( GDT_SOCKET_OPTION *option );
+
+void gdt_recv_event(GDT_SOCKET_OPTION *option, GDT_SERVER_CONNECTION_INFO *child, socklen_t srlen);
 
 void gdt_nonblocking_server(GDT_SOCKET_OPTION *option);
 void gdt_server_update(GDT_SOCKET_OPTION *option);

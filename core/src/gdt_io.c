@@ -40,7 +40,7 @@ int gdt_fget_info( char* file_name, GDT_FILE_INFO* info )
 	if (lstat(file_name, &st) < 0)
 #endif
 	{
-		printf("[gdt_lstate]lstat error\n");
+		//printf("[gdt_lstate]lstat error:%s\n",file_name);
 		return GDT_SYSTEM_ERROR;
 	}
 	info->size = st.st_size;
