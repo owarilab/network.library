@@ -54,6 +54,7 @@ extern "C"{
 #include <sys/socket.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 
 // thread
 //#include <pthread.h>
@@ -66,7 +67,6 @@ extern "C"{
 //#include <unistd.h>
 //#include <syslog.h>
 //#include <sys/ioctl.h>
-//#include <arpa/inet.h>
 
 // epoll
 //#ifdef USE_EPOOL
