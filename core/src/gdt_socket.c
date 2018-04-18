@@ -585,13 +585,20 @@ ssize_t gdt_send_all(GDT_SOCKET_ID soc, char *buf, size_t size, int flag )
 		{
 			if( ( len = send( soc, ptr, lest, flag ) ) == -1 )
 			{
+				if (errno == 0) {
+#ifdef __WINDOWS__
+					Sleep(1);
+#else
+					usleep(1000);
+#endif
+				}
 				//  && errno != EWOULDBLOCK
-				if( errno != EAGAIN  ){
+				else if( errno != EAGAIN  ){
 					return (-1);
 				}
 				else{
 #ifdef __WINDOWS__
-
+					Sleep(1);
 #else
 					usleep(1000);
 #endif
@@ -625,9 +632,23 @@ ssize_t gdt_sendto_all(GDT_SOCKET_ID soc, char *buf, size_t size, int flag, stru
 			if( ( len = sendto( soc, ptr, lest, flag, pfrom, fromlen ) ) == -1 )
 			//if( ( len = sendto( soc, ptr, lest, flag, NULL, 0 ) ) == -1 )
 			{
-				if( errno != EAGAIN )
-				{
+				if (errno == 0) {
+#ifdef __WINDOWS__
+					Sleep(1);
+#else
+					usleep(1000);
+#endif
+				}
+				//  && errno != EWOULDBLOCK
+				else if (errno != EAGAIN) {
 					return (-1);
+				}
+				else {
+#ifdef __WINDOWS__
+					Sleep(1);
+#else
+					usleep(1000);
+#endif
 				}
 				len = 0;
 			}
@@ -1680,7 +1701,7 @@ ssize_t gdt_send_msg( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, cons
 		head1 = 0x80 | psockparam->ws_msg_mode;
 		headersize = gdt_make_size_header(&head2,size);
 		size_t binsize = (size_t) ( ( sizeof( uint8_t ) * size ) + headersize );
-		if( psockparam->buf_munit < 0 || gdt_usize( option->memory_pool, psockparam->buf_munit ) <= size + headersize )
+		if( psockparam->buf_munit < 0 || gdt_usize( option->memory_pool, psockparam->buf_munit ) <= binsize )
 		{
 			if( psockparam->buf_munit >= 0 ){
 				gdt_free_memory_unit( option->memory_pool, &psockparam->buf_munit );
