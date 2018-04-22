@@ -52,7 +52,7 @@ int32_t gdt_create_hash( GDT_MEMORY_POOL* _ppool, size_t hlen )
 	return h_munit;
 }
 
-int32_t gdt_add_hash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, int32_t name_munit, int32_t data_munit, int32_t id )
+GDT_HASH_ELEMENT* gdt_add_hash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, int32_t name_munit, int32_t data_munit, int32_t id )
 {
 	struct GDT_HASH *hash;
 	struct GDT_HASH *hashchild;
@@ -60,9 +60,9 @@ int32_t gdt_add_hash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, int32_t name_mun
 	uint32_t hashkey;
 	char* pbuf;
 	uint32_t i;
-	int32_t is_push = 0;
+	GDT_HASH_ELEMENT* is_push = NULL;
 	if( -1 == h_munit ){
-		return GDT_SYSTEM_ERROR;
+		return is_push;
 	}
 	hash = (struct GDT_HASH *)GDT_POINTER( _ppool, h_munit );
 	hashkey = gdt_ihash( (char*)GDT_POINTER( _ppool, name_munit ), hash->hash_size );
@@ -70,10 +70,10 @@ int32_t gdt_add_hash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, int32_t name_mun
 	hashchild = (struct GDT_HASH *)GDT_POINTER( _ppool, hash->hash_munit );
 	if( -1 == hashchild[hashkey].hash_munit )
 	{
-		if( -1 == (hashchild[hashkey].hash_munit = gdt_create_munit( _ppool, sizeof( struct GDT_HASH_ELEMENT ) * 16, MEMORY_TYPE_DEFAULT ))){
-			return GDT_SYSTEM_ERROR;
+		if( -1 == (hashchild[hashkey].hash_munit = gdt_create_munit( _ppool, sizeof( struct GDT_HASH_ELEMENT ) * GDT_HASH_ELEMENT_SIZE, MEMORY_TYPE_DEFAULT ))){
+			return is_push;
 		}
-		hashchild[hashkey].hash_size = 16;
+		hashchild[hashkey].hash_size = GDT_HASH_ELEMENT_SIZE;
 		hashelement = (struct GDT_HASH_ELEMENT*)GDT_POINTER( _ppool, hashchild[hashkey].hash_munit );
 		for( i = 0; i < hashchild[hashkey].hash_size; i++ )
 		{
@@ -94,7 +94,7 @@ int32_t gdt_add_hash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, int32_t name_mun
 				}
 				hashelement[i].elm_munit = data_munit;
 				hashelement[i].id = id;
-				is_push = 1;
+				is_push = &hashelement[i];
 				break;
 			}
 		}
@@ -102,15 +102,11 @@ int32_t gdt_add_hash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, int32_t name_mun
 			hashelement[i].hashname_munit = name_munit;
 			hashelement[i].elm_munit = data_munit;
 			hashelement[i].id = id;
-			is_push = 1;
+			is_push = &hashelement[i];
 			break;
 		}
 	}
-	if( is_push == 0 ){
-		printf("hash size over\n");
-		return  GDT_SYSTEM_ERROR;
-	}
-	return  GDT_SYSTEM_OK;
+	return is_push;
 }
 
 int32_t gdt_make_hash_name( GDT_MEMORY_POOL* _ppool, int32_t h_munit,const char* name)
@@ -313,10 +309,12 @@ int32_t gdt_move_hash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* has
 			if( !strcmp( tmpname, hashname_from ) )
 			{
 				memcpy(tmpname,hashname_to,gdt_strlen(hashname_to));
-				retmunit = gdt_add_hash( _ppool, h_munit, hashelement[i].hashname_munit, hashelement[i].elm_munit, hashelement[i].id );
-				hashelement[i].hashname_munit = -1;
-				hashelement[i].elm_munit = -1;
-				hashelement[i].id = -1;
+				GDT_HASH_ELEMENT* elm = gdt_add_hash( _ppool, h_munit, hashelement[i].hashname_munit, hashelement[i].elm_munit, hashelement[i].id );
+				if( elm != &hashelement[i] ){
+					hashelement[i].hashname_munit = -1;
+					hashelement[i].elm_munit = -1;
+					hashelement[i].id = -1;
+				}
 				break;
 			}
 		}
@@ -421,18 +419,14 @@ int32_t gdt_get_hash_name( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char*
 	}
 	hashkey = gdt_ihash( hashname, hash->hash_size );
 	hashchild = (struct GDT_HASH *)GDT_POINTER( _ppool, hash->hash_munit );
-	if( -1 == hashchild[hashkey].hash_munit )
-	{
+	if( -1 == hashchild[hashkey].hash_munit ){
 		return retmunit;
 	}
 	GDT_HASH_ELEMENT *hashelement = (struct GDT_HASH_ELEMENT*)GDT_POINTER( _ppool, hashchild[hashkey].hash_munit );
 	uint32_t i;
-	for( i = 0; i < hashchild[hashkey].hash_size; i++ )
-	{
-		if( hashelement[i].hashname_munit >= 0 )
-		{
-			if( !strcmp( (char*)GDT_POINTER( _ppool, hashelement[i].hashname_munit ), hashname ) )
-			{
+	for( i = 0; i < hashchild[hashkey].hash_size; i++ ){
+		if( hashelement[i].hashname_munit >= 0 ){
+			if( !strcmp( (char*)GDT_POINTER( _ppool, hashelement[i].hashname_munit ), hashname ) ){
 				retmunit = hashelement[i].hashname_munit;
 				break;
 			}

@@ -44,6 +44,7 @@ typedef struct GDT_MSGQUEUE
 {
 	int32_t top;
 	int32_t tail;
+	int32_t status;
 	size_t queuelen;
 	int32_t queuemunit;
 	int32_t mqlock_munit;

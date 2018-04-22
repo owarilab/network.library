@@ -187,6 +187,7 @@ uint32_t gdt_initialize_memory_unit( GDT_MEMORY_UNIT * unit );
 
 // debug
 void gdt_memory_info( GDT_MEMORY_POOL* _ppool );
+void gdt_memory_size( GDT_MEMORY_POOL* _ppool );
 void gdt_memory_unit_info( GDT_MEMORY_POOL* _ppool );
 
 #endif /*_GDT_MEMORY_ALLOCATOR_H_*/

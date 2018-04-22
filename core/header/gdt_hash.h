@@ -53,8 +53,10 @@ typedef struct GDT_HASH_ELEMENT
 	int32_t elm_munit;
 } GDT_HASH_ELEMENT;
 
+#define GDT_HASH_ELEMENT_SIZE 16
+
 int32_t gdt_create_hash( GDT_MEMORY_POOL* _ppool, size_t hlen );
-int32_t gdt_add_hash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, int32_t name_munit, int32_t data_munit, int32_t id );
+GDT_HASH_ELEMENT* gdt_add_hash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, int32_t name_munit, int32_t data_munit, int32_t id );
 int32_t gdt_make_hash_name( GDT_MEMORY_POOL* _ppool, int32_t h_munit,const char* name);
 void gdt_add_hash_array_string( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, const char* value );
 void gdt_add_hash_array_empty_string( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, size_t size );

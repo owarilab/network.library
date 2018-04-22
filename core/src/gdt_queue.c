@@ -56,6 +56,7 @@ void gdt_create_message_queue( GDT_MEMORY_POOL* _ppool, int32_t *q_munit, size_t
 			pmq = (GDT_MSGQUEUE *)gdt_upointer( _ppool, (*q_munit) );
 			pmq->top		= 0;
 			pmq->tail		= 0;
+			pmq->status		= 0;
 			pmq->queuelen	= qlen;
 #ifdef __WINDOWS__
 			if( 0 >= ( pmq->mqlock_munit = gdt_create_munit( _ppool, sizeof( HANDLE ), MEMORY_TYPE_DEFAULT ) ) ){
@@ -154,6 +155,7 @@ int gdt_enqueue( GDT_MEMORY_POOL* _ppool, int32_t q_munit, const char* pbuf, siz
 		pmq->tail = ( pmq->tail + 1 ) % pmq->queuelen;
 		if( pmq->tail == pmq->top ){
 			pmq->top = ( pmq->top + 1 ) % pmq->queuelen;
+			pmq->status = 1;
 		}
 	}while( false );
 	return addindex;
@@ -221,14 +223,27 @@ int32_t gdt_dequeue( GDT_MEMORY_POOL* _ppool, int32_t q_munit )
 			break;
 		}
 		mqlist = (int32_t *)gdt_upointer( _ppool, pmq->queuemunit );
+		int32_t target = pmq->top - pmq->status;
+		if( target < 0 ){
+			target = pmq->queuelen-1;
+		}
 		if( pmq->top == pmq->tail ){
+			if( pmq->status == 1 ){
+				pminf = (GDT_MSG_INFO*)gdt_upointer( _ppool, mqlist[target] );
+				if( pminf->msgmunit < 0 ){
+					printf( "pminf->msgmunit is not allocate : %d\n", pminf->msgmunit );
+					break;
+				}
+				munit = pminf->msgmunit;
+				pmq->status = 0;
+			}
 			break;
 		}
-		if( mqlist[pmq->top] < 0 ){
-			printf( "mqlist[pmq->top] is not allocate : %d\n", pmq->top );
+		if( mqlist[target] < 0 ){
+			printf( "mqlist[pmq->top] is not allocate : %d\n", target );
 			break;
 		}
-		pminf = (GDT_MSG_INFO*)gdt_upointer( _ppool, mqlist[pmq->top] );
+		pminf = (GDT_MSG_INFO*)gdt_upointer( _ppool, mqlist[target] );
 		if( pminf->msgmunit < 0 ){
 			printf( "pminf->msgmunit is not allocate : %d\n", pminf->msgmunit );
 			break;
@@ -248,6 +263,7 @@ int32_t gdt_get_queue_length( GDT_MEMORY_POOL* _ppool, int32_t q_munit )
 	}
 	pmq = (GDT_MSGQUEUE *)gdt_upointer( _ppool, q_munit );
 	if( pmq->tail == pmq->top ){
+		length+=pmq->status;
 		return length;
 	}
 	if( pmq->tail < pmq->top ){
@@ -256,6 +272,7 @@ int32_t gdt_get_queue_length( GDT_MEMORY_POOL* _ppool, int32_t q_munit )
 	}
 	else{
 		length += pmq->tail - pmq->top;
+		length+=pmq->status;
 	}
 	return length;
 }

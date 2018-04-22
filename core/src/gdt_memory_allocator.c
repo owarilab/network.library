@@ -173,7 +173,7 @@ int32_t gdt_create_mini_memory( GDT_MEMORY_POOL* _ppool, size_t allocate_size )
 {
 	int32_t tiny_pool_munit = -1;
 	allocate_size = GDT_ALIGNUP( allocate_size, _ppool->alignment );
-	if( 0 >= (tiny_pool_munit = gdt_create_munit( _ppool, sizeof(GDT_MEMORY_POOL), MEMORY_TYPE_DEFAULT )) ){
+	if( -1 == (tiny_pool_munit = gdt_create_munit( _ppool, sizeof(GDT_MEMORY_POOL), MEMORY_TYPE_DEFAULT )) ){
 		return tiny_pool_munit;
 	}
 	GDT_MEMORY_POOL* tiny_pool = ( GDT_MEMORY_POOL * )GDT_POINTER( _ppool, tiny_pool_munit );
@@ -965,6 +965,12 @@ void gdt_memory_info( GDT_MEMORY_POOL* _ppool )
 	printf(  "memory freetop = %p\n", ( (uint8_t*)_ppool->memory + _ppool->top ) );
 	printf(  "memory freebottom = %p\n", ( (uint8_t*)_ppool->memory + _ppool->bottom ) );
 	printf(  "#############################################################\n");
+}
+
+void gdt_memory_size( GDT_MEMORY_POOL* _ppool )
+{
+	size_t freeSize = ( ( _ppool->bottom - _ppool->top ) );
+	printf(  "use   : %zd Byte\n", _ppool->size - freeSize );
 }
 
 void gdt_memory_unit_info( GDT_MEMORY_POOL* _ppool )

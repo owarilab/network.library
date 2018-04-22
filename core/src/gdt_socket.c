@@ -467,6 +467,35 @@ void gdt_initialize_connection_info( GDT_SOCKET_OPTION *option, struct GDT_SERVE
 	}
 }
 
+
+ssize_t gdt_send_one( GDT_SOCKET_OPTION *option, uint32_t connection, char *buf, size_t size, uint32_t payload_type )
+{
+	ssize_t ret = 0;
+	GDT_SERVER_CONNECTION_INFO *tmptinfo;
+	int i;
+	if( option->connection_munit > 0 )
+	{
+		for( i = 0; i < option->maxconnection; i++ )
+		{
+			tmptinfo = gdt_offsetpointer( option->memory_pool, option->connection_munit, sizeof( GDT_SERVER_CONNECTION_INFO ), i );
+			if( tmptinfo->index == connection )
+			{
+				if( tmptinfo->sockparam.acc > 0 )
+				{
+					if( -1 == ( ret = gdt_send( option, &tmptinfo->sockparam, buf, size, payload_type ) ) ){
+						if( option->close_callback != NULL ){
+							option->close_callback( tmptinfo );
+						}
+						gdt_free_sockparam( option, &tmptinfo->sockparam );
+					}
+				}
+				break;
+			}
+		}
+	}
+	return ret;
+}
+
 ssize_t gdt_send_broadcast( GDT_SOCKET_OPTION *option, char *buf, size_t size, uint32_t payload_type )
 {
 	ssize_t ret = 0;

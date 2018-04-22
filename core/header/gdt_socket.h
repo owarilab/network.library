@@ -288,6 +288,7 @@ int32_t gdt_make_connection_info_core( GDT_SOCKET_OPTION *option, GDT_SERVER_CON
 void gdt_initialize_connection_info( GDT_SOCKET_OPTION *option, GDT_SERVER_CONNECTION_INFO* tinfo );
 
 ssize_t gdt_send_broadcast( GDT_SOCKET_OPTION *option, char *buf, size_t size, uint32_t payload_type );
+ssize_t gdt_send_one( GDT_SOCKET_OPTION *option, uint32_t connection, char *buf, size_t size, uint32_t payload_type );
 ssize_t gdt_send( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, char *buf, size_t size, uint32_t payload_type );
 ssize_t gdt_send_all(GDT_SOCKET_ID soc, char *buf, size_t size, int flag );
 ssize_t gdt_sendto_all(GDT_SOCKET_ID soc, char *buf, size_t size, int flag, struct sockaddr *pfrom, socklen_t fromlen );

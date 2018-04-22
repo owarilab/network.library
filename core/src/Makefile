@@ -22,6 +22,6 @@ $(PROGRAM): $(OBJGROUP)
 
 .PHONY: clean
 clean:
-	\rm -f $(PROGRAMOUT)$(PROGRAM)
-	\rm -f ./*.o
+	rm -f $(PROGRAMOUT)$(PROGRAM)
+	rm -f ./*.o
 

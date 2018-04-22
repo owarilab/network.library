@@ -38,7 +38,7 @@ extern "C"{
 #include <time.h>
 
 #if !defined(__WINDOWS__) && !defined(__BSD_UNIX__) && !defined(__IOS__)
-#include <sys/prctl.h>
+//#include <sys/prctl.h>
 #endif
 
 #define MEMORY_UNIT_PATH_BUFFER 0
