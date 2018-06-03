@@ -704,6 +704,13 @@ void gdt_set_sock_option( GDT_SOCKET_OPTION *option )
 	if( getsockopt( option->sockid, SOL_SOCKET, SO_SNDBUF, &option->sendbuffer_size, &len ) == -1 ){
 		perror("getsockopt");
 	}
+//#ifdef __LINUX__
+//	int flag = 0;
+//	(void) setsockopt( option->sockid, IPPROTO_TCP, TCP_CORK, (const void*)flag, sizeof(int) );
+//	int flag2 = 1;
+//	(void) setsockopt( option->sockid, IPPROTO_TCP, TCP_NODELAY, (const void*)flag2, sizeof(int) );
+//#endif
+
 //#ifdef __GDT_DEBUG__
 //	printf( "default:SO_RCVBUF=%zd\n", option->recvbuffer_size );
 //	printf( "default:SO_SNDBUF=%zd\n", option->sendbuffer_size );

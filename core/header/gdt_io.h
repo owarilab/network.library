@@ -51,7 +51,7 @@ typedef struct GDT_FILE_INFO
 	size_t size;
 	int64_t update_usec;
 	FILE* f;
-	char path[PATH_MAX];
+	char path[MAXPATHLEN];
 } GDT_FILE_INFO;
 
 int gdt_finit( GDT_FILE_INFO* info);
