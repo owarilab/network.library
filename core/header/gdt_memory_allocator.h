@@ -63,6 +63,7 @@ extern "C"{
 #define GDT_FIXPOINTER( _ppool, munit_id ) (((uint8_t*)_ppool->memory+(*(uint32_t*)(((uint8_t*)_ppool->memory+_ppool->end)-(_ppool->memory_unit_size_one*(munit_id+1))))))
 #define GDT_PUNIT( _ppool, munit_id ) (GDT_MEMORY_UNIT*)(((uint8_t*)_ppool->memory+_ppool->end)-(_ppool->memory_unit_size_one*(munit_id+1)))
 #define GDT_PUNIT_USIZE( _ppool, munit_id ) (*(uint32_t*)((((uint8_t*)_ppool->memory+_ppool->end)-(_ppool->memory_unit_size_one*(munit_id+1)))+sizeof(uint32_t)))
+#define GDT_INT32( _ppool, munit_id ) (*(int32_t*)(GDT_POINTER(_ppool,munit_id)+GDT_PUNIT_USIZE(_ppool,munit_id)-sizeof(int32_t)))
 
 #define BYTE_SWAP_BIT16( v ) (v >> 8) | ( (v & 0xff) << 8 )
 #define BYTE_SWAP_BIT32( v ) (v >> 24) | ( (v & 0x000000ff) << 24 ) | ( (v & 0x0000ff00) << 8 ) | ( (v & 0x00ff0000) >> 8 )

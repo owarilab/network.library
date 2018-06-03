@@ -336,6 +336,16 @@ int gdt_add_json_element( GDT_MEMORY_POOL* _ppool, int32_t buf_munit, char* src,
 	return 0;
 }
 
+GDT_NODE* gdt_get_json_root( GDT_MEMORY_POOL* _ppool, int32_t json_root_munit )
+{
+	if( -1 == json_root_munit ){
+		return NULL;
+	}
+	GDT_NODE* rootnode = (GDT_NODE*)GDT_POINTER(_ppool,json_root_munit);
+	GDT_NODE* workelemlist = ( GDT_NODE* )GDT_POINTER( _ppool, rootnode->element_munit );
+	return &workelemlist[0];
+}
+
 int32_t gdt_json_decode( GDT_MEMORY_POOL* _ppool, const char* src )
 {
 	int32_t rootnode_munit = -1;

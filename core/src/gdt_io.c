@@ -27,6 +27,64 @@
 
 #include "gdt_io.h"
 
+int gdt_finit( GDT_FILE_INFO* info)
+{
+	info->size = 0;
+	info->update_usec = 0;
+	memset(info->path,0,sizeof(info->path));
+	info->f = NULL;
+	return GDT_SYSTEM_OK;
+}
+
+int gdt_fopen( char* file_name, char* mode, GDT_FILE_INFO* info )
+{
+	struct stat st;
+	memset(info->path,0,sizeof(info->path));
+	memcpy(info->path,file_name,gdt_strlen(file_name));
+#ifdef __WINDOWS__
+	if (stat(file_name, &st) < 0)
+#else
+	if (lstat(file_name, &st) < 0)
+#endif
+	{
+		info->size=0;
+		info->update_usec=0;
+	}
+	else{
+		info->size = st.st_size;
+		info->update_usec = st.st_mtime;
+		//st.st_atime;
+		//st.st_ctime;
+		//st.st_mtim.tv_nsec;
+	}
+#ifdef __WINDOWS__
+	if (0 != fopen_s(&info->f, file_name, mode))
+#else
+	if (!(info->f = fopen(file_name, mode)))
+#endif
+	{
+		return GDT_SYSTEM_ERROR;
+	}
+	return GDT_SYSTEM_OK;
+}
+
+int gdt_fwrite2( GDT_FILE_INFO* info, char* write_buffer, size_t write_buffer_size )
+{
+	char* p = write_buffer;
+	while(*p!='\0'&&(p-write_buffer)<write_buffer_size){ fputc( *(p++), info->f ); };
+	return GDT_SYSTEM_OK;
+	// binary
+	//return (int)fwrite((void *)write_buffer,sizeof(char),write_buffer_size,info->f);
+}
+
+int gdt_fclose( GDT_FILE_INFO* info )
+{
+	if( info->f == NULL ){ return GDT_SYSTEM_OK; }
+	fclose(info->f);
+	gdt_finit(info);
+	return GDT_SYSTEM_OK;
+}
+
 int gdt_fget_info( char* file_name, GDT_FILE_INFO* info )
 {
 	struct stat st;

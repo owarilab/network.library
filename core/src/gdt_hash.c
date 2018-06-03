@@ -490,6 +490,50 @@ int32_t gdt_hash_length( GDT_MEMORY_POOL* _ppool, int32_t h_munit )
 	return length;
 }
 
+
+int32_t gdt_init_hash_foreach( GDT_MEMORY_POOL* _ppool, int32_t h_munit, GDT_HASH_FOREACH* hf )
+{
+	hf->p1 = 0;
+	hf->p2 = 0;
+	hf->root = (GDT_HASH*)GDT_POINTER( _ppool, h_munit );
+	hf->child = (GDT_HASH*)GDT_POINTER( _ppool, hf->root->hash_munit );
+	hf->he = NULL;
+	return GDT_SYSTEM_OK;
+}
+
+
+GDT_HASH_ELEMENT* gdt_hash_foreach( GDT_MEMORY_POOL* _ppool, GDT_HASH_FOREACH* hf )
+{
+	GDT_HASH_ELEMENT* ret = NULL;
+	do{
+		if( hf->he == NULL ){
+			if( hf->p1 >= hf->root->hash_size ){
+				hf->p1 = 0;
+				break;
+			}
+			if( hf->child[hf->p1].hash_munit == -1 ){
+				++hf->p1;
+				continue;
+			}
+			hf->he = (GDT_HASH_ELEMENT*)GDT_POINTER( _ppool, hf->child[hf->p1]. hash_munit );
+		}
+		if( hf->p2 >= hf->child[hf->p1].hash_size ){
+			hf->he = NULL;
+			hf->p2 = 0;
+			++hf->p1;
+			continue;
+		}
+		if( hf->he[hf->p2].hashname_munit == -1 ){
+			++hf->p2;
+			continue;
+		}
+		ret = &hf->he[hf->p2];
+		++hf->p2;
+		break;
+	}while( true );
+	return ret;
+}
+
 void gdt_dump_hash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, int index )
 {
 	struct GDT_HASH *hash;

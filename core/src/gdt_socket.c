@@ -1360,6 +1360,7 @@ void gdt_server_update(GDT_SOCKET_OPTION *option)
 				else{
 					if( i == option->maxconnection-1 ){
 						printf("connection is full\n");
+						gdt_close_socket(&acc, NULL);
 					}
 				}
 			}
@@ -1414,6 +1415,179 @@ void gdt_server_update(GDT_SOCKET_OPTION *option)
 						option->close_callback(child);
 					}
 					gdt_free_sockparam(option, &child->sockparam);
+				}
+			}
+		}
+	}
+	else if (option->socket_type == SOKET_TYPE_SERVER_UDP)
+	{
+		child = (GDT_SERVER_CONNECTION_INFO*)gdt_offsetpointer(option->memory_pool, option->connection_munit, sizeof(GDT_SERVER_CONNECTION_INFO), 0);
+		child->sockparam.fromlen = sizeof(child->sockparam.from);
+		if ((srlen = recvfrom(option->sockid, (char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), buffer_size, 0, (struct sockaddr *)&child->sockparam.from, &child->sockparam.fromlen)) == -1)
+		{
+			if (errno != 0 && errno != EINTR && errno != EAGAIN) {
+				perror("recvfrom");
+			}
+			return;
+		}
+		gdt_recv_event(option,child,srlen);
+	}
+}
+
+void gdt_server_update2(GDT_SOCKET_OPTION *option)
+{
+	if (option->mode != SOCKET_MODE_NONBLOCKING) {
+		return;
+	}
+	size_t buffer_size = sizeof(char) * (option->recvbuffer_size);
+	socklen_t srlen;
+	GDT_SERVER_CONNECTION_INFO *child;
+	socklen_t len;
+	if (option->socket_type == SOKET_TYPE_SERVER_TCP)
+	{
+		GDT_SOCKET_ID acc;
+		int i;
+		struct sockaddr_storage from;
+		len = (socklen_t) sizeof(from);
+		
+		// select
+		int width;
+		fd_set mask, fdread;
+		struct timeval timeout;
+		timeout.tv_sec=option->t_sec;
+		timeout.tv_usec=option->t_usec;
+		FD_ZERO(&mask);
+		FD_SET(option->sockid,&mask);
+		width = option->sockid+1;
+		for (i = 0; i < option->maxconnection; i++)
+		{
+			child = (GDT_SERVER_CONNECTION_INFO*)gdt_offsetpointer(option->memory_pool, option->connection_munit, sizeof(GDT_SERVER_CONNECTION_INFO), i);
+			if (child->id != -1)
+			{
+				FD_SET(child->id,&mask);
+				width=child->id+1;
+			}
+		}
+		fdread=mask;
+		int select_ret=select(width,(fd_set*)&fdread,NULL,NULL,&timeout);
+		if(select_ret>0&&FD_ISSET(option->sockid,&fdread)){
+			if (-1 == (acc = accept(option->sockid, (struct sockaddr *) &from, &len))) {
+				//if (errno != 0 && errno != EINTR && errno != EAGAIN) {
+#ifdef __WINDOWS__
+				if (errno != 0 && errno != EAGAIN && errno != ENOENT)
+#else
+				if (errno != 0 && errno != EAGAIN)
+#endif
+				{
+					perror("accept");
+				}
+			}
+			if (acc == -1 && option->sockid6 != -1) {
+				if (-1 == (acc = accept(option->sockid6, (struct sockaddr *) &from, &len))) {
+					//if (errno != 0 && errno != EINTR && errno != EAGAIN) {
+#ifdef __WINDOWS__
+					if (errno != 0 && errno != EAGAIN && errno != ENOENT)
+#else
+					if (errno != 0 && errno != EAGAIN)
+#endif
+					{
+						perror("accept");
+					}
+				}
+			}
+			if (acc != -1)
+			{
+				for (i = 0; i < option->maxconnection; i++)
+				{
+					child = (GDT_SERVER_CONNECTION_INFO*)gdt_offsetpointer(option->memory_pool, option->connection_munit, sizeof(GDT_SERVER_CONNECTION_INFO), i);
+					if (child->id == -1)
+					{
+						if ( 0 != getnameinfo((struct sockaddr *) &from, len, child->hbuf, sizeof(child->hbuf), child->sbuf, sizeof(child->sbuf), NI_NUMERICHOST | NI_NUMERICSERV) )
+						{
+							printf( "getnameinfo error.\n" );
+							break;
+						}
+						child->id = acc;
+						child->sockparam.acc = child->id;
+						if (option->socket_type == SOKET_TYPE_SERVER_UDP){
+							child->sockparam.type = SOCK_TYPE_NORMAL_UDP;
+						}
+						else{
+							child->sockparam.type = SOCK_TYPE_NORMAL_TCP;
+						}
+						gdt_set_block(child->id, 0);
+						gdt_initialize_connection_info(option, child);
+						if (option->connection_start_callback != NULL){
+							option->connection_start_callback((void*)child);
+						}
+						break;
+					}
+					else{
+						if( i == option->maxconnection-1 ){
+							printf("connection is full\n");
+							gdt_close_socket(&acc, NULL);
+						}
+					}
+				}
+			}
+		}
+		else{
+			if(select_ret==-1){
+				perror("select");
+			}
+		}
+		if(select_ret>0){
+			for (i = 0; i < option->maxconnection; i++)
+			{
+				child = (GDT_SERVER_CONNECTION_INFO*)gdt_offsetpointer(option->memory_pool, option->connection_munit, sizeof(GDT_SERVER_CONNECTION_INFO), i);
+				if (child->id != -1&&FD_ISSET(child->id,&fdread))
+				{
+					if (option->user_recv_function != NULL) {
+						if (-1 == (srlen = option->user_recv_function(child, child->id, (char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), buffer_size, 0))) {
+#ifdef __WINDOWS__
+							if (WSAGetLastError() != WSAEWOULDBLOCK) {
+								perror("recv");
+								gdt_close_socket(&child->id, NULL);
+							}
+#else
+							if (errno != 0 && errno != EAGAIN && errno != EWOULDBLOCK)
+							{
+								perror("recv");
+								gdt_close_socket(&child->id, NULL);
+							}
+#endif
+						}
+					}
+					else {
+						if ((srlen = recv(child->id, (char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), buffer_size, 0)) == -1) {
+#ifdef __WINDOWS__
+							if (WSAGetLastError() != WSAEWOULDBLOCK) {
+								perror("recv");
+								gdt_close_socket(&child->id, NULL);
+							}
+#else
+							if (errno != 0 && errno != EAGAIN && errno != EWOULDBLOCK)
+							{
+								perror("recv");
+								printf("errno : %d\n",errno);
+								gdt_close_socket(&child->id, NULL);
+							}
+							//if( errno == EAGAIN ){
+							//	printf( ".\n" );
+							//	usleep( 1000 );
+							//}
+#endif
+						}
+					}
+					gdt_recv_event(option,child,srlen);
+					if (child->id == -1)
+					{
+						if (option->close_callback != NULL)
+						{
+							option->close_callback(child);
+						}
+						gdt_free_sockparam(option, &child->sockparam);
+					}
 				}
 			}
 		}

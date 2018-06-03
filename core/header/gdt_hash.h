@@ -53,6 +53,15 @@ typedef struct GDT_HASH_ELEMENT
 	int32_t elm_munit;
 } GDT_HASH_ELEMENT;
 
+typedef struct GDT_HASH_FOREACH
+{
+	int32_t p1;
+	int32_t p2;
+	GDT_HASH *root;
+	GDT_HASH *child;
+	GDT_HASH_ELEMENT* he;
+} GDT_HASH_FOREACH;
+
 #define GDT_HASH_ELEMENT_SIZE 16
 
 int32_t gdt_create_hash( GDT_MEMORY_POOL* _ppool, size_t hlen );
@@ -77,6 +86,9 @@ int32_t gdt_get_hash_name( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char*
 int32_t gdt_get_hash_id( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname );
 void gdt_dump_hash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, int index );
 int32_t gdt_hash_length( GDT_MEMORY_POOL* _ppool, int32_t h_munit );
+
+int32_t gdt_init_hash_foreach( GDT_MEMORY_POOL* _ppool, int32_t h_munit, GDT_HASH_FOREACH* hf );
+GDT_HASH_ELEMENT* gdt_hash_foreach( GDT_MEMORY_POOL* _ppool, GDT_HASH_FOREACH* hf );
 
 #endif /*_GDT_HASH_H_*/
 

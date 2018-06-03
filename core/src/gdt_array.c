@@ -308,20 +308,35 @@ GDT_ARRAY_ELEMENT* gdt_array_pop( GDT_MEMORY_POOL* _ppool, int32_t arraymunit )
 GDT_ARRAY_ELEMENT* gdt_array_get( GDT_MEMORY_POOL* _ppool, int32_t arraymunit, int index )
 {
 	GDT_ARRAY_ELEMENT* retelm = NULL;
-	if( arraymunit <= 0 ){
+	if( arraymunit == -1 ){
 		return retelm;
 	}
 	GDT_ARRAY* parray = (GDT_ARRAY*)GDT_POINTER( _ppool, arraymunit );
-	if( parray == NULL || parray->len >= index ){
+	if( parray == NULL || parray->len <= index ){
 		return retelm;
 	}
 	retelm = (GDT_ARRAY_ELEMENT*)GDT_POINTER( _ppool, parray->munit )+( index );
 	return retelm;
 }
 
+GDT_ARRAY_ELEMENT* gdt_array_foreach( GDT_MEMORY_POOL* _ppool, int32_t array_munit, size_t* psize )
+{
+	GDT_ARRAY_ELEMENT* retelm = NULL;
+	if( array_munit == -1 ){
+		return retelm;
+	}
+	GDT_ARRAY* parray = (GDT_ARRAY*)GDT_POINTER( _ppool, array_munit );
+	if( parray == NULL || parray->len <= (*psize) ){
+		return retelm;
+	}
+	retelm = (GDT_ARRAY_ELEMENT*)GDT_POINTER( _ppool, parray->munit )+( *psize );
+	*psize = *psize + 1;
+	return retelm;
+}
+
 int32_t gdt_array_length( GDT_MEMORY_POOL* _ppool, int32_t arraymunit )
 {
-	if( arraymunit <= 0 ){
+	if( arraymunit == -1 ){
 		return -1;
 	}
 	GDT_ARRAY* parray = (GDT_ARRAY*)GDT_POINTER( _ppool, arraymunit );

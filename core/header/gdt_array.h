@@ -73,6 +73,7 @@ int32_t gdt_array_push_string( GDT_MEMORY_POOL* _ppool, int32_t* pmunit, const c
 int32_t gdt_array_push_empty_string( GDT_MEMORY_POOL* _ppool, int32_t* pmunit, size_t size );
 GDT_ARRAY_ELEMENT* gdt_array_pop( GDT_MEMORY_POOL* _ppool, int32_t arraymunit );
 GDT_ARRAY_ELEMENT* gdt_array_get( GDT_MEMORY_POOL* _ppool, int32_t arraymunit, int index );
+GDT_ARRAY_ELEMENT* gdt_array_foreach( GDT_MEMORY_POOL* _ppool, int32_t array_munit, size_t* psize );
 int32_t gdt_array_length( GDT_MEMORY_POOL* _ppool, int32_t arraymunit );
 int32_t gdt_opendir( GDT_MEMORY_POOL* _ppool, const char* path );
 void gdt_array_dump( GDT_MEMORY_POOL* _ppool, int32_t munit, int index );

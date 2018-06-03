@@ -34,6 +34,7 @@ extern "C"{
 
 #include "gdt_core.h"
 #include "gdt_memory_allocator.h"
+#include "gdt_string.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -49,7 +50,14 @@ typedef struct GDT_FILE_INFO
 {
 	size_t size;
 	int64_t update_usec;
+	FILE* f;
+	char path[PATH_MAX];
 } GDT_FILE_INFO;
+
+int gdt_finit( GDT_FILE_INFO* info);
+int gdt_fopen( char* file_name, char* mode, GDT_FILE_INFO* info );
+int gdt_fwrite2( GDT_FILE_INFO* info, char* write_buffer, size_t write_buffer_size );
+int gdt_fclose( GDT_FILE_INFO* info );
 
 int gdt_fget_info( char* file_name, GDT_FILE_INFO* info );
 int gdt_fputchar( FILE* f );
