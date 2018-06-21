@@ -133,6 +133,34 @@ ssize_t gdt_send_message_broadcast(uint32_t payload_type, char* payload, size_t 
 	return 0;
 }
 
+ssize_t gdt_send_message_othercast(uint32_t payload_type, char* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info)
+{
+	GDT_SOCKET_OPTION* option = (GDT_SOCKET_OPTION*)gdt_recv_info->tinfo->gdt_socket_option;
+	if( option == NULL ){
+		return 0;
+	}
+	ssize_t ret = 0;
+	GDT_SERVER_CONNECTION_INFO *tmptinfo;
+	int i;
+	if( option->connection_munit > 0 )
+	{
+		for( i = 0; i < option->maxconnection; i++ )
+		{
+			tmptinfo = gdt_offsetpointer( option->memory_pool, option->connection_munit, sizeof( GDT_SERVER_CONNECTION_INFO ), i );
+			if(tmptinfo->sockparam.acc != -1 && tmptinfo->sockparam.acc > 0 && gdt_recv_info->tinfo->sockparam.acc != tmptinfo->sockparam.acc )
+			{
+				if( -1 == ( ret = gdt_send( option, &tmptinfo->sockparam, payload, payload_len, payload_type ) ) ){
+					if( option->close_callback != NULL ){
+						option->close_callback( tmptinfo );
+					}
+					gdt_free_sockparam( option, &tmptinfo->sockparam );
+				}
+			}
+		}
+	}
+	return ret;
+}
+
 ssize_t gdt_send_message_multicast(uint32_t payload_type, char* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info, GDT_MEMORY_POOL* array_memory, int32_t array_munit)
 {
 	ssize_t ret = 0;

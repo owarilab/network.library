@@ -252,6 +252,7 @@ GDT_SOCKET_OPTION* gdt_create_tcp_client(char* hostname, char* portnum);
 GDT_SOCKET_OPTION* gdt_create_udp_client(char* hostname, char* portnum);
 ssize_t gdt_send_message(uint32_t payload_type, char* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info);
 ssize_t gdt_send_message_broadcast(uint32_t payload_type, char* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info);
+ssize_t gdt_send_message_othercast(uint32_t payload_type, char* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info);
 ssize_t gdt_send_message_multicast(uint32_t payload_type, char* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info, GDT_MEMORY_POOL* array_memory, int32_t array_munit);
 ssize_t gdt_client_send_message(uint32_t payload_type, char* payload, size_t payload_len, GDT_SOCKET_OPTION *option);
 int32_t gdt_set_client_id(GDT_SOCKET_OPTION *option,uint32_t id);
