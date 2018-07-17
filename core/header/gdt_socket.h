@@ -154,6 +154,8 @@ typedef struct GDT_SOCKPARAM
 	struct sockaddr_in addr;		// UDP addr
 	struct sockaddr_storage from;	// UDP from
 	socklen_t fromlen;				// UDP from size
+	uint8_t header[32]; // header byte
+	int32_t header_size; 
 } GDT_SOCKPARAM;
 
 typedef struct GDT_SERVER_CONNECTION_INFO
