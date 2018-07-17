@@ -84,7 +84,7 @@ int on_close(GDT_SERVER_CONNECTION_INFO* connection)
 
 int main( int argc, char *argv[], char *envp[] )
 {
-	int exe_code = EX_OK;
+	int exe_code = 0;
 	gnt_set_argv( &argc, &argv, &envp );
 	gdt_set_defaultsignal();
 	//gdt_daemonize( 0 , 0 );
