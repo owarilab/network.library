@@ -27,13 +27,10 @@
 
 #include "gdt_random.h"
 
-uint32_t gdt_xorshift_32_seed;	// 32bit乱数のseed
-uint64_t gdt_xorshift_64_seed1; // 64bit乱数のseed1
-uint64_t gdt_xorshift_64_seed2; // 64bit乱数のseed2
+uint32_t gdt_xorshift_32_seed;
+uint64_t gdt_xorshift_64_seed1;
+uint64_t gdt_xorshift_64_seed2;
 
-/*
- * 32bit乱数の初期化
- */
 void gdt_srand_32()
 {
 #ifdef __WINDOWS__
@@ -61,9 +58,6 @@ void gdt_srand_32()
 #endif
 }
 
-/*
- * 64bit乱数の初期化
- */
 void gdt_srand_64()
 {
 #ifdef __WINDOWS__
@@ -93,9 +87,6 @@ void gdt_srand_64()
 #endif
 }
 
-/*
- * 32bit乱数の生成
- */
 uint32_t gdt_rand_32()
 {
 	gdt_xorshift_32_seed = gdt_xorshift_32_seed ^ ( gdt_xorshift_32_seed << 13 );
@@ -104,9 +95,6 @@ uint32_t gdt_rand_32()
 	return gdt_xorshift_32_seed;
 }
 
-/*
- * 64bit乱数の生成
- */
 uint64_t gdt_rand_64()
 {
 //	uint64_t s1 = gdt_xorshift_64_seed1;
@@ -123,9 +111,6 @@ uint64_t gdt_rand_64()
 	return gdt_xorshift_64_seed2;
 }
 
-/*
- * 32bit乱数からユニークなIDを生成
- */
 void gdt_uniqid_r32( char* idbuf, size_t size )
 {
 	int i = 0;
@@ -147,9 +132,6 @@ void gdt_uniqid_r32( char* idbuf, size_t size )
 	idbuf[i] = '\0';
 }
 
-/*
- * 64bit乱数からユニークなIDを生成
- */
 void gdt_uniqid_r64( char* idbuf, size_t size )
 {
 	int i = 0;

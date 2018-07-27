@@ -77,7 +77,6 @@ int gdt_error( char* error_str )
 
 #ifdef __WINDOWS__
 #else
-
 int32_t gdt_get_current_directory( GDT_MEMORY_POOL* _ppool )
 {
 	int32_t munit = -1;
@@ -112,11 +111,6 @@ int32_t gdt_get_current_directory( GDT_MEMORY_POOL* _ppool )
 	return munit;
 }
 
-/*
- * 自身をデーモン化する
- * @param  nochdir 0でルートディレクトリに移動
- * @param  noclose 0で標準ファイルディスクリプタをクローズ
- */
 int gdt_daemonize( int nochdir , int noclose )
 {
 	int i,fd,error_code;
@@ -146,8 +140,7 @@ int gdt_daemonize( int nochdir , int noclose )
 			}
 		}
 		
-		if( noclose == 0 )
-		{
+		if( noclose == 0 ){
 			for( i = 0; i < GDT_MAX_FILE_DESCRIPTOR; i++ ){
 				(void) close(i);
 			}
@@ -165,11 +158,6 @@ int gdt_daemonize( int nochdir , int noclose )
 	return 0;
 }
 
-/*
- * ディスクリプタのモード変更( 指定ビットをオンにする )
- * @param  fd 操作するファイルディスクリプタ
- * @param  ビットフラグをオンにするビット
- */
 int gdt_descriptor_flags_on( int fd, int flag )
 {
 	int flags;
@@ -184,11 +172,6 @@ int gdt_descriptor_flags_on( int fd, int flag )
 	return error_code;
 }
 
-/*
- * ディスクリプタのモード変更( 指定ビットをオフにする )
- * @param  fd 操作するファイルディスクリプタ
- * @param  ビットフラグをオフにするビット
- */
 int gdt_descriptor_flags_off( int fd, int flag )
 {
 	int flags;
@@ -236,7 +219,6 @@ int gdt_set_sigaction( int signum, SIG_HANDLER sh, int sa_flags )
 
 /*
  * SIGHUP
- * プロセスの再起動
  */
 void gdt_sig_hangup_handler( int sig )
 {
@@ -244,20 +226,16 @@ void gdt_sig_hangup_handler( int sig )
 #ifdef __GDT_DEBUG__
 	printf( "gdt_sig_hangup_handler(%d)\n", sig );
 #endif
-	// stdin, stdout, stderr以外のディスクリプタをクローズ
-	// クライアントソケット、サーバーソケットなどの数によって調整する
-	// オープンしていないディスクリプタをクローズしても特に問題ない
 	for( i = 3; i < GDT_MAX_FILE_DESCRIPTOR; i++ ){
 		(void) close(i);
 	}
-	// 自プロセスの上書き再実行
 	if( execve( (*argv_)[0], (*argv_), (*envp_) ) == -1 ) {
 		perror("execve");
 	}
 }
 
 /*
- * SIGCHILD
+ * SIGCHILD ( fork -> exit )
  */
 void gdt_sig_chld_handler( int sig )
 {

@@ -1275,6 +1275,7 @@ void gdt_recv_event(GDT_SOCKET_OPTION *option, GDT_SERVER_CONNECTION_INFO *child
 			switch (gdt_pre_packetfilter(option, rinfo, &child->sockparam, child->recvmsg_munit))
 			{
 			case -1:
+				//printf("gdt_recv_event error\n");
 				gdt_close_socket(&child->id, NULL);
 				break;
 			case 1:
@@ -1808,89 +1809,119 @@ int gdt_pre_packetfilter( GDT_SOCKET_OPTION *option, struct GDT_RECV_INFO *rinfo
 	return ret;
 }
 
+uint64_t get_parse_header(GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, uint8_t* u8buf, size_t size)
+{
+	uint8_t* header = u8buf;
+	size_t header_size = size;
+	uint8_t cp = 1;
+	size_t tmp_size = 0;
+	if(psockparam->header_size>0){
+		tmp_size=psockparam->header_size;
+		size_t cp_size = size;
+		if(cp_size>(sizeof(psockparam->header)-psockparam->header_size)){
+			cp_size = sizeof(psockparam->header)-psockparam->header_size;
+		}
+		memcpy(&psockparam->header[psockparam->header_size],u8buf,cp_size);
+		psockparam->header_size+=cp_size;
+		header=psockparam->header;
+		header_size=psockparam->header_size;
+		cp=0;
+	}
+	do{
+		psockparam->maskindex = 32; // max size(32byte)
+		if(header_size<2){
+			//printf("short header 2\n");
+			break;
+		}
+		psockparam->fin=0; // header[0] >> 7;
+		psockparam->rsv = ( header[0] & 0x70 ) >> 4;
+		psockparam->opcode = ( header[0] & 0x0f );
+		psockparam->mask = header[1] >> 7;
+		psockparam->ckpayloadlen = ( header[1] & 0x7f );
+		if( psockparam->opcode == 8 ){
+			return GDT_SYSTEM_ERROR;
+		}
+		if(psockparam->ckpayloadlen < 126 ){
+			psockparam->maskindex = 6;
+			psockparam->payloadlen = psockparam->ckpayloadlen;
+		}
+		else if(psockparam->ckpayloadlen < 127 ){
+			psockparam->maskindex = 8;
+			if(header_size<4){
+				//printf("short header 4\n");
+				break;
+			}
+			psockparam->payloadlen |= header[2] << 8;
+			psockparam->payloadlen |= header[3] << 0;
+		}
+		else{
+			psockparam->maskindex = 14;
+			if(header_size<10){
+				//printf("short header 10\n");
+				break;
+			}
+			psockparam->payloadlen |= (uint64_t)header[2] << 56;
+			psockparam->payloadlen |= (uint64_t)header[3] << 48;
+			psockparam->payloadlen |= (uint64_t)header[4] << 40;
+			psockparam->payloadlen |= (uint64_t)header[5] << 32;
+			psockparam->payloadlen |= (uint64_t)header[6] << 24;
+			psockparam->payloadlen |= (uint64_t)header[7] << 16;
+			psockparam->payloadlen |= (uint64_t)header[8] << 8;
+			psockparam->payloadlen |= (uint64_t)header[9] << 0;
+		}
+		psockparam->maskindex = psockparam->maskindex - tmp_size;
+	}while(false);
+	if( cp==1 ){
+		size_t cp_size = size;
+		if(cp_size>(sizeof(psockparam->header)-psockparam->header_size)){
+			cp_size = sizeof(psockparam->header)-psockparam->header_size;
+		}
+		memcpy(&psockparam->header[psockparam->header_size],u8buf,cp_size);
+		psockparam->header_size+=cp_size;
+		return GDT_SYSTEM_OK;
+	}
+	return GDT_SYSTEM_OK;
+}
+
 ssize_t gdt_parse_socket_binary( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, uint8_t* u8buf, size_t size, uint32_t basebuf_munit )
 {
 	int i, startpos;
 	int64_t cnt = 0;
-	uint64_t tmppayloadlen = 0;
 	char* msg = (char*)gdt_upointer( option->memory_pool,basebuf_munit );
 	ssize_t retsize = -1;
 	size_t tmp_continue_pos = psockparam->continue_pos;
 	do{
-		if( ( psockparam->fin == 1 && psockparam->tmpmsglen == 0 ) ){
+		if( psockparam->header_size<psockparam->maskindex || ( psockparam->fin == 1 && psockparam->tmpmsglen == 0 ) ){
 			if( psockparam->continue_pos > 0 ){
 				u8buf+=psockparam->continue_pos;
 				size-=psockparam->continue_pos;
 				psockparam->continue_pos = 0;
 			}
-			memset( msg, 0, gdt_usize( option->memory_pool, basebuf_munit ) );
 			psockparam->payloadlen = 0;
-			if(size<2){
+			if(GDT_SYSTEM_ERROR==get_parse_header(option, psockparam, u8buf, size)){
+				//printf("get_parse_header error\n");
 				psockparam->payloadlen = -1;
 				break;
 			}
-			psockparam->fin=0;
-			//psockparam->fin				= u8buf[0] >> 7;
-			psockparam->rsv				= ( u8buf[0] & 0x70 ) >> 4;
-			psockparam->opcode			= ( u8buf[0] & 0x0f );
-			psockparam->mask			= u8buf[1] >> 7;
-			psockparam->ckpayloadlen	= ( u8buf[1] & 0x7f );
-			if( psockparam->opcode == 8 ){
-				//printf("opecode : 8(close)\n");
-				break;
-			}
-			if(psockparam->ckpayloadlen < 126 ){
-				psockparam->maskindex = 6;
-				tmppayloadlen = psockparam->ckpayloadlen;
-			}
-			else if(psockparam->ckpayloadlen < 127 ){
-				psockparam->maskindex = 8;
-				if(size<4){
-					psockparam->payloadlen = -1;
-					break;
-				}
-				tmppayloadlen |= u8buf[2] << 8;
-				tmppayloadlen |= u8buf[3] << 0;
-			}
-			else{
-				psockparam->maskindex = 14;
-				if(size<10){
-					psockparam->payloadlen = -1;
-					break;
-				}
-				tmppayloadlen |= (uint64_t)u8buf[2] << 56;
-				tmppayloadlen |= (uint64_t)u8buf[3] << 48;
-				tmppayloadlen |= (uint64_t)u8buf[4] << 40;
-				tmppayloadlen |= (uint64_t)u8buf[5] << 32;
-				tmppayloadlen |= (uint64_t)u8buf[6] << 24;
-				tmppayloadlen |= (uint64_t)u8buf[7] << 16;
-				tmppayloadlen |= (uint64_t)u8buf[8] << 8;
-				tmppayloadlen |= (uint64_t)u8buf[9] << 0;
-			}
-			if( psockparam->fin == 0 ){
-				//printf("invalid packet?\n");
-				//exit(0);
-			}
-			//psockparam->payloadlen += tmppayloadlen;
-			psockparam->payloadlen = tmppayloadlen;
 			if( psockparam->payloadlen >= gdt_usize( option->memory_pool, basebuf_munit ) ){
-				printf( "payloadlen buffersize over[%"PRIu64"][%zd]\n", psockparam->payloadlen, gdt_usize( option->memory_pool, basebuf_munit ) );
+				//printf( "payloadlen buffersize over[%"PRIu64"][%zd]\n", psockparam->payloadlen, gdt_usize( option->memory_pool, basebuf_munit ) );
 				psockparam->payloadlen = -1;
+				break;
+			}
+			if( size < psockparam->maskindex ){
+				//printf("shortage packets : %d, %d\n", (int)(size), (int)(psockparam->maskindex));
+				retsize=0;
 				break;
 			}
 			psockparam->payloadmask = 0x00000000;
 			startpos = psockparam->maskindex;
-			if( size < psockparam->maskindex ){
-				printf("invalid payload size : %d\n", (int)(size));
-				psockparam->payloadlen = -1;
-				break;
-			}
 			if( option->memory_pool->endian == GDT_LITTLE_ENDIAN ){
 				psockparam->payload_type = BYTE_SWAP_BIT32( *( (uint32_t*)(u8buf+psockparam->maskindex-4) ) );
 			}
 			else{
 				psockparam->payload_type = *( (uint32_t*)(u8buf+psockparam->maskindex-4) );
 			}
+			//memset( msg, 0, gdt_usize( option->memory_pool, basebuf_munit ) );
 		}
 		else{
 			startpos = 0;
@@ -1918,10 +1949,9 @@ ssize_t gdt_parse_socket_binary( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psock
 			psockparam->tmpmsglen			= 0;
 			psockparam->tmpbitsift			= -1;
 			psockparam->appdata32bit = 0x00000000;
-			//psockparam->continue_pos		= 0;
 			msg[psockparam->payloadlen] = '\0';
 			retsize = psockparam->payloadlen;
-			psockparam->header_size			= 0;
+			psockparam->header_size = 0;
 			memset(psockparam->header,0,sizeof(psockparam->header));
 		}
 		else{

@@ -27,13 +27,6 @@
 
 #include "gdt_queue.h"
 
-/*
- * メッセージキューユニットの生成
- * @param _ppool queueを格納するメモリプール
- * @param q_munit queueを配置するメモリユニット
- * @param qlen キュー構造体の数
- * @param size キューメッセージの文字サイズ
- */
 void gdt_create_message_queue( GDT_MEMORY_POOL* _ppool, int32_t *q_munit, size_t qlen, size_t size )
 {
 	int i;
@@ -109,13 +102,6 @@ void gdt_create_message_queue( GDT_MEMORY_POOL* _ppool, int32_t *q_munit, size_t
 	}while( false );
 }
 
-/*
- * メッセージキューの追加
- * @param _ppool メッセージキューが格納されているメモリプール
- * @param q_munit メッセージキューが格納されているメモリユニットID
- * @param pbuf queueに格納するメッセージ
- * @param size メッセージサイズ
- */
 int gdt_enqueue( GDT_MEMORY_POOL* _ppool, int32_t q_munit, const char* pbuf, size_t size )
 {
 	int addindex = -1;
@@ -161,13 +147,6 @@ int gdt_enqueue( GDT_MEMORY_POOL* _ppool, int32_t q_munit, const char* pbuf, siz
 	return addindex;
 }
 
-/*
- * メッセージキューの追加( 排他制御 )
- * @param _ppool メッセージキューが格納されているメモリプール
- * @param q_munit メッセージキューが格納されているメモリユニットID
- * @param pbuf queueに格納するメッセージ
- * @param size メッセージサイズ
- */
 int gdt_safe_enqueue( GDT_MEMORY_POOL* _ppool, int32_t q_munit, const char* pbuf, size_t size )
 {
 	int addindex = -1;
@@ -203,9 +182,6 @@ int gdt_safe_enqueue( GDT_MEMORY_POOL* _ppool, int32_t q_munit, const char* pbuf
 	return addindex;
 }
 
-/*
- * メセージ取り出し
- */
 int32_t gdt_dequeue( GDT_MEMORY_POOL* _ppool, int32_t q_munit )
 {
 	int32_t munit = -1;

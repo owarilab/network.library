@@ -27,16 +27,6 @@
 
 #include "gdt_memory_allocator.h"
 
-/*
- *  新規メモリ確保
- * @param _ppool メモリプールのポインタ
- * @param  allocate_size(size_t) 確保するメモリのサイズ
- * @param  alignment_size(size_t) アラインメントサイズ
- * @param  fix_memory_unit(size_t) デフォルトのメモリユニット数
- * @param  free_memory_unit(size_t) デフォルトのメモリユニット数
- * @param  min_realloc(size_t) メモリ拡張最少バイト数
- * @return 確保したメモリのサイズ( 0なら失敗 )
- */
 size_t gdt_initialize_memory( GDT_MEMORY_POOL** _ppool, size_t allocate_size, size_t max_allocate_size, size_t alignment_size, size_t fix_memory_unit, size_t free_memory_unit, size_t min_realloc )
 {
 	size_t memory_size		= 0;
@@ -96,16 +86,6 @@ size_t gdt_initialize_memory_f64( GDT_MEMORY_POOL** _ppool, size_t allocate_size
 	return gdt_initialize_memory(_ppool, allocate_size, allocate_size, MEMORY_ALIGNMENT_SIZE_BIT_64, 0, 0, 0);
 }
 
-/*
- *  mmapシステム使用領域の確保
- * @param _ppool メモリプールのポインタ
- * @param  allocate_size(size_t) 確保するメモリのサイズ
- * @param  alignment_size(size_t) アラインメントサイズ
- * @param  fix_memory_unit(size_t) デフォルトのメモリユニット数
- * @param  free_memory_unit(size_t) デフォルトのメモリユニット数
- * @param  min_realloc(size_t) メモリ拡張最少バイト数
- * @return 確保したメモリのサイズ( 0なら失敗 )
- */
 size_t gdt_initialize_mmapmemory( GDT_MEMORY_POOL** _ppool, size_t allocate_size, size_t max_allocate_size, size_t alignment_size, size_t fix_memory_unit, size_t free_memory_unit, size_t min_realloc )
 {
 	size_t memory_size			= 0;
@@ -166,9 +146,6 @@ size_t gdt_initialize_mmapmemory( GDT_MEMORY_POOL** _ppool, size_t allocate_size
 	return memory_size;
 }
 
-/*
- * create tiny memory pool
- */
 int32_t gdt_create_mini_memory( GDT_MEMORY_POOL* _ppool, size_t allocate_size )
 {
 	int32_t tiny_pool_munit = -1;
@@ -237,8 +214,6 @@ int32_t gdt_create_clone_mini_memory( GDT_MEMORY_POOL* _ppool, GDT_MEMORY_POOL* 
 	tiny_pool->alloc_type		= _mini_ppool->alloc_type;
 	tiny_pool->endian			= _mini_ppool->endian;
 	tiny_pool->memory_unit_size_one 	= _mini_ppool->memory_unit_size_one;
-	//gdt_memory_info( tiny_pool );
-	//gdt_memory_info( _mini_ppool );
 	return tiny_pool_munit;
 }
 
@@ -271,9 +246,6 @@ int32_t gdt_copy_mini_memory( GDT_MEMORY_POOL* _dest_ppool, GDT_MEMORY_POOL* _sr
 	return GDT_SYSTEM_OK;
 }
 
-/*
- * clean memory pool
- */
 void gdt_memory_clean( GDT_MEMORY_POOL* _ppool )
 {
 	GDT_MEMORY_UNIT* unit;
@@ -287,21 +259,13 @@ void gdt_memory_clean( GDT_MEMORY_POOL* _ppool )
 	_ppool->lock_munit		= -1;
 	_ppool->bottom = _ppool->end - GDT_ALIGNUP( sizeof( GDT_MEMORY_UNIT ), _ppool->alignment ) * ( _ppool->unit_size );
 	_ppool->memory_unit_size_one = GDT_ALIGNUP( sizeof( GDT_MEMORY_UNIT ), _ppool->alignment );
-	for( i = (_ppool->unit_size-1); i >= 0; i-- )
-	{
+	for( i = (_ppool->unit_size-1); i >= 0; i-- ){
 		unit = (GDT_MEMORY_UNIT*)( ( (uint8_t*)_ppool->memory + _ppool->end ) - ( _ppool->memory_unit_size_one * ( _ppool->unit_size - i ) ) );
 		gdt_initialize_memory_unit( unit );
 		unit->id = ( (_ppool->unit_size-1) - i );
 	}
 }
 
-/*
- * memory拡張
- * @param _ppool メモリプールのポインタ
- * @param  allocate_size(size_t) 確保するメモリのサイズ
- * @param  current_unit 新しくメモリ確保しようとしているメモリユニット
- * @return 確保したメモリのサイズ( 0なら失敗 )
- */
 size_t gdt_realloc_memory( GDT_MEMORY_POOL* _ppool, size_t allocate_size, GDT_MEMORY_UNIT** current_unit )
 {
 	size_t memory_size	= 0;
@@ -373,12 +337,6 @@ size_t gdt_mgetsize( GDT_MEMORY_POOL* _ppool, size_t size )
 	return GDT_ALIGNUP( size, _ppool->alignment );
 }
 
-/*
- * メモリユニットの初期化
- * @param _ppool メモリプールのポインタ
- * @param unit			情報を保持するメモリユニット
- * @return 成功:0 , 失敗:0以外
- */
 uint32_t gdt_initialize_memory_unit( GDT_MEMORY_UNIT * unit )
 {
 	unit->p			= 0;
@@ -392,12 +350,6 @@ uint32_t gdt_initialize_memory_unit( GDT_MEMORY_UNIT * unit )
 	return 0;
 }
 
-/*
- * メモリユニットの破棄
- * @param _ppool メモリプールのポインタ
- * @param unit		破棄するメモリユニット
- * @return 成功:0 , 失敗:0以外
- */
 uint32_t gdt_free_memory_unit( GDT_MEMORY_POOL* _ppool, int32_t *munit_id )
 {
 	GDT_MEMORY_UNIT *unit;
@@ -410,8 +362,7 @@ uint32_t gdt_free_memory_unit( GDT_MEMORY_POOL* _ppool, int32_t *munit_id )
 		printf( "[gdt_free_memory_unit] unit is NULL \n" );
 		return GDT_SYSTEM_ERROR;
 	}
-	if( unit->status == MEMORY_STATUS_USE )
-	{
+	if( unit->status == MEMORY_STATUS_USE ){
 		//memset( ((uint8_t*)_ppool->memory + unit->p), 0, unit->size );
 		*((uint8_t*)_ppool->memory + unit->p) = '\0';
 		unit->top		= unit->p;
@@ -422,13 +373,6 @@ uint32_t gdt_free_memory_unit( GDT_MEMORY_POOL* _ppool, int32_t *munit_id )
 	return GDT_SYSTEM_OK;
 }
 
-/*
- * メモリプールから必要なメモリを探す
- * @param _ppool メモリプールのポインタ
- * @param allocate_size	確保するメモリサイズ
- * @param unit			情報を保持するメモリユニット
- * @return 成功:0 , 失敗:0以外
- */
 uint32_t gdt_malloc( GDT_MEMORY_POOL* _ppool, size_t allocate_size, GDT_MEMORY_UNIT** unit )
 {
 	size_t reallocSize = 0;
@@ -487,13 +431,6 @@ uint32_t gdt_malloc( GDT_MEMORY_POOL* _ppool, size_t allocate_size, GDT_MEMORY_U
 	return GDT_SYSTEM_OK;
 }
 
-/*
- * メモリプールから必要なメモリを探す
- * @param _ppool メモリプールのポインタ
- * @param allocate_size	確保するメモリサイズ
- * @param unit			情報を保持するメモリユニット
- * @return 成功:0 , 失敗:0以外
- */
 uint32_t gdt_safe_malloc( GDT_MEMORY_POOL* _ppool, size_t allocate_size, GDT_MEMORY_UNIT** unit )
 {
 	uint32_t error_code = 0;
@@ -513,11 +450,6 @@ uint32_t gdt_safe_malloc( GDT_MEMORY_POOL* _ppool, size_t allocate_size, GDT_MEM
 	return error_code;
 }
 
-/*
- * 新しい固定メモリユニットの割り当て
- * @param _ppool メモリプールのポインタ
- * @return メモリプールに配置されているメモリユニット配列のid値
- */
 int32_t gdt_create_fixmunit( GDT_MEMORY_POOL* _ppool, int32_t id, size_t size )
 {
 	GDT_MEMORY_UNIT* _unit = NULL;
@@ -542,13 +474,6 @@ int32_t gdt_create_fixmunit( GDT_MEMORY_POOL* _ppool, int32_t id, size_t size )
 	return ( unit != NULL ) ? unit->id : -1;
 }
 
-/*
- * 固定メモリユニットの取得
- * 使い方としてはIDをあらかじめ決めてしまって、
- * そのIDでどこからでもアクセスしたい場合に使う
- * @param _ppool メモリプールのポインタ
- * @return メモリユニット
- */
 GDT_MEMORY_UNIT* gdt_get_fixmunit( GDT_MEMORY_POOL* _ppool, int32_t id )
 {
 	GDT_MEMORY_UNIT* unit = NULL;
@@ -568,11 +493,6 @@ GDT_MEMORY_UNIT* gdt_get_fixmunit( GDT_MEMORY_POOL* _ppool, int32_t id )
 	return unit;
 }
 
-/*
- * 新しいメモリユニットの割り当て
- * @param _ppool メモリプールのポインタ
- * @return メモリプールに配置されているメモリユニット配列のid値
- */
 int32_t gdt_create_munit( GDT_MEMORY_POOL* _ppool, size_t size, uint8_t type )
 {
 	GDT_MEMORY_UNIT* unit = NULL;
@@ -597,11 +517,6 @@ int32_t gdt_create_munit( GDT_MEMORY_POOL* _ppool, size_t size, uint8_t type )
 	return unit->id;
 }
 
-/*
- * 空メモリユニットを取得
- * @param _ppool メモリプールのポインタ
- * @return 空のメモリユニット
- */
 GDT_MEMORY_UNIT* gdt_find_freemunit( GDT_MEMORY_POOL* _ppool, size_t size )
 {
 	GDT_MEMORY_UNIT* unit			= NULL;
@@ -718,11 +633,6 @@ int gdt_resize_garbage(GDT_MEMORY_POOL* _ppool,GDT_MEMORY_UNIT* garbageunit,GDT_
 	return GDT_SYSTEM_OK;
 }
 
-/*
- * メモリユニットの取得
- * @param _ppool メモリプールのポインタ
- * @return メモリユニット構造体のアドレス
- */
 GDT_MEMORY_UNIT* gdt_get_munit( GDT_MEMORY_POOL* _ppool, int32_t id )
 {
 	GDT_MEMORY_UNIT* unit = NULL;
@@ -734,11 +644,6 @@ GDT_MEMORY_UNIT* gdt_get_munit( GDT_MEMORY_POOL* _ppool, int32_t id )
 	return unit;
 }
 
-/*
- * メモリユニットの管理するメモリの先頭アドレス取得
- * @param _ppool メモリプールのポインタ
- * @return メモリユニットの管理するメモリの先頭アドレス取得
- */
 void* gdt_upointer( GDT_MEMORY_POOL* _ppool, int32_t id )
 {
 	void* pt = NULL;
@@ -769,11 +674,6 @@ void* gdt_fixupointer( GDT_MEMORY_POOL* _ppool, int32_t id )
 	return pt;
 }
 
-/*
- * メモリユニットの管理するメモリのオフセット番目のアドレス取得
- * @param _ppool メモリプールのポインタ
- * @return メモリユニットの管理するメモリのオフセット番目のポインタ
- */
 void* gdt_offsetpointer( GDT_MEMORY_POOL* _ppool, int32_t id, size_t size, int32_t offset )
 {
 	void* pt = NULL;
@@ -791,11 +691,6 @@ void* gdt_offsetpointer( GDT_MEMORY_POOL* _ppool, int32_t id, size_t size, int32
 	return pt;
 }
 
-/*
- * メモリユニットの管理するメモリのサイズ取得
- * @param _ppool メモリプールのポインタ
- * @return メモリユニットの管理するメモリのサイズ取得
- */
 size_t gdt_usize( GDT_MEMORY_POOL* _ppool, int32_t id )
 {
 	GDT_MEMORY_UNIT* unit = NULL;
@@ -807,19 +702,12 @@ size_t gdt_usize( GDT_MEMORY_POOL* _ppool, int32_t id )
 	return unit->size;
 }
 
-/*
- *  メモリ解放
- * @param _ppool 開放するメモリプールのポインタ
- * @return 開放したメモリのサイズ( 0なら未開放 )
- */
 size_t gdt_free( GDT_MEMORY_POOL* _ppool )
 {
 	size_t memory_size = 0;
-	if( _ppool != NULL )
-	{
+	if( _ppool != NULL ){
 		memory_size = _ppool->size;
-		if( _ppool->memory != NULL )
-		{
+		if( _ppool->memory != NULL ){
 			if( _ppool->alloc_type == MEMORY_ALLOCATE_TYPE_MALLOC ){
 				free( _ppool->memory );
 			}
@@ -1023,15 +911,9 @@ int gdt_endian()
 {
 	int v = 1;
 	if( *(char*)&v ){
-#ifdef __GDT_DEBUG__
-		//printf( "GDT_LITTLE_ENDIAN\n" );
-#endif
 		return GDT_LITTLE_ENDIAN;
 	}
 	else{
-#ifdef __GDT_DEBUG__
-		//printf( "GDT_BIG_ENDIAN\n" );
-#endif
 		return GDT_BIG_ENDIAN;
 	}
 }

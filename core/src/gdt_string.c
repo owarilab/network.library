@@ -27,12 +27,6 @@
 
 #include "gdt_string.h"
 
-/*
- * 数値を文字列に変換
- * @param  value 	変換する数値
- * @param  target	格納するcharポインタ
- * @param  size		char配列のサイズ
- */
 int gdt_itoa( int32_t value, char* target, size_t size )
 {
 	int error_code = 0;
@@ -60,9 +54,8 @@ int gdt_itoa( int32_t value, char* target, size_t size )
 	i = isminus;
 	index = 0;
 	len = ( tmpp - target ) - 1;
-	// 逆転
-	if( len > 1 )
-	{
+	// reverse
+	if( len > 1 ){
 		do{
 			c = *(target+index+i);
 			*(target+index+i) = *(target+(len-1)-index);
@@ -73,9 +66,6 @@ int gdt_itoa( int32_t value, char* target, size_t size )
 	return error_code;
 }
 
-/*
- * 指定した文字が最初に見つかった場所を変えす
- */
 int32_t gdt_find_char( char* target, size_t target_size, char delimiter_ch )
 {
 	int32_t index = -1;
@@ -90,12 +80,6 @@ int32_t gdt_find_char( char* target, size_t target_size, char delimiter_ch )
 	return index;
 }
 
-/*
- * 指定した区切り文字までか改行までの文字列を取得
- * @param  buf 
- * @param  target 
- * @param  delimiter_ch 
- */
 char* gdt_readline( char* buf, size_t buffer_size, char* target, char delimiter_ch )
 {
 	char *bufstart = buf;
@@ -118,32 +102,23 @@ char* gdt_readline( char* buf, size_t buffer_size, char* target, char delimiter_
 		target++;
 	}
 	(*buf) = '\0';
-	//while( (*target) == '\r' || (*target) == '\n' ){ target++; }
 	if( (*target) == '\r' ){ target++; }
 	if( (*target) == '\n' ){ target++; }
 	return target;
 }
 
-/*
- * 指定した区切り文字までの文字列を取得
- * @param  buf 
- * @param  target 
- * @param  delimiter_ch 
- */
 char* gdt_readdelimiter( char* buf, size_t buffer_size,char* target, char delimiter_ch )
 {
 	char *bufstart = buf;
 	if( buf == NULL || target == NULL ){
 		return target;
 	}
-	while( (*target) != '\0' )
-	{
+	while( (*target) != '\0' ){
 		if( buf - bufstart >= buffer_size -1 ){
 			printf("gdt_readline : buffer size over\n");
 			break;
 		}
-		if( (*target) == delimiter_ch )
-		{
+		if( (*target) == delimiter_ch ){
 			target++;
 			break;
 		}
@@ -153,12 +128,6 @@ char* gdt_readdelimiter( char* buf, size_t buffer_size,char* target, char delimi
 	return target;
 }
 
-/*
- * 文字列の結合(バッファのサイズまで)
- * @param  dst 
- * @param  src 
- * @param  size 
- */
 size_t gdt_strlcat( char *dst, const char *src, size_t size )
 {
 	size_t s = 0;
@@ -188,17 +157,6 @@ size_t gdt_strlcat( char *dst, const char *src, size_t size )
 	return s;
 }
 
-/*
- * 文字列の連結
- * pmainの後ろにpsubの文字列を連結する
- * mainsize,subsizeにはそれぞれpmainのサイズとpsubのサイズが入る
- * 連結できるサイズはmax_size分
- * @param  pmain
- * @param  mainsize
- * @param  psub
- * @param  subsize
- * @param  max_size
- */
 size_t gdt_strlink( char *pmain, size_t mainsize, char *psub, size_t subsize, size_t max_size )
 {
 	size_t s = 0;
@@ -222,12 +180,6 @@ size_t gdt_strlink( char *pmain, size_t mainsize, char *psub, size_t subsize, si
 	return s;
 }
 
-/*
- * ディレクトリトラバーサルの回避
- * @param  dst 
- * @param  src 
- * @param  size 
- */
 int gdt_escape_directory_traversal( char* dest, const char *src, size_t size )
 {
 	int error_code = GDT_SYSTEM_OK;
@@ -250,7 +202,6 @@ int gdt_escape_directory_traversal( char* dest, const char *src, size_t size )
 				error_code = GDT_SYSTEM_ERROR;
 				continue;
 			}
-			// パスは半角英数字、「-」、「_」、「/」、「.」のみにする
 			if( ( *ps >= 'a' && *ps <= 'z' ) 
 				|| ( *ps >= 'A' && *ps <= 'Z' )
 				|| ( *ps >= '0' && *ps <= '9' )
@@ -271,12 +222,6 @@ int gdt_escape_directory_traversal( char* dest, const char *src, size_t size )
 	return error_code;
 }
 
-/*
- * 改行をbrタグに変換用
- * @param  dst 
- * @param  src 
- * @param  size 
- */
 void gdt_nl2br( char* dest, const char *src, size_t size )
 {
 	const char *ps;
@@ -299,7 +244,6 @@ void gdt_nl2br( char* dest, const char *src, size_t size )
 			else if( *ps == '\n' ){
 				convBr = true;
 			}
-			// 改行を変換
 			if( convBr == true && ( dest - dstart ) + 4 < (size-1) ){
 				*(dest++) = '<';
 				*(dest++) = 'b';
@@ -307,7 +251,6 @@ void gdt_nl2br( char* dest, const char *src, size_t size )
 				*(dest++) = '/';
 				*(dest++) = '>';
 			}
-			// それ以外は普通に追加
 			else{
 				*(dest++) = *ps;
 			}
@@ -315,9 +258,7 @@ void gdt_nl2br( char* dest, const char *src, size_t size )
 		*dest='\0';
 	}while( false );
 }
-/*
- * 改行を文字列に変換用
- */
+
 void gdt_nl2char( char* dest, const char *src, size_t size )
 {
 	const char *ps;
@@ -340,7 +281,6 @@ void gdt_nl2char( char* dest, const char *src, size_t size )
 			else if( *ps == '\n' ){
 				convBr = 3;
 			}
-			// 改行を変換
 			if( convBr != false ){
 				switch( convBr )
 				{
@@ -366,7 +306,6 @@ void gdt_nl2char( char* dest, const char *src, size_t size )
 						break;
 				}
 			}
-			// それ以外は普通に追加
 			else{
 				*(dest++) = *ps;
 			}
@@ -375,12 +314,6 @@ void gdt_nl2char( char* dest, const char *src, size_t size )
 	}while( false );
 }
 
-/*
- * 文字列のコピー
- * @param  dst 
- * @param  src 
- * @param  size 
- */
 void gdt_strcopy( char* dest, const char*src, size_t size )
 {
 	char* dstart = dest;
@@ -388,8 +321,7 @@ void gdt_strcopy( char* dest, const char*src, size_t size )
 	if( dest == NULL || src == NULL ){
 		return;
 	}
-	if( size > 0 )
-	{
+	if( size > 0 ){
 		do{
 			*(dest++) = (*ps);
 		}while( *(ps++) != '\0' && ( dest - dstart ) < size-1 );
@@ -408,19 +340,12 @@ size_t gdt_strlen( const char* src )
 	return s;
 }
 
-/*
- * 任意の文字列から最大32bit符号なし整数のハッシュの生成
- * @param s
- * @param range
- */
 uint32_t gdt_ihash( const char* s, uint32_t range )
 {
 	uint32_t v = 0;
 	const char* ps = s;
-	if( s != NULL )
-	{
-		while( *ps != '\0' )
-		{
+	if( s != NULL ){
+		while( *ps != '\0' ){
 			v += ((*ps)*((ps-s)+v));
 			ps++;
 		}
