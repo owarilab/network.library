@@ -33,17 +33,15 @@
 int32_t gdt_inittoken( GDT_MEMORY_POOL* _ppool, int32_t allocsize )
 {
 	int32_t tokens_munit = -1;
-	do{
-		if( 0 >= ( tokens_munit = gdt_create_munit( _ppool, sizeof( GDT_TOKENS ), MEMORY_TYPE_DEFAULT ) ) ){
-			break;
-		}
-		GDT_TOKENS *ptokens = (GDT_TOKENS*)GDT_POINTER(_ppool,tokens_munit);
-		ptokens->token_munit = -1;
-		ptokens->size = 0;
-		ptokens->currentpos = 0;
-		ptokens->workpos = 0;
-		ptokens->allocsize = allocsize;
-	}while( false );
+	if( -1 == ( tokens_munit = gdt_create_munit( _ppool, sizeof( GDT_TOKENS ), MEMORY_TYPE_DEFAULT ) ) ){
+		return -1;
+	}
+	GDT_TOKENS *ptokens = (GDT_TOKENS*)GDT_POINTER(_ppool,tokens_munit);
+	ptokens->token_munit = -1;
+	ptokens->size = 0;
+	ptokens->currentpos = 0;
+	ptokens->workpos = 0;
+	ptokens->allocsize = allocsize;
 	return tokens_munit;
 }
 
@@ -58,19 +56,14 @@ int gdt_token_analyzer( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pst
 	int tokensize = 0;
 	int token_type = ID_UNK;
 	int ret = 0;
-	if( 0 < ( tmpbuf_munit = gdt_create_munit( _ppool, sizeof( char ) * STRBUF_SIZE, MEMORY_TYPE_DEFAULT ) ) ){
-		tokenbuf = (char*)gdt_upointer( _ppool, tmpbuf_munit );
-	}
-	if( tokenbuf == NULL )
-	{
+	if( -1 == ( tmpbuf_munit = gdt_create_munit( _ppool, sizeof( char ) * STRBUF_SIZE, MEMORY_TYPE_DEFAULT ) ) ){
 #ifdef __GDT_DEBUG__
 		printf("can not allocate memory of tokenbuf\n");
 #endif
-		return 1;
+		return GDT_SYSTEM_ERROR;
 	}
-
+	tokenbuf = (char*)gdt_upointer( _ppool, tmpbuf_munit );
 	ptoken = tokenbuf;
-
 	for(;;)
 	{
 		if( *pstr == '\0' )
@@ -435,7 +428,7 @@ int gdt_addtoken( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* tokenbuf,
 	GDT_TOKEN *ptoken = NULL;
 	if( ptokens->token_munit == -1 )
 	{
-		if( 0 >= ( ptokens->token_munit = gdt_create_munit( _ppool, sizeof( GDT_TOKEN ) * ptokens->allocsize, MEMORY_TYPE_DEFAULT ) ) ){
+		if( -1 == ( ptokens->token_munit = gdt_create_munit( _ppool, sizeof( GDT_TOKEN ) * ptokens->allocsize, MEMORY_TYPE_DEFAULT ) ) ){
 			return -1;
 		}
 		ptokens->size = ptokens->allocsize;
@@ -443,7 +436,7 @@ int gdt_addtoken( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* tokenbuf,
 	else{
 		if( ptokens->currentpos >= ptokens->size )
 		{
-			if( 0 >= ( tmpmunit = gdt_create_munit( _ppool, sizeof( GDT_TOKEN ) * ( ptokens->size + ptokens->allocsize ), MEMORY_TYPE_DEFAULT ) ) ){
+			if( -1 == ( tmpmunit = gdt_create_munit( _ppool, sizeof( GDT_TOKEN ) * ( ptokens->size + ptokens->allocsize ), MEMORY_TYPE_DEFAULT ) ) ){
 				printf("realloc token memory error\n");
 				return -1;
 			}
@@ -460,7 +453,7 @@ int gdt_addtoken( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* tokenbuf,
 	ptoken = ( GDT_TOKEN* )GDT_POINTER(_ppool,ptokens->token_munit)+ptokens->currentpos;
 	*(tokenbuf+((*tokensize)++)) = '\0';
 	if( type == ID_NUM ){
-		if( 0 >= ( ptoken->buf_munit = gdt_create_munit( _ppool, sizeof(char)*(*tokensize) + sizeof( int32_t ), MEMORY_TYPE_DEFAULT ) ) ){
+		if( -1 == ( ptoken->buf_munit = gdt_create_munit( _ppool, sizeof(char)*(*tokensize) + sizeof( int32_t ), MEMORY_TYPE_DEFAULT ) ) ){
 			printf("allocate token buf munit error.\n");
 			return -1;
 		}
@@ -470,7 +463,7 @@ int gdt_addtoken( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* tokenbuf,
 		(*(int32_t*)(GDT_POINTER(_ppool,ptoken->buf_munit)+gdt_usize(_ppool,ptoken->buf_munit)-sizeof(int32_t))) = atoi(tokenbuf);
 	}
 	else{
-		if( 0 >= ( ptoken->buf_munit = gdt_create_munit( _ppool, sizeof(char)*(*tokensize), MEMORY_TYPE_DEFAULT ) ) ){
+		if( -1 == ( ptoken->buf_munit = gdt_create_munit( _ppool, sizeof(char)*(*tokensize), MEMORY_TYPE_DEFAULT ) ) ){
 			printf("allocate token buf munit error.\n");
 			return -1;
 		}

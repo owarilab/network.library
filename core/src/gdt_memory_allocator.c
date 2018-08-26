@@ -146,6 +146,11 @@ size_t gdt_initialize_mmapmemory( GDT_MEMORY_POOL** _ppool, size_t allocate_size
 	return memory_size;
 }
 
+size_t gdt_initialize_mmapmemory_f64( GDT_MEMORY_POOL** _ppool, size_t allocate_size )
+{
+	return gdt_initialize_memory(_ppool, allocate_size, allocate_size, MEMORY_ALIGNMENT_SIZE_BIT_64, 0, 0, 0);
+}
+
 int32_t gdt_create_mini_memory( GDT_MEMORY_POOL* _ppool, size_t allocate_size )
 {
 	int32_t tiny_pool_munit = -1;

@@ -173,9 +173,9 @@ typedef struct GDT_SERVER_CONNECTION_INFO
 	pid_t current_processid;
 #endif
 	uint32_t index;	
-	int32_t recvbuf_munit;
-	int32_t recvinfo_munit;
-	int32_t recvmsg_munit;
+	int32_t recvbuf_munit; // char[]
+	int32_t recvinfo_munit; // GDT_RECV_INFO
+	int32_t recvmsg_munit; // char[]
 	void* user_data;
 	void* gdt_socket_option;
 	GDT_SOCKPARAM sockparam;
@@ -233,6 +233,8 @@ typedef struct GDT_SOCKET_OPTION
 	int32_t t_sec;							// connection timeout (sec)
 	int32_t s_sec;							// timeout( select, pool, epool )
 	int32_t s_usec;							// timeout( select, pool, epool )
+	int32_t sleep_usec;
+	uint8_t wait_read;
 	GDT_CONNECTION_EVENT_CALLBACK connection_start_callback;	// callback pointer
 	GDT_CALLBACK send_finish_callback;		// callback pointer
 	GDT_CALLBACK plane_recv_callback;		// callback pointer
@@ -256,6 +258,7 @@ ssize_t gdt_send_message(uint32_t payload_type, char* payload, size_t payload_le
 ssize_t gdt_send_message_broadcast(uint32_t payload_type, char* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info);
 ssize_t gdt_send_message_othercast(uint32_t payload_type, char* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info);
 ssize_t gdt_send_message_multicast(uint32_t payload_type, char* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info, GDT_MEMORY_POOL* array_memory, int32_t array_munit);
+ssize_t gdt_send_message_multiothercast(uint32_t payload_type, char* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info, GDT_MEMORY_POOL* array_memory, int32_t array_munit);
 ssize_t gdt_client_send_message(uint32_t payload_type, char* payload, size_t payload_len, GDT_SOCKET_OPTION *option);
 int32_t gdt_set_client_id(GDT_SOCKET_OPTION *option,uint32_t id);
 
@@ -313,7 +316,7 @@ void gdt_server_update(GDT_SOCKET_OPTION *option);
 void gdt_server_update2(GDT_SOCKET_OPTION *option);
 void gdt_nonblocking_client(GDT_SOCKET_OPTION *option);
 void gdt_client_update(GDT_SOCKET_OPTION *option);
-
+int gdt_client_is_connecting(GDT_SOCKET_OPTION *option);
 
 void gdt_print_payload(uint32_t payload_type, uint8_t* payload, size_t payload_len,size_t view_max);
 int gdt_pre_packetfilter( GDT_SOCKET_OPTION *option, struct GDT_RECV_INFO *rinfo, GDT_SOCKPARAM *psockparam, int32_t recvmsg_munit );

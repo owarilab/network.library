@@ -39,65 +39,65 @@ void gdt_create_message_queue( GDT_MEMORY_POOL* _ppool, int32_t *q_munit, size_t
 	int32_t* mqlist;
 	GDT_MSG_INFO *pminf;
 	char* pmqbuf;
+	if( qlen <= 0 ){
+		return;
+	}
+	(*q_munit) = gdt_create_munit( _ppool, sizeof( GDT_MSGQUEUE ), MEMORY_TYPE_DEFAULT );
+	if( -1 == (*q_munit) ){
+		return;
+	}
 	do{
-		if( qlen <= 0 ){
+		pmq = (GDT_MSGQUEUE *)gdt_upointer( _ppool, (*q_munit) );
+		pmq->top		= 0;
+		pmq->tail		= 0;
+		pmq->status		= 0;
+		pmq->queuelen	= qlen;
+#ifdef __WINDOWS__
+		if( 0 >= ( pmq->mqlock_munit = gdt_create_munit( _ppool, sizeof( HANDLE ), MEMORY_TYPE_DEFAULT ) ) ){
+			printf("alloc error\n");
+			(*q_munit) = -1;
 			break;
 		}
-		(*q_munit) = gdt_create_munit( _ppool, sizeof( GDT_MSGQUEUE ), MEMORY_TYPE_DEFAULT );
-		if( (*q_munit) >= 0 )
-		{
-			pmq = (GDT_MSGQUEUE *)gdt_upointer( _ppool, (*q_munit) );
-			pmq->top		= 0;
-			pmq->tail		= 0;
-			pmq->status		= 0;
-			pmq->queuelen	= qlen;
-#ifdef __WINDOWS__
-			if( 0 >= ( pmq->mqlock_munit = gdt_create_munit( _ppool, sizeof( HANDLE ), MEMORY_TYPE_DEFAULT ) ) ){
-				printf("alloc error\n");
-				(*q_munit) = -1;
-				break;
-			}
-			pmutex = (HANDLE *)gdt_upointer( _ppool, pmq->mqlock_munit );
-			*pmutex = CreateMutex( NULL, false , NULL );
+		pmutex = (HANDLE *)gdt_upointer( _ppool, pmq->mqlock_munit );
+		*pmutex = CreateMutex( NULL, false , NULL );
 #else
-			if( 0 >= ( pmq->mqlock_munit = gdt_create_munit( _ppool, sizeof( pthread_mutex_t ), MEMORY_TYPE_DEFAULT ) ) ){
-				printf("alloc error\n");
-				(*q_munit) = -1;
-				break;
-			}
-			pmutex = (pthread_mutex_t *)gdt_upointer( _ppool, pmq->mqlock_munit );
-			if( pthread_mutex_init(pmutex, NULL) != 0 ){
-				printf( "gdt_create_message_queue:pthread_mutex_init : error \n" );
-				(*q_munit) = -1;
-				break;
-			}
+		if( -1 == ( pmq->mqlock_munit = gdt_create_munit( _ppool, sizeof( pthread_mutex_t ), MEMORY_TYPE_DEFAULT ) ) ){
+			printf("alloc error\n");
+			(*q_munit) = -1;
+			break;
+		}
+		pmutex = (pthread_mutex_t *)gdt_upointer( _ppool, pmq->mqlock_munit );
+		if( pthread_mutex_init(pmutex, NULL) != 0 ){
+			printf( "gdt_create_message_queue:pthread_mutex_init : error \n" );
+			(*q_munit) = -1;
+			break;
+		}
 #endif
-			if( 0 >= ( pmq->queuemunit = gdt_create_munit( _ppool, sizeof( int32_t ) * pmq->queuelen, MEMORY_TYPE_DEFAULT ) ) ){
-				printf("create mu array error\n");
+		if( -1 == ( pmq->queuemunit = gdt_create_munit( _ppool, sizeof( int32_t ) * pmq->queuelen, MEMORY_TYPE_DEFAULT ) ) ){
+			printf("create mu array error\n");
+			(*q_munit) = -1;
+			break;
+		}
+		mqlist = (int32_t *)gdt_upointer( _ppool, pmq->queuemunit );
+		//memset( mqlist, -1, sizeof( int32_t ) * pmq->queuelen );
+		for( i = 0; i < pmq->queuelen; i++ )
+		{
+			if( -1 == ( mqlist[i] = gdt_create_munit( _ppool, sizeof( GDT_MSG_INFO ), MEMORY_TYPE_DEFAULT ) ) ){
+				printf("create msg info error\n");
 				(*q_munit) = -1;
-				break;
+				continue;
 			}
-			mqlist = (int32_t *)gdt_upointer( _ppool, pmq->queuemunit );
-			//memset( mqlist, -1, sizeof( int32_t ) * pmq->queuelen );
-			for( i = 0; i < pmq->queuelen; i++ )
-			{
-				if( 0 >= ( mqlist[i] = gdt_create_munit( _ppool, sizeof( GDT_MSG_INFO ), MEMORY_TYPE_DEFAULT ) ) ){
-					printf("create msg info error\n");
-					(*q_munit) = -1;
-					continue;
-				}
-				pminf = (GDT_MSG_INFO *)gdt_upointer( _ppool, mqlist[i] );
-				if( 0 >= ( pminf->msgmunit = gdt_create_munit( _ppool, sizeof( char ) * size, MEMORY_TYPE_DEFAULT ) ) ){
-					printf("create msg queue buf error\n");
-					(*q_munit) = -1;
-					continue;
-				}
-				pmqbuf = (char *)gdt_upointer( _ppool, pminf->msgmunit );
-				pmqbuf[0] = '\0';
-				//memset( pmqbuf, 0, sizeof( char ) * size );
-				pminf->len = 0;
-				pminf->id  = 0;
+			pminf = (GDT_MSG_INFO *)gdt_upointer( _ppool, mqlist[i] );
+			if( -1 == ( pminf->msgmunit = gdt_create_munit( _ppool, sizeof( char ) * size, MEMORY_TYPE_DEFAULT ) ) ){
+				printf("create msg queue buf error\n");
+				(*q_munit) = -1;
+				continue;
 			}
+			pmqbuf = (char *)gdt_upointer( _ppool, pminf->msgmunit );
+			pmqbuf[0] = '\0';
+			//memset( pmqbuf, 0, sizeof( char ) * size );
+			pminf->len = 0;
+			pminf->id  = 0;
 		}
 	}while( false );
 }
@@ -110,7 +110,7 @@ int gdt_enqueue( GDT_MEMORY_POOL* _ppool, int32_t q_munit, const char* pbuf, siz
 	GDT_MSG_INFO *pminf;
 	char* pmqbuf;
 	do{
-		if( q_munit < 0 ){
+		if( -1 == q_munit ){
 			printf( "q_munit is not allocate : %d\n", q_munit );
 			break;
 		}
@@ -189,12 +189,12 @@ int32_t gdt_dequeue( GDT_MEMORY_POOL* _ppool, int32_t q_munit )
 	int32_t* mqlist;
 	GDT_MSG_INFO *pminf;
 	do{
-		if( q_munit < 0 ){
+		if( -1 == q_munit ){
 			printf( "q_munit is not allocate : %d\n", q_munit );
 			break;
 		}
 		pmq = (GDT_MSGQUEUE *)gdt_upointer( _ppool, q_munit );
-		if( pmq->queuemunit < 0 ){
+		if( -1 == pmq->queuemunit ){
 			printf( "queuemunit is not allocate : %d\n", pmq->queuemunit );
 			break;
 		}
@@ -206,7 +206,7 @@ int32_t gdt_dequeue( GDT_MEMORY_POOL* _ppool, int32_t q_munit )
 		if( pmq->top == pmq->tail ){
 			if( pmq->status == 1 ){
 				pminf = (GDT_MSG_INFO*)gdt_upointer( _ppool, mqlist[target] );
-				if( pminf->msgmunit < 0 ){
+				if( -1 == pminf->msgmunit ){
 					printf( "pminf->msgmunit is not allocate : %d\n", pminf->msgmunit );
 					break;
 				}
@@ -215,12 +215,12 @@ int32_t gdt_dequeue( GDT_MEMORY_POOL* _ppool, int32_t q_munit )
 			}
 			break;
 		}
-		if( mqlist[target] < 0 ){
+		if( -1 == mqlist[target] ){
 			printf( "mqlist[pmq->top] is not allocate : %d\n", target );
 			break;
 		}
 		pminf = (GDT_MSG_INFO*)gdt_upointer( _ppool, mqlist[target] );
-		if( pminf->msgmunit < 0 ){
+		if( -1 == pminf->msgmunit ){
 			printf( "pminf->msgmunit is not allocate : %d\n", pminf->msgmunit );
 			break;
 		}

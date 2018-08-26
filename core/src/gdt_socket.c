@@ -201,6 +201,46 @@ ssize_t gdt_send_message_multicast(uint32_t payload_type, char* payload, size_t 
 	return ret;
 }
 
+ssize_t gdt_send_message_multiothercast(uint32_t payload_type, char* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info, GDT_MEMORY_POOL* array_memory, int32_t array_munit)
+{
+	ssize_t ret = 0;
+	if( array_munit == -1 ){
+		return ret;
+	}
+	GDT_SOCKET_OPTION *option = (GDT_SOCKET_OPTION*)gdt_recv_info->tinfo->gdt_socket_option;
+	if( option->connection_munit <= 0 ){
+		return ret;
+	}
+	GDT_ARRAY* parray;
+	GDT_ARRAY_ELEMENT* elm;
+	int i;
+	char* pbuf;
+	parray = (GDT_ARRAY*)GDT_POINTER( array_memory, array_munit );
+	elm = (GDT_ARRAY_ELEMENT*)GDT_POINTER( array_memory, parray->munit );
+	for( i = 0; i < parray->len; i++ )
+	{
+		pbuf = (char*)GDT_POINTER(array_memory,(elm+i)->munit);
+		if( strcmp(pbuf,"") ){
+			int offset = atoi(pbuf);
+			GDT_SERVER_CONNECTION_INFO *tmptinfo;
+			if( offset >= 0 && offset < option->maxconnection && offset != gdt_recv_info->tinfo->index )
+			{
+				tmptinfo = gdt_offsetpointer( option->memory_pool, option->connection_munit, sizeof( GDT_SERVER_CONNECTION_INFO ), offset );
+				if( tmptinfo->sockparam.acc > 0 )
+				{
+					if( -1 == ( ret = gdt_send( option, &tmptinfo->sockparam, payload, payload_len, payload_type ) ) ){
+						if( option->close_callback != NULL ){
+							option->close_callback( tmptinfo );
+						}
+						gdt_free_sockparam( option, &tmptinfo->sockparam );
+					}
+				}
+			}
+		}
+	}
+	return ret;
+}
+
 ssize_t gdt_client_send_message(uint32_t payload_type, char* payload, size_t payload_len, GDT_SOCKET_OPTION *option)
 {
 	ssize_t ret = 0;
@@ -259,10 +299,12 @@ int gdt_initialize_socket_option(
 	option->socket_type			= socket_type;
 	option->mode				= mode;
 	option->protocol			= protocol;
-	option->t_sec				= 0;	// default 0sec
+	option->t_sec				= 5;	// default 5sec
 	option->t_usec				= 0;	// default 0usec
 	option->s_sec				= 5;	// default 5sec
 	option->s_usec				= 0;	// default 0usec
+	option->sleep_usec			= 1000;
+	option->wait_read = 0;
 	option->connection_start_callback	= NULL;
 	option->send_finish_callback		= NULL;
 	option->plane_recv_callback			= NULL;
@@ -273,7 +315,7 @@ int gdt_initialize_socket_option(
 	option->user_send_function			= NULL;
 	option->recvbuffer_size				= SIZE_KBYTE*16;
 	option->sendbuffer_size				= SIZE_KBYTE*16;
-	option->msgbuffer_size				= SIZE_KBYTE*8;
+	option->msgbuffer_size				= SIZE_KBYTE*16;
 	option->connection_munit			= -1;
 	if( hostname == NULL ){
 		option->host_name_munit			= -1;
@@ -999,6 +1041,24 @@ GDT_SOCKET_ID gdt_client_socket( GDT_SOCKET_OPTION *option )
 				freeaddrinfo( res0 );
 				break;
 			}
+			len = sizeof( len );
+			if( getsockopt( sock, SOL_SOCKET, SO_ERROR, &val, &len ) != -1 )
+			{
+				if( val == 0 )
+				{
+					printf("ok\n");
+				}
+				else{
+					printf("error\n");
+#ifdef __WINDOWS__
+					char errbuf[256];
+					strerror_s(errbuf,255,val);
+#else
+					(void)fprintf(stderr, "getsockopt:%d:%s\n", val, strerror(val));
+#endif
+					gdt_close_socket( &sock, NULL );
+				}
+			}
 			freeaddrinfo( res0 );
 		}
 		else{
@@ -1008,7 +1068,7 @@ GDT_SOCKET_ID gdt_client_socket( GDT_SOCKET_OPTION *option )
 #ifdef __WINDOWS__
 				if( errno != 0 )
 #else
-				if( errno != EINPROGRESS )
+				if( errno != EINPROGRESS && errno != EINTR )
 #endif
 				{
 					gdt_close_socket( &sock, "select" );
@@ -1031,7 +1091,11 @@ GDT_SOCKET_ID gdt_client_socket( GDT_SOCKET_OPTION *option )
 			{
 				write_mask = mask;
 				read_mask = mask;
-				switch( select( width, &read_mask, &write_mask, NULL, &timeout ) )
+				fd_set* pwrite=&write_mask;
+				if(option->wait_read==1){
+					pwrite=NULL;
+				}
+				switch( select( width, &read_mask, pwrite, NULL, &timeout ) )
 				{
 					case -1:
 						if( errno != EINTR )
@@ -1046,7 +1110,7 @@ GDT_SOCKET_ID gdt_client_socket( GDT_SOCKET_OPTION *option )
 						freeaddrinfo( res0 );
 						break;
 					default:
-						if( FD_ISSET( sock, &write_mask ) || FD_ISSET( sock, &read_mask ) )
+						if( ( pwrite != NULL && FD_ISSET( sock, pwrite ) ) || FD_ISSET( sock, &read_mask ) )
 						{
 							len = sizeof( len );
 							if( getsockopt( sock, SOL_SOCKET, SO_ERROR, &val, &len ) != -1 )
@@ -1761,6 +1825,18 @@ void gdt_client_update(GDT_SOCKET_OPTION *option)
 	}
 }
 
+int gdt_client_is_connecting(GDT_SOCKET_OPTION *option)
+{
+	if( option->connection_munit == -1 ){
+		return 0;
+	}
+	GDT_SERVER_CONNECTION_INFO* child = (GDT_SERVER_CONNECTION_INFO*)GDT_POINTER(option->memory_pool,option->connection_munit);
+	if (child->id == -1){
+		return 0;
+	}
+	return 1;
+}
+
 void gdt_print_payload(uint32_t payload_type, uint8_t* payload, size_t payload_len,size_t view_max)
 {
 	printf("(payload_type:%d,payload_len:%d)", (int)payload_type, (int)payload_len);
@@ -1830,6 +1906,7 @@ uint64_t get_parse_header(GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, 
 	do{
 		psockparam->maskindex = 32; // max size(32byte)
 		if(header_size<2){
+			psockparam->fin=0;
 			//printf("short header 2\n");
 			break;
 		}

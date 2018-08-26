@@ -155,6 +155,7 @@ typedef struct GDT_BYTE_BUFFER
 size_t gdt_initialize_memory( GDT_MEMORY_POOL** _ppool, size_t allocate_size, size_t max_allocate_size, size_t alignment_size, size_t fix_memory_unit, size_t free_memory_unit, size_t min_realloc );
 size_t gdt_initialize_memory_f64( GDT_MEMORY_POOL** _ppool, size_t allocate_size );
 size_t gdt_initialize_mmapmemory( GDT_MEMORY_POOL** _ppool, size_t allocate_size, size_t max_allocate_size, size_t alignment_size, size_t fix_memory_unit, size_t free_memory_unit, size_t min_realloc );
+size_t gdt_initialize_mmapmemory_f64( GDT_MEMORY_POOL** _ppool, size_t allocate_size );
 int32_t gdt_create_mini_memory( GDT_MEMORY_POOL* _ppool, size_t allocate_size );
 int32_t gdt_create_clone_mini_memory( GDT_MEMORY_POOL* _ppool, GDT_MEMORY_POOL* _mini_ppool );
 int32_t gdt_copy_mini_memory( GDT_MEMORY_POOL* _dest_ppool, GDT_MEMORY_POOL* _src_ppool );

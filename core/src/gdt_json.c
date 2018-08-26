@@ -528,6 +528,9 @@ int32_t gdt_json_decode_parser_array( GDT_MEMORY_POOL* _ppool, GDT_NODE* node, G
 		}
 		else if( token_list[ptokens->workpos].type == ID_SIGN ){
 			if( *((char*)GDT_POINTER(_ppool,token_list[ptokens->workpos].buf_munit)) == ']' ){
+				if(working_munit==-1){
+					working_munit = gdt_create_array( _ppool, 8, NUMERIC_BUFFER_SIZE );
+				}
 				break;
 			}
 			else if( *((char*)GDT_POINTER(_ppool,token_list[ptokens->workpos].buf_munit)) == ',' ){
