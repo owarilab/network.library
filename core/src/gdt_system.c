@@ -271,3 +271,18 @@ void gdt_sig_int_handler( int sig )
 }
 
 #endif // ifndef __WINDOWS__
+
+void gdt_sleep(int time)
+{
+#ifdef __WINDOWS__
+	if(time<=1000){
+		time=1;
+	}
+	else{
+		time=time/1000;
+	}
+	Sleep(time);
+#else
+	usleep(time);
+#endif
+}

@@ -69,6 +69,7 @@ int gdt_set_sigaction( int signum, SIG_HANDLER sh, int sa_flags );
 void gdt_sig_hangup_handler( int sig );
 void gdt_sig_chld_handler( int sig );
 void gdt_sig_int_handler( int sig );
+void gdt_sleep(int time);
 #endif
 
 #endif /*_GDT_SYSTEM_H_*/

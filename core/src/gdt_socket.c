@@ -41,7 +41,7 @@ GDT_SOCKET_OPTION* gdt_create_tcp_server(char* hostname, char* portnum)
 		return NULL;
 	}
 	option = (GDT_SOCKET_OPTION*)GDT_POINTER(memory_pool,option_munit);
-	if (0 != gdt_initialize_socket_option(option, hostname, portnum, SOKET_TYPE_SERVER_TCP, SOCKET_MODE_NONBLOCKING, PROTOCOL_SIMPLE, maxconnection, memory_pool, NULL)) {
+	if (0 != gdt_initialize_socket_option(option, hostname, portnum, SOCKET_TYPE_SERVER_TCP, SOCKET_MODE_NONBLOCKING, PROTOCOL_SIMPLE, maxconnection, memory_pool, NULL)) {
 		return NULL;
 	}
 	return option;
@@ -61,7 +61,7 @@ GDT_SOCKET_OPTION* gdt_create_udp_server(char* hostname, char* portnum)
 		return NULL;
 	}
 	option = (GDT_SOCKET_OPTION*)GDT_POINTER(memory_pool,option_munit);
-	if (0 != gdt_initialize_socket_option(option, hostname, portnum, SOKET_TYPE_SERVER_UDP, SOCKET_MODE_NONBLOCKING, PROTOCOL_SIMPLE, maxconnection, memory_pool, NULL)){
+	if (0 != gdt_initialize_socket_option(option, hostname, portnum, SOCKET_TYPE_SERVER_UDP, SOCKET_MODE_NONBLOCKING, PROTOCOL_SIMPLE, maxconnection, memory_pool, NULL)){
 		return NULL;
 	}
 	return option;
@@ -81,7 +81,7 @@ GDT_SOCKET_OPTION* gdt_create_tcp_client(char* hostname, char* portnum)
 		return NULL;
 	}
 	option = (GDT_SOCKET_OPTION*)GDT_POINTER(memory_pool, option_munit);
-	if (0 != gdt_initialize_socket_option(option, hostname, portnum, SOKET_TYPE_CLIENT_TCP, SOCKET_MODE_CLIENT_NONBLOCKING, PROTOCOL_SIMPLE, maxconnection, memory_pool, NULL)) {
+	if (0 != gdt_initialize_socket_option(option, hostname, portnum, SOCKET_TYPE_CLIENT_TCP, SOCKET_MODE_CLIENT_NONBLOCKING, PROTOCOL_SIMPLE, maxconnection, memory_pool, NULL)) {
 		return NULL;
 	}
 	return option;
@@ -101,7 +101,7 @@ GDT_SOCKET_OPTION* gdt_create_udp_client(char* hostname, char* portnum)
 		return NULL;
 	}
 	option = (GDT_SOCKET_OPTION*)GDT_POINTER(memory_pool, option_munit);
-	if (0 != gdt_initialize_socket_option(option, hostname, portnum, SOKET_TYPE_CLIENT_UDP, SOCKET_MODE_CLIENT_NONBLOCKING, PROTOCOL_SIMPLE, maxconnection, memory_pool, NULL)) {
+	if (0 != gdt_initialize_socket_option(option, hostname, portnum, SOCKET_TYPE_CLIENT_UDP, SOCKET_MODE_CLIENT_NONBLOCKING, PROTOCOL_SIMPLE, maxconnection, memory_pool, NULL)) {
 		return NULL;
 	}
 	return option;
@@ -505,7 +505,6 @@ int32_t gdt_make_connection_info_core( GDT_SOCKET_OPTION *option, GDT_SERVER_CON
 	size_t msgbuffer_size = sizeof( char ) * ( option->msgbuffer_size );
 	tinfo->id				= -1;
 	tinfo->index			= index;
-	tinfo->user_data		= NULL;
 	tinfo->gdt_socket_option= option;
 	if( -1 == ( tinfo->recvbuf_munit = gdt_create_munit( option->memory_pool, recvbuffer_size, MEMORY_TYPE_DEFAULT ) ) ){
 		return GDT_SYSTEM_ERROR;
@@ -516,6 +515,7 @@ int32_t gdt_make_connection_info_core( GDT_SOCKET_OPTION *option, GDT_SERVER_CON
 	if( -1 == ( tinfo->recvmsg_munit = gdt_create_munit( option->memory_pool, msgbuffer_size, MEMORY_TYPE_DEFAULT ) ) ){
 		return GDT_SYSTEM_ERROR;
 	}
+	tinfo->user_information = -1;
 	gdt_init_socket_param( &tinfo->sockparam );
 	return GDT_SYSTEM_OK;
 }
@@ -535,9 +535,6 @@ void gdt_initialize_connection_info( GDT_SOCKET_OPTION *option, struct GDT_SERVE
 	{
 		pbuf = (char*)gdt_upointer( option->memory_pool, tinfo->recvmsg_munit );
 		memset( pbuf, 0, gdt_usize( option->memory_pool, tinfo->recvmsg_munit ) );
-	}
-	if( tinfo->user_data != NULL ){
-		tinfo->user_data = NULL;
 	}
 }
 
@@ -605,7 +602,7 @@ ssize_t gdt_send( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, char *bu
 	{
 		struct sockaddr* addr = NULL;
 		size_t fromlen = 0;
-		if (option->socket_type == SOKET_TYPE_SERVER_UDP) {
+		if (option->socket_type == SOCKET_TYPE_SERVER_UDP) {
 			addr = (struct sockaddr *)&psockparam->from;
 			fromlen = psockparam->fromlen;
 		}
@@ -839,11 +836,11 @@ int gdt_get_sockaddr_info( GDT_SOCKET_OPTION *option, struct sockaddr_storage *s
 			hints.ai_family = AF_INET6;
 		}
 		hints.ai_socktype = SOCK_STREAM;
-		if( option->socket_type == SOKET_TYPE_CLIENT_TCP )
+		if( option->socket_type == SOCKET_TYPE_CLIENT_TCP )
 		{
 			hints.ai_socktype = SOCK_STREAM;
 		}
-		else if( option->socket_type == SOKET_TYPE_CLIENT_UDP )
+		else if( option->socket_type == SOCKET_TYPE_CLIENT_UDP )
 		{
 			hints.ai_socktype = SOCK_DGRAM;
 		}
@@ -900,11 +897,11 @@ GDT_SOCKET_ID gdt_server_socket( GDT_SOCKET_OPTION *option, int is_ipv6 )
 			hints.ai_family   = AF_INET;
 		}
 		hints.ai_socktype = SOCK_STREAM;
-		if( option->socket_type == SOKET_TYPE_SERVER_TCP )
+		if( option->socket_type == SOCKET_TYPE_SERVER_TCP )
 		{
 			hints.ai_socktype = SOCK_STREAM;
 		}
-		else if( option->socket_type == SOKET_TYPE_SERVER_UDP )
+		else if( option->socket_type == SOCKET_TYPE_SERVER_UDP )
 		{
 			hints.ai_socktype = SOCK_DGRAM;	
 		}
@@ -944,7 +941,7 @@ GDT_SOCKET_ID gdt_server_socket( GDT_SOCKET_OPTION *option, int is_ipv6 )
 			freeaddrinfo( res0 );
 			break;
 		}
-		if( option->socket_type == SOKET_TYPE_SERVER_TCP )
+		if( option->socket_type == SOCKET_TYPE_SERVER_TCP )
 		{
 			if( listen( sock, SOMAXCONN ) == -1 )
 			{
@@ -984,11 +981,11 @@ GDT_SOCKET_ID gdt_client_socket( GDT_SOCKET_OPTION *option )
 			hints.ai_family = AF_INET6;
 		}
 		hints.ai_socktype = SOCK_STREAM;
-		if( option->socket_type == SOKET_TYPE_CLIENT_TCP )
+		if( option->socket_type == SOCKET_TYPE_CLIENT_TCP )
 		{
 			hints.ai_socktype = SOCK_STREAM;
 		}
-		else if( option->socket_type == SOKET_TYPE_CLIENT_UDP )
+		else if( option->socket_type == SOCKET_TYPE_CLIENT_UDP )
 		{
 			hints.ai_socktype = SOCK_DGRAM;
 		}
@@ -1015,7 +1012,7 @@ GDT_SOCKET_ID gdt_client_socket( GDT_SOCKET_OPTION *option )
 			(void) gdt_error("socket");
 			break;
 		}
-		if( option->socket_type == SOKET_TYPE_CLIENT_UDP )
+		if( option->socket_type == SOCKET_TYPE_CLIENT_UDP )
 		{
 			if( ( option->inetflag & INET_FLAG_BIT_CONNECT_UDP ) == 0 ){
 				if( ( errcode = getaddrinfo( NULL , "0", &hints, &local_info ) ) != 0 ){
@@ -1153,6 +1150,45 @@ void gdt_disconnect( GDT_SOCKPARAM *psockparam )
 	psockparam->c_status = PROTOCOL_STATUS_DEFAULT;
 }
 
+void* gdt_make_socket( GDT_SOCKET_OPTION *option )
+{
+	if( option == NULL || option->memory_pool == NULL ){
+		return NULL;
+	}
+	if( option->socket_type==SOCKET_TYPE_SERVER_TCP || option->socket_type==SOCKET_TYPE_SERVER_UDP){
+		if( ( option->sockid = gdt_server_socket( option, 0 ) ) <= 0 ){
+			printf( "gdt_server_socket error: port=%s, host=%s\n",
+					(char *)gdt_upointer( option->memory_pool,option->port_num_munit ),
+					(char *)gdt_upointer( option->memory_pool,option->host_name_munit )
+				  );
+			option->sockid=0;
+			return NULL;
+		}
+		if( ( option->inetflag & INET_FLAG_BIT_IPV6 ) != 0 ){
+			if( ( option->sockid6 = gdt_server_socket( option, 1 ) ) <= 0 ){
+				printf( "gdt_server_socket ipv6 error: port=%s, host=%s\n",
+						(char *)gdt_upointer( option->memory_pool,option->port_num_munit ),
+						(char *)gdt_upointer( option->memory_pool,option->host_name_munit )
+					  );
+				option->sockid6 = -1;
+				return NULL;
+			}
+		}
+		gdt_set_sock_option( option );
+	}
+	else if( option->socket_type==SOCKET_TYPE_CLIENT_TCP || option->socket_type==SOCKET_TYPE_CLIENT_UDP){
+		if( ( option->sockid = gdt_client_socket( option ) ) <= 0 ){
+			printf( "gdt_client_socket error: port=%s, host=%s\n",
+				(char *)gdt_upointer( option->memory_pool,option->port_num_munit ),
+				(char *)gdt_upointer( option->memory_pool,option->host_name_munit )
+			);
+			return NULL;
+		}
+		gdt_set_sock_option( option );
+	}
+	return NULL;
+}
+
 void* gdt_socket( GDT_SOCKET_OPTION *option )
 {
 	do{
@@ -1162,18 +1198,24 @@ void* gdt_socket( GDT_SOCKET_OPTION *option )
 		}
 		switch( option->socket_type )
 		{
-			case SOKET_TYPE_SERVER_TCP:
-			case SOKET_TYPE_SERVER_UDP:
+			case SOCKET_TYPE_SERVER_TCP:
+			case SOCKET_TYPE_SERVER_UDP:
 				if( ( option->sockid = gdt_server_socket( option, 0 ) ) <= 0 )
 				{
-					printf( "gdt_server_socket error: port=%s, host=%s\n", (char *)gdt_upointer( option->memory_pool,option->port_num_munit ), (char *)gdt_upointer( option->memory_pool,option->host_name_munit ) );
+					printf( "gdt_server_socket error: port=%s, host=%s\n",
+						(char *)gdt_upointer( option->memory_pool,option->port_num_munit ),
+						(char *)gdt_upointer( option->memory_pool,option->host_name_munit )
+					);
 					break;
 				}
 				if( ( option->inetflag & INET_FLAG_BIT_IPV6 ) != 0 )
 				{
 					if( ( option->sockid6 = gdt_server_socket( option, 1 ) ) <= 0 )
 					{
-						printf( "gdt_server_socket ipv6 error: port=%s, host=%s\n", (char *)gdt_upointer( option->memory_pool,option->port_num_munit ), (char *)gdt_upointer( option->memory_pool,option->host_name_munit ) );
+						printf( "gdt_server_socket ipv6 error: port=%s, host=%s\n",
+							(char *)gdt_upointer( option->memory_pool,option->port_num_munit ),
+							(char *)gdt_upointer( option->memory_pool,option->host_name_munit )
+						);
 						option->sockid6 = -1;
 					}
 				}
@@ -1235,8 +1277,8 @@ void* gdt_socket( GDT_SOCKET_OPTION *option )
 				}
 #endif
 				break;
-			case SOKET_TYPE_CLIENT_TCP:
-			case SOKET_TYPE_CLIENT_UDP:
+			case SOCKET_TYPE_CLIENT_TCP:
+			case SOCKET_TYPE_CLIENT_UDP:
 				if( ( option->sockid = gdt_client_socket( option ) ) <= 0 )
 				{
 					printf( "gdt_client_socket error: port=%s, host=%s\n", (char *)gdt_upointer( option->memory_pool,option->port_num_munit ), (char *)gdt_upointer( option->memory_pool,option->host_name_munit ) );
@@ -1316,7 +1358,7 @@ void gdt_recv_event(GDT_SOCKET_OPTION *option, GDT_SERVER_CONNECTION_INFO *child
 	}
 	else
 	{
-		if (option->socket_type == SOKET_TYPE_CLIENT_UDP || option->socket_type == SOKET_TYPE_SERVER_UDP){
+		if (option->socket_type == SOCKET_TYPE_CLIENT_UDP || option->socket_type == SOCKET_TYPE_SERVER_UDP){
 //#ifdef __WINDOWS__
 //#else
 //			struct sockaddr_in* pfrom = (struct sockaddr_in*)&child->sockparam.from;
@@ -1378,7 +1420,7 @@ void gdt_nonblocking_server(GDT_SOCKET_OPTION *option)
 #ifdef __GDT_DEBUG__
 //	printf("gdt_nonblocking_server: soc4=%d, soc6=%d\n", (int)option->sockid, (int)option->sockid6);
 #endif
-	if (option->socket_type == SOKET_TYPE_SERVER_UDP)
+	if (option->socket_type == SOCKET_TYPE_SERVER_UDP)
 	{
 		if (option->maxconnection > 1) {
 			printf("change udp maxconnection %zd -> 1\n", option->maxconnection);
@@ -1404,7 +1446,7 @@ void gdt_server_update(GDT_SOCKET_OPTION *option)
 	socklen_t srlen;
 	GDT_SERVER_CONNECTION_INFO *child;
 	socklen_t len;
-	if (option->socket_type == SOKET_TYPE_SERVER_TCP)
+	if (option->socket_type == SOCKET_TYPE_SERVER_TCP)
 	{
 		GDT_SOCKET_ID acc;
 		int i;
@@ -1448,7 +1490,7 @@ void gdt_server_update(GDT_SOCKET_OPTION *option)
 					}
 					child->id = acc;
 					child->sockparam.acc = child->id;
-					if (option->socket_type == SOKET_TYPE_SERVER_UDP){
+					if (option->socket_type == SOCKET_TYPE_SERVER_UDP){
 						child->sockparam.type = SOCK_TYPE_NORMAL_UDP;
 					}
 					else{
@@ -1523,7 +1565,7 @@ void gdt_server_update(GDT_SOCKET_OPTION *option)
 			}
 		}
 	}
-	else if (option->socket_type == SOKET_TYPE_SERVER_UDP)
+	else if (option->socket_type == SOCKET_TYPE_SERVER_UDP)
 	{
 		child = (GDT_SERVER_CONNECTION_INFO*)gdt_offsetpointer(option->memory_pool, option->connection_munit, sizeof(GDT_SERVER_CONNECTION_INFO), 0);
 		child->sockparam.fromlen = sizeof(child->sockparam.from);
@@ -1547,7 +1589,7 @@ void gdt_server_update2(GDT_SOCKET_OPTION *option)
 	socklen_t srlen;
 	GDT_SERVER_CONNECTION_INFO *child;
 	socklen_t len;
-	if (option->socket_type == SOKET_TYPE_SERVER_TCP)
+	if (option->socket_type == SOCKET_TYPE_SERVER_TCP)
 	{
 		GDT_SOCKET_ID acc;
 		int i;
@@ -1613,7 +1655,7 @@ void gdt_server_update2(GDT_SOCKET_OPTION *option)
 						}
 						child->id = acc;
 						child->sockparam.acc = child->id;
-						if (option->socket_type == SOKET_TYPE_SERVER_UDP){
+						if (option->socket_type == SOCKET_TYPE_SERVER_UDP){
 							child->sockparam.type = SOCK_TYPE_NORMAL_UDP;
 						}
 						else{
@@ -1696,7 +1738,7 @@ void gdt_server_update2(GDT_SOCKET_OPTION *option)
 			}
 		}
 	}
-	else if (option->socket_type == SOKET_TYPE_SERVER_UDP)
+	else if (option->socket_type == SOCKET_TYPE_SERVER_UDP)
 	{
 		child = (GDT_SERVER_CONNECTION_INFO*)gdt_offsetpointer(option->memory_pool, option->connection_munit, sizeof(GDT_SERVER_CONNECTION_INFO), 0);
 		child->sockparam.fromlen = sizeof(child->sockparam.from);
@@ -1742,7 +1784,7 @@ void gdt_nonblocking_client(GDT_SOCKET_OPTION *option)
 	child->index = 0;
 	gdt_init_socket_param( &child->sockparam );
 	child->sockparam.acc = option->sockid;
-	if (option->socket_type == SOKET_TYPE_CLIENT_TCP){
+	if (option->socket_type == SOCKET_TYPE_CLIENT_TCP){
 		child->sockparam.type = SOCK_TYPE_NORMAL_TCP;
 	}
 	else {
@@ -1765,7 +1807,7 @@ void gdt_client_update(GDT_SOCKET_OPTION *option)
 	size_t buffer_size = sizeof(char) * (option->recvbuffer_size);
 	socklen_t srlen;
 	GDT_SERVER_CONNECTION_INFO* child = (GDT_SERVER_CONNECTION_INFO*)GDT_POINTER(option->memory_pool,option->connection_munit);
-	if (option->socket_type == SOKET_TYPE_CLIENT_TCP)
+	if (option->socket_type == SOCKET_TYPE_CLIENT_TCP)
 	{
 		if (child->id != -1)
 		{
@@ -1805,7 +1847,7 @@ void gdt_client_update(GDT_SOCKET_OPTION *option)
 			}
 		}
 	}
-	else if (option->socket_type == SOKET_TYPE_CLIENT_UDP)
+	else if (option->socket_type == SOCKET_TYPE_CLIENT_UDP)
 	{
 		if (child->id == -1){
 			return;
@@ -1852,7 +1894,7 @@ int gdt_pre_packetfilter( GDT_SOCKET_OPTION *option, struct GDT_RECV_INFO *rinfo
 	pbuf = (char*)gdt_upointer( option->memory_pool, rinfo->recvbuf_munit );
 	if( rinfo->recvlen > 0 )
 	{
-		if( option->socket_type == SOKET_TYPE_SERVER_UDP || option->socket_type == SOKET_TYPE_CLIENT_UDP )
+		if( option->socket_type == SOCKET_TYPE_SERVER_UDP || option->socket_type == SOCKET_TYPE_CLIENT_UDP )
 		{
 			psockparam->type		= SOCK_TYPE_NORMAL_UDP;
 			psockparam->c_status	= PROTOCOL_STATUS_OTHER;
@@ -2042,58 +2084,6 @@ ssize_t gdt_parse_socket_binary( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psock
 	return retsize;
 }
 
-ssize_t gdt_send_msg( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, const char* msg, ssize_t size, uint32_t payload_type )
-{
-	void *sendbin;
-	uint8_t head1;
-	uint8_t head2;
-	uint8_t *ptr;
-	char* cptr;
-	uint32_t headersize = 0;
-	ssize_t len = 0;
-	do{
-		head1 = 0x80 | psockparam->ws_msg_mode;
-		headersize = gdt_make_size_header(&head2,size);
-		size_t binsize = (size_t) ( ( sizeof( uint8_t ) * size ) + headersize );
-		if( psockparam->buf_munit < 0 || gdt_usize( option->memory_pool, psockparam->buf_munit ) <= binsize )
-		{
-			if( psockparam->buf_munit >= 0 ){
-				gdt_free_memory_unit( option->memory_pool, &psockparam->buf_munit );
-			}
-			if( ( psockparam->buf_munit = gdt_create_munit( option->memory_pool, binsize+1, MEMORY_TYPE_DEFAULT ) ) == -1 )
-			{
-				printf( "[gdt_send_msg]size over: %zd byte\n", size );
-				break;
-			}
-		}
-		sendbin = gdt_upointer( option->memory_pool, psockparam->buf_munit );
-		ptr = (uint8_t*) sendbin;
-		*ptr = 0;
-		*(ptr+1) = 0;
-		*(ptr++) |= head1;
-		*(ptr++) |= head2;
-		if( headersize == 8 ){
-			*(ptr++) = (uint8_t)(size >> 8);
-			*(ptr++) = (uint8_t)(size & 0x00ff);
-		}
-		else if( headersize == 14 ){
-			*(ptr++) = (uint8_t)(( size & 0xff00000000000000) >> 56);
-			*(ptr++) = (uint8_t)(( size & 0x00ff000000000000) >> 48);
-			*(ptr++) = (uint8_t)(( size & 0x0000ff0000000000) >> 40);
-			*(ptr++) = (uint8_t)(( size & 0x000000ff00000000) >> 32);
-			*(ptr++) = (uint8_t)(( size & 0x00000000ff000000) >> 24);
-			*(ptr++) = (uint8_t)(( size & 0x0000000000ff0000) >> 16);
-			*(ptr++) = (uint8_t)(( size & 0x000000000000ff00) >> 8);
-			*(ptr++) = (uint8_t)(( size & 0x00000000000000ff) >> 0);
-		}
-		MEMORY_PUSH_BIT32_B( option->memory_pool, ptr, payload_type );
-		cptr = (char*)ptr;
-		memcpy( cptr, msg, size );
-		len = gdt_send_all( psockparam->acc, (char*)sendbin, binsize, 0 );
-	}while( false );
-	return len;
-}
-
 uint32_t gdt_make_size_header(uint8_t* head_ptr,ssize_t size)
 {
 	uint32_t headersize = 0;
@@ -2118,6 +2108,69 @@ uint32_t gdt_make_size_header(uint8_t* head_ptr,ssize_t size)
 	return headersize;
 }
 
+int32_t gdt_make_message_buffer(GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, size_t size)
+{
+	size_t tmp_size = size + gdt_make_size_header(NULL,size);
+	if( psockparam->buf_munit < 0 || gdt_usize( option->memory_pool, psockparam->buf_munit ) <= tmp_size ){
+		if( psockparam->buf_munit >= 0 ){
+			gdt_free_memory_unit( option->memory_pool, &psockparam->buf_munit );
+		}
+		if( ( psockparam->buf_munit = gdt_create_munit( option->memory_pool, sizeof( uint8_t ) * GDT_ALIGNUP( tmp_size, option->msgbuffer_size ), MEMORY_TYPE_DEFAULT ) ) == -1 )
+		{
+			printf( "[gdt_send_udpmsg]size over: %zd byte\n", size );
+			return GDT_SYSTEM_ERROR;
+		}
+	}
+	return GDT_SYSTEM_OK;
+}
+
+size_t gdt_make_msg( GDT_SOCKET_OPTION* option, GDT_SOCKPARAM* psockparam, void* sendbin, const char* msg, ssize_t size, uint32_t payload_type )
+{
+	uint8_t head1;
+	uint8_t head2;
+	uint8_t *ptr;
+	char* cptr;
+	uint32_t headersize = 0;
+	head1 = 0x80 | psockparam->ws_msg_mode;
+	headersize = gdt_make_size_header(&head2,size);
+	ptr = (uint8_t*) sendbin;
+	*ptr = 0;
+	*(ptr+1) = 0;
+	*(ptr++) |= head1;
+	*(ptr++) |= head2;
+	if( headersize == 8 ){
+		*(ptr++) = (uint8_t)(size >> 8);
+		*(ptr++) = (uint8_t)(size & 0x00ff);
+	}
+	else if( headersize == 14 ){
+		*(ptr++) = (uint8_t)(( size & 0xff00000000000000) >> 56);
+		*(ptr++) = (uint8_t)(( size & 0x00ff000000000000) >> 48);
+		*(ptr++) = (uint8_t)(( size & 0x0000ff0000000000) >> 40);
+		*(ptr++) = (uint8_t)(( size & 0x000000ff00000000) >> 32);
+		*(ptr++) = (uint8_t)(( size & 0x00000000ff000000) >> 24);
+		*(ptr++) = (uint8_t)(( size & 0x0000000000ff0000) >> 16);
+		*(ptr++) = (uint8_t)(( size & 0x000000000000ff00) >> 8);
+		*(ptr++) = (uint8_t)(( size & 0x00000000000000ff) >> 0);
+	}
+	MEMORY_PUSH_BIT32_B( option->memory_pool, ptr, payload_type );
+	cptr = (char*)ptr;
+	memcpy( cptr, msg, size );
+	return (size_t) ( ( sizeof( uint8_t ) * size ) + headersize );
+}
+
+ssize_t gdt_send_msg( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, const char* msg, ssize_t size, uint32_t payload_type )
+{
+	ssize_t len = 0;
+	void *sendbin = NULL;
+	if(GDT_SYSTEM_ERROR == gdt_make_message_buffer(option,psockparam,size)){
+		return 0;
+	}
+	sendbin = gdt_upointer( option->memory_pool, psockparam->buf_munit );
+	size_t binsize = gdt_make_msg(option,psockparam,sendbin,msg,size,payload_type);
+	len = gdt_send_all( psockparam->acc, (char*)sendbin, binsize, 0 );
+	return len;
+}
+
 size_t gdt_make_udpmsg( void* sendbin, const char* msg, ssize_t size, uint32_t payload_type )
 {
 	uint8_t head1;
@@ -2125,32 +2178,30 @@ size_t gdt_make_udpmsg( void* sendbin, const char* msg, ssize_t size, uint32_t p
 	uint8_t *ptr;
 	char* cptr;
 	uint32_t headersize = 0;
-	do{
-		head1 = 0x80;
-		headersize = gdt_make_size_header(&head2,size);
-		ptr = (uint8_t*) sendbin;
-		*ptr = 0;
-		*(ptr+1) = 0;
-		*(ptr++) |= head1;
-		*(ptr++) |= head2;
-		if( headersize == 8 ){
-			*(ptr++) = size >> 8;
-			*(ptr++) = size & 0x00ff;
-		}
-		else if( headersize == 14 ){
-			*(ptr++) = ( size & 0xff00000000000000) >> 56;
-			*(ptr++) = ( size & 0x00ff000000000000) >> 48;
-			*(ptr++) = ( size & 0x0000ff0000000000) >> 40;
-			*(ptr++) = ( size & 0x000000ff00000000) >> 32;
-			*(ptr++) = ( size & 0x00000000ff000000) >> 24;
-			*(ptr++) = ( size & 0x0000000000ff0000) >> 16;
-			*(ptr++) = ( size & 0x000000000000ff00) >> 8;
-			*(ptr++) = ( size & 0x00000000000000ff) >> 0;
-		}
-		MEMORY_PUSH_BIT32_B2( gdt_endian(), ptr, payload_type );
-		cptr = (char*)ptr;
-		memcpy( cptr, msg, size );
-	}while( false );
+	head1 = 0x80;
+	headersize = gdt_make_size_header(&head2,size);
+	ptr = (uint8_t*) sendbin;
+	*ptr = 0;
+	*(ptr+1) = 0;
+	*(ptr++) |= head1;
+	*(ptr++) |= head2;
+	if( headersize == 8 ){
+		*(ptr++) = size >> 8;
+		*(ptr++) = size & 0x00ff;
+	}
+	else if( headersize == 14 ){
+		*(ptr++) = ( size & 0xff00000000000000) >> 56;
+		*(ptr++) = ( size & 0x00ff000000000000) >> 48;
+		*(ptr++) = ( size & 0x0000ff0000000000) >> 40;
+		*(ptr++) = ( size & 0x000000ff00000000) >> 32;
+		*(ptr++) = ( size & 0x00000000ff000000) >> 24;
+		*(ptr++) = ( size & 0x0000000000ff0000) >> 16;
+		*(ptr++) = ( size & 0x000000000000ff00) >> 8;
+		*(ptr++) = ( size & 0x00000000000000ff) >> 0;
+	}
+	MEMORY_PUSH_BIT32_B2( gdt_endian(), ptr, payload_type );
+	cptr = (char*)ptr;
+	memcpy( cptr, msg, size );
 	return (size_t) ( ( sizeof( char ) * size ) + headersize );
 }
 
@@ -2158,23 +2209,11 @@ ssize_t gdt_send_udpmsg( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, c
 {
 	void *sendbin;
 	ssize_t len = 0;
-	do{
-		size_t tmp_size = size + gdt_make_size_header(NULL,size);
-		if( psockparam->buf_munit < 0 || gdt_usize( option->memory_pool, psockparam->buf_munit ) <= tmp_size )
-		{
-			if( psockparam->buf_munit >= 0 ){
-				gdt_free_memory_unit( option->memory_pool, &psockparam->buf_munit );
-			}
-			if( ( psockparam->buf_munit = gdt_create_munit( option->memory_pool, sizeof( uint8_t ) * GDT_ALIGNUP( tmp_size, option->msgbuffer_size ), MEMORY_TYPE_DEFAULT ) ) == -1 )
-			{
-				printf( "[gdt_send_udpmsg]size over: %zd byte\n", size );
-				break;
-			}
-		}
-		sendbin = gdt_upointer( option->memory_pool, psockparam->buf_munit );
-		memset( sendbin, 0, gdt_usize( option->memory_pool, psockparam->buf_munit ) );
-		size_t send_size = gdt_make_udpmsg( sendbin, msg, size, payload_type );
-		len = gdt_sendto_all( psockparam->acc, (char*)sendbin, send_size, 0, pfrom, fromlen );
-	}while( false );
+	if(GDT_SYSTEM_ERROR == gdt_make_message_buffer(option,psockparam,size)){
+		return 0;
+	}
+	sendbin = gdt_upointer( option->memory_pool, psockparam->buf_munit );
+	size_t send_size = gdt_make_udpmsg( sendbin, msg, size, payload_type );
+	len = gdt_sendto_all( psockparam->acc, (char*)sendbin, send_size, 0, pfrom, fromlen );
 	return len;
 }

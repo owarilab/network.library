@@ -93,10 +93,10 @@ extern "C"{
 #define INET_FLAG_BIT_CONNECT_UDP 0x00000002
 
 // sokcet type
-#define SOKET_TYPE_SERVER_TCP 1
-#define SOKET_TYPE_SERVER_UDP 2
-#define SOKET_TYPE_CLIENT_TCP 3
-#define SOKET_TYPE_CLIENT_UDP 4
+#define SOCKET_TYPE_SERVER_TCP 1
+#define SOCKET_TYPE_SERVER_UDP 2
+#define SOCKET_TYPE_CLIENT_TCP 3
+#define SOCKET_TYPE_CLIENT_UDP 4
 
 // server mode
 #define SOCKET_MODE_SINGLE 0
@@ -176,7 +176,7 @@ typedef struct GDT_SERVER_CONNECTION_INFO
 	int32_t recvbuf_munit; // char[]
 	int32_t recvinfo_munit; // GDT_RECV_INFO
 	int32_t recvmsg_munit; // char[]
-	void* user_data;
+	int32_t user_information;
 	void* gdt_socket_option;
 	GDT_SOCKPARAM sockparam;
 } GDT_SERVER_CONNECTION_INFO;
@@ -226,7 +226,7 @@ typedef struct GDT_SOCKET_OPTION
 	int64_t t_lock_id;						// thread lock id
 	char recvtimeoutmode;					// recv timeout mode( TIMEOUT_MODE_* )
 	size_t maxconnection;					// max connection length
-	uint8_t socket_type;					// socket type( SOKET_TYPE_SERVER_TCP: server socket, SOKET_TYPE_CLIENT_TCP: client socket )
+	uint8_t socket_type;					// socket type( SOCKET_TYPE_SERVER_TCP: server socket, SOCKET_TYPE_CLIENT_TCP: client socket )
 	uint8_t mode;							// connect mode( SOCKET_MODE_SINGLE:single task, SOCKET_MODE_PREFORK:prefork, SOCKET_MODE_THREAD:thread)
 	uint8_t protocol;						// PROTOCOL_*
 	int32_t t_usec;							// connection timeout (usec)
@@ -306,6 +306,7 @@ GDT_SOCKET_ID gdt_server_socket( GDT_SOCKET_OPTION *option, int is_ipv6 );
 GDT_SOCKET_ID gdt_client_socket( GDT_SOCKET_OPTION *option );
 void gdt_disconnect( GDT_SOCKPARAM *psockparam );
 void gdt_set_sock_option( GDT_SOCKET_OPTION *option );
+void* gdt_make_socket( GDT_SOCKET_OPTION *option );
 void* gdt_socket( GDT_SOCKET_OPTION *option );
 void gdt_free_socket( GDT_SOCKET_OPTION *option );
 
@@ -323,8 +324,10 @@ int gdt_pre_packetfilter( GDT_SOCKET_OPTION *option, struct GDT_RECV_INFO *rinfo
 
 ssize_t gdt_parse_socket_binary( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, uint8_t* u8buf, size_t size, uint32_t basebuf_munit );
 uint64_t get_parse_header(GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, uint8_t* u8buf, size_t size);
-ssize_t gdt_send_msg( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, const char* msg, ssize_t size, uint32_t payload_type );
 uint32_t gdt_make_size_header(uint8_t* head_ptr,ssize_t size);
+int32_t gdt_make_message_buffer(GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, size_t size);
+size_t gdt_make_msg( GDT_SOCKET_OPTION* option,GDT_SOCKPARAM *psockparam, void* sendbin, const char* msg, ssize_t size, uint32_t payload_type );
+ssize_t gdt_send_msg( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, const char* msg, ssize_t size, uint32_t payload_type );
 size_t gdt_make_udpmsg( void* sendbin, const char* msg, ssize_t size, uint32_t payload_type );
 ssize_t gdt_send_udpmsg( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, const char* msg, ssize_t size, uint32_t payload_type, struct sockaddr *pfrom, socklen_t fromlen );
 
