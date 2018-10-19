@@ -29,61 +29,20 @@
 extern "C"{
 #endif
 
-#ifndef _GDT_TOKEN_ANALYZER_H_
-#define _GDT_TOKEN_ANALYZER_H_
+#ifndef _GDT_CHAIN_ARRAY_H_
+#define _GDT_CHAIN_ARRAY_H_
 
 #include "gdt_core.h"
-#include "gdt_array.h"
-#include "gdt_io.h"
-#include <stdio.h>
-#include <string.h>
-#include <ctype.h>
+#include "gdt_memory_allocator.h"
 
-#define STRBUF_SIZE			4096
-#define ID_UNK				0
-#define ID_NUM				1
-#define ID_OP				2
-#define ID_SIGN				3
-#define ID_STR				4
-#define ID_SYMBOL			5
-#define ID_SYS_IF			6
-#define ID_SYS_ELSE			7
-#define ID_SYS_ELSEIF		8
-#define ID_FLOAT			9
-#define ID_SYS_LOOP			10
-#define ID_SYS_WHILE		11
-
-// system words 
-#define SYS_LOOP    "loop"
-#define SYS_WHILE   "while"
-#define SYS_IF      "if"
-#define SYS_ELSEIF  "elseif"
-#define SYS_ELSE    "else"
-
-typedef struct GDT_TOKEN
-{
-	int32_t buf_munit;
-	uint8_t type;
-//	size_t size;
-	uint16_t size;
-} GDT_TOKEN;
-
-typedef struct GDT_TOKENS
-{
-	int32_t token_munit;
-	size_t size;
-	uint32_t currentpos;
-	uint32_t workpos;
-	int32_t allocsize;
-} GDT_TOKENS;
-
-int32_t gdt_inittoken( GDT_MEMORY_POOL* _ppool, int32_t allocsize );
-int gdt_token_analyzer( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr );
-int  gdt_addtoken( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* tokenbuf, int* tokensize, int type );
-int  gdt_check_systemword( char* token );
-void gdt_tokendump( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit );
-
-#endif /*_GDT_TOKEN_ANALYZER_H_*/
+int32_t gdt_create_chain_array(GDT_MEMORY_POOL* memory,size_t chain_size, size_t data_size);
+void* gdt_add_chain(GDT_MEMORY_POOL* memory,int32_t chain_id);
+int32_t gdt_add_chain_i(GDT_MEMORY_POOL* memory,int32_t chain_id);
+void* gdt_get_chain(GDT_MEMORY_POOL* memory,int32_t chain_id,void* current);
+void* gdt_get_chain_i(GDT_MEMORY_POOL* memory,int32_t chain_id,int32_t offset);
+int32_t gdt_remove_chain(GDT_MEMORY_POOL* memory,int32_t chain_id,void* chain);
+void gdt_dump_chain_array(GDT_MEMORY_POOL* memory,int32_t chain_id);
+#endif /*_GDT_CHAIN_ARRAY_H_*/
 
 #ifdef __cplusplus
 }

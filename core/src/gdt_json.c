@@ -368,12 +368,12 @@ int32_t gdt_json_decode( GDT_MEMORY_POOL* _ppool, const char* src )
 	return rootnode_munit;
 }
 
-int32_t gdt_json_decode_h( GDT_MEMORY_POOL* _ppool, const char* src, int32_t hash_size )
+int32_t gdt_json_decode_h( GDT_MEMORY_POOL* _ppool, const char* src, int32_t hash_size, int32_t init_token_size )
 {
 	int32_t rootnode_munit = -1;
 	int32_t tokens_munit = -1;
 	do{
-		if( 0 >= ( tokens_munit = gdt_inittoken( _ppool, 10000 ) ) ){
+		if( 0 >= ( tokens_munit = gdt_inittoken( _ppool, init_token_size ) ) ){
 			break;
 		}
 		gdt_token_analyzer( _ppool, tokens_munit, (char*)src );
@@ -465,7 +465,7 @@ int32_t gdt_json_decode_parser_hash( GDT_MEMORY_POOL* _ppool, GDT_NODE* node, GD
 					int32_t parser_child_munit = -1;
 					int32_t hash_name_munit = token_list[ptokens->workpos].buf_munit;
 					ptokens->workpos+=3;
-					if( -1 == ( parser_child_munit = gdt_json_decode_parser_hash( _ppool, node, ptokens, token_list, 4 ) ) ){
+					if( -1 == ( parser_child_munit = gdt_json_decode_parser_hash( _ppool, node, ptokens, token_list, 8 ) ) ){
 						working_munit = -1;
 						break;
 					}

@@ -39,8 +39,15 @@ void gdt_srand_32()
 	struct tm mytm;
 	struct tm *ptm = &mytm;
 	localtime_s( &mytm, &now );
-	seed = ptm->tm_year * ptm->tm_mon * ptm->tm_mday * clock();
-	gdt_xorshift_32_seed = ( seed * ptm->tm_sec ) * ptm->tm_hour * ptm->tm_min * ptm->tm_sec * clock();
+	int32_t my = ptm->tm_year + 1;
+	int32_t mm = ptm->tm_mon + 1;
+	int32_t md = ptm->tm_mday + 1;
+	int32_t mh = ptm->tm_hour + 1;
+	int32_t mmin = ptm->tm_min + 1;
+	int32_t msec = ptm->tm_sec + 1;
+	int32_t clc = clock() + 1;
+	seed = my * mm * md * clc;
+	gdt_xorshift_32_seed = ( seed * msec ) * mh * mmin * msec * clc;
 	seed = seed % 0xFF;
 	while( seed-- > 0 ){
 		gdt_rand_32();
@@ -66,13 +73,20 @@ void gdt_srand_64()
 	struct tm mytm;
 	struct tm *ptm = &mytm;
 	localtime_s( &mytm, &now );
-	seed = ptm->tm_year * ptm->tm_mon * ptm->tm_mday;
-	gdt_xorshift_64_seed1 = ( seed * ptm->tm_sec ) * ptm->tm_hour * ptm->tm_min * ptm->tm_sec * clock();
+	int32_t my = ptm->tm_year + 1;
+	int32_t mm = ptm->tm_mon + 1;
+	int32_t md = ptm->tm_mday + 1;
+	int32_t mh = ptm->tm_hour + 1;
+	int32_t mmin = ptm->tm_min + 1;
+	int32_t msec = ptm->tm_sec + 1;
+	int32_t clc = clock() + 1;
+	seed = my * mm * md * clc;
+	gdt_xorshift_64_seed1 = ( seed * msec ) * mh * mmin * msec * clc;
 	seed = seed % 0xFF;
 	while( seed-- > 0 ){
 		gdt_rand_64();
 	}
-	gdt_xorshift_64_seed2 = ( gdt_xorshift_64_seed1 * ptm->tm_sec ) + ptm->tm_hour + ptm->tm_min + ptm->tm_sec * clock();
+	gdt_xorshift_64_seed2 = ( gdt_xorshift_64_seed1 * msec ) + mh + mmin + msec * clc;
 #else
 	int i;
 	int finish;
