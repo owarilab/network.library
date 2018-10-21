@@ -31,6 +31,10 @@ int *argc_;
 char ***argv_;
 char ***envp_;
 
+#ifndef __WINDOWS__
+pid_t child_pid[MAX_CHILD_PROCESS];
+#endif
+
 void gnt_set_argv( int* _pargc_, char ***_argvp_, char *** _envp_ )
 {
 	argc_ = _pargc_;
@@ -267,7 +271,29 @@ void gdt_sig_int_handler( int sig )
 #ifdef __GDT_DEBUG__
 	printf("\nsigint handler\n");
 #endif
+	int i;
+	for(i=0;i<MAX_CHILD_PROCESS;++i){
+		if(child_pid[i]!=0){
+			printf("child pid:%d\n",(int)child_pid[i]);
+			kill(child_pid[i],SIGKILL);
+		}
+	}
 	exit(0);
+}
+
+void gdt_init_child_pid()
+{
+	int i;
+	for(i=0;i<MAX_CHILD_PROCESS;++i){
+		child_pid[i] = 0;
+	}
+}
+void gdt_set_child_pid(pid_t pid,int32_t offset)
+{
+	if(offset>=MAX_CHILD_PROCESS){
+		return;
+	}
+	child_pid[offset] = pid;
 }
 
 #endif // ifndef __WINDOWS__

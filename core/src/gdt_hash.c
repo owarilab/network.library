@@ -137,7 +137,10 @@ void gdt_add_hash_value( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* n
 	}
 	pbuf = (char*)GDT_POINTER( _ppool, datamunit );
 	memcpy( pbuf, value, gdt_usize( _ppool, datamunit ) );
-	gdt_add_hash( _ppool, h_munit, namemunit, datamunit, id );
+	GDT_HASH_ELEMENT* is_push = gdt_add_hash( _ppool, h_munit, namemunit, datamunit, id );
+	if( NULL==is_push){
+		printf("is_push is NULL\n");
+	}
 }
 
 void gdt_add_hash_array_string( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, const char* value )
@@ -156,7 +159,10 @@ void gdt_add_hash_array_string( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const 
 	if( GDT_SYSTEM_ERROR == gdt_array_push_string( _ppool, &array_munit, value ) ){
 		return;
 	}
-	gdt_add_hash( _ppool, h_munit, namemunit, array_munit, ELEMENT_ARRAY );
+	GDT_HASH_ELEMENT* is_push = gdt_add_hash( _ppool, h_munit, namemunit, array_munit, ELEMENT_ARRAY );
+	if( NULL==is_push){
+		printf("is_push is NULL\n");
+	}
 }
 
 void gdt_add_hash_array_empty_string( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, size_t size )
@@ -175,7 +181,10 @@ void gdt_add_hash_array_empty_string( GDT_MEMORY_POOL* _ppool, int32_t h_munit, 
 	if( GDT_SYSTEM_ERROR == gdt_array_push_empty_string( _ppool, &array_munit, size ) ){
 		return;
 	}
-	gdt_add_hash( _ppool, h_munit, namemunit, array_munit, ELEMENT_ARRAY );
+	GDT_HASH_ELEMENT* is_push = gdt_add_hash( _ppool, h_munit, namemunit, array_munit, ELEMENT_ARRAY );
+	if( NULL==is_push){
+		printf("is_push is NULL\n");
+	}
 }
 
 void gdt_add_hash_binary( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, uint8_t* binary, size_t size )
@@ -200,7 +209,10 @@ void gdt_add_hash_binary( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* 
 	}
 	bin = (uint8_t*)GDT_POINTER( _ppool, datamunit );
 	memcpy( bin, binary, size );
-	gdt_add_hash( _ppool, h_munit, namemunit, datamunit, ELEMENT_LITERAL_BIN );
+	GDT_HASH_ELEMENT* is_push = gdt_add_hash( _ppool, h_munit, namemunit, datamunit, ELEMENT_LITERAL_BIN );
+	if( NULL==is_push){
+		printf("is_push is NULL\n");
+	}
 }
 
 void gdt_add_hash_integer( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, int32_t value )
@@ -217,7 +229,10 @@ void gdt_add_hash_integer( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char*
 	}
 	gdt_itoa( value, (char*)GDT_POINTER(_ppool,datamunit), gdt_usize(_ppool,datamunit) );
 	(*(int32_t*)(GDT_POINTER(_ppool,datamunit)+gdt_usize(_ppool,datamunit)-sizeof(int32_t))) = value;
-	gdt_add_hash( _ppool, h_munit, namemunit, datamunit, ELEMENT_LITERAL_NUM );
+	GDT_HASH_ELEMENT* is_push = gdt_add_hash( _ppool, h_munit, namemunit, datamunit, ELEMENT_LITERAL_NUM );
+	if( NULL==is_push){
+		printf("is_push is NULL\n");
+	}
 }
 
 void gdt_add_hash_integer_kint( GDT_MEMORY_POOL* _ppool, int32_t h_munit, int32_t name_munit, int32_t value )
@@ -228,7 +243,10 @@ void gdt_add_hash_integer_kint( GDT_MEMORY_POOL* _ppool, int32_t h_munit, int32_
 	}
 	gdt_itoa( value, (char*)GDT_POINTER(_ppool,datamunit), gdt_usize(_ppool,datamunit) );
 	(*(int32_t*)(GDT_POINTER(_ppool,datamunit)+gdt_usize(_ppool,datamunit)-sizeof(int32_t))) = value;
-	gdt_add_hash( _ppool, h_munit, name_munit, datamunit, ELEMENT_LITERAL_NUM );
+	GDT_HASH_ELEMENT* is_push = gdt_add_hash( _ppool, h_munit, name_munit, datamunit, ELEMENT_LITERAL_NUM );
+	if( NULL==is_push){
+		printf("is_push is NULL\n");
+	}
 }
 
 void gdt_add_hash_string( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, const char* value )
@@ -254,7 +272,10 @@ void gdt_add_hash_string( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* 
 	}
 	pbuf = (char*)GDT_POINTER( _ppool, datamunit );
 	memcpy( pbuf, value, gdt_usize( _ppool, datamunit ) );
-	gdt_add_hash( _ppool, h_munit, namemunit, datamunit, ELEMENT_LITERAL_STR );
+	GDT_HASH_ELEMENT* is_push = gdt_add_hash( _ppool, h_munit, namemunit, datamunit, ELEMENT_LITERAL_STR );
+	if( NULL==is_push){
+		printf("is_push is NULL\n");
+	}
 }
 
 void gdt_add_hash_emptystring( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, size_t string_size )
@@ -272,7 +293,10 @@ void gdt_add_hash_emptystring( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const c
 	pbuf = (char*)GDT_POINTER( _ppool, datamunit );
 	//memset( pbuf, 0, gdt_usize( _ppool, datamunit ) );
 	pbuf[0] = '\0';
-	gdt_add_hash( _ppool, h_munit, namemunit, datamunit, ELEMENT_LITERAL_STR );
+	GDT_HASH_ELEMENT* is_push = gdt_add_hash( _ppool, h_munit, namemunit, datamunit, ELEMENT_LITERAL_STR );
+	if( NULL==is_push){
+		printf("is_push is NULL\n");
+	}
 }
 
 void gdt_add_hash_value_kstring( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, int32_t data_munit, int32_t id )
@@ -281,7 +305,10 @@ void gdt_add_hash_value_kstring( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const
 	if( namemunit == -1 ){
 		return;
 	}
-	gdt_add_hash( _ppool, h_munit, namemunit, data_munit, id );
+	GDT_HASH_ELEMENT* is_push = gdt_add_hash( _ppool, h_munit, namemunit, data_munit, id );
+	if( NULL==is_push){
+		printf("is_push is NULL\n");
+	}
 }
 
 int32_t gdt_move_hash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname_from, const char* hashname_to )

@@ -76,6 +76,9 @@ void* gdt_get_chain(GDT_MEMORY_POOL* memory,int32_t chain_id,void* current)
 	int32_t block_size = *(((int32_t*)chain_root)+4);
 	int32_t header_size = *(((int32_t*)chain_root)+5);
 	if(NULL==current){
+		if(start==tail){
+			return NULL;
+		}
 		return (void*)(chain_root+header_size+(start*block_size));
 	}
 	uint8_t* chain = (uint8_t*)current;
@@ -101,6 +104,7 @@ void* gdt_get_chain_i(GDT_MEMORY_POOL* memory,int32_t chain_id,int32_t offset)
 int32_t gdt_remove_chain(GDT_MEMORY_POOL* memory,int32_t chain_id,void* chain)
 {
 	uint8_t* chain_root = (uint8_t*)GDT_POINTER(memory,chain_id);
+	//int32_t tail = *(((int32_t*)chain_root)+1);
 	int32_t data_size = *(((int32_t*)chain_root)+3);
 	int32_t block_size = *(((int32_t*)chain_root)+4);
 	int32_t header_size = *(((int32_t*)chain_root)+5);
@@ -120,9 +124,10 @@ int32_t gdt_remove_chain(GDT_MEMORY_POOL* memory,int32_t chain_id,void* chain)
 	}else{
 		int32_t* prev_info = (int32_t*)(chain_root+header_size+(prev*block_size)+data_size);
 		*(prev_info+1) = next;
+		*(next_info) = prev;
 	}
 	int32_t* end_info = (int32_t*)(chain_root+header_size+(end*block_size)+data_size);
-	//*(end_info+1) = my_index;
+	*(end_info+1) = my_index;
 	*(info) = end;
 	*(info+1) = -1;
 	*(((int32_t*)chain_root)+6) = my_index;
@@ -131,6 +136,7 @@ int32_t gdt_remove_chain(GDT_MEMORY_POOL* memory,int32_t chain_id,void* chain)
 
 void gdt_dump_chain_array(GDT_MEMORY_POOL* memory,int32_t chain_id)
 {
+	int32_t print_length=0;
 	uint8_t* chain_root = (uint8_t*)GDT_POINTER(memory,chain_id);
 	int32_t start = *(((int32_t*)chain_root));
 	int32_t tail = *(((int32_t*)chain_root)+1);
@@ -139,12 +145,38 @@ void gdt_dump_chain_array(GDT_MEMORY_POOL* memory,int32_t chain_id)
 	int32_t block_size = *(((int32_t*)chain_root)+4);
 	//int32_t header_size = *(((int32_t*)chain_root)+5);
 	int32_t end = *(((int32_t*)chain_root)+6);
-	printf("start=%d,tail=%d,size=%d,data_size=%d,block=%d,end=%d\n",start,tail,chain_size,data_size,block_size,end);
 	void* current=NULL;
 	while( NULL != (current=gdt_get_chain(memory,chain_id,current)) ){
 		uint8_t* chain = (uint8_t*)current;
-		int32_t* pv = (int32_t*)(chain);
 		int32_t* info = (int32_t*)(chain+data_size);
-		printf("v = %d, prev=%d, next=%d\n",*pv,*(info),*(info+1));
+		printf("prev=%d, next=%d\n",*(info),*(info+1));
+		print_length++;
 	}
+	printf("start=%d,tail=%d,size=%d,data_size=%d,block=%d,end=%d\n",start,tail,chain_size,data_size,block_size,end);
+	printf("total : %d\n",print_length);
+}
+
+int32_t gdt_get_chain_start(GDT_MEMORY_POOL* memory,int32_t chain_id)
+{
+	uint8_t* chain_root = (uint8_t*)GDT_POINTER(memory,chain_id);
+	int32_t start = *(((int32_t*)chain_root));
+	return start;
+}
+
+int32_t gdt_get_chain_length(GDT_MEMORY_POOL* memory,int32_t chain_id)
+{
+	int32_t print_length=0;
+	uint8_t* chain_root = (uint8_t*)GDT_POINTER(memory,chain_id);
+	int32_t start = *(((int32_t*)chain_root));
+	int32_t tail = *(((int32_t*)chain_root)+1);
+	int32_t chain_size = *(((int32_t*)chain_root)+2);
+	int32_t data_size = *(((int32_t*)chain_root)+3);
+	int32_t block_size = *(((int32_t*)chain_root)+4);
+	//int32_t header_size = *(((int32_t*)chain_root)+5);
+	int32_t end = *(((int32_t*)chain_root)+6);
+	void* current=NULL;
+	while( NULL != (current=gdt_get_chain(memory,chain_id,current)) ){
+		print_length++;
+	}
+	return print_length;
 }

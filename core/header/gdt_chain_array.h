@@ -42,6 +42,8 @@ void* gdt_get_chain(GDT_MEMORY_POOL* memory,int32_t chain_id,void* current);
 void* gdt_get_chain_i(GDT_MEMORY_POOL* memory,int32_t chain_id,int32_t offset);
 int32_t gdt_remove_chain(GDT_MEMORY_POOL* memory,int32_t chain_id,void* chain);
 void gdt_dump_chain_array(GDT_MEMORY_POOL* memory,int32_t chain_id);
+int32_t gdt_get_chain_start(GDT_MEMORY_POOL* memory,int32_t chain_id);
+int32_t gdt_get_chain_length(GDT_MEMORY_POOL* memory,int32_t chain_id);
 #endif /*_GDT_CHAIN_ARRAY_H_*/
 
 #ifdef __cplusplus

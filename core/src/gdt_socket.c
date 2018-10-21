@@ -459,10 +459,10 @@ void gdt_free_sockparam( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam )
 	psockparam->tmpbitsift			= -1;
 	psockparam->continue_pos		= 0;
 	psockparam->appdata32bit = 0x00000000;
-	if( option->memory_pool != NULL && psockparam->buf_munit >= 0 ){
-		gdt_free_memory_unit( option->memory_pool, &psockparam->buf_munit );
-	}
-	psockparam->buf_munit			= -1;
+//	if( option->memory_pool != NULL && psockparam->buf_munit >= 0 ){
+//		gdt_free_memory_unit( option->memory_pool, &psockparam->buf_munit );
+//	}
+//	psockparam->buf_munit			= -1;
 	psockparam->header_size			= 0;
 	memset(psockparam->header,0,sizeof(psockparam->header));
 }
@@ -2117,7 +2117,7 @@ int32_t gdt_make_message_buffer(GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockp
 		}
 		if( ( psockparam->buf_munit = gdt_create_munit( option->memory_pool, sizeof( uint8_t ) * GDT_ALIGNUP( tmp_size, option->msgbuffer_size ), MEMORY_TYPE_DEFAULT ) ) == -1 )
 		{
-			printf( "[gdt_send_udpmsg]size over: %zd byte\n", size );
+			printf( "[gdt_make_message_buffer]size over: %zd byte\n", size );
 			return GDT_SYSTEM_ERROR;
 		}
 	}

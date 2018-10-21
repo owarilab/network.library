@@ -46,11 +46,17 @@ extern "C"{
 #define MEMORY_UNIT_SIGACTION 2
 #define MEMORY_UNIT_HASH_STRING_TABLE 3
 
+#define MAX_CHILD_PROCESS 10000
+
 typedef void (*SIG_HANDLER)(int sig);
 
 extern int *argc_;
 extern char ***argv_;
 extern char ***envp_;
+
+#ifndef __WINDOWS__
+extern pid_t child_pid[MAX_CHILD_PROCESS];
+#endif
 
 void gnt_set_argv( int* argc, char ***_argvp_, char *** _envp_ );
 void gnt_print_argv();
@@ -69,6 +75,8 @@ int gdt_set_sigaction( int signum, SIG_HANDLER sh, int sa_flags );
 void gdt_sig_hangup_handler( int sig );
 void gdt_sig_chld_handler( int sig );
 void gdt_sig_int_handler( int sig );
+void gdt_init_child_pid();
+void gdt_set_child_pid(pid_t pid,int32_t offset);
 void gdt_sleep(int time);
 #endif
 
