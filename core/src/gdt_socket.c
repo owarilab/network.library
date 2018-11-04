@@ -1725,7 +1725,13 @@ void gdt_server_update2(GDT_SOCKET_OPTION *option)
 #endif
 						}
 					}
+//printf("recv\n");
+//printf("@%s@\n",(char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit));
 					gdt_recv_event(option,child,srlen);
+					// clean buffer( support binary )
+					if(srlen>0){
+						memset((char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit),0, srlen);
+					}
 					if (child->id == -1)
 					{
 						if (option->close_callback != NULL)
