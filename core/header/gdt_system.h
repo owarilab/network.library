@@ -46,7 +46,7 @@ extern "C"{
 #define MEMORY_UNIT_SIGACTION 2
 #define MEMORY_UNIT_HASH_STRING_TABLE 3
 
-#define MAX_CHILD_PROCESS 10000
+#define MAX_CHILD_PROCESS 100
 
 typedef void (*SIG_HANDLER)(int sig);
 

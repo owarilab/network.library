@@ -25,9 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sysexits.h>
 #include "gdt_system.h"
 #include "gdt_socket.h"
 #include "gdt_random.h"
+#include "gdt_io.h"
 
 GDT_MEMORY_POOL* main_memory_pool = NULL;
 int32_t g_reciver_munit;
@@ -230,8 +232,7 @@ int32_t make_log_path(GDT_MEMORY_POOL* memory_pool,int32_t dest_munit,char* path
 	}
 	char* dest = (char*)GDT_POINTER(memory_pool,dest_munit);
 	size_t path_buffer_len = gdt_usize(memory_pool,dest_munit);
-	size_t path_len = 0;
-	path_len = gdt_strlink( dest, 0, path, gdt_strlen(path), path_buffer_len );
+	gdt_strlink( dest, 0, path, gdt_strlen(path), path_buffer_len );
 	return dest_munit;
 }
 
@@ -296,10 +297,10 @@ int main( int argc, char *argv[], char *envp[] )
 			break;
 		}
 		option = (GDT_SOCKET_OPTION*)GDT_POINTER(memory_pool,option_munit);
-		if (0 != gdt_initialize_socket_option(option, hostname, portnum, SOKET_TYPE_SERVER_TCP, SOCKET_MODE_NONBLOCKING, PROTOCOL_SIMPLE, maxconnection, memory_pool, NULL)) {
+		if (0 != gdt_initialize_socket_option(option, hostname, portnum, SOCKET_TYPE_SERVER_TCP, SOCKET_MODE_NONBLOCKING, PROTOCOL_SIMPLE, maxconnection, memory_pool, NULL)) {
 			break;
 		}
-		set_message_buffer(option,SIZE_KBYTE*512);
+		gdt_set_message_buffer(option,SIZE_KBYTE*512);
 		set_on_connect_event( option, on_connect);
 		set_on_payload_recv_event(option, on_payload_recv);
 		set_on_close_event( option, on_close );

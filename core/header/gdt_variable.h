@@ -25,51 +25,58 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-// TODO : sha2 do not work yet...
-//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 #ifdef __cplusplus
 extern "C"{
 #endif
 
-#ifndef _GDT_SHA2_H_
-#define _GDT_SHA2_H_
+#ifndef _GDT_VARIABLE_H_
+#define _GDT_VARIABLE_H_
 
-#include "gdt_core.h"
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#if defined(__LINUX__) || defined(__BSD_UNIX__) || defined(__ANDROID__) || defined(__IOS__)
-#include <stdint.h>
-#endif
-#include <errno.h>
+#include "gdt_node.h"
+#include "gdt_string.h"
+#include "gdt_hash.h"
+#include "gdt_array.h"
+#include "gdt_chain_array.h"
 
-#define GDT_SHA256_HASH_BITS 256
-#define GDT_SHA256_HASH_BYTES ( GDT_SHA256_HASH_BITS / 8 )
-#define GDT_SHA256_BLOCK_BITS 512
-#define GDT_SHA256_BLOCK_BYTES ( GDT_SHA256_BLOCK_BITS / 8 )
-#define GDT_SHA256_INTERMEDIAE_HASH_BYTES ( GDT_SHA256_HASH_BYTES / 4 )
-#define GDT_SHA256_SEQUENCE_BUFFER_BYTES 64
-
-typedef struct GDT_SHA256_CONTEXT
+typedef struct GDT_CACHE
 {
-	uint32_t hash[GDT_SHA256_INTERMEDIAE_HASH_BYTES];
-	uint8_t message_block[GDT_SHA256_BLOCK_BYTES];
-	uint32_t length_high;
-	uint32_t length_low;
-} GDT_SHA256_CONTEXT;
+	GDT_MEMORY_POOL* memory;
+	size_t chain_allocate_size;
+	size_t page_allocate_size;
+	size_t hash_size;
+	size_t max_cache_size;
+	size_t max_key_size;
+	int32_t page;
+	int32_t chain_memory;
+	int32_t chain;
+	int32_t memory_page1;
+	int32_t page1_hash;
+	int32_t memory_page2;
+	int32_t page2_hash;
+	int32_t swap_count;
+} GDT_CACHE;
 
-void gdt_sha256_initialize( GDT_SHA256_CONTEXT* sha256_ctx );
-uint32_t gdt_sha256_rotate_left( uint32_t v, uint8_t bits );
-uint32_t gdt_sha256_rotate_right( uint32_t v, uint8_t bits );
-uint32_t gdt_sha256_sigma0( uint32_t v );
-uint32_t gdt_sha256_sigma1( uint32_t v );
-uint32_t gdt_sha256_sigma2( uint32_t v );
-uint32_t gdt_sha256_sigma3( uint32_t v );
-void gdt_sha256( void *dest, const void* src, uint32_t length );
-void gdt_sha256_block_proc( GDT_SHA256_CONTEXT* sha256_ctx );
+typedef struct GDT_CACHE_PAGE
+{
+	GDT_MEMORY_POOL* memory;
+	int32_t hash_id;
+} GDT_CACHE_PAGE;
 
-#endif /*_GDT_SHA2_H_*/
+int32_t gdt_create_cache( GDT_MEMORY_POOL* memory,size_t chain_allocate_size,size_t max_cache_size,size_t page_allocate_size,size_t page_hash_size,size_t max_key_size);
+void gdt_get_cache_page(GDT_CACHE* cache,GDT_CACHE_PAGE* page);
+void gdt_swap_page(GDT_CACHE* cache,GDT_CACHE_PAGE* page);
+void gdt_add_cache_key(GDT_CACHE* cache,char* key);
+int32_t gdt_cache_int(GDT_CACHE* cache,char* key,int32_t value);
+int32_t gdt_cache_string(GDT_CACHE* cache,char* key,char* value);
+int32_t gdt_remove_cache(GDT_CACHE* cache,char* key);
+int32_t gdt_cache_length(GDT_CACHE* cache);
+
+
+void gdt_array_dump( GDT_MEMORY_POOL* _ppool, int32_t munit, int index );
+void gdt_hash_dump( GDT_MEMORY_POOL* _ppool, int32_t h_munit, int index );
+int32_t gdt_opendir( GDT_MEMORY_POOL* _ppool, const char* path );
+
+#endif /*_GDT_VARIABLE_H_*/
 
 #ifdef __cplusplus
 }

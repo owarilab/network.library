@@ -436,7 +436,8 @@ int gdt_addtoken( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* tokenbuf,
 	else{
 		if( ptokens->currentpos >= ptokens->size )
 		{
-			if( -1 == ( tmpmunit = gdt_create_munit( _ppool, sizeof( GDT_TOKEN ) * ( ptokens->size + ptokens->allocsize ), MEMORY_TYPE_DEFAULT ) ) ){
+			int32_t resize = ptokens->size * 2;
+			if( -1 == ( tmpmunit = gdt_create_munit( _ppool, sizeof( GDT_TOKEN ) * ( resize ), MEMORY_TYPE_DEFAULT ) ) ){
 				printf("realloc token memory error\n");
 				return -1;
 			}
@@ -447,7 +448,7 @@ int gdt_addtoken( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit, char* tokenbuf,
 			);
 			gdt_free_memory_unit( _ppool, &ptokens->token_munit );
 			ptokens->token_munit = tmpmunit;
-			ptokens->size += ptokens->allocsize;
+			ptokens->size = resize;
 		}
 	}
 	ptoken = ( GDT_TOKEN* )GDT_POINTER(_ppool,ptokens->token_munit)+ptokens->currentpos;

@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sysexits.h>
 #include "gdt_socket.h"
 #include "gdt_json.h"
 #include "gdt_memory_allocator.h"
@@ -109,7 +110,7 @@ int main( int argc, char *argv[], char *envp[] )
 									snprintf( (recivers+i)->port, sizeof( (recivers+i)->port ) -1, "%s", (char*)GDT_POINTER(main_memory_pool,port_munit) );
 									snprintf( (recivers+i)->target, sizeof( (recivers+i)->target ) -1, "%s", (char*)GDT_POINTER(main_memory_pool,target_munit) );
 									(recivers+i)->tcp_client = gdt_create_tcp_client((recivers+i)->host, (recivers+i)->port);
-									set_message_buffer((recivers+i)->tcp_client,SIZE_MBYTE*4);
+									gdt_set_message_buffer((recivers+i)->tcp_client,SIZE_MBYTE*4);
 									set_on_connect_event( (recivers+i)->tcp_client, on_connect );
 									set_on_payload_recv_event((recivers+i)->tcp_client, on_payload_recv);
 									set_on_close_event( (recivers+i)->tcp_client, on_close );

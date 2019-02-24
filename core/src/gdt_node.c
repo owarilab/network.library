@@ -149,11 +149,9 @@ void gdt_elementdumpchild( GDT_MEMORY_POOL* _ppool, GDT_NODE* node, int32_t inde
 				for( j=0;j<index;j++ ){ printf("  "); }
 				if( workelemlist[i].id == ELEMENT_ARRAY){
 					printf("element[%d][%d] : array object\n" , workelemlist[i].element_munit, workelemlist[i].id );
-					//gdt_array_dump( _ppool, workelemlist[i].element_munit, index );
 				}
 				else if( workelemlist[i].id == ELEMENT_HASH ){
 					printf("element[%d][%d] : hash object\n" , workelemlist[i].element_munit, workelemlist[i].id );
-					//gdt_dump_hash( _ppool, workelemlist[i].element_munit, index );
 				}
 				else{
 					printf("element[%d][%d] : %s\n" , workelemlist[i].element_munit, workelemlist[i].id, (char*)GDT_POINTER( _ppool, workelemlist[i].element_munit ) );

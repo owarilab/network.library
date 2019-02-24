@@ -66,6 +66,7 @@ size_t gdt_initialize_memory( GDT_MEMORY_POOL** _ppool, size_t allocate_size, si
 		(*_ppool)->memory_buf_munit	= -1;
 		(*_ppool)->alloc_type			= MEMORY_ALLOCATE_TYPE_MALLOC;
 		(*_ppool)->endian			= gdt_endian();
+		(*_ppool)->debug			= MEMORY_DEBUG;
 		memory_unit_one_size = GDT_ALIGNUP( sizeof( GDT_MEMORY_UNIT ), alignment_size );
 		memoryUnitSize = memory_unit_one_size * ( fix_memory_unit + free_memory_unit );
 		(*_ppool)->bottom = (*_ppool)->end - memoryUnitSize;
@@ -130,6 +131,7 @@ size_t gdt_initialize_mmapmemory( GDT_MEMORY_POOL** _ppool, size_t allocate_size
 		(*_ppool)->memory_buf_munit	= -1;
 		(*_ppool)->alloc_type			= MEMORY_ALLOCATE_TYPE_MMAP;
 		(*_ppool)->endian			= gdt_endian();
+		(*_ppool)->debug			= MEMORY_DEBUG;
 		memory_unit_one_size = GDT_ALIGNUP( sizeof( GDT_MEMORY_UNIT ), alignment_size );
 		memoryUnitSize = memory_unit_one_size * ( fix_memory_unit + free_memory_unit );
 		(*_ppool)->bottom = (*_ppool)->end - memoryUnitSize;
@@ -162,6 +164,12 @@ int32_t gdt_create_mini_memory( GDT_MEMORY_POOL* _ppool, size_t allocate_size )
 	memset( tiny_pool, 0, sizeof( GDT_MEMORY_POOL ) );
 	size_t max_byte_size = sizeof( uint8_t ) * allocate_size;
 	int32_t memory_buf_munit = gdt_create_munit( _ppool, max_byte_size, MEMORY_TYPE_DEFAULT );
+	if(-1==memory_buf_munit){
+		if(_ppool->debug){
+			printf("gdt_create_mini_memory error\n");
+		}
+		return -1;
+	}
 	tiny_pool->memory = ( void* )GDT_POINTER( _ppool, memory_buf_munit );
 	tiny_pool->top				= 0;
 	tiny_pool->end				= max_byte_size;
@@ -177,6 +185,7 @@ int32_t gdt_create_mini_memory( GDT_MEMORY_POOL* _ppool, size_t allocate_size )
 	tiny_pool->memory_buf_munit = memory_buf_munit;
 	tiny_pool->alloc_type			= MEMORY_ALLOCATE_TYPE_MINI;
 	tiny_pool->endian			= gdt_endian();
+	tiny_pool->debug			= MEMORY_DEBUG;
 	uint32_t memory_unit_one_size = GDT_ALIGNUP( sizeof( GDT_MEMORY_UNIT ), _ppool->alignment );
 	uint32_t memoryUnitSize = memory_unit_one_size * ( FIX_MUNIT_SIZE );
 	tiny_pool->bottom = tiny_pool->end - memoryUnitSize;
@@ -218,6 +227,7 @@ int32_t gdt_create_clone_mini_memory( GDT_MEMORY_POOL* _ppool, GDT_MEMORY_POOL* 
 	tiny_pool->memory_buf_munit	= memory_buf_munit;
 	tiny_pool->alloc_type		= _mini_ppool->alloc_type;
 	tiny_pool->endian			= _mini_ppool->endian;
+	tiny_pool->debug			= _mini_ppool->debug;
 	tiny_pool->memory_unit_size_one 	= _mini_ppool->memory_unit_size_one;
 	return tiny_pool_munit;
 }
@@ -246,6 +256,7 @@ int32_t gdt_copy_mini_memory( GDT_MEMORY_POOL* _dest_ppool, GDT_MEMORY_POOL* _sr
 	_dest_ppool->lock_munit		= _src_ppool->lock_munit;
 	_dest_ppool->alloc_type		= _src_ppool->alloc_type;
 	_dest_ppool->endian			= _src_ppool->endian;
+	_dest_ppool->debug			= _src_ppool->debug;
 	_dest_ppool->memory_unit_size_one 	= _src_ppool->memory_unit_size_one;
 	//gdt_memory_info( _dest_ppool );
 	return GDT_SYSTEM_OK;
@@ -407,8 +418,10 @@ uint32_t gdt_malloc( GDT_MEMORY_POOL* _ppool, size_t allocate_size, GDT_MEMORY_U
 		if( _ppool->top + allocate_size >= _ppool->bottom )
 		{
 			over_size = ( _ppool->top + allocate_size ) - _ppool->bottom;
-			printf( "[gdt_malloc] _ppool allocate size over %zd Byte\n", over_size );
-			printf( "[gdt_malloc] reallocSize %zd Byte\n", reallocSize );
+			if(_ppool->debug){
+				printf( "[gdt_malloc] _ppool allocate size over %zd Byte\n", over_size );
+				printf( "[gdt_malloc] reallocSize %zd Byte\n", reallocSize );
+			}
 			return GDT_SYSTEM_ERROR;
 		}
 //#ifdef __GDT_DEBUG__
@@ -507,14 +520,18 @@ int32_t gdt_create_munit( GDT_MEMORY_POOL* _ppool, size_t size, uint8_t type )
 	}
 	unit = gdt_find_freemunit( _ppool, size );
 	if( unit == NULL ){
-		printf( "[gdt_create_munit]gdt_find_freemunit error\n" );
+		if(_ppool->debug){
+			printf( "[gdt_create_munit]gdt_find_freemunit error\n" );
+		}
 		return -1;
 	}
 	if( unit->status == MEMORY_STATUS_FREE )
 	{
 		if( ( gdt_malloc( _ppool, size, &unit ) ) != 0 )
 		{
-			printf( "[gdt_create_munit]gdt_malloc error\n" );
+			if(_ppool->debug){
+				printf( "[gdt_create_munit]gdt_malloc error\n" );
+			}
 			return -1;
 		}
 	}
@@ -563,8 +580,10 @@ GDT_MEMORY_UNIT* gdt_find_freemunit( GDT_MEMORY_POOL* _ppool, size_t size )
 				}
 				else{
 					size_t over_size = ( _ppool->bottom - memory_unit_one_size ) - _ppool->top;
-					printf( "[gdt_find_freemunit] GDT_MEMORY_UNIT allocate size over %zd Byte\n", over_size );
-					printf( "[gdt_find_freemunit] reallocSize %zd Byte\n", reallocSize );
+					if(_ppool->debug){
+						printf( "[gdt_find_freemunit] GDT_MEMORY_UNIT allocate size over %zd Byte\n", over_size );
+						printf( "[gdt_find_freemunit] reallocSize %zd Byte\n", reallocSize );
+					}
 					break;
 				}
 			}
@@ -798,6 +817,32 @@ uint32_t gdt_pop_big_to_host_bit32( GDT_BYTE_BUFFER* pbuffer )
 		v = *( (uint32_t*)pbuffer->pos );
 	}
 	pbuffer->pos+=4;
+	return v;
+}
+
+uint64_t gdt_pop_little_to_host_bit64( GDT_BYTE_BUFFER* pbuffer )
+{
+	uint64_t v = 0;
+	if( pbuffer->endian == GDT_BIG_ENDIAN ){
+		v = BYTE_SWAP_BIT64( *( (uint64_t*)pbuffer->pos ) );
+	}
+	else{
+		v = *( (uint64_t*)pbuffer->pos );
+	}
+	pbuffer->pos+=8;
+	return v;
+}
+
+uint64_t gdt_pop_big_to_host_bit64( GDT_BYTE_BUFFER* pbuffer )
+{
+	uint64_t v = 0;
+	if( pbuffer->endian == GDT_LITTLE_ENDIAN ){
+		v = BYTE_SWAP_BIT64( *( (uint64_t*)pbuffer->pos ) );
+	}
+	else{
+		v = *( (uint64_t*)pbuffer->pos );
+	}
+	pbuffer->pos+=8;
 	return v;
 }
 

@@ -72,7 +72,7 @@ GDT_SOCKET_OPTION* gdt_create_tcp_client(char* hostname, char* portnum)
 	GDT_MEMORY_POOL* memory_pool = NULL;
 	GDT_SOCKET_OPTION *option;
 	size_t maxconnection = 1;
-	if (gdt_initialize_memory(&memory_pool, SIZE_MBYTE * 16, SIZE_MBYTE * 16, MEMORY_ALIGNMENT_SIZE_BIT_64, FIX_MUNIT_SIZE, 1, SIZE_KBYTE * 16) <= 0) {
+	if (gdt_initialize_memory(&memory_pool, SIZE_MBYTE * 1, SIZE_MBYTE * 1, MEMORY_ALIGNMENT_SIZE_BIT_64, FIX_MUNIT_SIZE, 1, SIZE_KBYTE * 16) <= 0) {
 		printf("gdt_initialize_memory error\n");
 		return NULL;
 	}
@@ -255,6 +255,7 @@ ssize_t gdt_client_send_message(uint32_t payload_type, char* payload, size_t pay
 				if( option->close_callback != NULL ){
 					option->close_callback( gdt_connection_info );
 				}
+				gdt_close_socket(&gdt_connection_info->sockparam.acc,NULL);
 				gdt_free_sockparam( option, &gdt_connection_info->sockparam );
 			}
 		}
@@ -338,6 +339,7 @@ int gdt_initialize_socket_option(
 	option->lock_file_munit		= -1;
 	option->memory_pool			= memory_pool;
 	option->mmap_memory_pool	= mmap_memory_pool;
+	option->application_data    = NULL;
 #ifdef __WINDOWS__
 	result = WSAStartup( MAKEWORD( 2, 2 ), &option->wsdata );
 	if( result != 0 )
@@ -407,7 +409,16 @@ void gdt_set_select_timeout( GDT_SOCKET_OPTION *option, int32_t sec, int32_t use
 	option->s_sec = sec;
 	option->s_usec = usec;
 }
-void set_message_buffer( GDT_SOCKET_OPTION *option, size_t buffer_size)
+
+void gdt_set_recv_buffer( GDT_SOCKET_OPTION* option, size_t buffer_size )
+{
+	option->recvbuffer_size = buffer_size;
+}
+void gdt_set_send_buffer( GDT_SOCKET_OPTION* option, size_t buffer_size )
+{
+	option->sendbuffer_size = buffer_size;
+}
+void gdt_set_message_buffer( GDT_SOCKET_OPTION* option, size_t buffer_size )
 {
 	option->msgbuffer_size = buffer_size;
 }
@@ -506,6 +517,8 @@ int32_t gdt_make_connection_info_core( GDT_SOCKET_OPTION *option, GDT_SERVER_CON
 	tinfo->id				= -1;
 	tinfo->index			= index;
 	tinfo->gdt_socket_option= option;
+	tinfo->create_time = time(NULL);
+	tinfo->update_time = tinfo->create_time;
 	if( -1 == ( tinfo->recvbuf_munit = gdt_create_munit( option->memory_pool, recvbuffer_size, MEMORY_TYPE_DEFAULT ) ) ){
 		return GDT_SYSTEM_ERROR;
 	}
@@ -1063,7 +1076,8 @@ GDT_SOCKET_ID gdt_client_socket( GDT_SOCKET_OPTION *option )
 			if( connect( sock, res0->ai_addr, res0->ai_addrlen ) == -1 )
 			{
 #ifdef __WINDOWS__
-				if( errno != 0 )
+				int err = WSAGetLastError();
+				if (err != 0 && err != WSAEWOULDBLOCK)
 #else
 				if( errno != EINPROGRESS && errno != EINTR )
 #endif
@@ -1803,6 +1817,9 @@ void gdt_nonblocking_client(GDT_SOCKET_OPTION *option)
 
 void gdt_client_update(GDT_SOCKET_OPTION *option)
 {
+	if(option==NULL){
+		return;
+	}
 	if (option->mode != SOCKET_MODE_CLIENT_NONBLOCKING) {
 		return;
 	}

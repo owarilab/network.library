@@ -45,11 +45,16 @@ extern "C"{
 #endif
 #include <errno.h>
 
+#define MEMORY_DEBUG 0
+
+#define MEMORY_ALIGNMENT_SIZE_BIT_64 ( SIZE_BYTE * 8 )
+#define MEMORY_ALIGNMENT_SIZE_BIT_32 ( SIZE_BYTE * 4 )
+// memory types of gdt_memory_allocator
+#define MEMORY_TYPE_DEFAULT 0
+
 #define MEMORY_ALLOCATE_TYPE_MALLOC 0
 #define MEMORY_ALLOCATE_TYPE_MMAP 1
 #define MEMORY_ALLOCATE_TYPE_MINI 2
-
-#define MEMORY_INFO_BUFFER sizeof(uint8_t) * 128
 
 // byte order
 #define GDT_LITTLE_ENDIAN 1
@@ -67,6 +72,7 @@ extern "C"{
 
 #define BYTE_SWAP_BIT16( v ) (v >> 8) | ( (v & 0xff) << 8 )
 #define BYTE_SWAP_BIT32( v ) (v >> 24) | ( (v & 0x000000ff) << 24 ) | ( (v & 0x0000ff00) << 8 ) | ( (v & 0x00ff0000) >> 8 )
+#define BYTE_SWAP_BIT64( v ) (v & 0xff00000000000000) >> 56 | (v & 0x00ff000000000000) >> 40 | (v & 0x0000ff0000000000) >> 24 | (v & 0x000000ff00000000) >> 8 | (v & 0x00000000ff000000) << 8 | (v & 0x0000000000ff0000) << 24 | (v & 0x000000000000ff00) << 40 | (v & 0x00000000000000ff) << 56
 
 #define MEMORY_PUSH_BIT16_L( _ppool, mem, v ) \
 	if( _ppool->endian==GDT_LITTLE_ENDIAN ){ *((uint16_t*)mem) = v; } \
@@ -122,6 +128,7 @@ typedef struct GDT_MEMORY_POOL{
 	int32_t memory_buf_munit;
 	int alloc_type;
 	uint8_t endian;
+	uint8_t debug;
 } GDT_MEMORY_POOL;
 
 typedef struct GDT_MEMORY_UNIT{
@@ -176,6 +183,8 @@ uint16_t gdt_pop_little_to_host_bit16( GDT_BYTE_BUFFER* pbuffer );
 uint16_t gdt_pop_big_to_host_bit16( GDT_BYTE_BUFFER* pbuffer );
 uint32_t gdt_pop_little_to_host_bit32( GDT_BYTE_BUFFER* pbuffer );
 uint32_t gdt_pop_big_to_host_bit32( GDT_BYTE_BUFFER* pbuffer );
+uint64_t gdt_pop_little_to_host_bit64( GDT_BYTE_BUFFER* pbuffer );
+uint64_t gdt_pop_big_to_host_bit64( GDT_BYTE_BUFFER* pbuffer );
 int32_t gdt_create_memory_info( GDT_MEMORY_POOL* _ppool, GDT_BYTE_BUFFER* pbuffer );
 // private
 GDT_MEMORY_UNIT* gdt_find_freemunit( GDT_MEMORY_POOL* _ppool, size_t size );

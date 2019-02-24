@@ -39,7 +39,7 @@ extern "C"{
 #include <string.h>
 #include <ctype.h>
 
-#define STRBUF_SIZE			4096
+#define STRBUF_SIZE			SIZE_KBYTE * 8
 #define ID_UNK				0
 #define ID_NUM				1
 #define ID_OP				2
@@ -64,7 +64,6 @@ typedef struct GDT_TOKEN
 {
 	int32_t buf_munit;
 	uint8_t type;
-//	size_t size;
 	uint16_t size;
 } GDT_TOKEN;
 

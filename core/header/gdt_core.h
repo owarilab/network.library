@@ -92,7 +92,11 @@ extern "C"{
 #ifndef MAXPATHLEN
 #define MAXPATHLEN MAX_PATH
 #endif
+
+#ifndef ssize_t
 #define ssize_t int64_t
+#endif
+
 # define snprintf(s, n, format, ...) \
     _snprintf_s(s, n, _TRUNCATE, format, __VA_ARGS__)
 # define gdt_sprintf(s, n, format, ...) \
@@ -100,12 +104,6 @@ extern "C"{
 #else
 # define gdt_sprintf(s, n, format, ...) \
     sprintf(s, format, __VA_ARGS__)
-#endif
-
-#ifdef __WINDOWS__
-typedef SOCKET GDT_SOCKET_ID;
-#else
-typedef int GDT_SOCKET_ID;
 #endif
 
 #ifndef TRUE
@@ -126,9 +124,6 @@ typedef int GDT_SOCKET_ID;
 #define SIZE_MBYTE ( SIZE_KBYTE * 1024 )	// 1MB
 #define SIZE_GBYTE ( SIZE_MBYTE * 1024 )	// 1GB
 
-#define MEMORY_ALIGNMENT_SIZE_BIT_64 ( SIZE_BYTE * 8 )
-#define MEMORY_ALIGNMENT_SIZE_BIT_32 ( SIZE_BYTE * 4 )
-
 #define NUMERIC_BUFFER_SIZE (20+sizeof(int32_t))
 
 #define GDT_MAX_FILE_DESCRIPTOR 1024
@@ -142,9 +137,6 @@ typedef int GDT_SOCKET_ID;
 #ifndef __GDT_DEBUG__
 #define __GDT_RELEASE__
 #endif
-
-// memory types of gdt_memory_allocator
-#define MEMORY_TYPE_DEFAULT 0
 
 #endif /*_GDT_CORE_H_*/
 

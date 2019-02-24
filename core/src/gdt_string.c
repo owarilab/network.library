@@ -465,7 +465,8 @@ void gdt_print_hex( uint8_t* hex, size_t size, size_t view_max )
 	}
 	int i;
 	for( i = 0; i < view_max && i < size; i++ ){
-		printf("%c",*(((char*)hex)+i));
+		//printf("%c",*(((char*)hex)+i));
+		printf("%x",*(hex+i));
 	}
 	if( size > view_max ){
 		printf("...");

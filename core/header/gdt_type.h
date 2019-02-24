@@ -29,39 +29,41 @@
 extern "C"{
 #endif
 
-#ifndef _GDT_SHA1_H_
-#define _GDT_SHA1_H_
+#ifndef _GDT_TYPE_H_
+#define _GDT_TYPE_H_
 
-#include "gdt_core.h"
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#if defined(__LINUX__) || defined(__BSD_UNIX__) || defined(__ANDROID__) || defined(__IOS__)
-#include <stdint.h>
-#endif
-#include <errno.h>
+// base elements
+#define ELEMENT_NONE				0
+#define ELEMENT_ROOT				1
+#define ELEMENT_CHILD				2
+#define ELEMENT_CHILD_ARRAY			3
+#define ELEMENT_CHILD_HASH			4
 
-#define GDT_SHA1_HASH_BITS 160
-#define GDT_SHA1_HASH_BYTES ( GDT_SHA1_HASH_BITS / 8 )
-#define GDT_SHA1_BLOCK_BITS 512
-#define GDT_SHA1_BLOCK_BYTES ( GDT_SHA1_BLOCK_BITS / 8 )
-#define GDT_SHA1_INTERMEDIAE_HASH_BYTES ( GDT_SHA1_HASH_BYTES / 4 )
-#define GDT_SHA1_SEQUENCE_BUFFER_BYTES 80
+// additional elements
+#define ELEMENT_LITERAL_NUM			5
+#define ELEMENT_LITERAL_FLOAT		6
+#define ELEMENT_LITERAL_STR			7
+#define ELEMENT_CMP					8
+#define ELEMENT_FUNCTION			9
+#define ELEMENT_VALIABLE			10
+#define ELEMENT_IF					11
+#define ELEMENT_ELSEIF				12
+#define ELEMENT_ELSE				13
+#define ELEMENT_ASSIGNMENT			14
+#define ELEMENT_OP					15
+#define ELEMENT_LOOP				16
+#define ELEMENT_WHILE				17
+#define ELEMENT_OP_LITERAL_MINUS	18
+#define ELEMENT_RETURN				19
+#define ELEMENT_ARRAY				20
+#define ELEMENT_ARRAY_REFERENCE		21
+#define ELEMENT_HASH				22
+#define ELEMENT_HASH_OP				23
+#define ELEMENT_LITERAL_BIN			24
+#define ELEMENT_QUEUE				25
+#define ELEMENT_NULL				1000
 
-typedef struct GDT_SHA1_CONTEXT
-{
-	uint32_t hash[GDT_SHA1_INTERMEDIAE_HASH_BYTES];
-	uint8_t message_block[GDT_SHA1_BLOCK_BYTES];
-	uint32_t length_high;
-	uint32_t length_low;
-} GDT_SHA1_CONTEXT;
-
-void gdt_sha1_initialize( GDT_SHA1_CONTEXT* sha1_ctx );
-uint32_t gdt_rotate_left( uint32_t v, uint8_t bits ); 
-void gdt_sha1( void *dest, const void* src, uint32_t length );
-void gdt_sha1_block_proc( GDT_SHA1_CONTEXT* sha1_ctx );
-
-#endif /*_GDT_SHA1_H_*/
+#endif /*_GDT_TYPE_H_*/
 
 #ifdef __cplusplus
 }

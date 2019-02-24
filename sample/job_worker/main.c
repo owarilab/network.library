@@ -89,10 +89,10 @@ int main( int argc, char *argv[], char *envp[] )
 			break;
 		}
 		option = (GDT_SOCKET_OPTION*)GDT_POINTER(memory_pool,option_munit);
-		if (0 != gdt_initialize_socket_option(option, hostname, portnum, SOKET_TYPE_SERVER_TCP, SOCKET_MODE_NONBLOCKING, PROTOCOL_SIMPLE, maxconnection, memory_pool, NULL)) {
+		if (0 != gdt_initialize_socket_option(option, hostname, portnum, SOCKET_TYPE_SERVER_TCP, SOCKET_MODE_NONBLOCKING, PROTOCOL_SIMPLE, maxconnection, memory_pool, NULL)) {
 			break;
 		}
-		set_message_buffer(option,SIZE_KBYTE*16);
+		gdt_set_message_buffer(option,SIZE_KBYTE*16);
 		set_on_connect_event( option, on_connect);
 		set_on_payload_recv_event(option, on_payload_recv);
 		set_on_close_event( option, on_close );

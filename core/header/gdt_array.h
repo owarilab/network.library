@@ -33,10 +33,9 @@ extern "C"{
 #define _GDT_ARRAY_H_
 
 #include "gdt_core.h"
+#include "gdt_type.h"
 #include "gdt_memory_allocator.h"
-#include "gdt_node.h"
 #include "gdt_string.h"
-#include "gdt_hash.h"
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -46,6 +45,7 @@ extern "C"{
 #include <utime.h>
 #endif
 
+#define GDT_ARRAY_SIZE_DEFAULT 8
 
 typedef struct GDT_ARRAY
 {
@@ -75,8 +75,6 @@ GDT_ARRAY_ELEMENT* gdt_array_pop( GDT_MEMORY_POOL* _ppool, int32_t arraymunit );
 GDT_ARRAY_ELEMENT* gdt_array_get( GDT_MEMORY_POOL* _ppool, int32_t arraymunit, int index );
 GDT_ARRAY_ELEMENT* gdt_array_foreach( GDT_MEMORY_POOL* _ppool, int32_t array_munit, size_t* psize );
 int32_t gdt_array_length( GDT_MEMORY_POOL* _ppool, int32_t arraymunit );
-int32_t gdt_opendir( GDT_MEMORY_POOL* _ppool, const char* path );
-void gdt_array_dump( GDT_MEMORY_POOL* _ppool, int32_t munit, int index );
 #endif /*_GDT_ARRAY_H_*/
 
 #ifdef __cplusplus

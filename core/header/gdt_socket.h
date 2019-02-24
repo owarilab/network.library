@@ -36,17 +36,8 @@ extern "C"{
 #include "gdt_system.h"
 #include "gdt_string.h"
 #include "gdt_hash.h"
+#include "gdt_array.h"
 #include "gdt_memory_allocator.h"
-
-//#include <stdio.h>
-//#include <string.h>
-//#include <stdlib.h>
-//#include <errno.h>
-//#include <ctype.h>
-//#include <fcntl.h>
-//#include <time.h>
-//#include <sys/types.h>
-//#include <sys/stat.h>
 
 #ifdef __WINDOWS__
 #include <process.h>
@@ -56,36 +47,12 @@ extern "C"{
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
+#endif
 
-// thread
-//#include <pthread.h>
-//#include <semaphore.h>
-
-// poll
-//#include <poll.h>
-
-// fork
-//#include <unistd.h>
-//#include <syslog.h>
-//#include <sys/ioctl.h>
-
-// epoll
-//#ifdef USE_EPOOL
-//#include <sys/epoll.h>
-//#endif
-
-// kqueue
-//#ifdef USE_KQUEUE
-//#include <sys/event.h>
-//#endif
-
-//#include <sys/wait.h>
-//#include <sys/param.h>
-//#include <sys/file.h>
-//#include <sys/time.h>
-//#include <sys/resource.h>
-//#include <net/if.h>
-//#include <ifaddrs.h>
+#ifdef __WINDOWS__
+typedef SOCKET GDT_SOCKET_ID;
+#else
+typedef int GDT_SOCKET_ID;
 #endif
 
 // inetflags
@@ -163,6 +130,8 @@ typedef struct GDT_SERVER_CONNECTION_INFO
 	GDT_SOCKET_ID id;
 	char hbuf[NI_MAXHOST];
 	char sbuf[NI_MAXHOST];
+	time_t create_time;
+	time_t update_time;
 #ifdef __WINDOWS__
 	HANDLE	parentid;
 	HANDLE	currentid;
@@ -248,6 +217,7 @@ typedef struct GDT_SOCKET_OPTION
 	size_t msgbuffer_size;					// message buffer size
 	GDT_MEMORY_POOL* memory_pool;			// memory pool
 	GDT_MEMORY_POOL* mmap_memory_pool;		// mmap memory pool
+	void* application_data;
 } GDT_SOCKET_OPTION;
 
 GDT_SOCKET_OPTION* gdt_create_tcp_server(char* hostname, char* portnum);
@@ -281,10 +251,12 @@ void set_on_payload_recv_event( GDT_SOCKET_OPTION *option, GDT_ON_RECV func );
 void set_on_close_event( GDT_SOCKET_OPTION *option, GDT_CONNECTION_EVENT_CALLBACK func );
 void set_user_recv_event( GDT_SOCKET_OPTION *option, GDT_USER_RECV func );
 void set_user_send_event( GDT_SOCKET_OPTION *option, GDT_USER_SEND func);
-void set_message_buffer( GDT_SOCKET_OPTION *option, size_t buffer_size);
 void gdt_set_timeout_event( GDT_SOCKET_OPTION *option, GDT_CALLBACK func );
 void gdt_set_connection_timeout( GDT_SOCKET_OPTION *option, int32_t sec, int32_t usec );
 void gdt_set_select_timeout( GDT_SOCKET_OPTION *option, int32_t sec, int32_t usec );
+void gdt_set_recv_buffer( GDT_SOCKET_OPTION* option, size_t buffer_size );
+void gdt_set_send_buffer( GDT_SOCKET_OPTION* option, size_t buffer_size );
+void gdt_set_message_buffer( GDT_SOCKET_OPTION* option, size_t buffer_size );
 
 void gdt_init_socket_param( GDT_SOCKPARAM *psockparam );
 void gdt_free_sockparam( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam );
