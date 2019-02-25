@@ -286,7 +286,6 @@ void gdt_recv_event(GDT_SOCKET_OPTION *option, GDT_SERVER_CONNECTION_INFO *child
 
 void gdt_nonblocking_server(GDT_SOCKET_OPTION *option);
 void gdt_server_update(GDT_SOCKET_OPTION *option);
-void gdt_server_update2(GDT_SOCKET_OPTION *option);
 void gdt_nonblocking_client(GDT_SOCKET_OPTION *option);
 void gdt_client_update(GDT_SOCKET_OPTION *option);
 int gdt_client_is_connecting(GDT_SOCKET_OPTION *option);
