@@ -1541,41 +1541,24 @@ void gdt_server_update(GDT_SOCKET_OPTION *option)
 			if (child->id != -1)
 			{
 				if (option->user_recv_function != NULL) {
-					if (-1 == (srlen = option->user_recv_function(child, child->id, (char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), buffer_size, 0))) {
-#ifdef __WINDOWS__
-						if (WSAGetLastError() != WSAEWOULDBLOCK) {
-							perror("recv");
-							gdt_close_socket(&child->id, NULL);
-						}
-#else
-						if (errno != 0 && errno != EAGAIN && errno != EWOULDBLOCK)
-						{
-							perror("recv");
-							gdt_close_socket(&child->id, NULL);
-						}
-#endif
-					}
+					srlen = option->user_recv_function(child, child->id, (char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), buffer_size, 0);
 				}
 				else {
-					if ((srlen = recv(child->id, (char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), buffer_size, 0)) == -1) {
+					srlen = recv(child->id, (char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), buffer_size, 0);
+				}
+				
+				if(-1==srlen){
 #ifdef __WINDOWS__
-						if (WSAGetLastError() != WSAEWOULDBLOCK) {
-							perror("recv");
-							gdt_close_socket(&child->id, NULL);
-						}
-#else
-						if (errno != 0 && errno != EAGAIN && errno != EWOULDBLOCK)
-						{
-							perror("recv");
-							printf("errno : %d\n",errno);
-							gdt_close_socket(&child->id, NULL);
-						}
-						//if( errno == EAGAIN ){
-						//	printf( ".\n" );
-						//	usleep( 1000 );
-						//}
-#endif
+					if (WSAGetLastError() != WSAEWOULDBLOCK) {
+						perror("recv");
+						gdt_close_socket(&child->id, NULL);
 					}
+#else
+					if (errno != 0 && errno != EAGAIN && errno != EWOULDBLOCK){
+						perror("recv");
+						gdt_close_socket(&child->id, NULL);
+					}
+#endif
 				}
 				gdt_recv_event(option,child,srlen);
 				if (child->id == -1)
@@ -1609,6 +1592,9 @@ void gdt_nonblocking_client(GDT_SOCKET_OPTION *option)
 //#ifdef __GDT_DEBUG__
 //	printf("gdt_nonblocking_client: soc4=%d, soc6=%d\n", (int)option->sockid, (int)option->sockid6);
 //#endif
+	if(-1==option->sockid){
+		return;
+	}
 	size_t buffer_size = sizeof(char) * (option->recvbuffer_size);
 	gdt_set_block(option->sockid, 0);
 	if( -1 == ( option->connection_munit = gdt_create_munit( option->memory_pool, sizeof( GDT_SERVER_CONNECTION_INFO ), MEMORY_TYPE_DEFAULT ) ) ){
@@ -1660,29 +1646,24 @@ void gdt_client_update(GDT_SOCKET_OPTION *option)
 		if (child->id != -1)
 		{
 			if (option->user_recv_function != NULL) {
-				if (-1 == (srlen = option->user_recv_function(child, child->id, (char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), buffer_size, 0))) {
-					if (errno != 0 && errno != EAGAIN)
-					{
-						perror("recv");
-						gdt_close_socket(&child->id, NULL);
-					}
-				}
+				srlen = option->user_recv_function(child, child->id, (char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), buffer_size, 0);
 			}
 			else {
-				if ((srlen = recv(child->id, (char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), buffer_size, 0)) == -1) {
+				srlen = recv(child->id, (char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), buffer_size, 0);
+			}
+			if(-1 == srlen){
 #ifdef __WINDOWS__
-					if (WSAGetLastError() != WSAEWOULDBLOCK) {
-						perror("recv");
-						gdt_close_socket(&child->id, NULL);
-					}
-#else
-					if (errno != 0 && errno != EAGAIN)
-					{
-						perror("recv");
-						gdt_close_socket(&child->id, NULL);
-					}
-#endif
+				if (WSAGetLastError() != WSAEWOULDBLOCK) {
+					perror("recv");
+					gdt_close_socket(&child->id, NULL);
 				}
+#else
+				if (errno != 0 && errno != EAGAIN)
+				{
+					perror("recv");
+					gdt_close_socket(&child->id, NULL);
+				}
+#endif
 			}
 			gdt_recv_event(option,child,srlen);
 			if (child->id == -1)
