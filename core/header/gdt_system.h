@@ -77,8 +77,9 @@ void gdt_sig_chld_handler( int sig );
 void gdt_sig_int_handler( int sig );
 void gdt_init_child_pid();
 void gdt_set_child_pid(pid_t pid,int32_t offset);
-void gdt_sleep(int time);
 #endif
+
+void gdt_sleep(int time);
 
 #endif /*_GDT_SYSTEM_H_*/
 

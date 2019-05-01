@@ -52,6 +52,7 @@ typedef struct GDT_HASH_ELEMENT
 	int32_t hashname_munit;
 	int32_t elm_munit;
 	time_t create_time;
+	int32_t life_time;
 } GDT_HASH_ELEMENT;
 
 typedef struct GDT_HASH_FOREACH

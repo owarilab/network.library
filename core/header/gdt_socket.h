@@ -86,6 +86,7 @@ typedef int GDT_SOCKET_ID;
 #define PROTOCOL_STATUS_WEBSOCKET_RECVHANDSHAKEOK 2
 #define PROTOCOL_STATUS_HTTP 3
 #define PROTOCOL_STATUS_OTHER 10
+#define PROTOCOL_STATUS_DISCONNECT 100
 
 // socket type
 #define SOCK_TYPE_NORMAL_TCP 1		// tcp socket
@@ -178,6 +179,7 @@ typedef struct GDT_SOCKET_OPTION
 	int32_t connection_munit;		// connection array ( GDT_SERVER_CONNECTION_INFO* )
 	int32_t lock_file_munit;		// lock file name( char* )
 	int lock_file_fd;				// accept lock fd
+	int32_t backend_munit;			// backend connection array (GDT_SOCKET_OPTION* )
 #ifdef __WINDOWS__
 	WSADATA wsdata;
 	HOSTENT *phostent;
@@ -257,6 +259,8 @@ void gdt_set_select_timeout( GDT_SOCKET_OPTION *option, int32_t sec, int32_t use
 void gdt_set_recv_buffer( GDT_SOCKET_OPTION* option, size_t buffer_size );
 void gdt_set_send_buffer( GDT_SOCKET_OPTION* option, size_t buffer_size );
 void gdt_set_message_buffer( GDT_SOCKET_OPTION* option, size_t buffer_size );
+
+GDT_SOCKET_OPTION* gdt_get_backend( GDT_SOCKET_OPTION* option, int index );
 
 void gdt_init_socket_param( GDT_SOCKPARAM *psockparam );
 void gdt_free_sockparam( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam );

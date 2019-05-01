@@ -81,6 +81,7 @@ GDT_HASH_ELEMENT* gdt_add_hash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, int32_
 			hashelement[i].elm_munit = -1;
 			hashelement[i].id = -1;
 			hashelement[i].create_time = 0;
+			hashelement[i].life_time = 0;
 		}
 	}
 	hashelement = (struct GDT_HASH_ELEMENT*)GDT_POINTER( _ppool, hashchild[hashkey].hash_munit );
@@ -124,11 +125,13 @@ GDT_HASH_ELEMENT* gdt_add_hash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, int32_
 				hashelement[i].elm_munit = oldhashelement[i].elm_munit;
 				hashelement[i].id = oldhashelement[i].id;
 				hashelement[i].create_time = oldhashelement[i].create_time;
+				hashelement[i].life_time = oldhashelement[i].life_time;
 			} else {
 				hashelement[i].hashname_munit = -1;
 				hashelement[i].elm_munit = -1;
 				hashelement[i].id = -1;
 				hashelement[i].create_time = 0;
+				hashelement[i].life_time = 0;
 			}
 		}
 		
@@ -372,6 +375,7 @@ int32_t gdt_move_hash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* has
 					hashelement[i].elm_munit = -1;
 					hashelement[i].id = -1;
 					hashelement[i].create_time = 0;
+					hashelement[i].life_time = 0;
 				}
 				break;
 			}
@@ -397,6 +401,7 @@ int32_t gdt_remove_hash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* h
 				hashelement[i].hashname_munit = -1;
 				hashelement[i].elm_munit = -1;
 				hashelement[i].create_time = 0;
+				hashelement[i].life_time = 0;
 				break;
 			}
 		}

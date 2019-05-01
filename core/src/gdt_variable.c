@@ -154,30 +154,36 @@ void gdt_add_cache_key(GDT_CACHE* cache,char* key)
 	}
 }
 
-int32_t gdt_cache_int(GDT_CACHE* cache,char* key,int32_t value)
+int32_t gdt_cache_int(GDT_CACHE* cache,char* key,int32_t value, int32_t life_time)
 {
 	GDT_CACHE_PAGE cache_page;
 	gdt_get_cache_page(cache,&cache_page);
-	if(NULL==gdt_add_hash_integer( cache_page.memory, cache_page.hash_id, key, value )){
+	GDT_HASH_ELEMENT* elm = NULL;
+	if(NULL==(elm=gdt_add_hash_integer( cache_page.memory, cache_page.hash_id, key, value ))){
 		gdt_swap_page(cache,&cache_page);
-		if(NULL==gdt_add_hash_integer( cache_page.memory, cache_page.hash_id, key, value )){
+		if(NULL==(elm=gdt_add_hash_integer( cache_page.memory, cache_page.hash_id, key, value ))){
 			return GDT_SYSTEM_ERROR;
 		}
 	}
+	elm->create_time = time(NULL);
+	elm->life_time = life_time;
 	gdt_add_cache_key(cache,key);
 	return GDT_SYSTEM_OK;
 }
 
-int32_t gdt_cache_string(GDT_CACHE* cache,char* key,char* value)
+int32_t gdt_cache_string(GDT_CACHE* cache,char* key,char* value, int32_t life_time)
 {
 	GDT_CACHE_PAGE cache_page;
 	gdt_get_cache_page(cache,&cache_page);
-	if(NULL==gdt_add_hash_string( cache_page.memory, cache_page.hash_id, key, value )){
+	GDT_HASH_ELEMENT* elm = NULL;
+	if(NULL==(elm=gdt_add_hash_string( cache_page.memory, cache_page.hash_id, key, value ))){
 		gdt_swap_page(cache,&cache_page);
-		if(NULL==gdt_add_hash_string( cache_page.memory, cache_page.hash_id, key, value )){
+		if(NULL==(elm=gdt_add_hash_string( cache_page.memory, cache_page.hash_id, key, value ))){
 			return GDT_SYSTEM_ERROR;
 		}
 	}
+	elm->create_time = time(NULL);
+	elm->life_time = life_time;
 	gdt_add_cache_key(cache,key);
 	return GDT_SYSTEM_OK;
 }

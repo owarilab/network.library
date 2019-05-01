@@ -342,6 +342,9 @@ GDT_NODE* gdt_get_json_root( GDT_MEMORY_POOL* _ppool, int32_t json_root_munit )
 		return NULL;
 	}
 	GDT_NODE* rootnode = (GDT_NODE*)GDT_POINTER(_ppool,json_root_munit);
+	if(rootnode->pos==0){
+		return NULL;
+	}
 	GDT_NODE* workelemlist = ( GDT_NODE* )GDT_POINTER( _ppool, rootnode->element_munit );
 	return &workelemlist[0];
 }
@@ -350,21 +353,21 @@ int32_t gdt_json_decode( GDT_MEMORY_POOL* _ppool, const char* src )
 {
 	int32_t rootnode_munit = -1;
 	int32_t tokens_munit = -1;
-	do{
-		if( 0 >= ( tokens_munit = gdt_inittoken( _ppool, 10000 ) ) ){
-			break;
-		}
-		gdt_token_analyzer( _ppool, tokens_munit, (char*)src );
-		GDT_TOKENS *ptokens = (GDT_TOKENS*)GDT_POINTER(_ppool,tokens_munit);
-        if( ptokens->token_munit == -1 ){
-            break;
-        }
-		GDT_TOKEN *token_list = (GDT_TOKEN*)GDT_POINTER(_ppool,ptokens->token_munit);
-		rootnode_munit = gdt_createrootnode( _ppool );
-		GDT_NODE *rootnode = (GDT_NODE*)GDT_POINTER( _ppool, rootnode_munit );
-		//gdt_tokendump(_ppool,tokens_munit);
-		gdt_json_decode_parser( _ppool, rootnode, ptokens, token_list, 128 );
-	}while( false );
+	if( -1 == ( tokens_munit = gdt_inittoken( _ppool, 10000 ) ) ){
+		return -1;
+	}
+	gdt_token_analyzer( _ppool, tokens_munit, (char*)src );
+	GDT_TOKENS *ptokens = (GDT_TOKENS*)GDT_POINTER(_ppool,tokens_munit);
+	if( ptokens->token_munit == -1 ){
+		return -1;
+	}
+	GDT_TOKEN *token_list = (GDT_TOKEN*)GDT_POINTER(_ppool,ptokens->token_munit);
+	rootnode_munit = gdt_createrootnode( _ppool );
+	GDT_NODE *rootnode = (GDT_NODE*)GDT_POINTER( _ppool, rootnode_munit );
+	//gdt_tokendump(_ppool,tokens_munit);
+	if(0!=gdt_json_decode_parser( _ppool, rootnode, ptokens, token_list, 128 )){
+		return -1;
+	}
 	return rootnode_munit;
 }
 
@@ -372,18 +375,18 @@ int32_t gdt_json_decode_h( GDT_MEMORY_POOL* _ppool, const char* src, int32_t has
 {
 	int32_t rootnode_munit = -1;
 	int32_t tokens_munit = -1;
-	do{
-		if( 0 >= ( tokens_munit = gdt_inittoken( _ppool, init_token_size ) ) ){
-			break;
-		}
-		gdt_token_analyzer( _ppool, tokens_munit, (char*)src );
-		GDT_TOKENS *ptokens = (GDT_TOKENS*)GDT_POINTER(_ppool,tokens_munit);
-		GDT_TOKEN *token_list = (GDT_TOKEN*)GDT_POINTER(_ppool,ptokens->token_munit);
-		rootnode_munit = gdt_createrootnode( _ppool );
-		GDT_NODE *rootnode = (GDT_NODE*)GDT_POINTER( _ppool, rootnode_munit );
-		//gdt_tokendump(_ppool,tokens_munit);
-		gdt_json_decode_parser( _ppool, rootnode, ptokens, token_list, hash_size );
-	}while( false );
+	if( -1 == ( tokens_munit = gdt_inittoken( _ppool, init_token_size ) ) ){
+		return -1;
+	}
+	gdt_token_analyzer( _ppool, tokens_munit, (char*)src );
+	GDT_TOKENS *ptokens = (GDT_TOKENS*)GDT_POINTER(_ppool,tokens_munit);
+	GDT_TOKEN *token_list = (GDT_TOKEN*)GDT_POINTER(_ppool,ptokens->token_munit);
+	rootnode_munit = gdt_createrootnode( _ppool );
+	GDT_NODE *rootnode = (GDT_NODE*)GDT_POINTER( _ppool, rootnode_munit );
+	//gdt_tokendump(_ppool,tokens_munit);
+	if(0!=gdt_json_decode_parser( _ppool, rootnode, ptokens, token_list, hash_size )){
+		return -1;
+	}
 	return rootnode_munit;
 }
 

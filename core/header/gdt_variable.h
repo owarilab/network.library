@@ -37,6 +37,7 @@ extern "C"{
 #include "gdt_hash.h"
 #include "gdt_array.h"
 #include "gdt_chain_array.h"
+#include "gdt_json.h"
 
 typedef struct GDT_CACHE
 {
@@ -66,8 +67,8 @@ int32_t gdt_create_cache( GDT_MEMORY_POOL* memory,size_t chain_allocate_size,siz
 void gdt_get_cache_page(GDT_CACHE* cache,GDT_CACHE_PAGE* page);
 void gdt_swap_page(GDT_CACHE* cache,GDT_CACHE_PAGE* page);
 void gdt_add_cache_key(GDT_CACHE* cache,char* key);
-int32_t gdt_cache_int(GDT_CACHE* cache,char* key,int32_t value);
-int32_t gdt_cache_string(GDT_CACHE* cache,char* key,char* value);
+int32_t gdt_cache_int(GDT_CACHE* cache,char* key,int32_t value,int32_t life_time);
+int32_t gdt_cache_string(GDT_CACHE* cache,char* key,char* value, int32_t life_time);
 int32_t gdt_remove_cache(GDT_CACHE* cache,char* key);
 int32_t gdt_cache_length(GDT_CACHE* cache);
 
