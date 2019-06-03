@@ -54,11 +54,11 @@ extern "C"{
 #define ID_SYS_WHILE		11
 
 // system words 
-#define SYS_LOOP    "loop"
-#define SYS_WHILE   "while"
-#define SYS_IF      "if"
-#define SYS_ELSEIF  "elseif"
-#define SYS_ELSE    "else"
+#define SYS_LOOP "loop"
+#define SYS_WHILE "while"
+#define SYS_IF "if"
+#define SYS_ELSEIF "elseif"
+#define SYS_ELSE "else"
 
 typedef struct GDT_TOKEN
 {

@@ -42,6 +42,7 @@ int32_t gdt_create_cache( GDT_MEMORY_POOL* memory,size_t chain_allocate_size,siz
 	cache->hash_size = page_hash_size;
 	cache->page = 0;
 	cache->swap_count = 0;
+	cache->is_swap = 1;
 	cache->chain_memory = gdt_create_mini_memory(cache->memory,cache->chain_allocate_size);
 	if(-1==cache->chain_memory){
 		return -1;
@@ -75,6 +76,88 @@ int32_t gdt_create_cache( GDT_MEMORY_POOL* memory,size_t chain_allocate_size,siz
 	return cache_id;
 }
 
+int32_t gdt_create_storage_cache( const char* store_name, GDT_MEMORY_POOL** pp_memory,size_t max_cache_size,size_t page_allocate_size,size_t page_hash_size,size_t max_key_size)
+{
+	int is_swap = 0;
+	size_t page_size = (is_swap==1) ? (page_allocate_size * 2) : page_allocate_size;
+	size_t chain_allocate_size = (max_cache_size * (max_key_size + 8)) + SIZE_KBYTE;
+	size_t allocate_size = chain_allocate_size + page_size + SIZE_KBYTE * 4;
+	if(0>=gdt_initialize_mmapmemory_f( store_name, pp_memory, allocate_size )){
+		printf("gdt_initialize_mmapmemory_f error\n");
+		return -1;
+	}
+	GDT_MEMORY_POOL* memory = *pp_memory;
+	int32_t cache_id = -1;
+	if(memory->memory_buf_munit == -1){
+		cache_id = gdt_create_munit(memory,sizeof(GDT_CACHE),MEMORY_TYPE_DEFAULT);
+		if(cache_id==-1){
+			printf("create cache error\n");
+			return -1;
+		}
+		GDT_CACHE* cache = (GDT_CACHE*)GDT_POINTER(memory,cache_id);
+		cache->memory = memory;
+		cache->page_allocate_size = page_allocate_size;
+		cache->chain_allocate_size = chain_allocate_size;
+		cache->max_cache_size = max_cache_size;
+		cache->max_key_size = max_key_size;
+		cache->hash_size = page_hash_size;
+		cache->page = 0;
+		cache->swap_count = 0;
+		cache->is_swap = is_swap;
+		cache->chain_memory = gdt_create_mini_memory(cache->memory,cache->chain_allocate_size);
+		if(-1==cache->chain_memory){
+			printf("gdt_create_mini_memory error\n");
+			return -1;
+		}
+		GDT_MEMORY_POOL* chain_memory = (GDT_MEMORY_POOL*)GDT_POINTER(cache->memory,cache->chain_memory);
+		gdt_memory_clean(chain_memory);
+		cache->chain = gdt_create_chain_array(chain_memory,cache->max_cache_size,sizeof(int8_t)*cache->max_key_size);
+		if(-1==cache->chain){
+			printf("gdt_create_chain_array error\n");
+			return -1;
+		}
+		cache->memory_page1 = gdt_create_mini_memory(cache->memory,cache->page_allocate_size);
+		if(-1==cache->memory_page1){
+			printf("gdt_create_mini_memory page1 error\n");
+			return -1;
+		}
+		GDT_MEMORY_POOL* page1 = (GDT_MEMORY_POOL*)GDT_POINTER(cache->memory,cache->memory_page1);
+		gdt_memory_clean(page1);
+		cache->page1_hash = gdt_create_hash(page1,cache->hash_size);
+		if(-1==cache->page1_hash){
+			printf("page1_hash error\n");
+			return -1;
+		}
+		if(cache->is_swap==1){
+			cache->memory_page2 = gdt_create_mini_memory(cache->memory,cache->page_allocate_size);
+			if(-1==cache->memory_page2){
+				printf("gdt_create_mini_memory page2 error\n");
+				return -1;
+			}
+			GDT_MEMORY_POOL* page2 = (GDT_MEMORY_POOL*)GDT_POINTER(cache->memory,cache->memory_page2);
+			gdt_memory_clean(page2);
+			cache->page2_hash = gdt_create_hash(page2,cache->hash_size);
+			if(-1==cache->page2_hash){
+				printf("page2_hash error\n");
+				return -1;
+			}
+		}
+		memory->memory_buf_munit = cache_id;
+		gdt_sync_mmap_memory(memory);
+	} else{
+		cache_id = memory->memory_buf_munit;
+		GDT_CACHE* cache = (GDT_CACHE*)GDT_POINTER(memory,cache_id);
+		cache->memory = memory;
+		GDT_MEMORY_POOL* page1 = (GDT_MEMORY_POOL*)GDT_POINTER(cache->memory,cache->memory_page1);
+		page1->memory = ( void* )GDT_POINTER( memory, page1->memory_buf_munit );
+		if(cache->is_swap==1){
+			GDT_MEMORY_POOL* page2 = (GDT_MEMORY_POOL*)GDT_POINTER(cache->memory,cache->memory_page2);
+			page2->memory = ( void* )GDT_POINTER( memory, page2->memory_buf_munit );
+		}
+	}
+	return cache_id;
+}
+
 void gdt_get_cache_page(GDT_CACHE* cache,GDT_CACHE_PAGE* page)
 {
 	if(cache->page==0){
@@ -88,6 +171,9 @@ void gdt_get_cache_page(GDT_CACHE* cache,GDT_CACHE_PAGE* page)
 
 void gdt_swap_page(GDT_CACHE* cache,GDT_CACHE_PAGE* page)
 {
+	if(cache->is_swap==0){
+		return;
+	}
 	GDT_MEMORY_POOL* chain_memory = (GDT_MEMORY_POOL*)GDT_POINTER(cache->memory,cache->chain_memory);
 	GDT_MEMORY_POOL* current_page;
 	int32_t current_hash_id;
@@ -167,7 +253,9 @@ int32_t gdt_cache_int(GDT_CACHE* cache,char* key,int32_t value, int32_t life_tim
 	}
 	elm->create_time = time(NULL);
 	elm->life_time = life_time;
-	gdt_add_cache_key(cache,key);
+	if(cache->is_swap==1){
+		gdt_add_cache_key(cache,key);
+	}
 	return GDT_SYSTEM_OK;
 }
 
@@ -184,7 +272,28 @@ int32_t gdt_cache_string(GDT_CACHE* cache,char* key,char* value, int32_t life_ti
 	}
 	elm->create_time = time(NULL);
 	elm->life_time = life_time;
-	gdt_add_cache_key(cache,key);
+	if(cache->is_swap==1){
+		gdt_add_cache_key(cache,key);
+	}
+	return GDT_SYSTEM_OK;
+}
+
+int32_t gdt_cache_binary(GDT_CACHE* cache,char* key,uint8_t* bin,size_t bin_size, int32_t life_time)
+{
+	GDT_CACHE_PAGE cache_page;
+	gdt_get_cache_page(cache,&cache_page);
+	GDT_HASH_ELEMENT* elm = NULL;
+	if(NULL==(elm=gdt_add_hash_binary( cache_page.memory, cache_page.hash_id, key, bin, bin_size ))){
+		gdt_swap_page(cache,&cache_page);
+		if(NULL==(elm=gdt_add_hash_binary( cache_page.memory, cache_page.hash_id, key, bin, bin_size ))){
+			return GDT_SYSTEM_ERROR;
+		}
+	}
+	elm->create_time = time(NULL);
+	elm->life_time = life_time;
+	if(cache->is_swap==1){
+		gdt_add_cache_key(cache,key);
+	}
 	return GDT_SYSTEM_OK;
 }
 

@@ -164,7 +164,7 @@ size_t gdt_strlink( char *pmain, size_t mainsize, char *psub, size_t subsize, si
 	char *ps = psub;
 	do{
 		pm += mainsize;
-		if( ps == '\0' ){
+		if( *ps == '\0' ){
 			break;
 		}
 		if( mainsize + subsize >= max_size-1 ){
@@ -173,7 +173,7 @@ size_t gdt_strlink( char *pmain, size_t mainsize, char *psub, size_t subsize, si
 		}
 		do{
 			*(pm++) = *(ps++);
-		}while( ps < ( psub + subsize ) && ps != '\0' );
+		}while( ps < ( psub + subsize ) && *ps != '\0' );
 		s = mainsize + ( ps - psub );
 		pmain[s] = '\0';
 	}while( false );
@@ -344,11 +344,10 @@ uint32_t gdt_ihash( const char* s, uint32_t range )
 {
 	uint32_t v = 0;
 	const char* ps = s;
-	if( s != NULL ){
-		while( *ps != '\0' ){
-			v += ((*ps)*((ps-s)+v));
-			ps++;
-		}
+	int cnt = 0;
+	while( *ps != '\0' ){
+		v += (*ps)*((++cnt)+v);
+		++ps;
 	}
 	return ( v % range );
 }

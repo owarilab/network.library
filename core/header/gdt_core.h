@@ -98,25 +98,25 @@ extern "C"{
 #endif
 
 # define snprintf(s, n, format, ...) \
-    _snprintf_s(s, n, _TRUNCATE, format, __VA_ARGS__)
+	_snprintf_s(s, n, _TRUNCATE, format, __VA_ARGS__)
 # define gdt_sprintf(s, n, format, ...) \
-    sprintf_s(s, n, format, __VA_ARGS__)
+	sprintf_s(s, n, format, __VA_ARGS__)
 #else
 # define gdt_sprintf(s, n, format, ...) \
-    sprintf(s, format, __VA_ARGS__)
+	sprintf(s, format, __VA_ARGS__)
 #endif
 
 #ifndef TRUE
-    #define TRUE 1
+	#define TRUE 1
 #endif
 #ifndef true
-    #define true 1
+	#define true 1
 #endif
 #ifndef FALSE
-    #define FALSE 0
+	#define FALSE 0
 #endif
 #ifndef false
-    #define false 0
+	#define false 0
 #endif
 
 #define SIZE_BYTE 1							// 1B

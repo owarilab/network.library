@@ -5,7 +5,8 @@ AR=ar
 INCDIR = -I ../header
 
 # default _LINUX
-CFLAG = $(DEFINE) $(INCDIR) -pthread -Wall -O
+#CFLAG = $(DEFINE) $(INCDIR) -pthread -Wall -O0 -pg
+CFLAG = $(DEFINE) $(INCDIR) -pthread -Wall -O0
 #CFLAG = -D_BSD_UNIX $(INCDIR) -pthread -Wall -O
 #CFLAG = -D_LINUX $(INCDIR) -pthread -Wall -O
 #CFLAG = -D_WINDOWS $(INCDIR) -pthread -Wall -O

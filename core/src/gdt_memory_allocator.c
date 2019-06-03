@@ -129,6 +129,7 @@ size_t gdt_initialize_mmapmemory( GDT_MEMORY_POOL** _ppool, size_t allocate_size
 		(*_ppool)->tail_munit		= -1;
 		(*_ppool)->lock_munit		= -1;
 		(*_ppool)->memory_buf_munit	= -1;
+		(*_ppool)->mmap_fd			= -1;
 		(*_ppool)->alloc_type			= MEMORY_ALLOCATE_TYPE_MMAP;
 		(*_ppool)->endian			= gdt_endian();
 		(*_ppool)->debug			= MEMORY_DEBUG;
@@ -151,6 +152,153 @@ size_t gdt_initialize_mmapmemory( GDT_MEMORY_POOL** _ppool, size_t allocate_size
 size_t gdt_initialize_mmapmemory_f64( GDT_MEMORY_POOL** _ppool, size_t allocate_size )
 {
 	return gdt_initialize_memory(_ppool, allocate_size, allocate_size, MEMORY_ALIGNMENT_SIZE_BIT_64, 0, 0, 0);
+}
+
+size_t gdt_initialize_mmapmemory_f( const char* file_name, GDT_MEMORY_POOL** _ppool, size_t allocate_size )
+{
+	size_t memory_size			= 0;
+#if defined(__LINUX__) || defined(__BSD_UNIX__)
+	size_t byte_size			= 0;
+	size_t max_byte_size		= 0;
+	size_t memory_unit_one_size	= 0;
+	size_t memoryUnitSize		= 0;
+	size_t free_memory_unit = 0;
+	size_t fix_memory_unit = FIX_MUNIT_SIZE;
+	size_t min_realloc = 0;
+	allocate_size = GDT_ALIGNUP( allocate_size, MEMORY_ALIGNMENT_SIZE_BIT_64 );
+	if( ( (*_ppool) = ( GDT_MEMORY_POOL * )mmap( 0, sizeof( GDT_MEMORY_POOL ), PROT_READ | PROT_WRITE, MAP_ANON | MAP_SHARED, -1, 0 ) ) == NULL ){
+		return 0;
+	}
+	memset( (*_ppool), 0, sizeof( GDT_MEMORY_POOL ) );
+	byte_size = sizeof( uint8_t ) * allocate_size;
+	max_byte_size = sizeof( uint8_t ) * allocate_size;
+	if( max_byte_size < byte_size ){
+		max_byte_size = byte_size;
+	}
+	int not_exist = 0;
+	struct stat st;
+	if (lstat(file_name, &st) < 0){
+		not_exist = 1;
+	}
+	int fd = open(file_name, O_CREAT | O_RDWR, 0755);
+	if( fd < 0 ){
+		return 0;
+	}
+	
+	if(not_exist==1){
+		// make fill file
+		int error = 0;
+		char c = 0;
+		if(0>(error = lseek(fd, byte_size, SEEK_SET))){
+			close(fd);
+			return 0;
+		}
+		if(-1==write(fd, &c, sizeof(char))){
+			close(fd);
+			return 0;
+		}
+		if(0>(error = lseek(fd, 0, SEEK_SET))){
+			close(fd);
+			return 0;
+		}
+	}
+	if( ( (*_ppool)->memory = ( void* )mmap( 0, byte_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 ) ) == NULL ){
+		return 0;
+	}
+	if(not_exist==1){
+		memset( (*_ppool)->memory, 0, byte_size );
+	}
+	(*_ppool)->top				= 0;
+	(*_ppool)->end				= byte_size;
+	(*_ppool)->bottom			= byte_size;
+	(*_ppool)->size				= byte_size;
+	(*_ppool)->max_size			= max_byte_size;
+	(*_ppool)->alignment		= MEMORY_ALIGNMENT_SIZE_BIT_64;
+	(*_ppool)->min_realloc		= GDT_ALIGNUP( min_realloc, MEMORY_ALIGNMENT_SIZE_BIT_64 );
+	(*_ppool)->fix_unit_size	= fix_memory_unit;
+	(*_ppool)->unit_size		= ( free_memory_unit + fix_memory_unit );
+	(*_ppool)->tail_munit		= -1;
+	(*_ppool)->lock_munit		= -1;
+	(*_ppool)->memory_buf_munit	= -1;
+	(*_ppool)->mmap_fd			= fd;
+	(*_ppool)->alloc_type		= MEMORY_ALLOCATE_TYPE_MMAP;
+	(*_ppool)->endian			= gdt_endian();
+	(*_ppool)->debug			= MEMORY_DEBUG;
+	memory_unit_one_size = GDT_ALIGNUP( sizeof( GDT_MEMORY_UNIT ), MEMORY_ALIGNMENT_SIZE_BIT_64 );
+	memoryUnitSize = memory_unit_one_size * ( fix_memory_unit + free_memory_unit );
+	(*_ppool)->bottom = (*_ppool)->end - memoryUnitSize;
+	(*_ppool)->memory_unit_size_one = memory_unit_one_size;
+	
+	if(not_exist==1){
+		int i;
+		GDT_MEMORY_UNIT* unit		= NULL;
+		for( i = ((*_ppool)->unit_size-1); i >= 0; i-- ){
+			unit = (GDT_MEMORY_UNIT*)( ( (*_ppool)->memory + (*_ppool)->end ) - ( memory_unit_one_size * ( (*_ppool)->unit_size - i ) ) );
+			gdt_initialize_memory_unit( unit );
+			unit->id = ( ((*_ppool)->unit_size-1) - i );
+		}
+		// make memory header
+		int32_t header_size = 56;
+		(*_ppool)->top = header_size;
+		GDT_BYTE_BUFFER buffer;
+		buffer.endian = (*_ppool)->endian;
+		buffer.buffer = (uint8_t*)((*_ppool)->memory);
+		buffer.pos = buffer.buffer;
+		buffer.size = header_size; // 4byte * 14
+		gdt_create_memory_info((*_ppool),&buffer);
+	} else{
+		int32_t* pv = (*_ppool)->memory;
+		(*_ppool)->end = *(pv++);
+		(*_ppool)->top = *(pv++);
+		(*_ppool)->bottom = *(pv++);
+		(*_ppool)->size = *(pv++);
+		(*_ppool)->max_size = *(pv++);
+		(*_ppool)->alignment = *(pv++);
+		(*_ppool)->memory_unit_size_one = *(pv++);
+		(*_ppool)->min_realloc = *(pv++);
+		(*_ppool)->fix_unit_size = *(pv++);
+		(*_ppool)->unit_size = *(pv++);
+		(*_ppool)->tail_munit = *(pv++);
+		(*_ppool)->memory_buf_munit = *(pv++);
+		(*_ppool)->alloc_type = *(pv++);
+		(*_ppool)->endian = *(pv++);
+	}
+	
+	memory_size = (*_ppool)->size;
+#endif // #if defined(__LINUX__) || defined(__BSD_UNIX__)
+	return memory_size;
+}
+
+int32_t gdt_sync_mmap_memory(GDT_MEMORY_POOL* memory_pool)
+{
+#if defined(__LINUX__) || defined(__BSD_UNIX__)
+		// make memory header
+		int32_t header_size = 56;
+		GDT_BYTE_BUFFER buffer;
+		buffer.endian = memory_pool->endian;
+		buffer.buffer = (uint8_t*)(memory_pool->memory);
+		buffer.pos = buffer.buffer;
+		buffer.size = header_size; // 4byte * 14
+		gdt_create_memory_info(memory_pool,&buffer);
+		msync(memory_pool->memory,memory_pool->size,MS_SYNC);
+#endif // #if defined(__LINUX__) || defined(__BSD_UNIX__)
+	return GDT_SYSTEM_OK;
+}
+
+int32_t gdt_async_mmap_memory(GDT_MEMORY_POOL* memory_pool)
+{
+#if defined(__LINUX__) || defined(__BSD_UNIX__)
+		// make memory header
+		int32_t header_size = 56;
+		GDT_BYTE_BUFFER buffer;
+		buffer.endian = memory_pool->endian;
+		buffer.buffer = (uint8_t*)(memory_pool->memory);
+		buffer.pos = buffer.buffer;
+		buffer.size = header_size; // 4byte * 14
+		gdt_create_memory_info(memory_pool,&buffer);
+		msync(memory_pool->memory,memory_pool->size,MS_ASYNC);
+#endif // #if defined(__LINUX__) || defined(__BSD_UNIX__)
+	return GDT_SYSTEM_OK;
 }
 
 int32_t gdt_create_mini_memory( GDT_MEMORY_POOL* _ppool, size_t allocate_size )
@@ -737,6 +885,10 @@ size_t gdt_free( GDT_MEMORY_POOL* _ppool )
 			}
 			else{
 #if defined(__LINUX__) || defined(__BSD_UNIX__)
+				if(_ppool->mmap_fd!=-1){
+					close(_ppool->mmap_fd);
+					_ppool->mmap_fd = -1;
+				}
 				munmap( _ppool->memory, memory_size );
 #endif
 			}
@@ -859,9 +1011,10 @@ int32_t gdt_create_memory_info( GDT_MEMORY_POOL* _ppool, GDT_BYTE_BUFFER* pbuffe
 	MEMORY_PUSH_BIT32_L( _ppool, pbuffer->pos, _ppool->fix_unit_size );
 	MEMORY_PUSH_BIT32_L( _ppool, pbuffer->pos, _ppool->unit_size );
 	MEMORY_PUSH_BIT32_L( _ppool, pbuffer->pos, _ppool->tail_munit );
-	MEMORY_PUSH_BIT32_L( _ppool, pbuffer->pos, _ppool->lock_munit );
+	MEMORY_PUSH_BIT32_L( _ppool, pbuffer->pos, _ppool->memory_buf_munit );
 	MEMORY_PUSH_BIT32_L( _ppool, pbuffer->pos, _ppool->alloc_type );
 	MEMORY_PUSH_BIT32_L( _ppool, pbuffer->pos, _ppool->endian );
+	
 //	pbuffer->pos = pbuffer->buffer;
 //	printf("pbuffer size : %dbyte\n",(int)pbuffer->size);
 //	printf("memory_pool->end : %d ?? %d\n", _ppool->end, gdt_pop_little_to_host_bit32( pbuffer ));

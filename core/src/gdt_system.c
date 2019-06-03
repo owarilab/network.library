@@ -296,7 +296,89 @@ void gdt_set_child_pid(pid_t pid,int32_t offset)
 	child_pid[offset] = pid;
 }
 
+int gdt_set_execute_user(SYSTEM_SERVER_OPTION* sys_option)
+{
+	struct passwd* pw;
+	pw=getpwuid(getuid());
+	if(0==pw->pw_uid){ // 0 = root user
+		if(NULL==(pw=getpwnam(sys_option->execute_user_name))){
+			fprintf(stdout,"unknown user\n");
+			return GDT_SYSTEM_ERROR;
+		}
+		setgid(pw->pw_gid); // step 1
+		initgroups(pw->pw_name,pw->pw_gid); // step 2
+		setuid(pw->pw_uid); // step 3
+		pw=getpwuid(getuid());
+	}
+	return GDT_SYSTEM_OK;
+}
+
 #endif // ifndef __WINDOWS__
+
+
+void gdt_getopt(SYSTEM_SERVER_OPTION* sys_option, const char* hostname, const char* portnum, const char* pid_file_path, const char* log_file_path, const char* execute_user_name)
+{
+	sys_option->phostname = NULL;
+	memset( sys_option->hostname, 0, sizeof( sys_option->hostname ) );
+	memset( sys_option->portnum, 0, sizeof( sys_option->portnum ) );
+	memset( sys_option->pid_file_path, 0, sizeof( sys_option->pid_file_path ) );
+	memset( sys_option->log_file_path, 0, sizeof( sys_option->log_file_path ) );
+	memset( sys_option->execute_user_name, 0, sizeof( sys_option->execute_user_name ) );
+	snprintf( sys_option->hostname, sizeof( sys_option->hostname ) -1, hostname );
+	snprintf( sys_option->portnum, sizeof( sys_option->portnum ) -1, portnum );
+	snprintf( sys_option->pid_file_path, sizeof( sys_option->pid_file_path ) -1, pid_file_path );
+	snprintf( sys_option->log_file_path, sizeof( sys_option->log_file_path ) -1, log_file_path );
+	snprintf( sys_option->execute_user_name, sizeof( sys_option->execute_user_name ) -1, execute_user_name );
+	sys_option->inetflag = 0;
+	sys_option->is_daemonize = 0;
+	
+#ifndef __WINDOWS__
+	int result;
+	while( ( result = getopt( *argc_, *argv_, "v:h:p:f:l:e:" ) ) != -1 )
+	{
+		switch(result)
+		{
+		case 'v':
+			fprintf( stdout,"%c %s\n", result, optarg );
+			if( optarg[0] == '6' ){
+				sys_option->inetflag = 1;
+			}
+			else if( optarg[0] == '4' ){
+				sys_option->inetflag = 0;
+			}
+			break;
+		case 'h':
+			fprintf( stdout,"%c %s\n", result, optarg );
+			snprintf( sys_option->hostname, sizeof( sys_option->hostname ) -1, "%s", optarg );
+			sys_option->phostname = sys_option->hostname;
+			break;
+		case 'p':
+			fprintf( stdout,"%c %s\n", result, optarg );
+			snprintf( sys_option->portnum, sizeof( sys_option->portnum ) -1, "%s", optarg );
+			break;
+		case 'f':
+			fprintf( stdout,"%c %s\n", result, optarg );
+			snprintf( sys_option->pid_file_path, sizeof( sys_option->pid_file_path ) -1, "%s", optarg );
+			break;
+		case 'l':
+			fprintf( stdout,"%c %s\n", result, optarg );
+			snprintf( sys_option->log_file_path, sizeof( sys_option->log_file_path ) -1, "%s", optarg );
+			break;
+		case 'e':
+			fprintf( stdout,"%c %s\n", result, optarg );
+			snprintf( sys_option->execute_user_name, sizeof( sys_option->execute_user_name ) -1, "%s", optarg );
+			break;
+		case ':':
+			fprintf( stdout,"%c needs value\n", result );
+			break;
+		case '?':
+			fprintf(stdout,"unknown\n");
+			break;
+		}
+	}
+#endif
+
+}
 
 void gdt_sleep(int time)
 {
@@ -311,4 +393,48 @@ void gdt_sleep(int time)
 #else
 	usleep(time);
 #endif
+}
+
+void gdt_initialize_scheduler(SYSTEM_UPDATE_SCHEDULER* scheduler)
+{
+	scheduler->last_update_time = time(NULL);
+	scheduler->update_max = 10;
+	scheduler->update_high = 100;
+	scheduler->update_middle = 1000;
+	scheduler->update_low = 5000;
+	scheduler->update_idle = 50000;
+	scheduler->counter_high = 10000;
+	scheduler->counter_middle = 2500;
+	scheduler->counter_low = 250;
+	scheduler->counter = 0;
+	scheduler->last_counter = 0;
+	scheduler->sleep_time = scheduler->update_idle;
+	scheduler->update_interval_sec = 1;
+	scheduler->on_update = 0;
+}
+
+void gdt_update_scheduler(SYSTEM_UPDATE_SCHEDULER* scheduler)
+{
+	time_t t = time(NULL);
+	scheduler->on_update = 0;
+	if( ( t - scheduler->last_update_time) > scheduler->update_interval_sec ){
+		if(scheduler->counter>0){
+			if(scheduler->counter>scheduler->counter_high){
+				scheduler->sleep_time = scheduler->update_max;
+			}
+			else if(scheduler->counter>scheduler->counter_middle){
+				scheduler->sleep_time = scheduler->update_high;
+			} else if(scheduler->counter>scheduler->counter_low){
+				scheduler->sleep_time = scheduler->update_middle;
+			} else {
+				scheduler->sleep_time = scheduler->update_low;
+			}
+		} else {
+			scheduler->sleep_time = scheduler->update_idle;
+		}
+		scheduler->last_update_time = t;
+		scheduler->last_counter = scheduler->counter;
+		scheduler->counter = 0;
+		scheduler->on_update = 1;
+	}
 }

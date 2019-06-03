@@ -105,8 +105,8 @@ extern "C"{
 	mem+=4;
 
 #define MEMORY_PUSH_CAST_BIT32_B( _ppool, mem, v ) \
-	if( _ppool->endian==GDT_BIG_ENDIAN ){ *((uint32_t*)mem) = *((uint32_t*)(&v)); } \
-	else{ *((uint32_t*)mem) = (*((uint32_t*)(&v)) >> 24) | ( (*((uint32_t*)(&v)) & 0x000000ff) << 24 ) | ( (*((uint32_t*)(&v)) & 0x0000ff00) << 8 ) | ( (*((uint32_t*)(&v)) & 0x00ff0000) >> 8 ); } \
+	if( _ppool->endian==GDT_BIG_ENDIAN ){ *((uint32_t*)mem) = *(v); } \
+	else{ *((uint32_t*)mem) = (*(v) >> 24) | ( (*(v) & 0x000000ff) << 24 ) | ( (*(v) & 0x0000ff00) << 8 ) | ( (*(v) & 0x00ff0000) >> 8 ); } \
 	mem+=4;
 
 #define FIX_MUNIT_SIZE 4
@@ -129,6 +129,7 @@ typedef struct GDT_MEMORY_POOL{
 	int alloc_type;
 	uint8_t endian;
 	uint8_t debug;
+	int mmap_fd;
 } GDT_MEMORY_POOL;
 
 typedef struct GDT_MEMORY_UNIT{
@@ -163,6 +164,9 @@ size_t gdt_initialize_memory( GDT_MEMORY_POOL** _ppool, size_t allocate_size, si
 size_t gdt_initialize_memory_f64( GDT_MEMORY_POOL** _ppool, size_t allocate_size );
 size_t gdt_initialize_mmapmemory( GDT_MEMORY_POOL** _ppool, size_t allocate_size, size_t max_allocate_size, size_t alignment_size, size_t fix_memory_unit, size_t free_memory_unit, size_t min_realloc );
 size_t gdt_initialize_mmapmemory_f64( GDT_MEMORY_POOL** _ppool, size_t allocate_size );
+size_t gdt_initialize_mmapmemory_f( const char* file_name, GDT_MEMORY_POOL** _ppool, size_t allocate_size );
+int32_t gdt_sync_mmap_memory(GDT_MEMORY_POOL* memory_pool);
+int32_t gdt_async_mmap_memory(GDT_MEMORY_POOL* memory_pool);
 int32_t gdt_create_mini_memory( GDT_MEMORY_POOL* _ppool, size_t allocate_size );
 int32_t gdt_create_clone_mini_memory( GDT_MEMORY_POOL* _ppool, GDT_MEMORY_POOL* _mini_ppool );
 int32_t gdt_copy_mini_memory( GDT_MEMORY_POOL* _dest_ppool, GDT_MEMORY_POOL* _src_ppool );

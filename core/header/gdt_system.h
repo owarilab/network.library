@@ -37,6 +37,12 @@ extern "C"{
 #include "gdt_string.h"
 #include <time.h>
 
+#ifndef __WINDOWS__
+#include <sysexits.h>
+#include <pwd.h>
+#include <grp.h>
+#endif
+
 #if !defined(__WINDOWS__) && !defined(__BSD_UNIX__) && !defined(__IOS__)
 //#include <sys/prctl.h>
 #endif
@@ -58,6 +64,39 @@ extern char ***envp_;
 extern pid_t child_pid[MAX_CHILD_PROCESS];
 #endif
 
+typedef struct SYSTEM_UPDATE_SCHEDULER
+{
+	int64_t counter;
+	int64_t last_counter;
+	time_t last_update_time;
+	int sleep_time;
+	int update_interval_sec;
+	
+	int64_t counter_high;
+	int64_t counter_middle;
+	int64_t counter_low;
+	
+	int update_max;
+	int update_high;
+	int update_middle;
+	int update_low;
+	int update_idle;
+	
+	int8_t on_update;
+} SYSTEM_UPDATE_SCHEDULER;
+
+typedef struct SYSTEM_SERVER_OPTION
+{
+	char* phostname;
+	char hostname[256];
+	char portnum[32];
+	char pid_file_path[1024];
+	char log_file_path[1024];
+	char execute_user_name[32];
+	int inetflag;
+	int is_daemonize;
+} SYSTEM_SERVER_OPTION;
+
 void gnt_set_argv( int* argc, char ***_argvp_, char *** _envp_ );
 void gnt_print_argv();
 int gnt_get_argc();
@@ -77,9 +116,13 @@ void gdt_sig_chld_handler( int sig );
 void gdt_sig_int_handler( int sig );
 void gdt_init_child_pid();
 void gdt_set_child_pid(pid_t pid,int32_t offset);
+int gdt_set_execute_user(SYSTEM_SERVER_OPTION* sys_option);
 #endif
 
+void gdt_getopt(SYSTEM_SERVER_OPTION* sys_option, const char* hostname, const char* portnum, const char* pid_file_path, const char* log_file_path, const char* execute_user_name);
 void gdt_sleep(int time);
+void gdt_initialize_scheduler(SYSTEM_UPDATE_SCHEDULER* scheduler);
+void gdt_update_scheduler(SYSTEM_UPDATE_SCHEDULER* scheduler);
 
 #endif /*_GDT_SYSTEM_H_*/
 
