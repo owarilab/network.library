@@ -38,7 +38,7 @@ void gdt_srand_32()
 	time_t now = time( NULL );
 	struct tm mytm;
 	struct tm *ptm = &mytm;
-	localtime_s( &mytm, &now );
+	gdt_localtime( &mytm, &now );
 	int32_t my = ptm->tm_year + 1;
 	int32_t mm = ptm->tm_mon + 1;
 	int32_t md = ptm->tm_mday + 1;
@@ -72,7 +72,7 @@ void gdt_srand_64()
 	time_t now = time( NULL );
 	struct tm mytm;
 	struct tm *ptm = &mytm;
-	localtime_s( &mytm, &now );
+	gdt_localtime( &mytm, &now );
 	int32_t my = ptm->tm_year + 1;
 	int32_t mm = ptm->tm_mon + 1;
 	int32_t md = ptm->tm_mday + 1;

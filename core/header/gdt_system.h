@@ -119,6 +119,7 @@ void gdt_set_child_pid(pid_t pid,int32_t offset);
 int gdt_set_execute_user(SYSTEM_SERVER_OPTION* sys_option);
 #endif
 
+void gdt_localtime(struct tm* ptm, time_t* ptime );
 void gdt_getopt(SYSTEM_SERVER_OPTION* sys_option, const char* hostname, const char* portnum, const char* pid_file_path, const char* log_file_path, const char* execute_user_name);
 void gdt_sleep(int time);
 void gdt_initialize_scheduler(SYSTEM_UPDATE_SCHEDULER* scheduler);

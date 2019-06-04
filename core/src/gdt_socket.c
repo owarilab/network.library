@@ -1243,58 +1243,7 @@ void* gdt_socket( GDT_SOCKET_OPTION *option )
 					}
 				}
 				gdt_set_sock_option( option );
-#ifdef __WINDOWS__
-				switch( option->mode )
-				{
-					case SOCKET_MODE_SINGLE:	// single connection server mode
-					case SOCKET_MODE_SELECT:	// select server mode
-						//gdt_select_server( option );
-						//break;
-						case SOCKET_MODE_THREAD:	// thread server mode
-						//gdt_thread_server( option );
-						//break;
-					case SOCKET_MODE_POOL:		// pool server mode
-					case SOCKET_MODE_EPOOL:		// epool server mode
-					case SOCKET_MODE_KQUEUE:	// kqueue server mode
-					case SOCKET_MODE_PREFORK:	// prefork serve mode
-						printf("not suppoerted windows server mode\n");
-						break;
-					case SOCKET_MODE_NONBLOCKING:
-						gdt_nonblocking_server(option);
-						break;
-					default:
-						break;
-				}
-#else
-				switch( option->mode )
-				{
-					case SOCKET_MODE_NONBLOCKING:
-						gdt_nonblocking_server(option);
-						break;
-					case SOCKET_MODE_SINGLE:	// single connection server mode
-					case SOCKET_MODE_SELECT:	// select server mode
-						//gdt_select_server( option );
-						//break;
-					case SOCKET_MODE_POOL:		// pool server mode
-						//gdt_pool_server( option );
-						//break;
-					case SOCKET_MODE_EPOOL:		// epool server mode
-						//gdt_epool_server( option );
-						//break;
-					case SOCKET_MODE_PREFORK:	// prefork server mode
-						//gdt_prefork_server( option );
-						//break;
-					case SOCKET_MODE_THREAD:	// thread server mode
-						//gdt_thread_server( option );
-						//break;
-					case SOCKET_MODE_KQUEUE:	// kqueue server mode
-						//gdt_kqueue_server( option );
-						//break;
-					default:
-						printf("not suppoerted server mode\n");
-						break;
-				}
-#endif
+				gdt_nonblocking_server(option);
 				break;
 			case SOCKET_TYPE_CLIENT_TCP:
 			case SOCKET_TYPE_CLIENT_UDP:
@@ -1304,20 +1253,7 @@ void* gdt_socket( GDT_SOCKET_OPTION *option )
 					break;
 				}
 				gdt_set_sock_option( option );
-				switch( option->mode )
-				{
-					case SOCKET_MODE_SIMPLE_TERM:
-						//gdt_send_recv_client_term( option );
-						break;
-					case SOCKET_MODE_CLIENT_THREAD:
-						//gdt_thread_client( option );
-						break;
-					case SOCKET_MODE_CLIENT_NONBLOCKING:
-						gdt_nonblocking_client(option);
-						break;
-					default:
-						break;
-				}
+				gdt_nonblocking_client(option);
 				break;
 			default:
 				printf( "socket_type error\n" );
@@ -1392,6 +1328,11 @@ void gdt_recv_event(GDT_SOCKET_OPTION *option, GDT_SERVER_CONNECTION_INFO *child
 		}
 		rinfo = (struct GDT_RECV_INFO *)gdt_upointer(option->memory_pool, child->recvinfo_munit);
 		child->sockparam.acc = child->id;
+		
+		if(option->socket_type == SOCKET_TYPE_SERVER_UDP){
+			child->sockparam.acc = option->sockid;
+		}
+		
 		rinfo->tinfo = child;
 		size_t old_pos = 0;
 		do{

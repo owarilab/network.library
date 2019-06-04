@@ -315,6 +315,14 @@ int gdt_set_execute_user(SYSTEM_SERVER_OPTION* sys_option)
 
 #endif // ifndef __WINDOWS__
 
+void gdt_localtime(struct tm* ptm, time_t* ptime )
+{
+#ifdef __WINDOWS__
+	localtime_s(ptm, ptime);
+#else
+	localtime_r(ptime, ptm);
+#endif
+}
 
 void gdt_getopt(SYSTEM_SERVER_OPTION* sys_option, const char* hostname, const char* portnum, const char* pid_file_path, const char* log_file_path, const char* execute_user_name)
 {
