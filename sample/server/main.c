@@ -41,7 +41,7 @@ int main( int argc, char *argv[], char *envp[] )
 	set_on_close_event(option,on_close);
 	gdt_socket(option);
 	
-	GDT_SOCKET_OPTION* udp_option = gdt_create_udp_server(NULL, "53001");
+	GDT_SOCKET_OPTION* udp_option = gdt_create_udp_server(NULL, "52001");
 	set_on_payload_recv_event(udp_option,on_recv_udp);
 	gdt_socket(udp_option);
 
