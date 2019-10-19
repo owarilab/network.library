@@ -454,7 +454,7 @@ size_t gdt_realloc_memory( GDT_MEMORY_POOL* _ppool, size_t allocate_size, GDT_ME
 		else{
 			if( allocate_size < _ppool->min_realloc ){
 #ifdef __GDT_DEBUG__
-					printf( "[gdt_realloc_memory] min size check s : %zd -> s2 : %"PRIu32"\n", allocate_size, _ppool->min_realloc );
+					printf( "[gdt_realloc_memory] min size check s : %zd -> s2 : %"PRIu64"\n", allocate_size, _ppool->min_realloc );
 #endif
 				allocate_size = _ppool->min_realloc;
 			}
@@ -547,12 +547,12 @@ uint32_t gdt_malloc( GDT_MEMORY_POOL* _ppool, size_t allocate_size, GDT_MEMORY_U
 //#endif
 	allocate_size = GDT_ALIGNUP( allocate_size, _ppool->alignment );
 	if( allocate_size > _ppool->max_size ){
-		printf( "[gdt_malloc] allocate_size over max_size = %"PRIu32", allocate_size = %zd \n" , _ppool->max_size, allocate_size );
+		printf( "[gdt_malloc] allocate_size over max_size = %"PRIu64", allocate_size = %zd \n" , _ppool->max_size, allocate_size );
 		return GDT_SYSTEM_ERROR;
 	}
 	if( allocate_size <= 0 )
 	{
-		printf( "[gdt_malloc] invalid allocate_size : %"PRIu32", %zd \n" , _ppool->max_size, allocate_size );
+		printf( "[gdt_malloc] invalid allocate_size : %"PRIu64", %zd \n" , _ppool->max_size, allocate_size );
 		return GDT_SYSTEM_ERROR;
 	}
 	if( _ppool->top + allocate_size >= _ppool->bottom )
@@ -663,7 +663,7 @@ int32_t gdt_create_munit( GDT_MEMORY_POOL* _ppool, size_t size, uint8_t type )
 {
 	GDT_MEMORY_UNIT* unit = NULL;
 	if( GDT_ALIGNUP( size, _ppool->alignment ) > _ppool->max_size ){
-		printf( "[gdt_create_munit] allocate_size over max_size = %"PRIu32", allocate_size = %zd \n" , _ppool->max_size, size );
+		printf( "[gdt_create_munit] allocate_size over max_size = %"PRIu64", allocate_size = %zd \n" , _ppool->max_size, size );
 		return -1;
 	}
 	unit = gdt_find_freemunit( _ppool, size );
@@ -1046,11 +1046,11 @@ void gdt_memory_info( GDT_MEMORY_POOL* _ppool )
 	printf(  "# memory info\n");
 	printf(  "#############################################################\n");
 	freeSize = ( ( _ppool->bottom - _ppool->top ) );
-	printf(  "total : %d Byte\n", _ppool->size );
+	printf(  "total : %ld Byte\n", _ppool->size );
 	printf(  "use   : %zd Byte\n", _ppool->size - freeSize );
 	printf(  "free  : %zd Byte\n", freeSize );
-	printf(  "units : %d\n", _ppool->unit_size );
-	printf(  "max size : %d Byte\n", _ppool->max_size );
+	printf(  "units : %ld\n", _ppool->unit_size );
+	printf(  "max size : %ld Byte\n", _ppool->max_size );
 	printf(  "memory top = %p\n", ( (uint8_t*)_ppool->memory ) );
 	printf(  "memory end = %p\n", ( (uint8_t*)_ppool->memory + _ppool->size ) );
 	printf(  "memory freetop = %p\n", ( (uint8_t*)_ppool->memory + _ppool->top ) );
@@ -1077,7 +1077,7 @@ void gdt_memory_unit_info( GDT_MEMORY_POOL* _ppool )
 	}
 	printf(  "#############################################################\n");
 	printf(  "# -- MEMORY_UNIT size %zd Byte --\n", (size_t)( _ppool->end - _ppool->bottom ) );
-	printf(  "# total memory units = %"PRIu32"\n", _ppool->unit_size );
+	printf(  "# total memory units = %"PRIu64"\n", _ppool->unit_size );
 	printf(  "#############################################################\n");
 	memory_unit_one_size = GDT_ALIGNUP( sizeof( GDT_MEMORY_UNIT ), _ppool->alignment );
 	for( i = (_ppool->unit_size-1); i >= 0; i-- )
@@ -1085,7 +1085,7 @@ void gdt_memory_unit_info( GDT_MEMORY_POOL* _ppool )
 		unit = (GDT_MEMORY_UNIT*)( ( (uint8_t*)_ppool->memory + _ppool->end ) - ( memory_unit_one_size * ( _ppool->unit_size - i ) ) );
 		(void) fprintf(
 				stdout
-			, "[%d] addr:%p:%p, p:%p, pend:%p, memsize:%d Byte, status:%d, id:%d, parent:%d, child:%d, type:%d\n"
+			, "[%ld] addr:%p:%p, p:%p, pend:%p, memsize:%d Byte, status:%d, id:%d, parent:%d, child:%d, type:%d\n"
 			, _ppool->unit_size - ( i + 1 )
 			, unit
 			, (uint8_t*)(unit) + memory_unit_one_size

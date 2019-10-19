@@ -218,11 +218,14 @@ typedef struct GDT_SOCKET_OPTION
 	GDT_MEMORY_POOL* memory_pool;			// memory pool
 	GDT_MEMORY_POOL* mmap_memory_pool;		// mmap memory pool
 	void* application_data;
+	int is_connecting;
+	struct addrinfo *addr;
 } GDT_SOCKET_OPTION;
 
 GDT_SOCKET_OPTION* gdt_create_tcp_server(char* hostname, char* portnum);
 GDT_SOCKET_OPTION* gdt_create_udp_server(char* hostname, char* portnum);
 GDT_SOCKET_OPTION* gdt_create_tcp_client(char* hostname, char* portnum);
+GDT_SOCKET_OPTION* gdt_create_tcp_client_plane(char* hostname, char* portnum);
 GDT_SOCKET_OPTION* gdt_create_udp_client(char* hostname, char* portnum);
 ssize_t gdt_send_message(uint32_t payload_type, char* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info);
 ssize_t gdt_send_message_broadcast(uint32_t payload_type, char* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info);
@@ -278,6 +281,8 @@ int gdt_set_block(GDT_SOCKET_ID fd, int flag );
 int gdt_get_sockaddr_info( GDT_SOCKET_OPTION *option, struct sockaddr_storage *saddr, socklen_t *addr_len );
 GDT_SOCKET_ID gdt_server_socket( GDT_SOCKET_OPTION *option, int is_ipv6 );
 GDT_SOCKET_ID gdt_client_socket( GDT_SOCKET_OPTION *option );
+int gdt_check_socket_error(GDT_SOCKET_ID sock);
+void gdt_free_addrinfo(GDT_SOCKET_OPTION* option);
 void gdt_disconnect( GDT_SOCKPARAM *psockparam );
 void gdt_set_sock_option( GDT_SOCKET_OPTION *option );
 void* gdt_make_socket( GDT_SOCKET_OPTION *option );

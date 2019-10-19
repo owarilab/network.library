@@ -64,10 +64,10 @@ extern "C"{
 #define MEMORY_STATUS_USE  1
 #define MEMORY_STATUS_GARBAGE 2
 #define GDT_ALIGNUP( size, bytes ) ((((size_t)(size)+(bytes)-1)&(~((bytes)-1))))
-#define GDT_POINTER( _ppool, munit_id ) (((uint8_t*)_ppool->memory+(*(uint32_t*)(((uint8_t*)_ppool->memory+_ppool->end)-(_ppool->memory_unit_size_one*(munit_id+1))))))
-#define GDT_FIXPOINTER( _ppool, munit_id ) (((uint8_t*)_ppool->memory+(*(uint32_t*)(((uint8_t*)_ppool->memory+_ppool->end)-(_ppool->memory_unit_size_one*(munit_id+1))))))
+#define GDT_POINTER( _ppool, munit_id ) (((uint8_t*)_ppool->memory+(*(uint64_t*)(((uint8_t*)_ppool->memory+_ppool->end)-(_ppool->memory_unit_size_one*(munit_id+1))))))
+#define GDT_FIXPOINTER( _ppool, munit_id ) (((uint8_t*)_ppool->memory+(*(uint64_t*)(((uint8_t*)_ppool->memory+_ppool->end)-(_ppool->memory_unit_size_one*(munit_id+1))))))
 #define GDT_PUNIT( _ppool, munit_id ) (GDT_MEMORY_UNIT*)(((uint8_t*)_ppool->memory+_ppool->end)-(_ppool->memory_unit_size_one*(munit_id+1)))
-#define GDT_PUNIT_USIZE( _ppool, munit_id ) (*(uint32_t*)((((uint8_t*)_ppool->memory+_ppool->end)-(_ppool->memory_unit_size_one*(munit_id+1)))+sizeof(uint32_t)))
+#define GDT_PUNIT_USIZE( _ppool, munit_id ) (*(uint64_t*)((((uint8_t*)_ppool->memory+_ppool->end)-(_ppool->memory_unit_size_one*(munit_id+1)))+sizeof(uint64_t)))
 #define GDT_INT32( _ppool, munit_id ) (*(int32_t*)(GDT_POINTER(_ppool,munit_id)+GDT_PUNIT_USIZE(_ppool,munit_id)-sizeof(int32_t)))
 
 #define BYTE_SWAP_BIT16( v ) (v >> 8) | ( (v & 0xff) << 8 )
@@ -93,6 +93,10 @@ extern "C"{
 	if( _ppool->endian==GDT_BIG_ENDIAN ){ *((uint16_t*)mem) = v; } \
 	else{ *((uint16_t*)mem) = (v >> 8) | ( (v & 0xff) << 8 ); } \
 	mem+=2;
+#define MEMORY_PUSH_BIT16_B2( endian, mem, v ) \
+	if( endian==GDT_BIG_ENDIAN ){ *((uint16_t*)mem) = v; } \
+	else{ *((uint16_t*)mem) = (v >> 8) | ( (v & 0xff) << 8 ); } \
+	mem+=2;
 
 #define MEMORY_PUSH_BIT32_B( _ppool, mem, v ) \
 	if( _ppool->endian==GDT_BIG_ENDIAN ){ *((uint32_t*)mem) = v; } \
@@ -109,20 +113,30 @@ extern "C"{
 	else{ *((uint32_t*)mem) = (*(v) >> 24) | ( (*(v) & 0x000000ff) << 24 ) | ( (*(v) & 0x0000ff00) << 8 ) | ( (*(v) & 0x00ff0000) >> 8 ); } \
 	mem+=4;
 
+#define MEMORY_PUSH_BIT64_B( _ppool, mem, v ) \
+	if( _ppool->endian==GDT_BIG_ENDIAN ){ *((uint32_t*)mem) = v; } \
+	else{ *((uint64_t*)mem) = (v & 0xff00000000000000) >> 56 | (v & 0x00ff000000000000) >> 40 | (v & 0x0000ff0000000000) >> 24 | (v & 0x000000ff00000000) >> 8 | (v & 0x00000000ff000000) << 8 | (v & 0x0000000000ff0000) << 24 | (v & 0x000000000000ff00) << 40 | (v & 0x00000000000000ff) << 56; } \
+	mem+=8;
+
+#define MEMORY_PUSH_BIT64_B2( endian, mem, v ) \
+	if( endian==GDT_BIG_ENDIAN ){ *((uint64_t*)mem) = v; } \
+	else{ *((uint64_t*)mem) = (v & 0xff00000000000000) >> 56 | (v & 0x00ff000000000000) >> 40 | (v & 0x0000ff0000000000) >> 24 | (v & 0x000000ff00000000) >> 8 | (v & 0x00000000ff000000) << 8 | (v & 0x0000000000ff0000) << 24 | (v & 0x000000000000ff00) << 40 | (v & 0x00000000000000ff) << 56; } \
+	mem+=8;
+
 #define FIX_MUNIT_SIZE 4
 
 typedef struct GDT_MEMORY_POOL{
 	void *memory;
-	uint32_t end;
-	uint32_t top;
-	uint32_t bottom;
-	uint32_t size;
-	uint32_t max_size;
-	uint32_t alignment;	
-	uint32_t memory_unit_size_one;
-	uint32_t min_realloc;
-	uint32_t fix_unit_size;
-	uint32_t unit_size;
+	uint64_t end;
+	uint64_t top;
+	uint64_t bottom;
+	uint64_t size;
+	uint64_t max_size;
+	uint64_t alignment;	
+	uint64_t memory_unit_size_one;
+	uint64_t min_realloc;
+	uint64_t fix_unit_size;
+	uint64_t unit_size;
 	int32_t	tail_munit;
 	int32_t lock_munit;
 	int32_t memory_buf_munit;
@@ -133,23 +147,15 @@ typedef struct GDT_MEMORY_POOL{
 } GDT_MEMORY_POOL;
 
 typedef struct GDT_MEMORY_UNIT{
-	uint32_t p;	
-	uint32_t size;
-	uint32_t top;
+	uint64_t p;	
+	uint64_t size;
+	uint64_t top;
 	uint8_t	status;
 	uint8_t	type;
 	int32_t	id;
 	int32_t	parent;
 	int32_t	child;
 } GDT_MEMORY_UNIT;
-
-typedef struct GDT_MUNIT_QUEUE
-{
-	uint32_t size;
-	int32_t top;
-	int32_t tail;
-	int32_t lost_count;
-} GDT_MUNIT_QUEUE;
 
 typedef struct GDT_BYTE_BUFFER
 {

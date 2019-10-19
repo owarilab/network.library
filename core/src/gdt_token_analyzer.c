@@ -537,7 +537,7 @@ void gdt_tokendump( GDT_MEMORY_POOL* _ppool, int32_t tokens_munit )
 	{
 		type = token_list[i].type;
 		pbuf = (char*)gdt_upointer( _ppool, token_list[i].buf_munit );
-		printf("token(%s-%zdbyte) : %s\n",typelist[type],token_list[i].size,pbuf);
+		printf("token(%s , %d byte) : %s\n",typelist[type],token_list[i].size,pbuf);
 	}
 	printf("-----------------------------------------------------------------------\n");
 }

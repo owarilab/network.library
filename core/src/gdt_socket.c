@@ -84,6 +84,25 @@ GDT_SOCKET_OPTION* gdt_create_tcp_client(char* hostname, char* portnum)
 	return option;
 }
 
+GDT_SOCKET_OPTION* gdt_create_tcp_client_plane(char* hostname, char* portnum)
+{
+	GDT_MEMORY_POOL* memory_pool = NULL;
+	GDT_SOCKET_OPTION *option;
+	size_t maxconnection = 1;
+	if (gdt_initialize_memory(&memory_pool, SIZE_MBYTE * 1, SIZE_MBYTE * 1, MEMORY_ALIGNMENT_SIZE_BIT_64, FIX_MUNIT_SIZE, 1, SIZE_KBYTE * 16) <= 0) {
+		return NULL;
+	}
+	int32_t option_munit = gdt_create_munit(memory_pool, sizeof(GDT_SOCKET_OPTION), MEMORY_TYPE_DEFAULT);
+	if (option_munit == -1) {
+		return NULL;
+	}
+	option = (GDT_SOCKET_OPTION*)GDT_POINTER(memory_pool, option_munit);
+	if (0 != gdt_initialize_socket_option(option, hostname, portnum, SOCKET_TYPE_CLIENT_TCP, SOCKET_MODE_CLIENT_NONBLOCKING, PROTOCOL_PLAIN, maxconnection, memory_pool, NULL)) {
+		return NULL;
+	}
+	return option;
+}
+
 GDT_SOCKET_OPTION* gdt_create_udp_client(char* hostname, char* portnum)
 {
 	GDT_MEMORY_POOL* memory_pool = NULL;
@@ -343,11 +362,13 @@ int gdt_initialize_socket_option(
 		backend_clients[i].sockid = -1;
 	}
 	
-	option->lock_file_fd		= -1;
-	option->lock_file_munit		= -1;
-	option->memory_pool			= memory_pool;
-	option->mmap_memory_pool	= mmap_memory_pool;
-	option->application_data    = NULL;
+	option->lock_file_fd = -1;
+	option->lock_file_munit = -1;
+	option->memory_pool = memory_pool;
+	option->mmap_memory_pool = mmap_memory_pool;
+	option->application_data = NULL;
+	option->is_connecting = 0;
+	option->addr = NULL;
 #ifdef __WINDOWS__
 	result = WSAStartup( MAKEWORD( 2, 2 ), &option->wsdata );
 	if( result != 0 )
@@ -550,9 +571,6 @@ int32_t gdt_make_connection_info_core( GDT_SOCKET_OPTION *option, GDT_SERVER_CON
 	return GDT_SYSTEM_OK;
 }
 
-/*
- * initialize GDT_SERVER_CONNECTION_INFO
- */
 void gdt_initialize_connection_info( GDT_SOCKET_OPTION *option, struct GDT_SERVER_CONNECTION_INFO* tinfo )
 {
 	char *pbuf;
@@ -623,9 +641,6 @@ ssize_t gdt_send_broadcast( GDT_SOCKET_OPTION *option, char *buf, size_t size, u
 	return ret;
 }
 
-/*
- * send packets
- */
 ssize_t gdt_send( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, char *buf, size_t size, uint32_t payload_type )
 {
 	ssize_t len = 0;
@@ -698,9 +713,6 @@ ssize_t gdt_send( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, char *bu
 	return len;
 }
 
-/*
- * send tcp packets all
- */
 ssize_t gdt_send_all(GDT_SOCKET_ID soc, char *buf, size_t size, int flag )
 {
 	int32_t len, lest;
@@ -734,9 +746,6 @@ ssize_t gdt_send_all(GDT_SOCKET_ID soc, char *buf, size_t size, int flag )
 	return (size);
 }
 
-/*
- * send udp packets all
- */
 ssize_t gdt_sendto_all(GDT_SOCKET_ID soc, char *buf, size_t size, int flag, struct sockaddr *pfrom, socklen_t fromlen )
 {
 	int32_t len, lest;
@@ -849,44 +858,42 @@ int gdt_get_sockaddr_info( GDT_SOCKET_OPTION *option, struct sockaddr_storage *s
 //#ifdef __GDT_DEBUG__
 //	printf( "gdt_get_sockaddr_info: port=%s, host=%s\n", (char *)gdt_upointer( option->memory_pool,option->port_num_munit ), (char *)gdt_upointer( option->memory_pool,option->host_name_munit ) );
 //#endif
-	do{
-		(void) memset( &hints, 0, sizeof( hints ) );
-		if( ( option->inetflag & INET_FLAG_BIT_IPV6 ) == 0 ){
-			hints.ai_family = AF_INET;
-		}
-		else{
-			hints.ai_family = AF_INET6;
-		}
+	(void) memset( &hints, 0, sizeof( hints ) );
+	if( ( option->inetflag & INET_FLAG_BIT_IPV6 ) == 0 ){
+		hints.ai_family = AF_INET;
+	}
+	else{
+		hints.ai_family = AF_INET6;
+	}
+	hints.ai_socktype = SOCK_STREAM;
+	if( option->socket_type == SOCKET_TYPE_CLIENT_TCP )
+	{
 		hints.ai_socktype = SOCK_STREAM;
-		if( option->socket_type == SOCKET_TYPE_CLIENT_TCP )
-		{
-			hints.ai_socktype = SOCK_STREAM;
-		}
-		else if( option->socket_type == SOCKET_TYPE_CLIENT_UDP )
-		{
-			hints.ai_socktype = SOCK_DGRAM;
-		}
-		hints.ai_flags	= AI_PASSIVE;
-		//hints.ai_flags = AI_NUMERICSERV;
-		if( ( errcode = getaddrinfo( (char *)gdt_upointer( option->memory_pool,option->host_name_munit ) , (char *)gdt_upointer( option->memory_pool,option->port_num_munit ), &hints, &res0 ) ) != 0 ){
-			printf( "getaddrinfo():%s\n",gai_strerror( errcode ) );
-			return GDT_SYSTEM_ERROR;
-		}
-		if( ( errcode = getnameinfo( res0->ai_addr, res0->ai_addrlen, 
-			nbuf, sizeof( nbuf ), sbuf, sizeof( sbuf ), NI_NUMERICHOST | NI_NUMERICSERV ) ) != 0 )
-		{
-			printf( "getnameinfo():%s\n",gai_strerror( errcode ) );
-			freeaddrinfo( res0 );
-			return GDT_SYSTEM_ERROR;
-		}
+	}
+	else if( option->socket_type == SOCKET_TYPE_CLIENT_UDP )
+	{
+		hints.ai_socktype = SOCK_DGRAM;
+	}
+	hints.ai_flags	= AI_PASSIVE;
+	//hints.ai_flags = AI_NUMERICSERV;
+	if( ( errcode = getaddrinfo( (char *)gdt_upointer( option->memory_pool,option->host_name_munit ) , (char *)gdt_upointer( option->memory_pool,option->port_num_munit ), &hints, &res0 ) ) != 0 ){
+		printf( "getaddrinfo():%s\n",gai_strerror( errcode ) );
+		return GDT_SYSTEM_ERROR;
+	}
+	if( ( errcode = getnameinfo( res0->ai_addr, res0->ai_addrlen, 
+		nbuf, sizeof( nbuf ), sbuf, sizeof( sbuf ), NI_NUMERICHOST | NI_NUMERICSERV ) ) != 0 )
+	{
+		printf( "getnameinfo():%s\n",gai_strerror( errcode ) );
+		freeaddrinfo( res0 );
+		return GDT_SYSTEM_ERROR;
+	}
 //#ifdef __GDT_DEBUG__
 //		printf( "gdt_get_sockaddr_info:addr=%s\n", nbuf );
 //		printf( "gdt_get_sockaddr_info:port=%s\n", sbuf );
 //#endif
-		memcpy(saddr,res0->ai_addr,res0->ai_addrlen);
-		*addr_len = res0->ai_addrlen;
-		freeaddrinfo( res0 );
-	}while( false );
+	memcpy(saddr,res0->ai_addr,res0->ai_addrlen);
+	*addr_len = res0->ai_addrlen;
+	freeaddrinfo( res0 );
 	return GDT_SYSTEM_OK;
 }
 
@@ -902,50 +909,43 @@ GDT_SOCKET_ID gdt_server_socket( GDT_SOCKET_OPTION *option, int is_ipv6 )
 {
 	GDT_SOCKET_ID sock = -1;
 	char nbuf[NI_MAXHOST], sbuf[NI_MAXHOST];
-	struct addrinfo hints, *res0;
+	struct addrinfo hints;
 	int opt , errcode;
 	socklen_t opt_len;
 	char* hostname = ( option->host_name_munit >= 0 ) ? (char *)gdt_upointer( option->memory_pool,option->host_name_munit ) : NULL;
 	char* port = ( option->port_num_munit >= 0 ) ? (char *)gdt_upointer( option->memory_pool,option->port_num_munit ) : NULL;
-#ifdef __GDT_DEBUG__
-//	printf( "server_socket: port=%s, host=%s\n", port, hostname  );
-#endif
-	do{
-		(void) memset( &hints, 0, sizeof( hints ) );
-		if( is_ipv6 == 1 ){
-			hints.ai_family   = AF_INET6;
-		}
-		else{
-			hints.ai_family   = AF_INET;
-		}
+
+	memset( &hints, 0, sizeof( hints ) );
+	if( is_ipv6 == 1 ){
+		hints.ai_family   = AF_INET6;
+	}
+	else{
+		hints.ai_family   = AF_INET;
+	}
+	hints.ai_socktype = SOCK_STREAM;
+	if( option->socket_type == SOCKET_TYPE_SERVER_TCP )
+	{
 		hints.ai_socktype = SOCK_STREAM;
-		if( option->socket_type == SOCKET_TYPE_SERVER_TCP )
-		{
-			hints.ai_socktype = SOCK_STREAM;
-		}
-		else if( option->socket_type == SOCKET_TYPE_SERVER_UDP )
-		{
-			hints.ai_socktype = SOCK_DGRAM;	
-		}
-		hints.ai_flags	= AI_PASSIVE;
-		if( ( errcode = getaddrinfo( hostname , port, &hints, &res0 ) ) != 0 ){
-			printf( "getaddrinfo():%s\n",gai_strerror( errcode ) );
-			break;
-		}
-		if( ( errcode = getnameinfo( res0->ai_addr, res0->ai_addrlen, 
+	}
+	else if( option->socket_type == SOCKET_TYPE_SERVER_UDP )
+	{
+		hints.ai_socktype = SOCK_DGRAM;	
+	}
+	hints.ai_flags	= AI_PASSIVE;
+	if( ( errcode = getaddrinfo( hostname , port, &hints, &option->addr ) ) != 0 ){
+		printf( "getaddrinfo():%s\n",gai_strerror( errcode ) );
+		return -1;
+	}
+
+	do{
+		if( ( errcode = getnameinfo( option->addr->ai_addr, option->addr->ai_addrlen, 
 			nbuf, sizeof( nbuf ), sbuf, sizeof( sbuf ), NI_NUMERICHOST | NI_NUMERICSERV ) ) != 0 )
 		{
 			printf( "getnameinfo():%s\n",gai_strerror( errcode ) );
-			freeaddrinfo( res0 );
 			break;
 		}
-//#ifdef __GDT_DEBUG__
-//		printf( "addr=%s\n", nbuf );
-//		printf( "port=%s\n", sbuf );
-//#endif
-		if( ( sock = socket( res0->ai_family, res0->ai_socktype, res0-> ai_protocol ) ) == -1 )
+		if( ( sock = socket( option->addr->ai_family, option->addr->ai_socktype, option->addr-> ai_protocol ) ) == -1 )
 		{
-			freeaddrinfo( res0 );
 			gdt_error("socket");
 			break;
 		}
@@ -954,13 +954,11 @@ GDT_SOCKET_ID gdt_server_socket( GDT_SOCKET_OPTION *option, int is_ipv6 )
 		if( setsockopt( sock, SOL_SOCKET, SO_REUSEADDR, &opt, opt_len ) == -1 )
 		{
 			gdt_close_socket( &sock, "setsockopt" );
-			freeaddrinfo( res0 );
 			break;
 		}
-		if( bind( sock, res0->ai_addr, res0->ai_addrlen) == -1 )
+		if( bind( sock, option->addr->ai_addr, option->addr->ai_addrlen) == -1 )
 		{
 			gdt_close_socket( &sock, "bind" );
-			freeaddrinfo( res0 );
 			break;
 		}
 		if( option->socket_type == SOCKET_TYPE_SERVER_TCP )
@@ -968,121 +966,100 @@ GDT_SOCKET_ID gdt_server_socket( GDT_SOCKET_OPTION *option, int is_ipv6 )
 			if( listen( sock, SOMAXCONN ) == -1 )
 			{
 				gdt_close_socket( &sock, "listen" );
-				freeaddrinfo( res0 );
 				break;
 			}
 		}
-		freeaddrinfo( res0 );
 	}while( false );
+
+	gdt_free_addrinfo(option);
+
 	return ( sock );
 }
 
-/*
- * create client socket
- * @param option
- * @return GDT_SOCKET_ID( error : -1 )
- */
 GDT_SOCKET_ID gdt_client_socket( GDT_SOCKET_OPTION *option )
 {
 	GDT_SOCKET_ID sock = -1;
-	int connectSuccess = false;
 	char nbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
-	struct addrinfo hints, *res0, *local_info;
-	struct timeval timeout;
-	int errcode, width, val;
-	socklen_t len;
-	fd_set mask, write_mask, read_mask;
-	do{
-		char* hostname = (char *)gdt_upointer( option->memory_pool,option->host_name_munit );
-		char* portnum = (char *)gdt_upointer( option->memory_pool,option->port_num_munit );
-		(void) memset( &hints, 0, sizeof( hints ) );
-		if( ( option->inetflag & INET_FLAG_BIT_IPV6 ) == 0 ){
-			hints.ai_family = AF_INET;
-		}
-		else{
-			hints.ai_family = AF_INET6;
-		}
+	struct addrinfo hints;
+	int errcode;
+
+	char* hostname = (char *)gdt_upointer( option->memory_pool,option->host_name_munit );
+	char* portnum = (char *)gdt_upointer( option->memory_pool,option->port_num_munit );
+	memset( &hints, 0, sizeof( hints ) );
+	if( ( option->inetflag & INET_FLAG_BIT_IPV6 ) == 0 ){
+		hints.ai_family = AF_INET;
+	}
+	else{
+		hints.ai_family = AF_INET6;
+	}
+	hints.ai_socktype = SOCK_STREAM;
+	if( option->socket_type == SOCKET_TYPE_CLIENT_TCP )
+	{
 		hints.ai_socktype = SOCK_STREAM;
-		if( option->socket_type == SOCKET_TYPE_CLIENT_TCP )
-		{
-			hints.ai_socktype = SOCK_STREAM;
-		}
-		else if( option->socket_type == SOCKET_TYPE_CLIENT_UDP )
-		{
-			hints.ai_socktype = SOCK_DGRAM;
-		}
-		hints.ai_flags	= AI_PASSIVE;
-		//hints.ai_flags = AI_NUMERICSERV;
-		if( ( errcode = getaddrinfo( hostname , portnum, &hints, &res0 ) ) != 0 ){
-			printf( "getaddrinfo():%s\n",gai_strerror( errcode ) );
-			break;
-		}
-		if( ( errcode = getnameinfo( res0->ai_addr, res0->ai_addrlen, 
-			nbuf, sizeof( nbuf ), sbuf, sizeof( sbuf ), NI_NUMERICHOST | NI_NUMERICSERV ) ) != 0 )
-		{
-			printf( "getnameinfo():%s\n",gai_strerror( errcode ) );
-			freeaddrinfo( res0 );
-			break;
-		}
-//#ifdef __GDT_DEBUG__
-//		printf( "addr=%s\n", nbuf );
-//		printf( "port=%s\n", sbuf );
-//#endif
-		if( ( sock = socket( res0->ai_family, res0->ai_socktype, res0->ai_protocol ) ) == -1 )
-		{
-			freeaddrinfo( res0 );
-			(void) gdt_error("socket");
-			break;
-		}
-		if( option->socket_type == SOCKET_TYPE_CLIENT_UDP )
-		{
-			if( ( option->inetflag & INET_FLAG_BIT_CONNECT_UDP ) == 0 ){
-				if( ( errcode = getaddrinfo( NULL , "0", &hints, &local_info ) ) != 0 ){
-					printf( "getaddrinfo():%s\n",gai_strerror( errcode ) );
-					break;
-				}
-				if( bind( sock, (struct sockaddr *)local_info->ai_addr, sizeof(struct sockaddr)) == -1 )
-				{
-					freeaddrinfo( res0 );
-					freeaddrinfo( local_info );
-					(void) gdt_error("socket");
-					break;
-				}
-				freeaddrinfo( local_info );
-				freeaddrinfo( res0 );
-				break;
+	}
+	else if( option->socket_type == SOCKET_TYPE_CLIENT_UDP )
+	{
+		hints.ai_socktype = SOCK_DGRAM;
+	}
+	hints.ai_flags	= AI_PASSIVE; // AI_NUMERICSERV;
+	if( ( errcode = getaddrinfo( hostname , portnum, &hints, &option->addr ) ) != 0 ){
+		printf( "getaddrinfo():%s\n",gai_strerror( errcode ) );
+		return -1;
+	}
+	if( ( errcode = getnameinfo( option->addr->ai_addr, option->addr->ai_addrlen, 
+		nbuf, sizeof( nbuf ), sbuf, sizeof( sbuf ), NI_NUMERICHOST | NI_NUMERICSERV ) ) != 0 )
+	{
+		printf( "getnameinfo():%s\n",gai_strerror( errcode ) );
+		freeaddrinfo( option->addr );
+		return -1;
+	}
+	if( ( sock = socket( option->addr->ai_family, option->addr->ai_socktype, option->addr->ai_protocol ) ) == -1 )
+	{
+		freeaddrinfo( option->addr );
+		(void) gdt_error("socket");
+		return -1;
+	}
+	if( option->socket_type == SOCKET_TYPE_CLIENT_UDP )
+	{
+		if( ( option->inetflag & INET_FLAG_BIT_CONNECT_UDP ) == 0 ){
+			struct addrinfo *local_info;
+			if( ( errcode = getaddrinfo( NULL , "0", &hints, &local_info ) ) != 0 ){
+				gdt_close_socket( &sock, "getaddrinfo" );
+				printf( "getaddrinfo() error : %s\n",gai_strerror( errcode ) );
 			}
+			if( bind( sock, (struct sockaddr *)local_info->ai_addr, sizeof(struct sockaddr)) == -1 )
+			{
+				gdt_close_socket( &sock, "bind" );
+			}
+			freeaddrinfo( local_info );
+			freeaddrinfo( option->addr );
+			return sock;
 		}
+	}
+
+	do{
 		if( option->t_sec <= 0 && option->t_usec <= 0 )
 		{
-			if( connect( sock, res0->ai_addr, res0->ai_addrlen ) == -1 ){
+			if( connect( sock, option->addr->ai_addr, option->addr->ai_addrlen ) == -1 ){
 				gdt_close_socket( &sock, "connect" );
-				freeaddrinfo( res0 );
+				freeaddrinfo( option->addr );
 				break;
 			}
-			len = sizeof( len );
-			if( getsockopt( sock, SOL_SOCKET, SO_ERROR, &val, &len ) != -1 )
+			if(-1 == gdt_check_socket_error(sock))
 			{
-				if( val == 0 )
-				{
-					printf("ok\n");
-				}
-				else{
-					printf("error\n");
-#ifdef __WINDOWS__
-					char errbuf[256];
-					strerror_s(errbuf,255,val);
-#else
-					(void)fprintf(stderr, "getsockopt:%d:%s\n", val, strerror(val));
-#endif
-					gdt_close_socket( &sock, NULL );
-				}
+				gdt_close_socket( &sock, "connect" );
+				freeaddrinfo( option->addr );
+				break;
 			}
-			freeaddrinfo( res0 );
+			freeaddrinfo( option->addr );
 		}
 		else{
+			int width;
+			struct timeval timeout;
+			fd_set mask, write_mask, read_mask;
+			int connectSuccess = false;
 			( void ) gdt_set_block( sock, 0 );
-			if( connect( sock, res0->ai_addr, res0->ai_addrlen ) == -1 )
+			if( connect( sock, option->addr->ai_addr, option->addr->ai_addrlen ) == -1 )
 			{
 #ifdef __WINDOWS__
 				int err = WSAGetLastError();
@@ -1092,13 +1069,13 @@ GDT_SOCKET_ID gdt_client_socket( GDT_SOCKET_OPTION *option )
 #endif
 				{
 					gdt_close_socket( &sock, "select" );
-					freeaddrinfo( res0 );
+					freeaddrinfo( option->addr );
 					break;
 				}
 			}
 			else{
 				( void ) gdt_set_block( sock, 1 );
-				freeaddrinfo( res0 );
+				freeaddrinfo( option->addr );
 				break;
 			}
 			width = 0;
@@ -1121,41 +1098,24 @@ GDT_SOCKET_ID gdt_client_socket( GDT_SOCKET_OPTION *option )
 						if( errno != EINTR )
 						{
 							gdt_close_socket( &sock, "select" );
-							freeaddrinfo( res0 );
+							freeaddrinfo( option->addr );
 						}
 						break;
 					case 0:
-						gdt_close_socket( &sock, NULL );
-						printf( "select:timeout\n" );
-						freeaddrinfo( res0 );
+						gdt_close_socket( &sock, "select:timeout" );
+						freeaddrinfo( option->addr );
 						break;
 					default:
 						if( ( pwrite != NULL && FD_ISSET( sock, pwrite ) ) || FD_ISSET( sock, &read_mask ) )
 						{
-							len = sizeof( len );
-							if( getsockopt( sock, SOL_SOCKET, SO_ERROR, &val, &len ) != -1 )
+							if(-1 == gdt_check_socket_error(sock))
 							{
-								if( val == 0 )
-								{
-									(void) gdt_set_block( sock, 1 );
-									freeaddrinfo( res0 );
-									connectSuccess = true;
-								}
-								else{
-#ifdef __WINDOWS__
-									char errbuf[256];
-									strerror_s(errbuf,255,val);
-#else
-									(void)fprintf(stderr, "getsockopt:%d:%s\n", val, strerror(val));
-#endif
-									gdt_close_socket( &sock, NULL );
-									freeaddrinfo( res0 );
-								}
+								gdt_close_socket( &sock, "connect" );
+							} else{
+								(void) gdt_set_block( sock, 1 );
+								connectSuccess = true;
 							}
-							else{
-								gdt_close_socket( &sock, "select" );
-								freeaddrinfo( res0 );
-							}
+							freeaddrinfo( option->addr );
 						}
 						break;
 				}
@@ -1166,6 +1126,39 @@ GDT_SOCKET_ID gdt_client_socket( GDT_SOCKET_OPTION *option )
 		}
 	}while( false );
 	return sock;
+}
+
+int gdt_check_socket_error(GDT_SOCKET_ID sock)
+{
+	int getopt_val;
+	socklen_t len;
+	len = sizeof( len );
+	if( getsockopt( sock, SOL_SOCKET, SO_ERROR, &getopt_val, &len ) != -1 )
+	{
+		if( getopt_val == 0 )
+		{
+			return 0;
+		}
+		else{
+#ifdef __WINDOWS__
+			char errbuf[256];
+			strerror_s(errbuf,255,getopt_val);
+#else
+			(void)fprintf(stderr, "getsockopt:%d:%s\n", getopt_val, strerror(getopt_val));
+#endif
+			return -1;
+		}
+	}
+	return -1;
+}
+
+void gdt_free_addrinfo(GDT_SOCKET_OPTION* option)
+{
+	if(option->addr==NULL){
+		return;
+	}
+	freeaddrinfo(option->addr);
+	option->addr = NULL;
 }
 
 void gdt_disconnect( GDT_SOCKPARAM *psockparam )
@@ -1214,52 +1207,52 @@ void* gdt_make_socket( GDT_SOCKET_OPTION *option )
 
 void* gdt_socket( GDT_SOCKET_OPTION *option )
 {
-	do{
-		if( option->memory_pool == NULL ){
-			printf("option->memory_pool == NULL\n");
+	if( option == NULL || option->memory_pool == NULL ){
+		printf("empty memory error\n");
+		return ( (void *) NULL );
+	}
+	switch( option->socket_type )
+	{
+		case SOCKET_TYPE_SERVER_TCP:
+		case SOCKET_TYPE_SERVER_UDP:
+			if( -1 == ( option->sockid = gdt_server_socket( option, 0 ) ) )
+			{
+				break;
+			}
+			if( ( option->inetflag & INET_FLAG_BIT_IPV6 ) != 0 )
+			{
+				if( -1 == ( option->sockid6 = gdt_server_socket( option, 1 ) ) )
+				{
+					option->sockid6 = -1;
+					gdt_close_socket(&option->sockid,NULL);
+					break;
+				}
+			}
+			gdt_set_sock_option( option );
+			gdt_nonblocking_server(option);
 			break;
-		}
-		switch( option->socket_type )
-		{
-			case SOCKET_TYPE_SERVER_TCP:
-			case SOCKET_TYPE_SERVER_UDP:
-				if( ( option->sockid = gdt_server_socket( option, 0 ) ) <= 0 )
-				{
-					printf( "gdt_server_socket error: port=%s, host=%s\n",
-						(char *)gdt_upointer( option->memory_pool,option->port_num_munit ),
-						(char *)gdt_upointer( option->memory_pool,option->host_name_munit )
-					);
-					break;
-				}
-				if( ( option->inetflag & INET_FLAG_BIT_IPV6 ) != 0 )
-				{
-					if( ( option->sockid6 = gdt_server_socket( option, 1 ) ) <= 0 )
-					{
-						printf( "gdt_server_socket ipv6 error: port=%s, host=%s\n",
-							(char *)gdt_upointer( option->memory_pool,option->port_num_munit ),
-							(char *)gdt_upointer( option->memory_pool,option->host_name_munit )
-						);
-						option->sockid6 = -1;
-					}
-				}
-				gdt_set_sock_option( option );
-				gdt_nonblocking_server(option);
+		case SOCKET_TYPE_CLIENT_TCP:
+		case SOCKET_TYPE_CLIENT_UDP:
+			if( -1 == ( option->sockid = gdt_client_socket( option ) ) )
+			{
 				break;
-			case SOCKET_TYPE_CLIENT_TCP:
-			case SOCKET_TYPE_CLIENT_UDP:
-				if( ( option->sockid = gdt_client_socket( option ) ) <= 0 )
-				{
-					printf( "gdt_client_socket error: port=%s, host=%s\n", (char *)gdt_upointer( option->memory_pool,option->port_num_munit ), (char *)gdt_upointer( option->memory_pool,option->host_name_munit ) );
-					break;
-				}
-				gdt_set_sock_option( option );
-				gdt_nonblocking_client(option);
-				break;
-			default:
-				printf( "socket_type error\n" );
-				break;
-		}
-	}while( false );
+			}
+			gdt_set_sock_option( option );
+			gdt_nonblocking_client(option);
+			break;
+		default:
+			printf( "socket_type error\n" );
+			break;
+	}
+
+	if(option->sockid==-1){
+		printf( 
+			"create socket error: port=%s, host=%s\n"
+			, (char *)gdt_upointer( option->memory_pool,option->port_num_munit )
+			, (char *)gdt_upointer( option->memory_pool,option->host_name_munit )
+		);
+	}
+
 	return ( (void *) NULL );
 }
 
@@ -1315,11 +1308,6 @@ void gdt_recv_event(GDT_SOCKET_OPTION *option, GDT_SERVER_CONNECTION_INFO *child
 	else
 	{
 		if (option->socket_type == SOCKET_TYPE_CLIENT_UDP || option->socket_type == SOCKET_TYPE_SERVER_UDP){
-//#ifdef __WINDOWS__
-//#else
-//			struct sockaddr_in* pfrom = (struct sockaddr_in*)&child->sockparam.from;
-//			printf("(%d)%s:%d\n", (int)srlen, inet_ntoa(pfrom->sin_addr), ntohs(pfrom->sin_port));
-//#endif
 			if( 0 != getnameinfo((struct sockaddr *) &child->sockparam.from, child->sockparam.fromlen,child->hbuf, sizeof(child->hbuf), child->sbuf, sizeof(child->sbuf), NI_NUMERICHOST | NI_NUMERICSERV) )
 			{
 				printf("getnameinfo error.\n");
@@ -1360,12 +1348,10 @@ void gdt_recv_event(GDT_SOCKET_OPTION *option, GDT_SERVER_CONNECTION_INFO *child
 			*((char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit)) = '\0';
 			//memset((char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), 0, buffer_size);
 			if( child->sockparam.continue_pos > 0 ){
-				//gdt_sleep(1);
 				if( old_pos >= child->sockparam.continue_pos ){
 					printf("invalid packet\n");
 					break;
 				}
-				// printf("continue_pos : %d, %d, %d\n",(int)child->sockparam.continue_pos,(int)child->sockparam.tmpmsglen,child->sockparam.fin);
 				old_pos = child->sockparam.continue_pos;
 			}
 		}while( child->sockparam.continue_pos > 0 && -1 != child->id );
@@ -1374,9 +1360,6 @@ void gdt_recv_event(GDT_SOCKET_OPTION *option, GDT_SERVER_CONNECTION_INFO *child
 
 void gdt_nonblocking_server(GDT_SOCKET_OPTION *option)
 {
-#ifdef __GDT_DEBUG__
-//	printf("gdt_nonblocking_server: soc4=%d, soc6=%d\n", (int)option->sockid, (int)option->sockid6);
-#endif
 	if (option->socket_type == SOCKET_TYPE_SERVER_UDP)
 	{
 		if (option->maxconnection > 1) {
@@ -1522,9 +1505,6 @@ void gdt_server_update(GDT_SOCKET_OPTION *option)
 
 void gdt_nonblocking_client(GDT_SOCKET_OPTION *option)
 {
-//#ifdef __GDT_DEBUG__
-//	printf("gdt_nonblocking_client: soc4=%d, soc6=%d\n", (int)option->sockid, (int)option->sockid6);
-//#endif
 	if(-1==option->sockid){
 		return;
 	}
@@ -1617,12 +1597,9 @@ void gdt_client_update(GDT_SOCKET_OPTION *option)
 		if (child->id == -1){
 			return;
 		}
-		//memset(&child->sockparam.from,0,sizeof(child->sockparam.from));
 		child = (GDT_SERVER_CONNECTION_INFO*)gdt_offsetpointer(option->memory_pool, option->connection_munit, sizeof(GDT_SERVER_CONNECTION_INFO), 0);
 		child->sockparam.fromlen = sizeof(child->sockparam.from);
-		if ((srlen = recvfrom(option->sockid, (char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), buffer_size, 0, (struct sockaddr *)&child->sockparam.from, &child->sockparam.fromlen)) == -1)
-		//if ((srlen = recvfrom(option->sockid, (char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), buffer_size, 0, NULL, NULL)) == -1)
-		{
+		if ((srlen = recvfrom(option->sockid, (char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), buffer_size, 0, (struct sockaddr *)&child->sockparam.from, &child->sockparam.fromlen)) == -1){
 			if (errno != 0 && errno != EINTR && errno != EAGAIN) {
 				perror("recvfrom");
 			}
@@ -1634,6 +1611,9 @@ void gdt_client_update(GDT_SOCKET_OPTION *option)
 
 int gdt_client_is_connecting(GDT_SOCKET_OPTION *option)
 {
+	if( option->sockid == -1 ){
+		return 0;
+	}
 	if( option->connection_munit == -1 ){
 		return 0;
 	}
@@ -1661,8 +1641,8 @@ int gdt_pre_packetfilter( GDT_SOCKET_OPTION *option, struct GDT_RECV_INFO *rinfo
 	{
 		if( option->socket_type == SOCKET_TYPE_SERVER_UDP || option->socket_type == SOCKET_TYPE_CLIENT_UDP )
 		{
-			psockparam->type		= SOCK_TYPE_NORMAL_UDP;
-			psockparam->c_status	= PROTOCOL_STATUS_OTHER;
+			psockparam->type = SOCK_TYPE_NORMAL_UDP;
+			psockparam->c_status = PROTOCOL_STATUS_OTHER;
 		}
 		else{
 			psockparam->type = SOCK_TYPE_NORMAL_TCP;
@@ -1714,7 +1694,6 @@ uint64_t get_parse_header(GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, 
 		psockparam->maskindex = 32; // max size(32byte)
 		if(header_size<2){
 			psockparam->fin=0;
-			//printf("short header 2\n");
 			break;
 		}
 		psockparam->fin=0; // header[0] >> 7;
@@ -1732,7 +1711,6 @@ uint64_t get_parse_header(GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, 
 		else if(psockparam->ckpayloadlen < 127 ){
 			psockparam->maskindex = 8;
 			if(header_size<4){
-				//printf("short header 4\n");
 				break;
 			}
 			psockparam->payloadlen |= header[2] << 8;
@@ -1741,7 +1719,6 @@ uint64_t get_parse_header(GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, 
 		else{
 			psockparam->maskindex = 14;
 			if(header_size<10){
-				//printf("short header 10\n");
 				break;
 			}
 			psockparam->payloadlen |= (uint64_t)header[2] << 56;
@@ -1783,17 +1760,14 @@ ssize_t gdt_parse_socket_binary( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psock
 			}
 			psockparam->payloadlen = 0;
 			if(GDT_SYSTEM_ERROR==get_parse_header(option, psockparam, u8buf, size)){
-				//printf("get_parse_header error\n");
 				psockparam->payloadlen = -1;
 				break;
 			}
 			if( psockparam->payloadlen >= gdt_usize( option->memory_pool, basebuf_munit ) ){
-				//printf( "payloadlen buffersize over[%"PRIu64"][%zd]\n", psockparam->payloadlen, gdt_usize( option->memory_pool, basebuf_munit ) );
 				psockparam->payloadlen = -1;
 				break;
 			}
 			if( size < psockparam->maskindex ){
-				//printf("shortage packets : %d, %d\n", (int)(size), (int)(psockparam->maskindex));
 				retsize=0;
 				break;
 			}
@@ -1805,7 +1779,6 @@ ssize_t gdt_parse_socket_binary( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psock
 			else{
 				psockparam->payload_type = *( (uint32_t*)(u8buf+psockparam->maskindex-4) );
 			}
-			//memset( msg, 0, gdt_usize( option->memory_pool, basebuf_munit ) );
 		}
 		else{
 			startpos = 0;

@@ -576,7 +576,7 @@ void gdt_lstateout( GDT_MEMORY_POOL* _ppool, const char* path )
 		printf(  "nlink\t%d\n", (int)ps->st_nlink );
 		printf(  "uid\t%d\n", (int)ps->st_uid );
 		printf(  "gid\t%d\n", (int)ps->st_gid );
-		printf(  "size\t%lld\n", ps->st_size );
+		printf(  "size\t%ld\n", ps->st_size );
 #ifdef __WINDOWS__
 		ctime_s(bufa, sizeof(bufa), &ps->st_atime);
 		ctime_s(bufm, sizeof(bufm), &ps->st_mtime);

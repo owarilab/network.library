@@ -198,6 +198,11 @@ int gdt_set_defaultsignal()
 	(void) gdt_set_sigaction( SIGUSR2, SIG_IGN, SA_NODEFER );
 	(void) gdt_set_sigaction( SIGTTIN, SIG_IGN, SA_NODEFER );
 	(void) gdt_set_sigaction( SIGTTOU, SIG_IGN, SA_NODEFER );
+	
+	//(void) gdt_set_sigaction( SIGTERM, SIG_IGN, SA_NODEFER );
+	//(void) gdt_set_sigaction( SIGQUIT, SIG_IGN, SA_NODEFER );
+	//(void) gdt_set_sigaction( SIGTSTP, SIG_IGN, SA_NODEFER );
+	
 	(void) gdt_set_sigaction( SIGINT, gdt_sig_int_handler, SA_NODEFER );
 	(void) gdt_set_sigaction( SIGHUP, gdt_sig_hangup_handler, SA_NODEFER );
 	(void) gdt_set_sigaction( SIGCHLD, gdt_sig_chld_handler, SA_NODEFER );
