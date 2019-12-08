@@ -46,7 +46,7 @@ void gnt_print_argv()
 {
 #ifdef __GDT_DEBUG__
 	int i;
-#ifdef WINDOWS_OS
+#ifdef __WINDOWS__
 #else
 	printf( "pid=%d\n", getpid() );
 #endif
@@ -337,11 +337,11 @@ void gdt_getopt(SYSTEM_SERVER_OPTION* sys_option, const char* hostname, const ch
 	memset( sys_option->pid_file_path, 0, sizeof( sys_option->pid_file_path ) );
 	memset( sys_option->log_file_path, 0, sizeof( sys_option->log_file_path ) );
 	memset( sys_option->execute_user_name, 0, sizeof( sys_option->execute_user_name ) );
-	snprintf( sys_option->hostname, sizeof( sys_option->hostname ) -1, hostname );
-	snprintf( sys_option->portnum, sizeof( sys_option->portnum ) -1, portnum );
-	snprintf( sys_option->pid_file_path, sizeof( sys_option->pid_file_path ) -1, pid_file_path );
-	snprintf( sys_option->log_file_path, sizeof( sys_option->log_file_path ) -1, log_file_path );
-	snprintf( sys_option->execute_user_name, sizeof( sys_option->execute_user_name ) -1, execute_user_name );
+	snprintf( sys_option->hostname, sizeof( sys_option->hostname ) -1, "%s", hostname );
+	snprintf( sys_option->portnum, sizeof( sys_option->portnum ) -1, "%s", portnum );
+	snprintf( sys_option->pid_file_path, sizeof( sys_option->pid_file_path ) -1, "%s", pid_file_path );
+	snprintf( sys_option->log_file_path, sizeof( sys_option->log_file_path ) -1, "%s", log_file_path );
+	snprintf( sys_option->execute_user_name, sizeof( sys_option->execute_user_name ) -1, "%s", execute_user_name );
 	sys_option->inetflag = 0;
 	sys_option->is_daemonize = 0;
 	
@@ -391,6 +391,17 @@ void gdt_getopt(SYSTEM_SERVER_OPTION* sys_option, const char* hostname, const ch
 	}
 #endif
 
+}
+
+void gdt_set_pid(SYSTEM_SERVER_OPTION* sys_option)
+{
+#ifndef __WINDOWS__
+	// pid
+	int64_t pid = (int64_t)getpid();
+	char numstr[32];
+	gdt_itoa(pid, numstr, sizeof(numstr));
+	gdt_fwrite(sys_option->pid_file_path, numstr, gdt_strlen(numstr));
+#endif
 }
 
 void gdt_sleep(int time)

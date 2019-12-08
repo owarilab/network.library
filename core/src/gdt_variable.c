@@ -27,6 +27,44 @@
 
 #include "gdt_variable.h"
 
+size_t gdt_set_cache_alloc_info(CACHE_SERVER_DATA* data, size_t page_size, size_t json_memory_size)
+{
+	data->page_size = page_size;
+	data->key_size = 128;
+	data->hash_base = (data->page_size / (SIZE_KBYTE * 100));
+	if (data->hash_base <= 0) {
+		data->hash_base = 1;
+	}
+	data->cache_base = (data->page_size / (SIZE_KBYTE * 10));
+	if (data->cache_base <= 0) {
+		data->cache_base = 1;
+	}
+	data->hash_size = 8 * data->hash_base;
+	data->cache_size = 8 * data->cache_base;
+	data->chain_base = (data->cache_size / 5000);
+	if (data->chain_base <= 0) {
+		data->chain_base = 1;
+	}
+	data->chain_size = SIZE_MBYTE * data->chain_base;
+	data->array_size = SIZE_MBYTE * data->chain_base * 5;
+	data->alloc_size = data->chain_size + (data->page_size * 2) + SIZE_MBYTE;
+	data->json_element_size = json_memory_size / (data->key_size * 8);
+	return data->alloc_size;
+}
+
+size_t gdt_cache_alloc(CACHE_SERVER_DATA* data)
+{
+	size_t size;
+	if( (size = gdt_initialize_memory_f64( &data->memory_pool, data->alloc_size) ) <= 0 ){
+		return -1;
+	}
+	if(-1==(data->cache_id = gdt_create_cache(data->memory_pool, data->chain_size,data->cache_size, data->page_size,data->hash_size,data->key_size))){
+		gdt_free(data->memory_pool);
+		return -1;
+	}
+	return size;
+}
+
 int32_t gdt_create_cache( GDT_MEMORY_POOL* memory,size_t chain_allocate_size,size_t max_cache_size,size_t page_allocate_size,size_t page_hash_size,size_t max_key_size)
 {
 	int32_t cache_id = gdt_create_munit(memory,sizeof(GDT_CACHE),MEMORY_TYPE_DEFAULT);

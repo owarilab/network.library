@@ -162,21 +162,19 @@ size_t gdt_strlink( char *pmain, size_t mainsize, char *psub, size_t subsize, si
 	size_t s = 0;
 	char *pm = pmain;
 	char *ps = psub;
+	pm += mainsize;
+	if( *ps == '\0' ){
+		return s;
+	}
+	if( mainsize + subsize >= max_size-1 ){
+		printf("gdt_strlink : buffer size over\n");
+		return s;
+	}
 	do{
-		pm += mainsize;
-		if( *ps == '\0' ){
-			break;
-		}
-		if( mainsize + subsize >= max_size-1 ){
-			printf("gdt_strlink : buffer size over\n");
-			break;
-		}
-		do{
-			*(pm++) = *(ps++);
-		}while( ps < ( psub + subsize ) && *ps != '\0' );
-		s = mainsize + ( ps - psub );
-		pmain[s] = '\0';
-	}while( false );
+		*(pm++) = *(ps++);
+	}while( ps < ( psub + subsize ) && *ps != '\0' );
+	s = mainsize + ( ps - psub );
+	pmain[s] = '\0';
 	return s;
 }
 

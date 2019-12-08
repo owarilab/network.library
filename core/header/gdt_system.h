@@ -35,6 +35,7 @@ extern "C"{
 #include "gdt_core.h"
 #include "gdt_memory_allocator.h"
 #include "gdt_string.h"
+#include "gdt_io.h"
 #include <time.h>
 
 #ifndef __WINDOWS__
@@ -121,6 +122,7 @@ int gdt_set_execute_user(SYSTEM_SERVER_OPTION* sys_option);
 
 void gdt_localtime(struct tm* ptm, time_t* ptime );
 void gdt_getopt(SYSTEM_SERVER_OPTION* sys_option, const char* hostname, const char* portnum, const char* pid_file_path, const char* log_file_path, const char* execute_user_name);
+void gdt_set_pid(SYSTEM_SERVER_OPTION* sys_option);
 void gdt_sleep(int time);
 void gdt_initialize_scheduler(SYSTEM_UPDATE_SCHEDULER* scheduler);
 void gdt_update_scheduler(SYSTEM_UPDATE_SCHEDULER* scheduler);

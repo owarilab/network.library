@@ -331,7 +331,7 @@ int gdt_initialize_socket_option(
 	option->user_recv_function			= NULL;
 	option->user_send_function			= NULL;
 	option->recvbuffer_size				= SIZE_KBYTE*16;
-	option->sendbuffer_size				= SIZE_KBYTE*16;
+	option->sendbuffer_size				= SIZE_KBYTE*128;
 	option->msgbuffer_size				= SIZE_KBYTE*16;
 	option->connection_munit			= -1;
 	if( hostname == NULL ){
@@ -721,6 +721,12 @@ ssize_t gdt_send_all(GDT_SOCKET_ID soc, char *buf, size_t size, int flag )
 	{
 		if( ( len = send( soc, ptr, lest, flag ) ) == -1 )
 		{
+#ifdef __WINDOWS__
+			int err = WSAGetLastError();
+			if (err != 0 && WSAGetLastError() != WSAEWOULDBLOCK /*&& WSAGetLastError() != WSA_INVALID_HANDLE*/) {
+				return (-1);
+			}
+#else
 			if (errno == 0) {
 				//gdt_sleep(1);
 			}
@@ -728,6 +734,7 @@ ssize_t gdt_send_all(GDT_SOCKET_ID soc, char *buf, size_t size, int flag )
 			else if( errno != EAGAIN  ){
 				return (-1);
 			}
+#endif
 			else{
 				//gdt_sleep(1);
 			}
@@ -755,6 +762,12 @@ ssize_t gdt_sendto_all(GDT_SOCKET_ID soc, char *buf, size_t size, int flag, stru
 		if( ( len = sendto( soc, ptr, lest, flag, pfrom, fromlen ) ) == -1 )
 		//if( ( len = sendto( soc, ptr, lest, flag, NULL, 0 ) ) == -1 )
 		{
+#ifdef __WINDOWS__
+			int err = WSAGetLastError();
+			if (err != 0 && WSAGetLastError() != WSAEWOULDBLOCK /*&& WSAGetLastError() != WSA_INVALID_HANDLE*/) {
+				return (-1);
+			}
+#else
 			if (errno == 0) {
 				//gdt_sleep(1);
 			}
@@ -762,6 +775,7 @@ ssize_t gdt_sendto_all(GDT_SOCKET_ID soc, char *buf, size_t size, int flag, stru
 			else if (errno != EAGAIN) {
 				return (-1);
 			}
+#endif
 			else {
 				//gdt_sleep(1);
 			}
@@ -1263,6 +1277,7 @@ void gdt_free_socket( GDT_SOCKET_OPTION *option )
 {
 #ifdef __WINDOWS__
 	if( option->sockid > -1 ){
+		shutdown(option->sockid, SD_BOTH);
 		closesocket( option->sockid );
 	}
 	if( option->mode == SOCKET_MODE_THREAD )
@@ -1294,12 +1309,12 @@ void gdt_recv_event(GDT_SOCKET_OPTION *option, GDT_SERVER_CONNECTION_INFO *child
 	else if (srlen == 0) {
 #ifdef __WINDOWS__
 		if (WSAGetLastError() != WSAEWOULDBLOCK) {
-			perror("recv 0byte");
+			//perror("recv 0byte");
 			gdt_close_socket(&child->id, NULL);
 		}
 #else
 		if (errno != 0 && errno != EAGAIN && errno != EWOULDBLOCK){
-			perror("recv 0byte");
+			//perror("recv 0byte");
 		}
 		gdt_close_socket(&child->id, NULL);
 #endif
@@ -1395,7 +1410,7 @@ void gdt_server_update(GDT_SOCKET_OPTION *option)
 		if (-1 == (acc = accept(option->sockid, (struct sockaddr *) &from, &len))) {
 			//if (errno != 0 && errno != EINTR && errno != EAGAIN) {
 #ifdef __WINDOWS__
-			if (errno != 0 && errno != EAGAIN && errno != ENOENT)
+			if (errno != 0 && errno != EAGAIN && errno != ENOENT && WSAGetLastError() != WSAEWOULDBLOCK)
 #else
 			if (errno != 0 && errno != EAGAIN)
 #endif
@@ -1407,7 +1422,7 @@ void gdt_server_update(GDT_SOCKET_OPTION *option)
 			if (-1 == (acc = accept(option->sockid6, (struct sockaddr *) &from, &len))) {
 				//if (errno != 0 && errno != EINTR && errno != EAGAIN) {
 #ifdef __WINDOWS__
-				if (errno != 0 && errno != EAGAIN && errno != ENOENT)
+				if (errno != 0 && errno != EAGAIN && errno != ENOENT && WSAGetLastError() != WSAEWOULDBLOCK)
 #else
 				if (errno != 0 && errno != EAGAIN)
 #endif

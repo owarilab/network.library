@@ -40,10 +40,16 @@ extern "C"{
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #if defined(__LINUX__) || defined(__BSD_UNIX__) || defined(__ANDROID__) || defined(__IOS__)
 #include <sys/mman.h> 
 #endif
 #include <errno.h>
+
+#ifdef __WINDOWS__
+#include <io.h>
+#endif
 
 #define MEMORY_DEBUG 0
 
@@ -68,6 +74,7 @@ extern "C"{
 #define GDT_FIXPOINTER( _ppool, munit_id ) (((uint8_t*)_ppool->memory+(*(uint64_t*)(((uint8_t*)_ppool->memory+_ppool->end)-(_ppool->memory_unit_size_one*(munit_id+1))))))
 #define GDT_PUNIT( _ppool, munit_id ) (GDT_MEMORY_UNIT*)(((uint8_t*)_ppool->memory+_ppool->end)-(_ppool->memory_unit_size_one*(munit_id+1)))
 #define GDT_PUNIT_USIZE( _ppool, munit_id ) (*(uint64_t*)((((uint8_t*)_ppool->memory+_ppool->end)-(_ppool->memory_unit_size_one*(munit_id+1)))+sizeof(uint64_t)))
+#define GDT_PINT32( _ppool, munit_id ) (int32_t*)(GDT_POINTER(_ppool,munit_id)+GDT_PUNIT_USIZE(_ppool,munit_id)-sizeof(int32_t))
 #define GDT_INT32( _ppool, munit_id ) (*(int32_t*)(GDT_POINTER(_ppool,munit_id)+GDT_PUNIT_USIZE(_ppool,munit_id)-sizeof(int32_t)))
 
 #define BYTE_SWAP_BIT16( v ) (v >> 8) | ( (v & 0xff) << 8 )
@@ -144,6 +151,10 @@ typedef struct GDT_MEMORY_POOL{
 	uint8_t endian;
 	uint8_t debug;
 	int mmap_fd;
+#ifdef __WINDOWS__
+	HANDLE h_file;
+	HANDLE h_map;
+#endif
 } GDT_MEMORY_POOL;
 
 typedef struct GDT_MEMORY_UNIT{

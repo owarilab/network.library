@@ -349,6 +349,22 @@ GDT_NODE* gdt_get_json_root( GDT_MEMORY_POOL* _ppool, int32_t json_root_munit )
 	return &workelemlist[0];
 }
 
+int32_t gdt_get_json_root_hash(GDT_MEMORY_POOL* _ppool, int32_t json_root_munit)
+{
+	if (-1 == json_root_munit) {
+		return -1;
+	}
+	GDT_NODE* rootnode = (GDT_NODE*)GDT_POINTER(_ppool, json_root_munit);
+	if (rootnode->pos == 0) {
+		return -1;
+	}
+	GDT_NODE* workelemlist = (GDT_NODE*)GDT_POINTER(_ppool, rootnode->element_munit);
+	if (workelemlist[0].id != ELEMENT_HASH) {
+		return -1;
+	}
+	return workelemlist[0].element_munit;
+}
+
 int32_t gdt_json_decode( GDT_MEMORY_POOL* _ppool, const char* src )
 {
 	int32_t rootnode_munit = -1;

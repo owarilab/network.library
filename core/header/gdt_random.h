@@ -33,6 +33,7 @@ extern "C"{
 #define _GDT_RANDOM_H_
 
 #include "gdt_core.h"
+#include "gdt_system.h"
 #include <time.h>
 
 #if defined(__LINUX__) || defined(__BSD_UNIX__) || defined(__ANDROID__) || defined(__IOS__)

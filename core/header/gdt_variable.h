@@ -39,6 +39,24 @@ extern "C"{
 #include "gdt_chain_array.h"
 #include "gdt_json.h"
 
+typedef struct CACHE_SERVER_DATA
+{
+	size_t page_size;
+	size_t hash_base;
+	size_t cache_base;
+	size_t key_size;
+	size_t hash_size;
+	size_t cache_size;
+	size_t chain_base;
+	size_t chain_size;
+	size_t json_size;
+	size_t array_size;
+	size_t alloc_size;
+	GDT_MEMORY_POOL* memory_pool;
+	int32_t cache_id;
+	int32_t json_element_size;
+} CACHE_SERVER_DATA;
+
 typedef struct GDT_CACHE
 {
 	GDT_MEMORY_POOL* memory;
@@ -63,6 +81,9 @@ typedef struct GDT_CACHE_PAGE
 	GDT_MEMORY_POOL* memory;
 	int32_t hash_id;
 } GDT_CACHE_PAGE;
+
+size_t gdt_set_cache_alloc_info(CACHE_SERVER_DATA* data, size_t page_size, size_t json_memory_size);
+size_t gdt_cache_alloc(CACHE_SERVER_DATA* data);
 
 int32_t gdt_create_cache( GDT_MEMORY_POOL* memory,size_t chain_allocate_size,size_t max_cache_size,size_t page_allocate_size,size_t page_hash_size,size_t max_key_size);
 int32_t gdt_create_storage_cache( const char* store_name, GDT_MEMORY_POOL** pp_memory,size_t max_cache_size,size_t page_allocate_size,size_t page_hash_size,size_t max_key_size);

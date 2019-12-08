@@ -179,6 +179,22 @@ void gdt_add_hash_value( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* n
 	}
 }
 
+void gdt_add_hash_array(GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, int32_t array_id)
+{
+	int32_t namemunit = gdt_make_hash_name(_ppool, h_munit, name);
+	if (namemunit == -1) {
+		return;
+	}
+	int32_t array_munit = gdt_get_hash(_ppool, h_munit, name);
+	if (array_munit != -1) {
+		printf("array exist\n");
+	}
+	GDT_HASH_ELEMENT* is_push = gdt_add_hash(_ppool, h_munit, namemunit, array_id, ELEMENT_ARRAY);
+	if (NULL == is_push) {
+		printf("is_push is NULL\n");
+	}
+}
+
 void gdt_add_hash_array_string( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, const char* value )
 {
 	int32_t namemunit = gdt_make_hash_name( _ppool, h_munit, name );
@@ -430,6 +446,24 @@ char* gdt_get_hash_string( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char*
 		return NULL;
 	}
 	return (char*)GDT_POINTER(_ppool,elm->elm_munit);
+}
+
+int32_t* gdt_get_hash_integer( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname )
+{
+	if( h_munit == -1 ){
+		return NULL;
+	}
+	struct GDT_HASH *hash = (struct GDT_HASH *)GDT_POINTER( _ppool, h_munit );
+	struct GDT_HASH *hashchild = (struct GDT_HASH *)GDT_POINTER( _ppool, hash->hash_munit );
+	uint32_t hashkey = gdt_ihash( hashname, hash->hash_size );
+	GDT_HASH_ELEMENT* elm = gdt_get_hash_core( _ppool, hash, hashchild, hashname, hashkey );
+	if(elm==NULL){
+		return NULL;
+	}
+	if(elm->id != ELEMENT_LITERAL_NUM){
+		return NULL;
+	}
+	return GDT_PINT32(_ppool,elm->elm_munit);
 }
 
 int32_t gdt_get_hash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname )

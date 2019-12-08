@@ -24,9 +24,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
+#pragma warning(disable : 4996)
 #include "gdt_memory_allocator.h"
 
+// 64bit example -> 1024LLU * 1024LLU * 1024LLU * 4LLU
 size_t gdt_initialize_memory( GDT_MEMORY_POOL** _ppool, size_t allocate_size, size_t max_allocate_size, size_t alignment_size, size_t fix_memory_unit, size_t free_memory_unit, size_t min_realloc )
 {
 	size_t memory_size		= 0;
@@ -35,7 +36,7 @@ size_t gdt_initialize_memory( GDT_MEMORY_POOL** _ppool, size_t allocate_size, si
 	size_t memory_unit_one_size = 0;
 	size_t memoryUnitSize = 0;
 	GDT_MEMORY_UNIT* unit;
-	int i;
+	int64_t i;
 	do{
 		allocate_size = GDT_ALIGNUP( allocate_size, alignment_size );
 		if( ( (*_ppool) = ( GDT_MEMORY_POOL * )malloc( sizeof( GDT_MEMORY_POOL ) ) ) == NULL ){
@@ -266,20 +267,159 @@ size_t gdt_initialize_mmapmemory_f( const char* file_name, GDT_MEMORY_POOL** _pp
 	
 	memory_size = (*_ppool)->size;
 #endif // #if defined(__LINUX__) || defined(__BSD_UNIX__)
+#ifdef __WINDOWS__
+	if (((*_ppool) = (GDT_MEMORY_POOL *)malloc(sizeof(GDT_MEMORY_POOL))) == NULL) {
+		printf("_ppool allocate error\n");
+		return 0;
+	}
+	memset((*_ppool), 0, sizeof(GDT_MEMORY_POOL));
+
+	size_t byte_size = 0;
+	size_t max_byte_size = 0;
+	size_t memory_unit_one_size = 0;
+	size_t memoryUnitSize = 0;
+	size_t free_memory_unit = 0;
+	size_t fix_memory_unit = FIX_MUNIT_SIZE;
+	size_t min_realloc = 0;
+	allocate_size = GDT_ALIGNUP(allocate_size, MEMORY_ALIGNMENT_SIZE_BIT_64);
+	byte_size = sizeof(uint8_t) * allocate_size;
+	max_byte_size = sizeof(uint8_t) * allocate_size;
+	if (max_byte_size < byte_size) {
+		max_byte_size = byte_size;
+	}
+	int not_exist = 0;
+	struct stat st;
+	if (stat(file_name, &st) < 0) {
+		not_exist = 1;
+	}
+
+	int fd = open(file_name, O_CREAT | O_RDWR, 0755);
+	if (fd < 0) {
+		printf("open error\n");
+		return 0;
+	}
+
+	if (not_exist == 1) {
+		// make fill file
+		int error = 0;
+		char c = 0;
+		if (0 > (error = _lseeki64(fd, byte_size, SEEK_SET))) {
+			close(fd);
+			printf("lseek error\n");
+			return 0;
+		}
+		if (-1 == write(fd, &c, sizeof(char))) {
+			close(fd);
+			printf("write error\n");
+			return 0;
+		}
+		if (0 > (error = lseek(fd, 0, SEEK_SET))) {
+			close(fd);
+			printf("lseek2 error\n");
+			return 0;
+		}
+	}
+	close(fd);
+
+	DWORD access = GENERIC_READ | GENERIC_WRITE;
+	DWORD open = OPEN_EXISTING;
+	if (INVALID_HANDLE_VALUE == ((*_ppool)->h_file = CreateFile(file_name, access, 0, 0, open, 0, 0))) {
+		printf("CreateFile error : %d\n",GetLastError());
+		return 0;
+	}
+	DWORD map_flag = PAGE_READWRITE;
+	if (0 > ((*_ppool)->h_map = CreateFileMapping((*_ppool)->h_file, 0, map_flag, 0, 0, file_name))) {
+		CloseHandle((*_ppool)->h_file);
+		(*_ppool)->h_file = INVALID_HANDLE_VALUE;
+		printf("CreateFileMapping error\n");
+		return 0;
+	}
+	DWORD view_flag = FILE_MAP_WRITE;
+	if (NULL == ((*_ppool)->memory = MapViewOfFile((*_ppool)->h_map, view_flag, 0, 0, 0))) {
+		CloseHandle((*_ppool)->h_file);
+		(*_ppool)->h_file = INVALID_HANDLE_VALUE;
+		CloseHandle((*_ppool)->h_map);
+		(*_ppool)->h_map = 0;
+		printf("MapViewOfFile error\n");
+		return 0;
+	}
+
+	if (not_exist == 1) {
+		memset((*_ppool)->memory, 0, byte_size);
+	}
+	(*_ppool)->top = 0;
+	(*_ppool)->end = byte_size;
+	(*_ppool)->bottom = byte_size;
+	(*_ppool)->size = byte_size;
+	(*_ppool)->max_size = max_byte_size;
+	(*_ppool)->alignment = MEMORY_ALIGNMENT_SIZE_BIT_64;
+	(*_ppool)->min_realloc = GDT_ALIGNUP(min_realloc, MEMORY_ALIGNMENT_SIZE_BIT_64);
+	(*_ppool)->fix_unit_size = fix_memory_unit;
+	(*_ppool)->unit_size = (free_memory_unit + fix_memory_unit);
+	(*_ppool)->tail_munit = -1;
+	(*_ppool)->lock_munit = -1;
+	(*_ppool)->memory_buf_munit = -1;
+	(*_ppool)->mmap_fd = 0;
+	(*_ppool)->alloc_type = MEMORY_ALLOCATE_TYPE_MMAP;
+	(*_ppool)->endian = gdt_endian();
+	(*_ppool)->debug = MEMORY_DEBUG;
+	memory_unit_one_size = GDT_ALIGNUP(sizeof(GDT_MEMORY_UNIT), MEMORY_ALIGNMENT_SIZE_BIT_64);
+	memoryUnitSize = memory_unit_one_size * (fix_memory_unit + free_memory_unit);
+	(*_ppool)->bottom = (*_ppool)->end - memoryUnitSize;
+	(*_ppool)->memory_unit_size_one = memory_unit_one_size;
+
+	if (not_exist == 1) {
+		int i;
+		GDT_MEMORY_UNIT* unit = NULL;
+		for (i = ((*_ppool)->unit_size - 1); i >= 0; i--) {
+			unit = (GDT_MEMORY_UNIT*)(((uint8_t*)(*_ppool)->memory + (*_ppool)->end) - (memory_unit_one_size * ((*_ppool)->unit_size - i)));
+			gdt_initialize_memory_unit(unit);
+			unit->id = (((*_ppool)->unit_size - 1) - i);
+		}
+		// make memory header
+		int32_t header_size = 56;
+		(*_ppool)->top = header_size;
+		GDT_BYTE_BUFFER buffer;
+		buffer.endian = (*_ppool)->endian;
+		buffer.buffer = (uint8_t*)((*_ppool)->memory);
+		buffer.pos = buffer.buffer;
+		buffer.size = header_size; // 4byte * 14
+		gdt_create_memory_info((*_ppool), &buffer);
+	}
+	else {
+		int32_t* pv = (*_ppool)->memory;
+		(*_ppool)->end = *(pv++);
+		(*_ppool)->top = *(pv++);
+		(*_ppool)->bottom = *(pv++);
+		(*_ppool)->size = *(pv++);
+		(*_ppool)->max_size = *(pv++);
+		(*_ppool)->alignment = *(pv++);
+		(*_ppool)->memory_unit_size_one = *(pv++);
+		(*_ppool)->min_realloc = *(pv++);
+		(*_ppool)->fix_unit_size = *(pv++);
+		(*_ppool)->unit_size = *(pv++);
+		(*_ppool)->tail_munit = *(pv++);
+		(*_ppool)->memory_buf_munit = *(pv++);
+		(*_ppool)->alloc_type = *(pv++);
+		(*_ppool)->endian = *(pv++);
+	}
+
+	memory_size = (*_ppool)->size;
+#endif
 	return memory_size;
 }
 
 int32_t gdt_sync_mmap_memory(GDT_MEMORY_POOL* memory_pool)
 {
+	// make memory header
+	int32_t header_size = 56;
+	GDT_BYTE_BUFFER buffer;
+	buffer.endian = memory_pool->endian;
+	buffer.buffer = (uint8_t*)(memory_pool->memory);
+	buffer.pos = buffer.buffer;
+	buffer.size = header_size; // 4byte * 14
+	gdt_create_memory_info(memory_pool, &buffer);
 #if defined(__LINUX__) || defined(__BSD_UNIX__)
-		// make memory header
-		int32_t header_size = 56;
-		GDT_BYTE_BUFFER buffer;
-		buffer.endian = memory_pool->endian;
-		buffer.buffer = (uint8_t*)(memory_pool->memory);
-		buffer.pos = buffer.buffer;
-		buffer.size = header_size; // 4byte * 14
-		gdt_create_memory_info(memory_pool,&buffer);
 		msync(memory_pool->memory,memory_pool->size,MS_SYNC);
 #endif // #if defined(__LINUX__) || defined(__BSD_UNIX__)
 	return GDT_SYSTEM_OK;
@@ -287,15 +427,15 @@ int32_t gdt_sync_mmap_memory(GDT_MEMORY_POOL* memory_pool)
 
 int32_t gdt_async_mmap_memory(GDT_MEMORY_POOL* memory_pool)
 {
+	// make memory header
+	int32_t header_size = 56;
+	GDT_BYTE_BUFFER buffer;
+	buffer.endian = memory_pool->endian;
+	buffer.buffer = (uint8_t*)(memory_pool->memory);
+	buffer.pos = buffer.buffer;
+	buffer.size = header_size; // 4byte * 14
+	gdt_create_memory_info(memory_pool, &buffer);
 #if defined(__LINUX__) || defined(__BSD_UNIX__)
-		// make memory header
-		int32_t header_size = 56;
-		GDT_BYTE_BUFFER buffer;
-		buffer.endian = memory_pool->endian;
-		buffer.buffer = (uint8_t*)(memory_pool->memory);
-		buffer.pos = buffer.buffer;
-		buffer.size = header_size; // 4byte * 14
-		gdt_create_memory_info(memory_pool,&buffer);
 		msync(memory_pool->memory,memory_pool->size,MS_ASYNC);
 #endif // #if defined(__LINUX__) || defined(__BSD_UNIX__)
 	return GDT_SYSTEM_OK;
@@ -891,6 +1031,12 @@ size_t gdt_free( GDT_MEMORY_POOL* _ppool )
 				}
 				munmap( _ppool->memory, memory_size );
 #endif
+#ifdef __WINDOWS__
+				CloseHandle(_ppool->h_file);
+				_ppool->h_file = INVALID_HANDLE_VALUE;
+				CloseHandle(_ppool->h_map);
+				_ppool->h_map = 0;
+#endif
 			}
 			_ppool->memory = NULL;
 		}
@@ -900,6 +1046,9 @@ size_t gdt_free( GDT_MEMORY_POOL* _ppool )
 		else{
 #if defined(__LINUX__) || defined(__BSD_UNIX__)
 			munmap(_ppool, sizeof( GDT_MEMORY_POOL ) );
+#endif
+#ifdef __WINDOWS__
+			free(_ppool);
 #endif
 		}
 		_ppool = NULL;
@@ -1046,11 +1195,11 @@ void gdt_memory_info( GDT_MEMORY_POOL* _ppool )
 	printf(  "# memory info\n");
 	printf(  "#############################################################\n");
 	freeSize = ( ( _ppool->bottom - _ppool->top ) );
-	printf(  "total : %ld Byte\n", _ppool->size );
+	printf(  "total : %zd Byte\n", _ppool->size );
 	printf(  "use   : %zd Byte\n", _ppool->size - freeSize );
 	printf(  "free  : %zd Byte\n", freeSize );
 	printf(  "units : %ld\n", _ppool->unit_size );
-	printf(  "max size : %ld Byte\n", _ppool->max_size );
+	printf(  "max size : %zd Byte\n", _ppool->max_size );
 	printf(  "memory top = %p\n", ( (uint8_t*)_ppool->memory ) );
 	printf(  "memory end = %p\n", ( (uint8_t*)_ppool->memory + _ppool->size ) );
 	printf(  "memory freetop = %p\n", ( (uint8_t*)_ppool->memory + _ppool->top ) );
