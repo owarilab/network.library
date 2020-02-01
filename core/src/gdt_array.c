@@ -123,7 +123,7 @@ int32_t gdt_resize_array( GDT_MEMORY_POOL* _ppool, int32_t munit )
 		GDT_ARRAY* parray = (GDT_ARRAY*)GDT_POINTER( _ppool, munit );
 		if( parray->len >= parray->max_size )
 		{
-			int i;
+			size_t i;
 			size_t allocsize = parray->max_size;
 			GDT_ARRAY_ELEMENT* elm;
 			int32_t tmpmunit = gdt_create_munit( _ppool, sizeof( GDT_ARRAY_ELEMENT ) * ( parray->max_size + allocsize ), MEMORY_TYPE_DEFAULT );

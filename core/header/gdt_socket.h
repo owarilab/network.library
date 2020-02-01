@@ -281,6 +281,8 @@ int gdt_set_block(GDT_SOCKET_ID fd, int flag );
 int gdt_get_sockaddr_info( GDT_SOCKET_OPTION *option, struct sockaddr_storage *saddr, socklen_t *addr_len );
 GDT_SOCKET_ID gdt_server_socket( GDT_SOCKET_OPTION *option, int is_ipv6 );
 GDT_SOCKET_ID gdt_client_socket( GDT_SOCKET_OPTION *option );
+GDT_SOCKET_ID gdt_wait_client_socket(GDT_SOCKET_ID sock, GDT_SOCKET_OPTION *option);
+
 int gdt_check_socket_error(GDT_SOCKET_ID sock);
 void gdt_free_addrinfo(GDT_SOCKET_OPTION* option);
 void gdt_disconnect( GDT_SOCKPARAM *psockparam );

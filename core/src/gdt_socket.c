@@ -992,6 +992,7 @@ GDT_SOCKET_ID gdt_server_socket( GDT_SOCKET_OPTION *option, int is_ipv6 )
 
 GDT_SOCKET_ID gdt_client_socket( GDT_SOCKET_OPTION *option )
 {
+	option->is_connecting = 0;
 	GDT_SOCKET_ID sock = -1;
 	char nbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
 	struct addrinfo hints;
@@ -1051,94 +1052,174 @@ GDT_SOCKET_ID gdt_client_socket( GDT_SOCKET_OPTION *option )
 		}
 	}
 
-	do{
-		if( option->t_sec <= 0 && option->t_usec <= 0 )
+	if (option->t_sec <= 0 && option->t_usec <= 0)
+	{
+		if (connect(sock, option->addr->ai_addr, option->addr->ai_addrlen) == -1) {
+			gdt_close_socket(&sock, "connect");
+			freeaddrinfo(option->addr);
+			return sock;
+		}
+		if (-1 == gdt_check_socket_error(sock))
 		{
-			if( connect( sock, option->addr->ai_addr, option->addr->ai_addrlen ) == -1 ){
-				gdt_close_socket( &sock, "connect" );
-				freeaddrinfo( option->addr );
-				break;
-			}
-			if(-1 == gdt_check_socket_error(sock))
-			{
-				gdt_close_socket( &sock, "connect" );
-				freeaddrinfo( option->addr );
-				break;
-			}
-			freeaddrinfo( option->addr );
+			gdt_close_socket(&sock, "connect");
+			freeaddrinfo(option->addr);
+			return sock;
 		}
-		else{
-			int width;
-			struct timeval timeout;
-			fd_set mask, write_mask, read_mask;
-			int connectSuccess = false;
-			( void ) gdt_set_block( sock, 0 );
-			if( connect( sock, option->addr->ai_addr, option->addr->ai_addrlen ) == -1 )
-			{
+		freeaddrinfo(option->addr);
+		return sock;
+	}
+
+
+	do {
+		int width;
+		struct timeval timeout;
+		fd_set mask, write_mask, read_mask;
+		int connectSuccess = false;
+		(void)gdt_set_block(sock, 0);
+		if (connect(sock, option->addr->ai_addr, option->addr->ai_addrlen) == -1)
+		{
 #ifdef __WINDOWS__
-				int err = WSAGetLastError();
-				if (err != 0 && err != WSAEWOULDBLOCK)
+			int err = WSAGetLastError();
+			if (err != 0 && err != WSAEWOULDBLOCK)
 #else
-				if( errno != EINPROGRESS && errno != EINTR )
+			if (errno != EINPROGRESS && errno != EINTR)
 #endif
-				{
-					gdt_close_socket( &sock, "select" );
-					freeaddrinfo( option->addr );
-					break;
-				}
-			}
-			else{
-				( void ) gdt_set_block( sock, 1 );
-				freeaddrinfo( option->addr );
+			{
+				gdt_close_socket(&sock, "select");
+				freeaddrinfo(option->addr);
 				break;
 			}
-			width = 0;
-			FD_ZERO( &mask );
-			FD_SET( sock, &mask );
-			width = (int)(sock + 1);
-			timeout.tv_sec = option->t_sec;
-			timeout.tv_usec = option->t_usec;
-			for(;;)
+		}
+		else {
+			(void)gdt_set_block(sock, 1);
+			freeaddrinfo(option->addr);
+			break;
+		}
+		width = 0;
+		FD_ZERO(&mask);
+		FD_SET(sock, &mask);
+		width = (int)(sock + 1);
+		timeout.tv_sec = option->t_sec;
+		timeout.tv_usec = option->t_usec;
+		for (;;)
+		{
+			write_mask = mask;
+			read_mask = mask;
+			fd_set* pwrite = &write_mask;
+			if (option->wait_read == 1) {
+				pwrite = NULL;
+			}
+			switch (select(width, &read_mask, pwrite, NULL, &timeout))
 			{
-				write_mask = mask;
-				read_mask = mask;
-				fd_set* pwrite=&write_mask;
-				if(option->wait_read==1){
-					pwrite=NULL;
-				}
-				switch( select( width, &read_mask, pwrite, NULL, &timeout ) )
+			case -1:
+				if (errno != EINTR)
 				{
-					case -1:
-						if( errno != EINTR )
-						{
-							gdt_close_socket( &sock, "select" );
-							freeaddrinfo( option->addr );
-						}
-						break;
-					case 0:
-						gdt_close_socket( &sock, "select:timeout" );
-						freeaddrinfo( option->addr );
-						break;
-					default:
-						if( ( pwrite != NULL && FD_ISSET( sock, pwrite ) ) || FD_ISSET( sock, &read_mask ) )
-						{
-							if(-1 == gdt_check_socket_error(sock))
-							{
-								gdt_close_socket( &sock, "connect" );
-							} else{
-								(void) gdt_set_block( sock, 1 );
-								connectSuccess = true;
-							}
-							freeaddrinfo( option->addr );
-						}
-						break;
+					gdt_close_socket(&sock, "select");
+					freeaddrinfo(option->addr);
 				}
-				if( -1 == sock || connectSuccess == true ){
-					break;
+				break;
+			case 0:
+				gdt_close_socket(&sock, "select:timeout");
+				freeaddrinfo(option->addr);
+				break;
+			default:
+				if ((pwrite != NULL && FD_ISSET(sock, pwrite)) || FD_ISSET(sock, &read_mask))
+				{
+					if (-1 == gdt_check_socket_error(sock))
+					{
+						gdt_close_socket(&sock, "connect");
+					}
+					else {
+						(void)gdt_set_block(sock, 1);
+						connectSuccess = true;
+					}
+					freeaddrinfo(option->addr);
 				}
+				break;
+			}
+			if (-1 == sock || connectSuccess == true) {
+				break;
 			}
 		}
-	}while( false );
+	} while (false);
+
+	return sock;
+}
+
+GDT_SOCKET_ID gdt_wait_client_socket(GDT_SOCKET_ID sock,GDT_SOCKET_OPTION *option)
+{
+	do {
+		int width;
+		struct timeval timeout;
+		fd_set mask, write_mask, read_mask;
+		int connectSuccess = false;
+		(void)gdt_set_block(sock, 0);
+		if (connect(sock, option->addr->ai_addr, option->addr->ai_addrlen) == -1)
+		{
+#ifdef __WINDOWS__
+			int err = WSAGetLastError();
+			if (err != 0 && err != WSAEWOULDBLOCK)
+#else
+			if (errno != EINPROGRESS && errno != EINTR)
+#endif
+			{
+				gdt_close_socket(&sock, "select");
+				freeaddrinfo(option->addr);
+				break;
+			}
+		}
+		else {
+			(void)gdt_set_block(sock, 1);
+			freeaddrinfo(option->addr);
+			break;
+		}
+		width = 0;
+		FD_ZERO(&mask);
+		FD_SET(sock, &mask);
+		width = (int)(sock + 1);
+		timeout.tv_sec = option->t_sec;
+		timeout.tv_usec = option->t_usec;
+		for (;;)
+		{
+			write_mask = mask;
+			read_mask = mask;
+			fd_set* pwrite = &write_mask;
+			if (option->wait_read == 1) {
+				pwrite = NULL;
+			}
+			switch (select(width, &read_mask, pwrite, NULL, &timeout))
+			{
+			case -1:
+				if (errno != EINTR)
+				{
+					gdt_close_socket(&sock, "select");
+					freeaddrinfo(option->addr);
+				}
+				break;
+			case 0:
+				gdt_close_socket(&sock, "select:timeout");
+				freeaddrinfo(option->addr);
+				break;
+			default:
+				if ((pwrite != NULL && FD_ISSET(sock, pwrite)) || FD_ISSET(sock, &read_mask))
+				{
+					if (-1 == gdt_check_socket_error(sock))
+					{
+						gdt_close_socket(&sock, "connect");
+					}
+					else {
+						(void)gdt_set_block(sock, 1);
+						connectSuccess = true;
+					}
+					freeaddrinfo(option->addr);
+				}
+				break;
+			}
+			if (-1 == sock || connectSuccess == true) {
+				break;
+			}
+		}
+	} while (false);
 	return sock;
 }
 
@@ -1299,6 +1380,7 @@ void gdt_free_socket( GDT_SOCKET_OPTION *option )
 	}
 #endif
 	option->sockid = -1;
+	option->is_connecting = 0;
 }
 
 void gdt_recv_event(GDT_SOCKET_OPTION *option, GDT_SERVER_CONNECTION_INFO *child, socklen_t srlen)
@@ -1584,7 +1666,9 @@ void gdt_client_update(GDT_SOCKET_OPTION *option)
 			}
 			if(-1 == srlen){
 #ifdef __WINDOWS__
-				if (WSAGetLastError() != WSAEWOULDBLOCK) {
+				int error_id = WSAGetLastError();
+				if (error_id != WSAEWOULDBLOCK) {
+					printf("error : %d\n",error_id);
 					perror("recv");
 					gdt_close_socket(&child->id, NULL);
 				}
