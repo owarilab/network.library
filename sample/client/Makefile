@@ -7,7 +7,10 @@ INCDIR  = -I ../../core/header
 LIBA = ../../core/libgdt_core.a
 MYSOCKETOBJGROUP = main.o $(LIBA)
 
-build: $(PROGRAM)
+build: lib $(PROGRAM)
+
+lib:
+	cd ../../core/src && make 
 
 $(PROGRAM): $(MYSOCKETOBJGROUP)
 	$(CC) $(CFLAG) $(LIBDIR) $(INCDIR) -o $(PROGRAM) $(MYSOCKETOBJGROUP)
@@ -17,5 +20,6 @@ main.o: main.c
 
 .PHONY: clean
 clean: 
+	cd ../../core/src && make clean
 	rm -f $(PROGRAM) 
 	rm -f ./*.o
