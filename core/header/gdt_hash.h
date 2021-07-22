@@ -80,12 +80,9 @@ GDT_HASH_ELEMENT* gdt_add_hash_string( GDT_MEMORY_POOL* _ppool, int32_t h_munit,
 void gdt_add_hash_value_kstring( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, int32_t data_munit, int32_t id );
 void gdt_add_hash_emptystring( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, size_t string_size );
 int32_t gdt_move_hash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname_from, const char* hashname_to );
-
 int32_t gdt_remove_hash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname );
-
 char* gdt_get_hash_string( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname );
 int32_t* gdt_get_hash_integer( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname );
-
 int32_t gdt_get_hash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname );
 int32_t gdt_get_hash_fix_ihash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname, uint32_t hashkey );
 GDT_HASH_ELEMENT* gdt_get_hash_core( GDT_MEMORY_POOL* _ppool, struct GDT_HASH *hash, GDT_HASH *hashchild, const char* hashname, uint32_t hashkey );
@@ -95,7 +92,6 @@ int32_t gdt_get_hash_name( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char*
 int32_t gdt_get_hash_id( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname );
 GDT_HASH_ELEMENT* gdt_get_hash_element( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname );
 int32_t gdt_hash_length( GDT_MEMORY_POOL* _ppool, int32_t h_munit );
-
 int32_t gdt_init_hash_foreach( GDT_MEMORY_POOL* _ppool, int32_t h_munit, GDT_HASH_FOREACH* hf );
 GDT_HASH_ELEMENT* gdt_hash_foreach( GDT_MEMORY_POOL* _ppool, GDT_HASH_FOREACH* hf );
 

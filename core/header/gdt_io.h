@@ -58,7 +58,6 @@ int gdt_finit( GDT_FILE_INFO* info);
 int gdt_fopen( char* file_name, char* mode, GDT_FILE_INFO* info );
 int gdt_fwrite2( GDT_FILE_INFO* info, char* write_buffer, size_t write_buffer_size );
 int gdt_fclose( GDT_FILE_INFO* info );
-
 int gdt_fget_info( char* file_name, GDT_FILE_INFO* info );
 int gdt_fputchar( FILE* f );
 int gdt_fputchar_line( FILE* f, uint32_t start, uint32_t line );

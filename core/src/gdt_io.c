@@ -248,7 +248,11 @@ size_t gdt_fread( char* file_name, char* dest, size_t size )
 		}
 
 		if (st.st_size >= size) {
+#ifdef __WINDOWS__
+			printf("[gdt_fread_bin] buffer size over %ld , %zd\n", st.st_size, size);
+#else
 			printf("[gdt_fread_bin] buffer size over %zd , %zd\n", st.st_size, size);
+#endif
 			fclose( f );
 			break;
 		}
@@ -530,7 +534,7 @@ int32_t gdt_lstate( GDT_MEMORY_POOL* _ppool, const char* path )
 	int32_t status_munit = -1;
 	struct stat* ps;
 	do{
-		status_munit = gdt_create_munit( _ppool, sizeof(struct stat), MEMORY_TYPE_DEFAULT );
+		status_munit = gdt_create_memory_block( _ppool, sizeof(struct stat) );
 		ps = (struct stat*)gdt_upointer( _ppool, status_munit );
 		if( ps == NULL ){
 			printf( "[gdt_lstate]gdt_upointer error\n" );
@@ -738,7 +742,7 @@ int32_t gdt_readlink( GDT_MEMORY_POOL* _ppool, const char* path )
 {
 	int32_t muPathBuffer = -1;
 	do{
-		muPathBuffer = gdt_create_munit( _ppool, MAXPATHLEN, MEMORY_TYPE_DEFAULT );
+		muPathBuffer = gdt_create_memory_block( _ppool, MAXPATHLEN );
 		char* pbuf = (char*)gdt_upointer( _ppool, muPathBuffer );
 		if( pbuf == NULL ){
 			printf( "[gdt_readlink]gdt_upointer error\n" );

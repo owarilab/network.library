@@ -33,12 +33,12 @@ int32_t gdt_create_hash( GDT_MEMORY_POOL* _ppool, size_t hlen )
 	if( hlen <= 0 ){
 		return -1;
 	}
-	if( -1 == (h_munit = gdt_create_munit( _ppool, sizeof( struct GDT_HASH ), MEMORY_TYPE_DEFAULT )) ){
+	if( -1 == (h_munit = gdt_create_memory_block( _ppool, sizeof( struct GDT_HASH ) )) ){
 		return -1;
 	}
 	GDT_HASH *hash = (struct GDT_HASH *)GDT_POINTER( _ppool, h_munit );
 	hash->hash_size = hlen;
-	hash->hash_munit = gdt_create_munit( _ppool, sizeof( struct GDT_HASH ) * hlen, MEMORY_TYPE_DEFAULT );
+	hash->hash_munit = gdt_create_memory_block( _ppool, sizeof( struct GDT_HASH ) * hlen );
 	if( -1 == hash->hash_munit ){
 		return -1;
 	}
@@ -69,7 +69,7 @@ GDT_HASH_ELEMENT* gdt_add_hash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, int32_
 	hashchild = (struct GDT_HASH *)GDT_POINTER( _ppool, hash->hash_munit );
 	if( -1 == hashchild[hashkey].hash_munit )
 	{
-		if( -1 == (hashchild[hashkey].hash_munit = gdt_create_munit( _ppool, sizeof( struct GDT_HASH_ELEMENT ) * GDT_HASH_ELEMENT_SIZE, MEMORY_TYPE_DEFAULT ))){
+		if( -1 == (hashchild[hashkey].hash_munit = gdt_create_memory_block( _ppool, sizeof( struct GDT_HASH_ELEMENT ) * GDT_HASH_ELEMENT_SIZE ))){
 			return is_push;
 		}
 		hashchild[hashkey].hash_size = GDT_HASH_ELEMENT_SIZE;
@@ -114,7 +114,7 @@ GDT_HASH_ELEMENT* gdt_add_hash( GDT_MEMORY_POOL* _ppool, int32_t h_munit, int32_
 		int32_t resize_munit = -1;
 		size_t resize = hashchild[hashkey].hash_size * 2;
 		//printf("resize hash : %d -> %d\n",(int)(hashchild[hashkey].hash_size),(int)(resize));
-		if( -1 == (resize_munit = gdt_create_munit( _ppool, sizeof( struct GDT_HASH_ELEMENT ) * resize, MEMORY_TYPE_DEFAULT ))){
+		if( -1 == (resize_munit = gdt_create_memory_block( _ppool, sizeof( struct GDT_HASH_ELEMENT ) * resize ))){
 			return is_push;
 		}
 		hashelement = (struct GDT_HASH_ELEMENT*)GDT_POINTER( _ppool, resize_munit );
@@ -151,7 +151,7 @@ int32_t gdt_make_hash_name( GDT_MEMORY_POOL* _ppool, int32_t h_munit,const char*
 {
 	int32_t name_munit = gdt_get_hash_name( _ppool, h_munit, name );
 	if( name_munit == -1 ){
-		if( -1 == (name_munit = gdt_create_munit( _ppool, strlen( name )+1, MEMORY_TYPE_DEFAULT ))){
+		if( -1 == (name_munit = gdt_create_memory_block( _ppool, strlen( name )+1 ))){
 			return -1;
 		}
 		char* pbuf = (char*)GDT_POINTER( _ppool, name_munit );
@@ -168,7 +168,7 @@ void gdt_add_hash_value( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const char* n
 	if( namemunit == -1 ){
 		return;
 	}
-	if( -1 == (datamunit = gdt_create_munit( _ppool, strlen( value )+1, MEMORY_TYPE_DEFAULT ))){
+	if( -1 == (datamunit = gdt_create_memory_block( _ppool, strlen( value )+1 ))){
 		return;
 	}
 	pbuf = (char*)GDT_POINTER( _ppool, datamunit );
@@ -248,13 +248,13 @@ GDT_HASH_ELEMENT* gdt_add_hash_binary( GDT_MEMORY_POOL* _ppool, int32_t h_munit,
 	}
 	int32_t datamunit = gdt_get_hash( _ppool, h_munit, name );
 	if( datamunit == -1 ){
-		if( -1 == ( datamunit = gdt_create_munit( _ppool, size, MEMORY_TYPE_DEFAULT ) ) ){
+		if( -1 == ( datamunit = gdt_create_memory_block( _ppool, size ) ) ){
 			return NULL;
 		}
 	}
 	else{
 		if( gdt_usize(_ppool,datamunit) < size ){
-			if( -1 == ( datamunit = gdt_create_munit( _ppool, size, MEMORY_TYPE_DEFAULT ) ) ){
+			if( -1 == ( datamunit = gdt_create_memory_block( _ppool, size ) ) ){
 				return NULL;
 			}
 		}
@@ -275,7 +275,7 @@ GDT_HASH_ELEMENT* gdt_add_hash_integer( GDT_MEMORY_POOL* _ppool, int32_t h_munit
 	}
 	int32_t datamunit = gdt_get_hash( _ppool, h_munit, name );
 	if( datamunit == -1 ){
-		if( -1 == ( datamunit = gdt_create_munit( _ppool, NUMERIC_BUFFER_SIZE, MEMORY_TYPE_DEFAULT ) ) ){
+		if( -1 == ( datamunit = gdt_create_memory_block( _ppool, NUMERIC_BUFFER_SIZE ) ) ){
 			return NULL;
 		}
 	}
@@ -290,7 +290,7 @@ GDT_HASH_ELEMENT* gdt_add_hash_integer( GDT_MEMORY_POOL* _ppool, int32_t h_munit
 void gdt_add_hash_integer_kint( GDT_MEMORY_POOL* _ppool, int32_t h_munit, int32_t name_munit, int32_t value )
 {
 	int32_t datamunit;
-	if( -1 == ( datamunit = gdt_create_munit( _ppool, NUMERIC_BUFFER_SIZE, MEMORY_TYPE_DEFAULT ) ) ){
+	if( -1 == ( datamunit = gdt_create_memory_block( _ppool, NUMERIC_BUFFER_SIZE ) ) ){
 		return;
 	}
 	size_t data_size = gdt_usize(_ppool,datamunit);
@@ -312,7 +312,7 @@ GDT_HASH_ELEMENT* gdt_add_hash_string( GDT_MEMORY_POOL* _ppool, int32_t h_munit,
 	int32_t datamunit = gdt_get_hash( _ppool, h_munit, name );
 	size_t data_size = 0;
 	if( datamunit == -1 ){
-		if( -1 == ( datamunit = gdt_create_munit( _ppool, strlen( value )+1, MEMORY_TYPE_DEFAULT ) ) ){
+		if( -1 == ( datamunit = gdt_create_memory_block( _ppool, strlen( value )+1 ) ) ){
 			return NULL;
 		}
 		data_size = gdt_usize( _ppool, datamunit );
@@ -321,7 +321,7 @@ GDT_HASH_ELEMENT* gdt_add_hash_string( GDT_MEMORY_POOL* _ppool, int32_t h_munit,
 		size_t size = strlen( value )+1;
 		data_size = gdt_usize( _ppool, datamunit );
 		if( data_size < size ){
-			if( -1 == ( datamunit = gdt_create_munit( _ppool, strlen( value )+1, MEMORY_TYPE_DEFAULT ) ) ){
+			if( -1 == ( datamunit = gdt_create_memory_block( _ppool, strlen( value )+1 ) ) ){
 				return NULL;
 			}
 		}
@@ -341,7 +341,7 @@ void gdt_add_hash_emptystring( GDT_MEMORY_POOL* _ppool, int32_t h_munit, const c
 	if( namemunit == -1 ){
 		return;
 	}
-	if( -1 == ( datamunit = gdt_create_munit( _ppool, string_size, MEMORY_TYPE_DEFAULT ) ) ){
+	if( -1 == ( datamunit = gdt_create_memory_block( _ppool, string_size ) ) ){
 		return;
 	}
 	pbuf = (char*)GDT_POINTER( _ppool, datamunit );

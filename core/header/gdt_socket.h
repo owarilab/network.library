@@ -80,15 +80,13 @@ typedef int GDT_SOCKET_ID;
 
 // status
 #define PROTOCOL_STATUS_DEFAULT 0
-#define PROTOCOL_STATUS_WEBSOCKET_SENDHANDSHAKE 1
-#define PROTOCOL_STATUS_WEBSOCKET_RECVHANDSHAKEOK 2
 #define PROTOCOL_STATUS_HTTP 3
 #define PROTOCOL_STATUS_OTHER 10
 #define PROTOCOL_STATUS_DISCONNECT 100
 
 // socket type
 #define SOCK_TYPE_NORMAL_TCP 1		// tcp socket
-#define SOCK_TYPE_NORMAL_UDP 4		// udp socket
+#define SOCK_TYPE_NORMAL_UDP 2		// udp socket
 
 // protocol
 #define PROTOCOL_PLAIN 1			// plane
@@ -101,8 +99,13 @@ typedef struct GDT_SOCKPARAM
 	int32_t c_status;				// status( ROTOCOL_STATUS_* )
 	GDT_SOCKET_ID acc;				// client id
 	int32_t type;					// socket type( SOCK_TYPE_* )
+	struct sockaddr_in addr;		// UDP addr
+	struct sockaddr_storage from;	// UDP from
+	socklen_t fromlen;				// UDP from size
+	int32_t buf_munit;				// socket buffer
+
+	// protocol parameter
 	int phase;						// connect phase( SOCK_PHASE_* )
-	uint8_t ws_msg_mode;			// ( 1 : text, 2 : binary )
 	uint8_t fin;					// FIN flag( 1:finish )
 	uint8_t rsv;					// RSV flag
 	uint8_t opcode;					// opcode( 0:connection, 1:test, 2:binary, 3-7reserved for further, 8:close, 9:ping, a:pong b-f:reserved for further )
@@ -116,10 +119,6 @@ typedef struct GDT_SOCKPARAM
 	uint32_t appdata32bit;			// 32bit mask
 	int8_t tmpbitsift;				// tmp mask
 	size_t continue_pos;
-	int32_t buf_munit;				// socket buffer
-	struct sockaddr_in addr;		// UDP addr
-	struct sockaddr_storage from;	// UDP from
-	socklen_t fromlen;				// UDP from size
 	uint8_t header[64]; // header byte
 	int32_t header_size; 
 } GDT_SOCKPARAM;
@@ -218,7 +217,6 @@ typedef struct GDT_SOCKET_OPTION
 	GDT_MEMORY_POOL* memory_pool;			// memory pool
 	GDT_MEMORY_POOL* mmap_memory_pool;		// mmap memory pool
 	void* application_data;
-	int is_connecting;
 	struct addrinfo *addr;
 } GDT_SOCKET_OPTION;
 
@@ -306,7 +304,7 @@ ssize_t gdt_parse_socket_binary( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psock
 uint64_t get_parse_header(GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, uint8_t* u8buf, size_t size);
 uint32_t gdt_make_size_header(uint8_t* head_ptr,ssize_t size);
 int32_t gdt_make_message_buffer(GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, size_t size);
-size_t gdt_make_msg( GDT_SOCKET_OPTION* option,GDT_SOCKPARAM *psockparam, void* sendbin, const char* msg, ssize_t size, uint32_t payload_type );
+size_t gdt_make_msg( GDT_SOCKET_OPTION* option,GDT_SOCKPARAM *psockparam, void* sendbin, const char* msg, ssize_t size, uint32_t payload_type,int is_binary );
 ssize_t gdt_send_msg( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, const char* msg, ssize_t size, uint32_t payload_type );
 size_t gdt_make_udpmsg( void* sendbin, const char* msg, ssize_t size, uint32_t payload_type );
 ssize_t gdt_send_udpmsg( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, const char* msg, ssize_t size, uint32_t payload_type, struct sockaddr *pfrom, socklen_t fromlen );

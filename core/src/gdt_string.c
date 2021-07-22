@@ -68,16 +68,14 @@ int gdt_itoa( int32_t value, char* target, size_t size )
 
 int32_t gdt_find_char( char* target, size_t target_size, char delimiter_ch )
 {
-	int32_t index = -1;
 	char* ps = target;
 	while( *ps != '\0' ){
 		if( *ps == delimiter_ch ){
-			index = ps - target;
-			break;
+			return ps - target;
 		}
 		++ps;
 	}
-	return index;
+	return -1;
 }
 
 char* gdt_readline( char* buf, size_t buffer_size, char* target, char delimiter_ch )
@@ -86,20 +84,17 @@ char* gdt_readline( char* buf, size_t buffer_size, char* target, char delimiter_
 	if( buf == NULL || target == NULL ){
 		return target;
 	}
-	while( (*target) != '\r' && (*target) != '\n' && (*target) != '\0' )
+	while( (*target) != '\0' )
 	{
 		if( buf - bufstart >= buffer_size -1 ){
 			printf("gdt_readline : buffer size over\n");
 			break;
 		}
-		if( (*target) == delimiter_ch )
-		{
+		if( (*target) == delimiter_ch ){
 			target++;
 			break;
 		}
-		(*buf) = (*target);
-		buf++;
-		target++;
+		*(buf++) = *(target++);
 	}
 	(*buf) = '\0';
 	if( (*target) == '\r' ){ target++; }
@@ -107,7 +102,32 @@ char* gdt_readline( char* buf, size_t buffer_size, char* target, char delimiter_
 	return target;
 }
 
-char* gdt_readdelimiter( char* buf, size_t buffer_size,char* target, char delimiter_ch )
+char* gdt_read_line_delimiter( char* buf, size_t buffer_size,char* target, char delimiter_ch )
+{
+	char *bufstart = buf;
+	if( buf == NULL || target == NULL ){
+		return target;
+	}
+	while( (*target) != '\r' && (*target) != '\n' && (*target) != '\0' )
+	{
+		if( buf - bufstart >= buffer_size -1 ){
+			printf("gdt_read_line_delimiter : buffer size over\n");
+			break;
+		}
+		if( (*target) == delimiter_ch )
+		{
+			target++;
+			break;
+		}
+		*(buf++) = *(target++);
+	}
+	(*buf) = '\0';
+	if( (*target) == '\r' ){ target++; }
+	if( (*target) == '\n' ){ target++; }
+	return target;
+}
+
+char* gdt_read_delimiter( char* buf, size_t buffer_size,char* target, char delimiter_ch )
 {
 	char *bufstart = buf;
 	if( buf == NULL || target == NULL ){
@@ -115,7 +135,7 @@ char* gdt_readdelimiter( char* buf, size_t buffer_size,char* target, char delimi
 	}
 	while( (*target) != '\0' ){
 		if( buf - bufstart >= buffer_size -1 ){
-			printf("gdt_readline : buffer size over\n");
+			printf("gdt_read_delimiter : buffer size over\n");
 			break;
 		}
 		if( (*target) == delimiter_ch ){

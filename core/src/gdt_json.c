@@ -34,7 +34,7 @@ int32_t gdt_json_encode( GDT_MEMORY_POOL* _ppool, GDT_NODE* node, size_t buf_siz
 	GDT_NODE* childnode;
 	GDT_NODE* workelemlist;
 	do{
-		if( 0 >= ( buf_munit = gdt_create_munit( _ppool, sizeof( char ) * buf_size, MEMORY_TYPE_DEFAULT ) ) ){
+		if( -1 == ( buf_munit = gdt_create_memory_block( _ppool, sizeof( char ) * buf_size ) ) ){
 			break;
 		}
 		if( node->element_munit == -1 )

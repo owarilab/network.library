@@ -367,7 +367,6 @@ int gdt_initialize_socket_option(
 	option->memory_pool = memory_pool;
 	option->mmap_memory_pool = mmap_memory_pool;
 	option->application_data = NULL;
-	option->is_connecting = 0;
 	option->addr = NULL;
 #ifdef __WINDOWS__
 	result = WSAStartup( MAKEWORD( 2, 2 ), &option->wsdata );
@@ -469,7 +468,6 @@ void gdt_init_socket_param( GDT_SOCKPARAM *psockparam )
 	psockparam->acc					= -1;
 	psockparam->type				= 0;
 	psockparam->phase				= 0;
-	psockparam->ws_msg_mode			= 1;// // ( 1: text, 2 : binary )
 	psockparam->fin					= 1;
 	psockparam->rsv					= 0;
 	psockparam->opcode				= 0;
@@ -992,7 +990,6 @@ GDT_SOCKET_ID gdt_server_socket( GDT_SOCKET_OPTION *option, int is_ipv6 )
 
 GDT_SOCKET_ID gdt_client_socket( GDT_SOCKET_OPTION *option )
 {
-	option->is_connecting = 0;
 	GDT_SOCKET_ID sock = -1;
 	char nbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
 	struct addrinfo hints;
@@ -1380,7 +1377,6 @@ void gdt_free_socket( GDT_SOCKET_OPTION *option )
 	}
 #endif
 	option->sockid = -1;
-	option->is_connecting = 0;
 }
 
 void gdt_recv_event(GDT_SOCKET_OPTION *option, GDT_SERVER_CONNECTION_INFO *child, socklen_t srlen)
@@ -1961,14 +1957,14 @@ int32_t gdt_make_message_buffer(GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockp
 	return GDT_SYSTEM_OK;
 }
 
-size_t gdt_make_msg( GDT_SOCKET_OPTION* option, GDT_SOCKPARAM* psockparam, void* sendbin, const char* msg, ssize_t size, uint32_t payload_type )
+size_t gdt_make_msg( GDT_SOCKET_OPTION* option, GDT_SOCKPARAM* psockparam, void* sendbin, const char* msg, ssize_t size, uint32_t payload_type,int is_binary )
 {
 	uint8_t head1;
 	uint8_t head2;
 	uint8_t *ptr;
 	char* cptr;
 	uint32_t headersize = 0;
-	head1 = 0x80 | psockparam->ws_msg_mode;
+	head1 = 0x80 | ( (is_binary) ? 0x02 : 0x01 );
 	headersize = gdt_make_size_header(&head2,size);
 	ptr = (uint8_t*) sendbin;
 	*ptr = 0;
@@ -1997,13 +1993,14 @@ size_t gdt_make_msg( GDT_SOCKET_OPTION* option, GDT_SOCKPARAM* psockparam, void*
 
 ssize_t gdt_send_msg( GDT_SOCKET_OPTION *option, GDT_SOCKPARAM *psockparam, const char* msg, ssize_t size, uint32_t payload_type )
 {
+	int is_binary = 0;
 	ssize_t len = 0;
 	void *sendbin = NULL;
 	if(GDT_SYSTEM_ERROR == gdt_make_message_buffer(option,psockparam,size)){
 		return 0;
 	}
 	sendbin = gdt_upointer( option->memory_pool, psockparam->buf_munit );
-	size_t binsize = gdt_make_msg(option,psockparam,sendbin,msg,size,payload_type);
+	size_t binsize = gdt_make_msg(option,psockparam,sendbin,msg,size,payload_type,is_binary);
 	len = gdt_send_all( psockparam->acc, (char*)sendbin, binsize, 0 );
 	return len;
 }

@@ -17,5 +17,5 @@ main.o: main.c
 
 .PHONY: clean
 clean: 
-	\rm -f $(PROGRAM) 
-	\rm -f ./*.o
+	rm -f $(PROGRAM) 
+	rm -f ./*.o

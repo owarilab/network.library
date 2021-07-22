@@ -24,8 +24,11 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#pragma warning(disable : 4996)
+
 #include "gdt_memory_allocator.h"
+#ifdef __WINDOWS__
+#pragma warning(disable : 4996)
+#endif
 
 // 64bit example -> 1024LLU * 1024LLU * 1024LLU * 4LLU
 size_t gdt_initialize_memory( GDT_MEMORY_POOL** _ppool, size_t allocate_size, size_t max_allocate_size, size_t alignment_size, size_t fix_memory_unit, size_t free_memory_unit, size_t min_realloc )
@@ -827,6 +830,11 @@ int32_t gdt_create_munit( GDT_MEMORY_POOL* _ppool, size_t size, uint8_t type )
 	return unit->id;
 }
 
+int32_t gdt_create_memory_block( GDT_MEMORY_POOL* _ppool, size_t size )
+{
+	return gdt_create_munit( _ppool, size, MEMORY_TYPE_DEFAULT );
+}
+
 GDT_MEMORY_UNIT* gdt_find_freemunit( GDT_MEMORY_POOL* _ppool, size_t size )
 {
 	GDT_MEMORY_UNIT* unit			= NULL;
@@ -1234,7 +1242,7 @@ void gdt_memory_unit_info( GDT_MEMORY_POOL* _ppool )
 		unit = (GDT_MEMORY_UNIT*)( ( (uint8_t*)_ppool->memory + _ppool->end ) - ( memory_unit_one_size * ( _ppool->unit_size - i ) ) );
 		(void) fprintf(
 				stdout
-			, "[%ld] addr:%p:%p, p:%p, pend:%p, memsize:%d Byte, status:%d, id:%d, parent:%d, child:%d, type:%d\n"
+			, "[%ld] addr:%p:%p, p:%p, pend:%p, memsize:%ld Byte, status:%d, id:%d, parent:%d, child:%d, type:%d\n"
 			, _ppool->unit_size - ( i + 1 )
 			, unit
 			, (uint8_t*)(unit) + memory_unit_one_size

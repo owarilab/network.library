@@ -193,6 +193,7 @@ uint32_t gdt_free_memory_unit( GDT_MEMORY_POOL* _ppool, int32_t *munit_id );
 int32_t gdt_create_fixmunit( GDT_MEMORY_POOL* _ppool, int32_t id, size_t size );
 GDT_MEMORY_UNIT* gdt_get_fixmunit( GDT_MEMORY_POOL* _ppool, int32_t id );
 int32_t gdt_create_munit( GDT_MEMORY_POOL* _ppool, size_t size, uint8_t type );
+int32_t gdt_create_memory_block( GDT_MEMORY_POOL* _ppool, size_t size );
 GDT_MEMORY_UNIT* gdt_get_munit( GDT_MEMORY_POOL* _ppool, int32_t id );
 void* gdt_upointer( GDT_MEMORY_POOL* _ppool, int32_t id );
 void* gdt_fixupointer( GDT_MEMORY_POOL* _ppool, int32_t id );

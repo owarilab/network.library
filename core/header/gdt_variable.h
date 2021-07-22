@@ -96,7 +96,6 @@ int32_t gdt_cache_binary(GDT_CACHE* cache,char* key,uint8_t* bin,size_t bin_size
 int32_t gdt_remove_cache(GDT_CACHE* cache,char* key);
 int32_t gdt_cache_length(GDT_CACHE* cache);
 
-
 void gdt_array_dump( GDT_MEMORY_POOL* _ppool, int32_t munit, int index );
 void gdt_hash_dump( GDT_MEMORY_POOL* _ppool, int32_t h_munit, int index );
 int32_t gdt_opendir( GDT_MEMORY_POOL* _ppool, const char* path );
