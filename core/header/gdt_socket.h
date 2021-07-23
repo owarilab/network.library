@@ -167,6 +167,7 @@ typedef int (*GDT_CONNECTION_EVENT_CALLBACK)( GDT_SERVER_CONNECTION_INFO* connec
 typedef int32_t (*GDT_ON_RECV)(uint32_t payload_type, uint8_t* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info );
 typedef int (*GDT_USER_RECV)( void* connection, GDT_SOCKET_ID id, char* buf, size_t buffer_size, int flag );
 typedef int (*GDT_USER_SEND)( void* connection, GDT_SOCKET_ID id, char *buf, size_t buffer_size, int flag );
+typedef int (*GDT_USER_PROTOCOL_FILTER)( GDT_RECV_INFO* recv_info );
 
 typedef struct GDT_SOCKET_OPTION
 {
@@ -211,6 +212,7 @@ typedef struct GDT_SOCKET_OPTION
 	GDT_ON_RECV payload_recv_callback;
 	GDT_USER_RECV user_recv_function;		// user call recv
 	GDT_USER_SEND user_send_function;		// user call send
+	GDT_USER_PROTOCOL_FILTER user_protocol_filter;
 	size_t recvbuffer_size;					// recv buffer size
 	size_t sendbuffer_size;					// send buffer size
 	size_t msgbuffer_size;					// message buffer size
@@ -252,6 +254,7 @@ void set_on_payload_recv_event( GDT_SOCKET_OPTION *option, GDT_ON_RECV func );
 void set_on_close_event( GDT_SOCKET_OPTION *option, GDT_CONNECTION_EVENT_CALLBACK func );
 void set_user_recv_event( GDT_SOCKET_OPTION *option, GDT_USER_RECV func );
 void set_user_send_event( GDT_SOCKET_OPTION *option, GDT_USER_SEND func);
+void set_user_protocol_filter(GDT_SOCKET_OPTION *option, GDT_USER_PROTOCOL_FILTER func);
 void gdt_set_timeout_event( GDT_SOCKET_OPTION *option, GDT_CALLBACK func );
 void gdt_set_connection_timeout( GDT_SOCKET_OPTION *option, int32_t sec, int32_t usec );
 void gdt_set_select_timeout( GDT_SOCKET_OPTION *option, int32_t sec, int32_t usec );

@@ -330,6 +330,7 @@ int gdt_initialize_socket_option(
 	option->timeout_callback			= NULL;
 	option->user_recv_function			= NULL;
 	option->user_send_function			= NULL;
+	option->user_protocol_filter        = NULL;
 	option->recvbuffer_size				= SIZE_KBYTE*16;
 	option->sendbuffer_size				= SIZE_KBYTE*128;
 	option->msgbuffer_size				= SIZE_KBYTE*16;
@@ -422,6 +423,10 @@ void set_user_recv_event( GDT_SOCKET_OPTION *option, GDT_USER_RECV func )
 void set_user_send_event(GDT_SOCKET_OPTION *option, GDT_USER_SEND func)
 {
 	option->user_send_function = func;
+}
+void set_user_protocol_filter(GDT_SOCKET_OPTION *option, GDT_USER_PROTOCOL_FILTER func)
+{
+	option->user_protocol_filter = func;
 }
 void gdt_set_timeout_event( GDT_SOCKET_OPTION *option, GDT_CALLBACK func )
 {
@@ -1383,8 +1388,9 @@ void gdt_recv_event(GDT_SOCKET_OPTION *option, GDT_SERVER_CONNECTION_INFO *child
 {
 	GDT_RECV_INFO *rinfo;
 	if (srlen == -1) {
+		return;
 	}
-	else if (srlen == 0) {
+	if (srlen == 0) {
 #ifdef __WINDOWS__
 		if (WSAGetLastError() != WSAEWOULDBLOCK) {
 			//perror("recv 0byte");
@@ -1396,59 +1402,56 @@ void gdt_recv_event(GDT_SOCKET_OPTION *option, GDT_SERVER_CONNECTION_INFO *child
 		}
 		gdt_close_socket(&child->id, NULL);
 #endif
-
+		return;
 	}
-	else
-	{
-		if (option->socket_type == SOCKET_TYPE_CLIENT_UDP || option->socket_type == SOCKET_TYPE_SERVER_UDP){
-			if( 0 != getnameinfo((struct sockaddr *) &child->sockparam.from, child->sockparam.fromlen,child->hbuf, sizeof(child->hbuf), child->sbuf, sizeof(child->sbuf), NI_NUMERICHOST | NI_NUMERICSERV) )
-			{
-				printf("getnameinfo error.\n");
-				return;
-			}
+	if (option->socket_type == SOCKET_TYPE_CLIENT_UDP || option->socket_type == SOCKET_TYPE_SERVER_UDP){
+		if( 0 != getnameinfo((struct sockaddr *) &child->sockparam.from, child->sockparam.fromlen,child->hbuf, sizeof(child->hbuf), child->sbuf, sizeof(child->sbuf), NI_NUMERICHOST | NI_NUMERICSERV) )
+		{
+			printf("getnameinfo error.\n");
+			return;
 		}
-		rinfo = (struct GDT_RECV_INFO *)gdt_upointer(option->memory_pool, child->recvinfo_munit);
-		child->sockparam.acc = child->id;
-		
-		if(option->socket_type == SOCKET_TYPE_SERVER_UDP){
-			child->sockparam.acc = option->sockid;
-		}
-		
-		rinfo->tinfo = child;
-		size_t old_pos = 0;
-		do{
-			rinfo->recvlen = srlen;
-			rinfo->recvbuf_munit = child->recvbuf_munit;
-			rinfo->recvfrom = child->id;
-			switch (gdt_pre_packetfilter(option, rinfo, &child->sockparam, child->recvmsg_munit))
-			{
-			case -1:
-				//printf("gdt_recv_event error\n");
-				gdt_close_socket(&child->id, NULL);
-				break;
-			case 1:
-				if (option->plane_recv_callback != NULL){
-					option->plane_recv_callback((void*)rinfo);
-				}
-				else if (option->payload_recv_callback != NULL){
-					option->payload_recv_callback(child->sockparam.payload_type, (uint8_t*)GDT_POINTER(option->memory_pool, rinfo->recvbuf_munit), rinfo->recvlen, rinfo);
-				}
-				if (child->sockparam.c_status == PROTOCOL_STATUS_DEFAULT){
-						gdt_close_socket(&child->id, NULL);
-				}
-				break;
-			}
-			*((char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit)) = '\0';
-			//memset((char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), 0, buffer_size);
-			if( child->sockparam.continue_pos > 0 ){
-				if( old_pos >= child->sockparam.continue_pos ){
-					printf("invalid packet\n");
-					break;
-				}
-				old_pos = child->sockparam.continue_pos;
-			}
-		}while( child->sockparam.continue_pos > 0 && -1 != child->id );
 	}
+	rinfo = (struct GDT_RECV_INFO *)gdt_upointer(option->memory_pool, child->recvinfo_munit);
+	child->sockparam.acc = child->id;
+	
+	if(option->socket_type == SOCKET_TYPE_SERVER_UDP){
+		child->sockparam.acc = option->sockid;
+	}
+	
+	rinfo->tinfo = child;
+	size_t old_pos = 0;
+	do{
+		rinfo->recvlen = srlen;
+		rinfo->recvbuf_munit = child->recvbuf_munit;
+		rinfo->recvfrom = child->id;
+		switch (gdt_pre_packetfilter(option, rinfo, &child->sockparam, child->recvmsg_munit))
+		{
+		case -1:
+			//printf("gdt_recv_event error\n");
+			gdt_close_socket(&child->id, NULL);
+			break;
+		case 1:
+			if (option->plane_recv_callback != NULL){
+				option->plane_recv_callback((void*)rinfo);
+			}
+			else if (option->payload_recv_callback != NULL){
+				option->payload_recv_callback(child->sockparam.payload_type, (uint8_t*)GDT_POINTER(option->memory_pool, rinfo->recvbuf_munit), rinfo->recvlen, rinfo);
+			}
+			if (child->sockparam.c_status == PROTOCOL_STATUS_DEFAULT){
+					gdt_close_socket(&child->id, NULL);
+			}
+			break;
+		}
+		*((char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit)) = '\0';
+		//memset((char*)GDT_POINTER(option->memory_pool, child->recvbuf_munit), 0, buffer_size);
+		if( child->sockparam.continue_pos > 0 ){
+			if( old_pos >= child->sockparam.continue_pos ){
+				printf("invalid packet\n");
+				break;
+			}
+			old_pos = child->sockparam.continue_pos;
+		}
+	}while( child->sockparam.continue_pos > 0 && -1 != child->id );
 }
 
 void gdt_nonblocking_server(GDT_SOCKET_OPTION *option)
