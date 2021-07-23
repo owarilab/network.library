@@ -223,6 +223,7 @@ typedef struct GDT_SOCKET_OPTION
 } GDT_SOCKET_OPTION;
 
 GDT_SOCKET_OPTION* gdt_create_tcp_server(char* hostname, char* portnum);
+GDT_SOCKET_OPTION* gdt_create_tcp_server_plane(char* hostname, char* portnum);
 GDT_SOCKET_OPTION* gdt_create_udp_server(char* hostname, char* portnum);
 GDT_SOCKET_OPTION* gdt_create_tcp_client(char* hostname, char* portnum);
 GDT_SOCKET_OPTION* gdt_create_tcp_client_plane(char* hostname, char* portnum);

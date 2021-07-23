@@ -46,6 +46,25 @@ GDT_SOCKET_OPTION* gdt_create_tcp_server(char* hostname, char* portnum)
 	return option;
 }
 
+GDT_SOCKET_OPTION* gdt_create_tcp_server_plane(char* hostname, char* portnum)
+{
+	GDT_MEMORY_POOL* memory_pool = NULL;
+	GDT_SOCKET_OPTION *option;
+	size_t maxconnection = 1000;
+	if (gdt_initialize_memory(&memory_pool, SIZE_MBYTE * 128, SIZE_MBYTE * 128, MEMORY_ALIGNMENT_SIZE_BIT_64, FIX_MUNIT_SIZE, 1, SIZE_KBYTE * 16) <= 0) {
+		return NULL;
+	}
+	int32_t option_munit = gdt_create_munit( memory_pool, sizeof( GDT_SOCKET_OPTION ), MEMORY_TYPE_DEFAULT );
+	if( option_munit == -1 ){
+		return NULL;
+	}
+	option = (GDT_SOCKET_OPTION*)GDT_POINTER(memory_pool,option_munit);
+	if (0 != gdt_initialize_socket_option(option, hostname, portnum, SOCKET_TYPE_SERVER_TCP, SOCKET_MODE_NONBLOCKING, PROTOCOL_PLAIN, maxconnection, memory_pool, NULL)) {
+		return NULL;
+	}
+	return option;
+}
+
 GDT_SOCKET_OPTION* gdt_create_udp_server(char* hostname, char* portnum)
 {
 	GDT_MEMORY_POOL* memory_pool = NULL;
