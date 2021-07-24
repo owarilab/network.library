@@ -385,7 +385,7 @@ void gdt_array_dump( GDT_MEMORY_POOL* _ppool, int32_t munit, int index )
 	}
 	printf("\n");
 	for( k=0;k<index;k++ ){ printf("  "); }
-	printf("]");
+	printf("]\n");
 }
 
 void gdt_hash_dump( GDT_MEMORY_POOL* _ppool, int32_t h_munit, int index )
@@ -451,7 +451,7 @@ void gdt_hash_dump( GDT_MEMORY_POOL* _ppool, int32_t h_munit, int index )
 	}
 	printf("\n");
 	for( k=0;k<index;k++ ){ printf("  "); }
-	printf("}");
+	printf("}\n");
 }
 
 int32_t gdt_opendir( GDT_MEMORY_POOL* _ppool, const char* path )
