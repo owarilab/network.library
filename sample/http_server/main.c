@@ -79,6 +79,13 @@ void* on_recv( void* args )
 			break;
 	}
 
+	//dummy http response
+	{
+		//gdt_send(option, &tinfo->sockparam, HTTP_OK, gdt_strlen(HTTP_OK), 0);
+		//gdt_disconnect(&tinfo->sockparam);
+		//return ((void *)NULL);
+	}
+
 	GDT_MEMORY_POOL * temporary_memory = ( GDT_MEMORY_POOL* )GDT_POINTER( option->memory_pool, memid_temprorary_pool );
 	gdt_memory_clean( temporary_memory );
 
@@ -89,6 +96,7 @@ void* on_recv( void* args )
 	char *request = (char*)GDT_POINTER(option->memory_pool,gdt_get_hash( option->memory_pool, tinfo->sockparam.http_header_munit, "REQUEST" ));
 	char *get_params = (char*)GDT_POINTER(option->memory_pool,gdt_get_hash( option->memory_pool, tinfo->sockparam.http_header_munit, "GET_PARAMS" ));
 	char *content_type = (char*)GDT_POINTER(option->memory_pool,gdt_get_hash( option->memory_pool, tinfo->sockparam.http_header_munit, "CONTENT_TYPE" ));
+	char *cache_control = (char*)GDT_POINTER(option->memory_pool,gdt_get_hash( option->memory_pool, tinfo->sockparam.http_header_munit, "CACHE_CONTROL" ));
 	printf("method : %s , request : %s\n",method,request);
 
 	// get parameter
@@ -148,8 +156,139 @@ void* on_recv( void* args )
 		}
 	}
 
-	// http response
-	gdt_send(option, &tinfo->sockparam, HTTP_OK, gdt_strlen(HTTP_OK), 0);
+	// request path
+	char request_path[MAXPATHLEN];
+	gdt_http_document_path(request_path,MAXPATHLEN,"./www","index.html",request);
+
+	// extention
+	char extension[32];
+	gdt_get_extension( extension, sizeof(extension), request_path );
+
+	printf("request path : %s , extension : %s\n",request_path,extension);
+
+	int32_t http_status_code = 500;
+	do{
+		GDT_FILE_INFO info;
+		if( GDT_SYSTEM_ERROR == gdt_fget_info( request_path, &info ) ){
+			http_status_code = 404;
+			break;
+		}
+
+		//response
+		int32_t memid_response_buffer = gdt_create_memory_block(temporary_memory,info.size+SIZE_KBYTE*4);
+		if( -1 == memid_response_buffer ){
+			break;
+		}
+		char* response_buffer = (char*)GDT_POINTER(temporary_memory,memid_response_buffer);
+		size_t response_buffer_size = gdt_usize(temporary_memory,memid_response_buffer);
+		memset(response_buffer, 0, response_buffer_size); // memory over ( windows only )
+		size_t response_len = 0;
+		int is_binary = 0;
+
+		if( !strcmp(extension,"html"))
+		{
+			http_status_code = 200;
+			response_len = gdt_http_add_response_common(response_buffer,response_buffer_size,http_status_code,"text/html",info.size);
+			response_len = gdt_http_add_cache_control(response_buffer, response_buffer_size, response_len, 30, &info);
+		}
+		else if( !strcmp(extension,"css"))
+		{
+			if( !strcmp(cache_control,"max-age=0") ){
+				char *modified_since = (char*)GDT_POINTER(option->memory_pool,gdt_get_hash( option->memory_pool, tinfo->sockparam.http_header_munit, "IF_MODIFIED_SINCE" ));
+				if( strcmp("",modified_since)){
+					http_status_code = 304;
+					break;
+				}
+			}
+			http_status_code = 200;
+			response_len = gdt_http_add_response_common(response_buffer,response_buffer_size,http_status_code,"text/css",info.size);
+			response_len = gdt_http_add_cache_control(response_buffer, response_buffer_size, response_len, 30, &info);
+		}
+		else if( !strcmp(extension,"js"))
+		{
+			if( !strcmp(cache_control,"max-age=0") ){
+				char *modified_since = (char*)GDT_POINTER(option->memory_pool,gdt_get_hash( option->memory_pool, tinfo->sockparam.http_header_munit, "IF_MODIFIED_SINCE" ));
+				if( strcmp("",modified_since)){
+					http_status_code = 304;
+					break;
+				}
+			}
+			http_status_code = 200;
+			response_len = gdt_http_add_response_common(response_buffer,response_buffer_size,http_status_code,"text/javascript",info.size);
+			response_len = gdt_http_add_cache_control(response_buffer, response_buffer_size, response_len, 30, &info);
+		}
+		else if (!strcmp(extension, "json"))
+		{
+			if (!strcmp(cache_control, "max-age=0")) {
+				char *modified_since = (char*)GDT_POINTER(option->memory_pool, gdt_get_hash(option->memory_pool, tinfo->sockparam.http_header_munit, "IF_MODIFIED_SINCE"));
+				if (strcmp("", modified_since)) {
+					http_status_code = 304;
+					break;
+				}
+			}
+			http_status_code = 200;
+			response_len = gdt_http_add_response_common(response_buffer, response_buffer_size, http_status_code, "application/json", info.size);
+			response_len = gdt_http_add_cache_control(response_buffer, response_buffer_size, response_len, 30, &info);
+		}
+		else if( !strcmp(extension,"ico"))
+		{
+			http_status_code = 200;
+			response_len = gdt_http_add_response_common(response_buffer,response_buffer_size,http_status_code,"image/x-icon",info.size);
+			is_binary = 1;
+		}
+		else if (!strcmp(extension, "unityweb"))
+		{
+			http_status_code = 200;
+			response_len = gdt_http_add_response_common(response_buffer, response_buffer_size, 200, "application/octet-stream", info.size);
+			is_binary = 1;
+		}
+		else if (!strcmp(extension, "png"))
+		{
+			http_status_code = 200;
+			response_len = gdt_http_add_response_common(response_buffer, response_buffer_size, 200, "image/png", info.size);
+			is_binary = 1;
+		}
+		else if (!strcmp(extension, "mp3"))
+		{
+			http_status_code = 200;
+			response_len = gdt_http_add_response_common(response_buffer, response_buffer_size, 200, "audio/mp3", info.size);
+			is_binary = 1;
+		}
+		else{
+			break;
+		}
+		if( !strcmp("HEAD",method) ){
+			response_len = gdt_strlink( response_buffer, response_len, "\r\n", 2, response_buffer_size );
+		}
+		else{
+			response_len = gdt_strlink( response_buffer, response_len, "\r\n", 2, response_buffer_size );
+			char* pstart = response_buffer+response_len;
+			size_t plen = response_buffer_size-response_len;
+			if(is_binary==0){
+				size_t readlen = gdt_fread_bin( request_path, pstart, plen );
+				response_len+=readlen;
+			}
+			else{
+				size_t readlen = gdt_fread_bin( request_path, pstart, plen );
+				response_len+=readlen;
+			}
+		}
+		response_buffer[response_len] = '\0';
+		gdt_send( option, &tinfo->sockparam, response_buffer, response_len, 0 );
+	}while(false);
+
+	if( http_status_code != 200 ){
+		if( http_status_code == 304 ){
+			gdt_send( option, &tinfo->sockparam, HTTP_NOT_MODIFIED, gdt_strlen( HTTP_NOT_MODIFIED ), 0 );
+		}
+		else if( http_status_code == 404 ){
+			gdt_send( option, &tinfo->sockparam, HTTP_NOT_FOUND, gdt_strlen( HTTP_NOT_FOUND ), 0 );
+		}
+		else{
+			gdt_send( option, &tinfo->sockparam, HTTP_INTERNAL_SERVER_ERROR, gdt_strlen( HTTP_INTERNAL_SERVER_ERROR ), 0 );
+		}
+	}
+
 	gdt_disconnect(&tinfo->sockparam);
 	return ((void *)NULL);
 }

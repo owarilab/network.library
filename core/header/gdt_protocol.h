@@ -18,6 +18,7 @@ extern "C"{
 #define HTTP_REQUEST_URI_TOO_LONG_ERROR "HTTP/1.1 414 Request-URI Too Long\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n414 Request-URI Too Long\r\n"
 #define HTTP_BAD_REQUEST_ERROR "HTTP/1.1 400 Bad Request\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n400 Bad Request\r\n"
 #define HTTP_NOT_MODIFIED "HTTP/1.1 304 Not Modified\r\nConnection: close\r\n\r\n"
+#define HTTP_NOT_FOUND "HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n"
 #define HTTP_OK "HTTP/1.1 200 OK\r\n"
 
 #define HTTP_HEADER_STRINGS { \
@@ -49,6 +50,7 @@ int gdt_http_parser( GDT_RECV_INFO *rinfo );
 int gdt_http_parse_header( GDT_RECV_INFO *rinfo );
 size_t gdt_http_add_response_common(char* dest, size_t dest_size, int http_response_code, char* content_type, size_t content_length);
 size_t gdt_http_add_cache_control(char* dest, size_t dest_size, size_t start, int max_age, GDT_FILE_INFO* info);
+size_t gdt_http_document_path(char* dest, size_t dest_size,char* document_root, char* default_file, char* path);
 
 #endif /*_GDT_PROTOCOL_H_*/
 

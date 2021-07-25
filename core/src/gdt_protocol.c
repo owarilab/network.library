@@ -494,3 +494,15 @@ size_t gdt_http_add_cache_control(char* dest, size_t dest_size, size_t start, in
 	len = gdt_strlink( dest, len, "\r\n", 2, dest_size );
 	return len;
 }
+
+size_t gdt_http_document_path(char* dest, size_t dest_size,char* document_root, char* default_file, char* path)
+{
+	size_t path_len = 0;
+	path_len = gdt_strlink( dest, path_len, document_root, gdt_strlen(document_root), dest_size );
+	path_len = gdt_strlink( dest, path_len, path, gdt_strlen(path), dest_size );
+	if(!strcmp(path,"/")){
+		path_len = gdt_strlink( dest, path_len, default_file, gdt_strlen(default_file), dest_size );
+	}
+	dest[path_len] = '\0';
+	return path_len;
+}
