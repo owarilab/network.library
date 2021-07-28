@@ -1,15 +1,15 @@
-PROGRAM = gdt_http_server
+PROGRAM = qs_http_server
 CC      = gcc
 DEFINE  = -D_LINUX
 CFLAG   = -pthread -Wall -O
 #CFLAG   = -Wall -O2
 INCDIR  = -I ../../core/header
-LIBA = ../../core/libgdt_core.a
+LIBA = ../../core/libqs_core.a
 MYSOCKETOBJGROUP = main.o $(LIBA)
 
-build: lib $(PROGRAM)
+build: $(PROGRAM)
 
-lib:
+$(LIBA):
 	cd ../../core/src && make 
 
 $(PROGRAM): $(MYSOCKETOBJGROUP)

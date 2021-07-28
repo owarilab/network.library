@@ -1,4 +1,4 @@
-PROGRAM=libgdt_core.a
+PROGRAM=libqs_core.a
 PROGRAMOUT=../
 CC=gcc
 AR=ar

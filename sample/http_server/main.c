@@ -25,9 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "gdt_socket.h"
-#include "gdt_protocol.h"
-#include "gdt_variable.h"
+#include "qs_socket.h"
+#include "qs_protocol.h"
+#include "qs_variable.h"
 
 // api sample
 // curl -X POST -H "Content-Type: application/json" -d '{"id":"id_12345678", "password":"test"}' http://localhost:8080/api/v1/login
@@ -35,14 +35,14 @@
 
 int32_t memid_temprorary_pool = -1;
 
-int on_connect(GDT_SERVER_CONNECTION_INFO* connection);
+int on_connect(QS_SERVER_CONNECTION_INFO* connection);
 void* on_recv( void* args );
-int on_close(GDT_SERVER_CONNECTION_INFO* connection);
+int on_close(QS_SERVER_CONNECTION_INFO* connection);
 
 int main( int argc, char *argv[], char *envp[] )
 {
 	gdt_set_defaultsignal();
-	GDT_SOCKET_OPTION* option = gdt_create_tcp_server_plane(NULL, "8080");
+	QS_SOCKET_OPTION* option = gdt_create_tcp_server_plane(NULL, "8080");
 	memid_temprorary_pool = gdt_create_mini_memory( option->memory_pool, SIZE_KBYTE * 256 );
 	set_on_connect_event(option,on_connect);
 	set_on_packet_recv_event(option,on_recv);
@@ -57,17 +57,17 @@ int main( int argc, char *argv[], char *envp[] )
 	return 0;
 }
 
-int on_connect(GDT_SERVER_CONNECTION_INFO* connection)
+int on_connect(QS_SERVER_CONNECTION_INFO* connection)
 {
 	return 0;
 }
 
 void* on_recv( void* args )
 {
-	GDT_RECV_INFO *rinfo = (GDT_RECV_INFO *)args;
-	GDT_SERVER_CONNECTION_INFO * tinfo = (GDT_SERVER_CONNECTION_INFO *)rinfo->tinfo;
-	GDT_SOCKET_OPTION* option = (GDT_SOCKET_OPTION*)tinfo->gdt_socket_option;
-	GDT_SOCKPARAM* psockparam = &tinfo->sockparam;
+	QS_RECV_INFO *rinfo = (QS_RECV_INFO *)args;
+	QS_SERVER_CONNECTION_INFO * tinfo = (QS_SERVER_CONNECTION_INFO *)rinfo->tinfo;
+	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->gdt_socket_option;
+	QS_SOCKPARAM* psockparam = &tinfo->sockparam;
 	switch( gdt_http_protocol_filter(rinfo) )
 	{
 		case -1:
@@ -86,17 +86,17 @@ void* on_recv( void* args )
 		//return ((void *)NULL);
 	}
 
-	GDT_MEMORY_POOL * temporary_memory = ( GDT_MEMORY_POOL* )GDT_POINTER( option->memory_pool, memid_temprorary_pool );
+	QS_MEMORY_POOL * temporary_memory = ( QS_MEMORY_POOL* )QS_GET_POINTER( option->memory_pool, memid_temprorary_pool );
 	gdt_memory_clean( temporary_memory );
 
 	printf("headers\n");
 	gdt_hash_dump(option->memory_pool, tinfo->sockparam.http_header_munit,0);
 
-	char *method = (char*)GDT_POINTER(option->memory_pool,gdt_get_hash( option->memory_pool, tinfo->sockparam.http_header_munit, "HTTP_METHOD" ));
-	char *request = (char*)GDT_POINTER(option->memory_pool,gdt_get_hash( option->memory_pool, tinfo->sockparam.http_header_munit, "REQUEST" ));
-	char *get_params = (char*)GDT_POINTER(option->memory_pool,gdt_get_hash( option->memory_pool, tinfo->sockparam.http_header_munit, "GET_PARAMS" ));
-	char *content_type = (char*)GDT_POINTER(option->memory_pool,gdt_get_hash( option->memory_pool, tinfo->sockparam.http_header_munit, "CONTENT_TYPE" ));
-	char *cache_control = (char*)GDT_POINTER(option->memory_pool,gdt_get_hash( option->memory_pool, tinfo->sockparam.http_header_munit, "CACHE_CONTROL" ));
+	char *method = (char*)QS_GET_POINTER(option->memory_pool,gdt_get_hash( option->memory_pool, tinfo->sockparam.http_header_munit, "HTTP_METHOD" ));
+	char *request = (char*)QS_GET_POINTER(option->memory_pool,gdt_get_hash( option->memory_pool, tinfo->sockparam.http_header_munit, "REQUEST" ));
+	char *get_params = (char*)QS_GET_POINTER(option->memory_pool,gdt_get_hash( option->memory_pool, tinfo->sockparam.http_header_munit, "GET_PARAMS" ));
+	char *content_type = (char*)QS_GET_POINTER(option->memory_pool,gdt_get_hash( option->memory_pool, tinfo->sockparam.http_header_munit, "CONTENT_TYPE" ));
+	char *cache_control = (char*)QS_GET_POINTER(option->memory_pool,gdt_get_hash( option->memory_pool, tinfo->sockparam.http_header_munit, "CACHE_CONTROL" ));
 	printf("method : %s , request : %s\n",method,request);
 
 	// get parameter
@@ -127,7 +127,7 @@ void* on_recv( void* args )
 		// json
 		if( !strcmp("application/json",content_type)){
 			do{
-				GDT_NODE* hashroot = gdt_get_json_root(temporary_memory, gdt_json_decode_h(temporary_memory, body, 8, 128));
+				QS_NODE* hashroot = gdt_get_json_root(temporary_memory, gdt_json_decode_h(temporary_memory, body, 8, 128));
 				if (NULL == hashroot || hashroot->id != ELEMENT_HASH) {
 					break;
 				}
@@ -170,8 +170,8 @@ void* on_recv( void* args )
 
 	int32_t http_status_code = 500;
 	do{
-		GDT_FILE_INFO info;
-		if( GDT_SYSTEM_ERROR == gdt_fget_info( request_path, &info ) ){
+		QS_FILE_INFO info;
+		if( QS_SYSTEM_ERROR == gdt_fget_info( request_path, &info ) ){
 			http_status_code = 404;
 			break;
 		}
@@ -181,7 +181,7 @@ void* on_recv( void* args )
 		if( -1 == memid_response_buffer ){
 			break;
 		}
-		char* response_buffer = (char*)GDT_POINTER(temporary_memory,memid_response_buffer);
+		char* response_buffer = (char*)QS_GET_POINTER(temporary_memory,memid_response_buffer);
 		size_t response_buffer_size = gdt_usize(temporary_memory,memid_response_buffer);
 		memset(response_buffer, 0, response_buffer_size); // memory over ( windows only )
 		size_t response_len = 0;
@@ -196,7 +196,7 @@ void* on_recv( void* args )
 		else if( !strcmp(extension,"css"))
 		{
 			if( !strcmp(cache_control,"max-age=0") ){
-				char *modified_since = (char*)GDT_POINTER(option->memory_pool,gdt_get_hash( option->memory_pool, tinfo->sockparam.http_header_munit, "IF_MODIFIED_SINCE" ));
+				char *modified_since = (char*)QS_GET_POINTER(option->memory_pool,gdt_get_hash( option->memory_pool, tinfo->sockparam.http_header_munit, "IF_MODIFIED_SINCE" ));
 				if( strcmp("",modified_since)){
 					http_status_code = 304;
 					break;
@@ -209,7 +209,7 @@ void* on_recv( void* args )
 		else if( !strcmp(extension,"js"))
 		{
 			if( !strcmp(cache_control,"max-age=0") ){
-				char *modified_since = (char*)GDT_POINTER(option->memory_pool,gdt_get_hash( option->memory_pool, tinfo->sockparam.http_header_munit, "IF_MODIFIED_SINCE" ));
+				char *modified_since = (char*)QS_GET_POINTER(option->memory_pool,gdt_get_hash( option->memory_pool, tinfo->sockparam.http_header_munit, "IF_MODIFIED_SINCE" ));
 				if( strcmp("",modified_since)){
 					http_status_code = 304;
 					break;
@@ -222,7 +222,7 @@ void* on_recv( void* args )
 		else if (!strcmp(extension, "json"))
 		{
 			if (!strcmp(cache_control, "max-age=0")) {
-				char *modified_since = (char*)GDT_POINTER(option->memory_pool, gdt_get_hash(option->memory_pool, tinfo->sockparam.http_header_munit, "IF_MODIFIED_SINCE"));
+				char *modified_since = (char*)QS_GET_POINTER(option->memory_pool, gdt_get_hash(option->memory_pool, tinfo->sockparam.http_header_munit, "IF_MODIFIED_SINCE"));
 				if (strcmp("", modified_since)) {
 					http_status_code = 304;
 					break;
@@ -295,7 +295,7 @@ void* on_recv( void* args )
 	return ((void *)NULL);
 }
 
-int on_close(GDT_SERVER_CONNECTION_INFO* connection)
+int on_close(QS_SERVER_CONNECTION_INFO* connection)
 {
 	return 0;
 }

@@ -25,23 +25,23 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "gdt_socket.h"
-int on_connect(GDT_SERVER_CONNECTION_INFO* connection);
-int32_t on_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info );
-int on_close(GDT_SERVER_CONNECTION_INFO* connection);
+#include "qs_socket.h"
+int on_connect(QS_SERVER_CONNECTION_INFO* connection);
+int32_t on_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, QS_RECV_INFO *gdt_recv_info );
+int on_close(QS_SERVER_CONNECTION_INFO* connection);
 
-int32_t on_recv_udp(uint32_t payload_type, uint8_t* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info );
+int32_t on_recv_udp(uint32_t payload_type, uint8_t* payload, size_t payload_len, QS_RECV_INFO *gdt_recv_info );
 
 int main( int argc, char *argv[], char *envp[] )
 {
 	gdt_set_defaultsignal();
-	GDT_SOCKET_OPTION* option = gdt_create_tcp_server(NULL, "52001");
+	QS_SOCKET_OPTION* option = gdt_create_tcp_server(NULL, "52001");
 	set_on_connect_event(option,on_connect);
 	set_on_payload_recv_event(option,on_recv);
 	set_on_close_event(option,on_close);
 	gdt_socket(option);
 	
-	GDT_SOCKET_OPTION* udp_option = gdt_create_udp_server(NULL, "52001");
+	QS_SOCKET_OPTION* udp_option = gdt_create_udp_server(NULL, "52001");
 	set_on_payload_recv_event(udp_option,on_recv_udp);
 	gdt_socket(udp_option);
 
@@ -64,25 +64,25 @@ int main( int argc, char *argv[], char *envp[] )
 	return 0;
 }
 
-int on_connect(GDT_SERVER_CONNECTION_INFO* connection)
+int on_connect(QS_SERVER_CONNECTION_INFO* connection)
 {
 	printf("on_connect\n");
 	return 0;
 }
 
-int32_t on_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info )
+int32_t on_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, QS_RECV_INFO *gdt_recv_info )
 {
 	printf("on_recv(payload_type:%d,payload_len:%d)%s\n",payload_type,(int)payload_len,(char*)payload);
 	return 0;
 }
 
-int on_close(GDT_SERVER_CONNECTION_INFO* connection)
+int on_close(QS_SERVER_CONNECTION_INFO* connection)
 {
 	printf("on_close\n");
 	return 0;
 }
 
-int32_t on_recv_udp(uint32_t payload_type, uint8_t* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info )
+int32_t on_recv_udp(uint32_t payload_type, uint8_t* payload, size_t payload_len, QS_RECV_INFO *gdt_recv_info )
 {
 	printf("on_recv_udp(payload_type:%d,payload_len:%d)%s\n",payload_type,(int)payload_len,(char*)payload);
 	struct sockaddr_storage from;

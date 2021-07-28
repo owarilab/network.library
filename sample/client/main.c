@@ -25,21 +25,21 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "gdt_socket.h"
-int on_connect(GDT_SERVER_CONNECTION_INFO* connection);
-int32_t on_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info );
-int on_close(GDT_SERVER_CONNECTION_INFO* connection);
-int32_t on_udp_client_payload_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info);
+#include "qs_socket.h"
+int on_connect(QS_SERVER_CONNECTION_INFO* connection);
+int32_t on_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, QS_RECV_INFO *gdt_recv_info );
+int on_close(QS_SERVER_CONNECTION_INFO* connection);
+int32_t on_udp_client_payload_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, QS_RECV_INFO *gdt_recv_info);
 
 int main( int argc, char *argv[], char *envp[] )
 {
-	GDT_SOCKET_OPTION* tcp_client = gdt_create_tcp_client("localhost", "52001");
+	QS_SOCKET_OPTION* tcp_client = gdt_create_tcp_client("localhost", "52001");
 	set_on_connect_event(tcp_client,on_connect);
 	set_on_payload_recv_event(tcp_client,on_recv);
 	set_on_close_event(tcp_client,on_close);
 	gdt_socket(tcp_client);
 	
-	GDT_SOCKET_OPTION*  udp_client = gdt_create_udp_client("localhost", "52001");
+	QS_SOCKET_OPTION*  udp_client = gdt_create_udp_client("localhost", "52001");
 	set_on_payload_recv_event(udp_client, on_udp_client_payload_recv);
 	gdt_socket(udp_client);
 	
@@ -58,25 +58,25 @@ int main( int argc, char *argv[], char *envp[] )
 	return 0;
 }
 
-int on_connect(GDT_SERVER_CONNECTION_INFO* connection)
+int on_connect(QS_SERVER_CONNECTION_INFO* connection)
 {
 	printf("on_connect\n");
 	return 0;
 }
 
-int32_t on_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info )
+int32_t on_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, QS_RECV_INFO *gdt_recv_info )
 {
 	printf("on_recv(payload_type:%d,payload_len:%d)%s\n",payload_type,(int)payload_len,(char*)payload);
 	return 0;
 }
 
-int on_close(GDT_SERVER_CONNECTION_INFO* connection)
+int on_close(QS_SERVER_CONNECTION_INFO* connection)
 {
 	printf("on_close\n");
 	return 0;
 }
 
-int32_t on_udp_client_payload_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, GDT_RECV_INFO *gdt_recv_info)
+int32_t on_udp_client_payload_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, QS_RECV_INFO *gdt_recv_info)
 {
 	char *pbuf = (char*)payload;
 	pbuf[payload_len] = '\0';
