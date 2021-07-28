@@ -158,10 +158,12 @@ void* on_recv( void* args )
 
 	// request path
 	char request_path[MAXPATHLEN];
+	memset(request_path,0,sizeof(request_path));
 	gdt_http_document_path(request_path,MAXPATHLEN,"./www","index.html",request);
 
 	// extention
 	char extension[32];
+	memset(extension,0,sizeof(extension));
 	gdt_get_extension( extension, sizeof(extension), request_path );
 
 	printf("request path : %s , extension : %s\n",request_path,extension);
