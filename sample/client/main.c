@@ -46,9 +46,9 @@ int main( int argc, char *argv[], char *envp[] )
 	while(1){
 		qs_client_update(tcp_client);
 		qs_client_update(udp_client);
-		usleep(100000);
+		qs_sleep(100000);
 		qs_client_send_message(0x01,"test1",4,tcp_client);
-		usleep(100000);
+		qs_sleep(100000);
 		qs_client_send_message(0x02,"test2",4,udp_client);
 	}
 	qs_free_socket(tcp_client);

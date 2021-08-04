@@ -50,7 +50,7 @@ int main( int argc, char *argv[], char *envp[] )
 	while(1){
 		qs_server_update(option);
 		qs_server_update(udp_option);
-		usleep(100);
+		qs_sleep(100);
 		now_time = time(NULL);
 		if( now_time - timer > 5 ){
 			timer = now_time;

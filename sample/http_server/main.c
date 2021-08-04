@@ -62,7 +62,7 @@ int main( int argc, char *argv[], char *envp[] )
 			update_time = current_time;
 		}
 		qs_server_update(option);
-		usleep(100);
+		qs_sleep(100);
 	}
 	qs_free_socket(option);
 	qs_free(option->memory_pool);
