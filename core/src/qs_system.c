@@ -73,7 +73,7 @@ char* gnt_get_argv( int index )
 	return NULL;
 }
 
-int gdt_error( char* error_str )
+int qs_error( char* error_str )
 {
 	perror( error_str );
 	return QS_SYSTEM_ERROR;
@@ -81,41 +81,41 @@ int gdt_error( char* error_str )
 
 #ifdef __WINDOWS__
 #else
-int32_t gdt_get_current_directory( QS_MEMORY_POOL* _ppool )
+int32_t qs_get_current_directory( QS_MEMORY_POOL* _ppool )
 {
 	int32_t munit = -1;
 	do{
-		int32_t muPathBuffer = gdt_create_munit( _ppool, MAXPATHLEN, MEMORY_TYPE_DEFAULT );
-		char* pbuf = (char*)gdt_upointer( _ppool,muPathBuffer );
+		int32_t muPathBuffer = qs_create_munit( _ppool, MAXPATHLEN, MEMORY_TYPE_DEFAULT );
+		char* pbuf = (char*)qs_upointer( _ppool,muPathBuffer );
 		if( pbuf == NULL ){
-			printf( "[gdt_get_current_directory]gdt_upointer error\n" );
+			printf( "[qs_get_current_directory]qs_upointer error\n" );
 			break;
 		}
 		if( NULL == getcwd( pbuf, MAXPATHLEN ) )
 		{
-			printf( "[gdt_get_current_directory]getcwd error\n" );
+			printf( "[qs_get_current_directory]getcwd error\n" );
 			munit = QS_SYSTEM_ERROR;
 			break;
 		}
-		size_t length = gdt_strlen( pbuf );
-		size_t msize = gdt_mgetsize( _ppool, length + 1 );
-		munit = gdt_create_munit( _ppool, msize, MEMORY_TYPE_DEFAULT );
+		size_t length = qs_strlen( pbuf );
+		size_t msize = qs_mgetsize( _ppool, length + 1 );
+		munit = qs_create_munit( _ppool, msize, MEMORY_TYPE_DEFAULT );
 		if( munit < 0 ){
-			printf( "[gdt_get_current_directory]gdt_create_munit error = %d\n", munit );
+			printf( "[qs_get_current_directory]qs_create_munit error = %d\n", munit );
 			break;
 		}
-		gdt_strcopy( (char *)gdt_upointer(_ppool,munit), pbuf, gdt_usize(_ppool,munit) );
-		gdt_free_memory_unit( _ppool, &muPathBuffer );
+		qs_strcopy( (char *)qs_upointer(_ppool,munit), pbuf, qs_usize(_ppool,munit) );
+		qs_free_memory_unit( _ppool, &muPathBuffer );
 #ifdef __QS_DEBUG__
-//		syslog( LOG_USER|LOG_NOTICE, "daemon:cwd=%s\n", (char *)gdt_upointer(_ppool,munit) );
-//		printf(  "daemon:cwd=%s\n", (char *)gdt_upointer(_ppool,munit) );
+//		syslog( LOG_USER|LOG_NOTICE, "daemon:cwd=%s\n", (char *)qs_upointer(_ppool,munit) );
+//		printf(  "daemon:cwd=%s\n", (char *)qs_upointer(_ppool,munit) );
 //		printf(  "length=%zd\n", length );
 #endif
 	}while( false );
 	return munit;
 }
 
-int gdt_daemonize( int nochdir , int noclose )
+int qs_daemonize( int nochdir , int noclose )
 {
 	int i,fd,error_code;
 	pid_t pid;
@@ -162,7 +162,7 @@ int gdt_daemonize( int nochdir , int noclose )
 	return 0;
 }
 
-int gdt_descriptor_flags_on( int fd, int flag )
+int qs_descriptor_flags_on( int fd, int flag )
 {
 	int flags;
 	int error_code = 0;
@@ -176,7 +176,7 @@ int gdt_descriptor_flags_on( int fd, int flag )
 	return error_code;
 }
 
-int gdt_descriptor_flags_off( int fd, int flag )
+int qs_descriptor_flags_off( int fd, int flag )
 {
 	int flags;
 	int error_code = 0;
@@ -190,26 +190,26 @@ int gdt_descriptor_flags_off( int fd, int flag )
 	return error_code;
 }
 
-int gdt_set_defaultsignal()
+int qs_set_defaultsignal()
 {
-	(void) gdt_set_sigaction( SIGALRM, SIG_IGN, SA_NODEFER );
-	(void) gdt_set_sigaction( SIGPIPE, SIG_IGN, SA_NODEFER );
-	(void) gdt_set_sigaction( SIGUSR1, SIG_IGN, SA_NODEFER );
-	(void) gdt_set_sigaction( SIGUSR2, SIG_IGN, SA_NODEFER );
-	(void) gdt_set_sigaction( SIGTTIN, SIG_IGN, SA_NODEFER );
-	(void) gdt_set_sigaction( SIGTTOU, SIG_IGN, SA_NODEFER );
+	(void) qs_set_sigaction( SIGALRM, SIG_IGN, SA_NODEFER );
+	(void) qs_set_sigaction( SIGPIPE, SIG_IGN, SA_NODEFER );
+	(void) qs_set_sigaction( SIGUSR1, SIG_IGN, SA_NODEFER );
+	(void) qs_set_sigaction( SIGUSR2, SIG_IGN, SA_NODEFER );
+	(void) qs_set_sigaction( SIGTTIN, SIG_IGN, SA_NODEFER );
+	(void) qs_set_sigaction( SIGTTOU, SIG_IGN, SA_NODEFER );
 	
-	//(void) gdt_set_sigaction( SIGTERM, SIG_IGN, SA_NODEFER );
-	//(void) gdt_set_sigaction( SIGQUIT, SIG_IGN, SA_NODEFER );
-	//(void) gdt_set_sigaction( SIGTSTP, SIG_IGN, SA_NODEFER );
+	//(void) qs_set_sigaction( SIGTERM, SIG_IGN, SA_NODEFER );
+	//(void) qs_set_sigaction( SIGQUIT, SIG_IGN, SA_NODEFER );
+	//(void) qs_set_sigaction( SIGTSTP, SIG_IGN, SA_NODEFER );
 	
-	(void) gdt_set_sigaction( SIGINT, gdt_sig_int_handler, SA_NODEFER );
-	(void) gdt_set_sigaction( SIGHUP, gdt_sig_hangup_handler, SA_NODEFER );
-	(void) gdt_set_sigaction( SIGCHLD, gdt_sig_chld_handler, SA_NODEFER );
+	(void) qs_set_sigaction( SIGINT, qs_sig_int_handler, SA_NODEFER );
+	(void) qs_set_sigaction( SIGHUP, qs_sig_hangup_handler, SA_NODEFER );
+	(void) qs_set_sigaction( SIGCHLD, qs_sig_chld_handler, SA_NODEFER );
 	return 1;
 }
 
-int gdt_set_sigaction( int signum, SIG_HANDLER sh, int sa_flags )
+int qs_set_sigaction( int signum, SIG_HANDLER sh, int sa_flags )
 {
 	struct sigaction sa;
 	(void) sigaction( signum, (struct sigaction *) NULL, &sa );
@@ -229,11 +229,11 @@ int gdt_set_sigaction( int signum, SIG_HANDLER sh, int sa_flags )
 /*
  * SIGHUP
  */
-void gdt_sig_hangup_handler( int sig )
+void qs_sig_hangup_handler( int sig )
 {
 	int i;
 #ifdef __QS_DEBUG__
-	printf( "gdt_sig_hangup_handler(%d)\n", sig );
+	printf( "qs_sig_hangup_handler(%d)\n", sig );
 #endif
 	for( i = 3; i < QS_MAX_FILE_DESCRIPTOR; i++ ){
 		(void) close(i);
@@ -246,7 +246,7 @@ void gdt_sig_hangup_handler( int sig )
 /*
  * SIGCHILD ( fork -> exit )
  */
-void gdt_sig_chld_handler( int sig )
+void qs_sig_chld_handler( int sig )
 {
 	int status;
 	pid_t pid;
@@ -256,7 +256,7 @@ void gdt_sig_chld_handler( int sig )
 		
 	}
 #ifdef __QS_DEBUG__
-	printf( "gdt_sig_chld_handler:wait:pid%d,status=%d\n", pid, status );
+	printf( "qs_sig_chld_handler:wait:pid%d,status=%d\n", pid, status );
 	printf( " WIFEXITED:%d, WEXITSTATUS:%d, WIFSIGNALED:%d,WTERMSIG:%d,WIFSTOPPED:%d,WSTOPSIG:%d\n",
 					WIFEXITED(status),
 					WEXITSTATUS(status),
@@ -271,7 +271,7 @@ void gdt_sig_chld_handler( int sig )
 /*
  * SIGINT( Ctrl + c )
  */
-void gdt_sig_int_handler( int sig )
+void qs_sig_int_handler( int sig )
 {
 #ifdef __QS_DEBUG__
 	printf("\nsigint handler\n");
@@ -286,14 +286,14 @@ void gdt_sig_int_handler( int sig )
 	exit(0);
 }
 
-void gdt_init_child_pid()
+void qs_init_child_pid()
 {
 	int i;
 	for(i=0;i<MAX_CHILD_PROCESS;++i){
 		child_pid[i] = 0;
 	}
 }
-void gdt_set_child_pid(pid_t pid,int32_t offset)
+void qs_set_child_pid(pid_t pid,int32_t offset)
 {
 	if(offset>=MAX_CHILD_PROCESS){
 		return;
@@ -301,7 +301,7 @@ void gdt_set_child_pid(pid_t pid,int32_t offset)
 	child_pid[offset] = pid;
 }
 
-int gdt_set_execute_user(SYSTEM_SERVER_OPTION* sys_option)
+int qs_set_execute_user(SYSTEM_SERVER_OPTION* sys_option)
 {
 	struct passwd* pw;
 	pw=getpwuid(getuid());
@@ -320,7 +320,7 @@ int gdt_set_execute_user(SYSTEM_SERVER_OPTION* sys_option)
 
 #endif // ifndef __WINDOWS__
 
-void gdt_localtime(struct tm* ptm, time_t* ptime )
+void qs_localtime(struct tm* ptm, time_t* ptime )
 {
 #ifdef __WINDOWS__
 	localtime_s(ptm, ptime);
@@ -329,7 +329,7 @@ void gdt_localtime(struct tm* ptm, time_t* ptime )
 #endif
 }
 
-void gdt_getopt(SYSTEM_SERVER_OPTION* sys_option, const char* hostname, const char* portnum, const char* pid_file_path, const char* log_file_path, const char* execute_user_name)
+void qs_getopt(SYSTEM_SERVER_OPTION* sys_option, const char* hostname, const char* portnum, const char* pid_file_path, const char* log_file_path, const char* execute_user_name)
 {
 	sys_option->phostname = NULL;
 	memset( sys_option->hostname, 0, sizeof( sys_option->hostname ) );
@@ -393,18 +393,18 @@ void gdt_getopt(SYSTEM_SERVER_OPTION* sys_option, const char* hostname, const ch
 
 }
 
-void gdt_set_pid(SYSTEM_SERVER_OPTION* sys_option)
+void qs_set_pid(SYSTEM_SERVER_OPTION* sys_option)
 {
 #ifndef __WINDOWS__
 	// pid
 	int64_t pid = (int64_t)getpid();
 	char numstr[32];
-	gdt_itoa(pid, numstr, sizeof(numstr));
-	gdt_fwrite(sys_option->pid_file_path, numstr, gdt_strlen(numstr));
+	qs_itoa(pid, numstr, sizeof(numstr));
+	qs_fwrite(sys_option->pid_file_path, numstr, qs_strlen(numstr));
 #endif
 }
 
-void gdt_sleep(int time)
+void qs_sleep(int time)
 {
 #ifdef __WINDOWS__
 	if(time<=1000){
@@ -419,7 +419,7 @@ void gdt_sleep(int time)
 #endif
 }
 
-void gdt_initialize_scheduler(SYSTEM_UPDATE_SCHEDULER* scheduler)
+void qs_initialize_scheduler(SYSTEM_UPDATE_SCHEDULER* scheduler)
 {
 	scheduler->last_update_time = time(NULL);
 	scheduler->update_max = 10;
@@ -437,7 +437,7 @@ void gdt_initialize_scheduler(SYSTEM_UPDATE_SCHEDULER* scheduler)
 	scheduler->on_update = 0;
 }
 
-void gdt_update_scheduler(SYSTEM_UPDATE_SCHEDULER* scheduler)
+void qs_update_scheduler(SYSTEM_UPDATE_SCHEDULER* scheduler)
 {
 	time_t t = time(NULL);
 	scheduler->on_update = 0;

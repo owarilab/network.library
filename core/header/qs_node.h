@@ -49,13 +49,13 @@ typedef struct QS_NODE
 } QS_NODE;
 
 // node tree
-int32_t gdt_createrootnode( QS_MEMORY_POOL* _ppool );
-int32_t gdt_addnodeelement( QS_MEMORY_POOL* _ppool, QS_NODE* node );
-int32_t gdt_addhashnodeelement( QS_MEMORY_POOL* _ppool, QS_NODE* node );
-int32_t gdt_addelement( QS_MEMORY_POOL* _ppool, QS_NODE* node, int id, int32_t data_munit );
-int32_t gdt_addhashelement( QS_MEMORY_POOL* _ppool, QS_NODE* node, int id, int32_t data_munit );
-void gdt_elementdump( QS_MEMORY_POOL* _ppool, QS_NODE* node );
-void gdt_elementdumpchild( QS_MEMORY_POOL* _ppool, QS_NODE* node, int32_t index );
+int32_t qs_createrootnode( QS_MEMORY_POOL* _ppool );
+int32_t qs_addnodeelement( QS_MEMORY_POOL* _ppool, QS_NODE* node );
+int32_t qs_addhashnodeelement( QS_MEMORY_POOL* _ppool, QS_NODE* node );
+int32_t qs_addelement( QS_MEMORY_POOL* _ppool, QS_NODE* node, int id, int32_t data_munit );
+int32_t qs_addhashelement( QS_MEMORY_POOL* _ppool, QS_NODE* node, int id, int32_t data_munit );
+void qs_elementdump( QS_MEMORY_POOL* _ppool, QS_NODE* node );
+void qs_elementdumpchild( QS_MEMORY_POOL* _ppool, QS_NODE* node, int32_t index );
 
 #endif /*_QS_NODE_H_*/
 

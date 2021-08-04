@@ -40,16 +40,16 @@ extern "C"{
 #include <sys/time.h>
 #endif
 
-extern uint32_t gdt_xorshift_32_seed;
-extern uint64_t gdt_xorshift_64_seed1;
-extern uint64_t gdt_xorshift_64_seed2;
+extern uint32_t qs_xorshift_32_seed;
+extern uint64_t qs_xorshift_64_seed1;
+extern uint64_t qs_xorshift_64_seed2;
 
-void gdt_srand_32();
-void gdt_srand_64();
-uint32_t gdt_rand_32();
-uint64_t gdt_rand_64();
-void gdt_uniqid_r32( char* idbuf, size_t size );
-void gdt_uniqid_r64( char* idbuf, size_t size );
+void qs_srand_32();
+void qs_srand_64();
+uint32_t qs_rand_32();
+uint64_t qs_rand_64();
+void qs_uniqid_r32( char* idbuf, size_t size );
+void qs_uniqid_r64( char* idbuf, size_t size );
 
 #endif /*_QS_RANDOM_H_*/
 

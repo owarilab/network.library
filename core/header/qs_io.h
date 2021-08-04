@@ -54,41 +54,41 @@ typedef struct QS_FILE_INFO
 	char path[MAXPATHLEN];
 } QS_FILE_INFO;
 
-int gdt_finit( QS_FILE_INFO* info);
-int gdt_fopen( char* file_name, char* mode, QS_FILE_INFO* info );
-int gdt_fwrite2( QS_FILE_INFO* info, char* write_buffer, size_t write_buffer_size );
-int gdt_fclose( QS_FILE_INFO* info );
-int gdt_fget_info( char* file_name, QS_FILE_INFO* info );
-int gdt_fputchar( FILE* f );
-int gdt_fputchar_line( FILE* f, uint32_t start, uint32_t line );
-int gdt_fout( char* file_name );
-int gdt_fout_line( char* file_name, uint32_t start, uint32_t line );
-size_t gdt_fread( char* file_name, char* dest, size_t size );
-size_t gdt_fread_range( char* file_name, char* dest, size_t pos, size_t size );
-size_t gdt_fread_bin( char* file_name, char* dest, size_t size );
-size_t gdt_fread_bin_range( char* file_name, char* dest, size_t pos, size_t size );
-int gdt_fwrite( char* file_name, char* out, size_t size );
-int gdt_fwrite_a( char* file_name, char* out, size_t size );
-int gdt_fwrite_bin( char* file_name, char* out, size_t size );
-int gdt_fwrite_bin_a( char* file_name, char* out, size_t size );
-int gdt_frename( const char* old_name, const char* new_name );
-int gdt_unlink( const char* file_name );
-int32_t gdt_lstate( QS_MEMORY_POOL* _ppool, const char* path );
-void gdt_lstateout( QS_MEMORY_POOL* _ppool, const char* path );
+int qs_finit( QS_FILE_INFO* info);
+int qs_fopen( char* file_name, char* mode, QS_FILE_INFO* info );
+int qs_fwrite2( QS_FILE_INFO* info, char* write_buffer, size_t write_buffer_size );
+int qs_fclose( QS_FILE_INFO* info );
+int qs_fget_info( char* file_name, QS_FILE_INFO* info );
+int qs_fputchar( FILE* f );
+int qs_fputchar_line( FILE* f, uint32_t start, uint32_t line );
+int qs_fout( char* file_name );
+int qs_fout_line( char* file_name, uint32_t start, uint32_t line );
+size_t qs_fread( char* file_name, char* dest, size_t size );
+size_t qs_fread_range( char* file_name, char* dest, size_t pos, size_t size );
+size_t qs_fread_bin( char* file_name, char* dest, size_t size );
+size_t qs_fread_bin_range( char* file_name, char* dest, size_t pos, size_t size );
+int qs_fwrite( char* file_name, char* out, size_t size );
+int qs_fwrite_a( char* file_name, char* out, size_t size );
+int qs_fwrite_bin( char* file_name, char* out, size_t size );
+int qs_fwrite_bin_a( char* file_name, char* out, size_t size );
+int qs_frename( const char* old_name, const char* new_name );
+int qs_unlink( const char* file_name );
+int32_t qs_lstate( QS_MEMORY_POOL* _ppool, const char* path );
+void qs_lstateout( QS_MEMORY_POOL* _ppool, const char* path );
 
 #ifdef __WINDOWS__
 #else
-int gdt_chown( char* file_name, uid_t owner, gid_t group );
-int gdt_lchown( char* file_name, uid_t owner, gid_t group );
-int gdt_utime( char *file_name, struct utimbuf *buf );
-int gdt_chmod_char( char *file_name, char* mode );
-int gdt_ls( char* path );
-int gdt_mkdir( char* path, mode_t mode );
-int gdt_rmdir( char* path );
-int gdt_link( const char* src, const char* dest );
-int gdt_symlink( const char* src, const char* dest );
-int32_t gdt_readlink( QS_MEMORY_POOL* _ppool, const char* path );
-char* gdt_filetype2char( mode_t mode );
+int qs_chown( char* file_name, uid_t owner, gid_t group );
+int qs_lchown( char* file_name, uid_t owner, gid_t group );
+int qs_utime( char *file_name, struct utimbuf *buf );
+int qs_chmod_char( char *file_name, char* mode );
+int qs_ls( char* path );
+int qs_mkdir( char* path, mode_t mode );
+int qs_rmdir( char* path );
+int qs_link( const char* src, const char* dest );
+int qs_symlink( const char* src, const char* dest );
+int32_t qs_readlink( QS_MEMORY_POOL* _ppool, const char* path );
+char* qs_filetype2char( mode_t mode );
 #endif
 
 // freopen

@@ -27,7 +27,7 @@
 
 #include "qs_io.h"
 
-int gdt_finit( QS_FILE_INFO* info)
+int qs_finit( QS_FILE_INFO* info)
 {
 	info->size = 0;
 	info->update_usec = 0;
@@ -36,11 +36,11 @@ int gdt_finit( QS_FILE_INFO* info)
 	return QS_SYSTEM_OK;
 }
 
-int gdt_fopen( char* file_name, char* mode, QS_FILE_INFO* info )
+int qs_fopen( char* file_name, char* mode, QS_FILE_INFO* info )
 {
 	struct stat st;
 	memset(info->path,0,sizeof(info->path));
-	memcpy(info->path,file_name,gdt_strlen(file_name));
+	memcpy(info->path,file_name,qs_strlen(file_name));
 #ifdef __WINDOWS__
 	if (stat(file_name, &st) < 0)
 #else
@@ -68,7 +68,7 @@ int gdt_fopen( char* file_name, char* mode, QS_FILE_INFO* info )
 	return QS_SYSTEM_OK;
 }
 
-int gdt_fwrite2( QS_FILE_INFO* info, char* write_buffer, size_t write_buffer_size )
+int qs_fwrite2( QS_FILE_INFO* info, char* write_buffer, size_t write_buffer_size )
 {
 	char* p = write_buffer;
 	while(*p!='\0'&&(p-write_buffer)<write_buffer_size){ fputc( *(p++), info->f ); };
@@ -77,19 +77,19 @@ int gdt_fwrite2( QS_FILE_INFO* info, char* write_buffer, size_t write_buffer_siz
 	//return (int)fwrite((void *)write_buffer,sizeof(char),write_buffer_size,info->f);
 }
 
-int gdt_fclose( QS_FILE_INFO* info )
+int qs_fclose( QS_FILE_INFO* info )
 {
 	if( info->f == NULL ){ return QS_SYSTEM_OK; }
 	fclose(info->f);
-	gdt_finit(info);
+	qs_finit(info);
 	return QS_SYSTEM_OK;
 }
 
-int gdt_fget_info( char* file_name, QS_FILE_INFO* info )
+int qs_fget_info( char* file_name, QS_FILE_INFO* info )
 {
 	struct stat st;
 	if( info == NULL ){
-		printf( "[gdt_fget_info] QS_FILE_INFO is null\n" );
+		printf( "[qs_fget_info] QS_FILE_INFO is null\n" );
 		return QS_SYSTEM_ERROR;
 	}
 #ifdef __WINDOWS__
@@ -98,7 +98,7 @@ int gdt_fget_info( char* file_name, QS_FILE_INFO* info )
 	if (lstat(file_name, &st) < 0)
 #endif
 	{
-		//printf("[gdt_lstate]lstat error:%s\n",file_name);
+		//printf("[qs_lstate]lstat error:%s\n",file_name);
 		return QS_SYSTEM_ERROR;
 	}
 	info->size = st.st_size;
@@ -109,11 +109,11 @@ int gdt_fget_info( char* file_name, QS_FILE_INFO* info )
 	return QS_SYSTEM_OK;
 }
 
-int gdt_fputchar( FILE* f )
+int qs_fputchar( FILE* f )
 {
 	char c;
 	if( f == NULL || !f ){
-		printf( "[gdt_fputchar] FILE get error\n" );
+		printf( "[qs_fputchar] FILE get error\n" );
 		return QS_SYSTEM_ERROR;
 	}
 	while( ( c = fgetc( f ) ) != EOF ){
@@ -124,7 +124,7 @@ int gdt_fputchar( FILE* f )
 	return QS_SYSTEM_OK;
 }
 
-int gdt_fputchar_line( FILE* f, uint32_t start, uint32_t line )
+int qs_fputchar_line( FILE* f, uint32_t start, uint32_t line )
 {
 	int error_code = 0;
 	int lineCount = 0;
@@ -135,7 +135,7 @@ int gdt_fputchar_line( FILE* f, uint32_t start, uint32_t line )
 	do{
 		if( f == NULL || !f )
 		{
-			printf( "[gdt_fputchar_line] FILE get error\n" );
+			printf( "[qs_fputchar_line] FILE get error\n" );
 			break;
 		}
 		while( ( c = fgetc( f ) ) != EOF )
@@ -173,7 +173,7 @@ int gdt_fputchar_line( FILE* f, uint32_t start, uint32_t line )
 	return error_code;
 }
 
-int gdt_fout( char* file_name )
+int qs_fout( char* file_name )
 {
 	int error_code = 0;
 	FILE* f;
@@ -184,16 +184,16 @@ int gdt_fout( char* file_name )
 		if (!(f = fopen(file_name, "r")))
 #endif
 		{
-			printf( "[gdt_fout] fopen error\n" );
+			printf( "[qs_fout] fopen error\n" );
 			break;
 		}
-		gdt_fputchar( f );
+		qs_fputchar( f );
 		fclose( f );
 	}while( false );
 	return error_code;
 }
 
-int gdt_fout_line( char* file_name, uint32_t start, uint32_t line  )
+int qs_fout_line( char* file_name, uint32_t start, uint32_t line  )
 {
 	int error_code = 0;
 	FILE* f;
@@ -204,16 +204,16 @@ int gdt_fout_line( char* file_name, uint32_t start, uint32_t line  )
 		if (!(f = fopen(file_name, "r")))
 #endif
 		{
-			printf( "[gdt_fout] fopen error\n" );
+			printf( "[qs_fout] fopen error\n" );
 			break;
 		}
-		gdt_fputchar_line( f, start, line );
+		qs_fputchar_line( f, start, line );
 		fclose( f );
 	}while( false );
 	return error_code;
 }
 
-size_t gdt_fread( char* file_name, char* dest, size_t size )
+size_t qs_fread( char* file_name, char* dest, size_t size )
 {
 	size_t rsize = 0;
 	struct stat st;
@@ -222,7 +222,7 @@ size_t gdt_fread( char* file_name, char* dest, size_t size )
 	char* ps = dest;
 	do{
 		if( dest == NULL ){
-			printf( "[gdt_fread] output pointer is null : %s\n", file_name );
+			printf( "[qs_fread] output pointer is null : %s\n", file_name );
 			break;
 		}
 
@@ -232,7 +232,7 @@ size_t gdt_fread( char* file_name, char* dest, size_t size )
 		if (!(f = fopen(file_name, "r")))
 #endif
 		{
-			printf( "[gdt_fread] fopen error = %s\n", file_name );
+			printf( "[qs_fread] fopen error = %s\n", file_name );
 			break;
 		}
 		
@@ -242,16 +242,16 @@ size_t gdt_fread( char* file_name, char* dest, size_t size )
 		if (lstat(file_name, &st) < 0)
 #endif
 		{
-			printf("[gdt_lstate]lstat error\n");
+			printf("[qs_lstate]lstat error\n");
 			fclose( f );
 			break;
 		}
 
 		if (st.st_size >= size) {
 #ifdef __WINDOWS__
-			printf("[gdt_fread_bin] buffer size over %ld , %zd\n", st.st_size, size);
+			printf("[qs_fread_bin] buffer size over %ld , %zd\n", st.st_size, size);
 #else
-			printf("[gdt_fread_bin] buffer size over %zd , %zd\n", st.st_size, size);
+			printf("[qs_fread_bin] buffer size over %zd , %zd\n", st.st_size, size);
 #endif
 			fclose( f );
 			break;
@@ -268,7 +268,7 @@ size_t gdt_fread( char* file_name, char* dest, size_t size )
 	return rsize;
 }
 
-size_t gdt_fread_range( char* file_name, char* dest, size_t pos, size_t size )
+size_t qs_fread_range( char* file_name, char* dest, size_t pos, size_t size )
 {
 	size_t rsize = 0;
 	struct stat st;
@@ -277,7 +277,7 @@ size_t gdt_fread_range( char* file_name, char* dest, size_t pos, size_t size )
 	char* ps = dest;
 	do{
 		if( dest == NULL ){
-			printf( "[gdt_fread] output pointer is null : %s\n", file_name );
+			printf( "[qs_fread] output pointer is null : %s\n", file_name );
 			break;
 		}
 
@@ -287,7 +287,7 @@ size_t gdt_fread_range( char* file_name, char* dest, size_t pos, size_t size )
 		if (!(f = fopen(file_name, "r")))
 #endif
 		{
-			printf( "[gdt_fread] fopen error = %s\n", file_name );
+			printf( "[qs_fread] fopen error = %s\n", file_name );
 			break;
 		}
 		
@@ -297,14 +297,14 @@ size_t gdt_fread_range( char* file_name, char* dest, size_t pos, size_t size )
 		if (lstat(file_name, &st) < 0)
 #endif
 		{
-			printf("[gdt_lstate]lstat error\n");
+			printf("[qs_lstate]lstat error\n");
 			fclose( f );
 			break;
 		}
 
 		if( (fseek(f, pos, SEEK_SET)) != 0 )
 		{
-			printf( "[gdt_fread_bin] fsetpos error\n" );
+			printf( "[qs_fread_bin] fsetpos error\n" );
 			fclose( f );
 			break;
 		}
@@ -320,7 +320,7 @@ size_t gdt_fread_range( char* file_name, char* dest, size_t pos, size_t size )
 	return rsize;
 }
 
-size_t gdt_fread_bin( char* file_name, char* dest, size_t size )
+size_t qs_fread_bin( char* file_name, char* dest, size_t size )
 {
 	size_t retsize = 0;
 	struct stat st;
@@ -328,7 +328,7 @@ size_t gdt_fread_bin( char* file_name, char* dest, size_t size )
 	size_t rsize = 0;
 	do{
 		if( dest == NULL ){
-			printf( "[gdt_fread_bin] output pointer is null : %s\n", file_name );
+			printf( "[qs_fread_bin] output pointer is null : %s\n", file_name );
 			break;
 		}
 #ifdef __WINDOWS__
@@ -337,7 +337,7 @@ size_t gdt_fread_bin( char* file_name, char* dest, size_t size )
 		if (!(f = fopen(file_name, "rb")))
 #endif
 		{
-			printf( "[gdt_fread_bin] fopen error = %s\n", file_name );
+			printf( "[qs_fread_bin] fopen error = %s\n", file_name );
 			break;
 		}
 
@@ -347,14 +347,14 @@ size_t gdt_fread_bin( char* file_name, char* dest, size_t size )
 		if (lstat(file_name, &st) < 0)
 #endif
 		{
-			printf("[gdt_fread_bin]lstat error\n");
+			printf("[qs_fread_bin]lstat error\n");
 			fclose( f );
 			break;
 		}
 		retsize = st.st_size;
 
 		if( retsize > size ){
-			printf( "[gdt_fread_bin] buffer size over %zd , %zd\n", retsize , size );
+			printf( "[qs_fread_bin] buffer size over %zd , %zd\n", retsize , size );
 			retsize = size;
 		}
 		
@@ -368,7 +368,7 @@ size_t gdt_fread_bin( char* file_name, char* dest, size_t size )
 	return retsize;
 }
 
-size_t gdt_fread_bin_range( char* file_name, char* dest, size_t pos, size_t size )
+size_t qs_fread_bin_range( char* file_name, char* dest, size_t pos, size_t size )
 {
 	size_t retsize = 0;
 	struct stat st;
@@ -381,7 +381,7 @@ size_t gdt_fread_bin_range( char* file_name, char* dest, size_t pos, size_t size
 		if (!(f = fopen(file_name, "rb")))
 #endif
 		{
-			printf( "[gdt_fread_bin] fopen error = %s\n", file_name );
+			printf( "[qs_fread_bin] fopen error = %s\n", file_name );
 			break;
 		}
 
@@ -391,14 +391,14 @@ size_t gdt_fread_bin_range( char* file_name, char* dest, size_t pos, size_t size
 		if (lstat(file_name, &st) < 0)
 #endif
 		{
-			printf("[gdt_fread_bin]lstat error\n");
+			printf("[qs_fread_bin]lstat error\n");
 			fclose( f );
 			break;
 		}
 
 		if( (fseek(f, pos, SEEK_SET)) != 0 )
 		{
-			printf( "[gdt_fread_bin] fsetpos error\n" );
+			printf( "[qs_fread_bin] fsetpos error\n" );
 			fclose( f );
 			break;
 		}
@@ -409,7 +409,7 @@ size_t gdt_fread_bin_range( char* file_name, char* dest, size_t pos, size_t size
 	return retsize;
 }
 
-int gdt_fwrite( char* file_name, char* out, size_t size )
+int qs_fwrite( char* file_name, char* out, size_t size )
 {
 	int error_code = 0;
 	char* p;
@@ -431,7 +431,7 @@ int gdt_fwrite( char* file_name, char* out, size_t size )
 	return error_code;
 }
 
-int gdt_fwrite_a( char* file_name, char* out, size_t size )
+int qs_fwrite_a( char* file_name, char* out, size_t size )
 {
 	int error_code = 0;
 	char* p;
@@ -444,7 +444,7 @@ int gdt_fwrite_a( char* file_name, char* out, size_t size )
 		if (!(fp = fopen(file_name, "a")))
 #endif
 		{
-			printf( "gdt_fwrite_a : fopen error.\n" );
+			printf( "qs_fwrite_a : fopen error.\n" );
 			error_code = -1;
 			break;
 		}
@@ -458,7 +458,7 @@ int gdt_fwrite_a( char* file_name, char* out, size_t size )
 	return error_code;
 }
 
-int gdt_fwrite_bin( char* file_name, char* out, size_t size )
+int qs_fwrite_bin( char* file_name, char* out, size_t size )
 {
 	int error_code = 0;
 	do{
@@ -469,7 +469,7 @@ int gdt_fwrite_bin( char* file_name, char* out, size_t size )
 		if (!(fp = fopen(file_name, "wb")))
 #endif
 		{
-			printf( "gdt_fwrite_a : fopen error.\n" );
+			printf( "qs_fwrite_a : fopen error.\n" );
 			error_code = -1;
 			break;
 		}
@@ -479,7 +479,7 @@ int gdt_fwrite_bin( char* file_name, char* out, size_t size )
 	return error_code;
 }
 
-int gdt_fwrite_bin_a( char* file_name, char* out, size_t size )
+int qs_fwrite_bin_a( char* file_name, char* out, size_t size )
 {
 	int error_code = 0;
 	do{
@@ -490,7 +490,7 @@ int gdt_fwrite_bin_a( char* file_name, char* out, size_t size )
 		if (!(fp = fopen(file_name, "ab")))
 #endif
 		{
-			printf( "gdt_fwrite_a : fopen error.\n" );
+			printf( "qs_fwrite_a : fopen error.\n" );
 			error_code = -1;
 			break;
 		}
@@ -500,7 +500,7 @@ int gdt_fwrite_bin_a( char* file_name, char* out, size_t size )
 	return error_code;
 }
 
-int gdt_frename( const char* old_name, const char* new_name )
+int qs_frename( const char* old_name, const char* new_name )
 {
 	int error_code = 0;
 	do{
@@ -512,7 +512,7 @@ int gdt_frename( const char* old_name, const char* new_name )
 	return error_code;
 }
 
-int gdt_unlink( const char* file_name )
+int qs_unlink( const char* file_name )
 {
 	int error_code = 0;
 	do{
@@ -529,15 +529,15 @@ int gdt_unlink( const char* file_name )
 	return error_code;
 }
 
-int32_t gdt_lstate( QS_MEMORY_POOL* _ppool, const char* path )
+int32_t qs_lstate( QS_MEMORY_POOL* _ppool, const char* path )
 {
 	int32_t status_munit = -1;
 	struct stat* ps;
 	do{
-		status_munit = gdt_create_memory_block( _ppool, sizeof(struct stat) );
-		ps = (struct stat*)gdt_upointer( _ppool, status_munit );
+		status_munit = qs_create_memory_block( _ppool, sizeof(struct stat) );
+		ps = (struct stat*)qs_upointer( _ppool, status_munit );
 		if( ps == NULL ){
-			printf( "[gdt_lstate]gdt_upointer error\n" );
+			printf( "[qs_lstate]qs_upointer error\n" );
 			status_munit = -1;
 			break;
 		}
@@ -547,7 +547,7 @@ int32_t gdt_lstate( QS_MEMORY_POOL* _ppool, const char* path )
 		if( lstat( path, ps ) < 0 )
 #endif
 		{
-			printf( "[gdt_lstate]lstat error\n" );
+			printf( "[qs_lstate]lstat error\n" );
 			status_munit = -1;
 			break;
 		}
@@ -555,21 +555,21 @@ int32_t gdt_lstate( QS_MEMORY_POOL* _ppool, const char* path )
 	return status_munit;
 }
 
-void gdt_lstateout( QS_MEMORY_POOL* _ppool, const char* path )
+void qs_lstateout( QS_MEMORY_POOL* _ppool, const char* path )
 {
 	struct stat* ps;
-	int32_t mulstate = gdt_lstate( _ppool, path );
+	int32_t mulstate = qs_lstate( _ppool, path );
 #ifdef __WINDOWS__
 	char bufa[32];
 	char bufm[32];
 	char bufc[32];
 #endif
 	if( mulstate >= 0 ){
-		ps = (struct stat*)gdt_upointer( _ppool, mulstate );
+		ps = (struct stat*)qs_upointer( _ppool, mulstate );
 #ifdef __WINDOWS__
 		printf(  "type\t(%d)\n", ps->st_mode );
 #else
-		printf(  "type\t%o (%s)\n", ( ps->st_mode & S_IFMT ), gdt_filetype2char( ps->st_mode ) );
+		printf(  "type\t%o (%s)\n", ( ps->st_mode & S_IFMT ), qs_filetype2char( ps->st_mode ) );
 		printf(  "blksize\t%lu\n", (unsigned long)ps->st_blksize );
 		printf(  "blocks\t%lu\n", (unsigned long)ps->st_blocks );
 #endif
@@ -606,7 +606,7 @@ void gdt_lstateout( QS_MEMORY_POOL* _ppool, const char* path )
  * @param owner 権限を付与するユーザー( 変更したくない場合は-1 )
  * @param group 権限を付与するグループ( 変更したくない場合は-1 )
  */
-int gdt_chown( char* file_name, uid_t owner, gid_t group )
+int qs_chown( char* file_name, uid_t owner, gid_t group )
 {
 	int retcode = 0;
 	retcode = chown( file_name, owner, group );
@@ -624,7 +624,7 @@ int gdt_chown( char* file_name, uid_t owner, gid_t group )
  * @param owner 権限を付与するユーザー( 変更したくない場合は-1 )
  * @param group 権限を付与するグループ( 変更したくない場合は-1 )
  */
-int gdt_lchown( char* file_name, uid_t owner, gid_t group )
+int qs_lchown( char* file_name, uid_t owner, gid_t group )
 {
 	int retcode = 0;
 	if( (retcode = lchown( file_name, owner, group )) == -1 ){
@@ -638,7 +638,7 @@ int gdt_lchown( char* file_name, uid_t owner, gid_t group )
  * @param file_name ファイル名
  * @param buf 更新時間( NULLの場合は現在時間 )
  */
-int gdt_utime( char *file_name, struct utimbuf *buf )
+int qs_utime( char *file_name, struct utimbuf *buf )
 {
 	int retcode = 0;
 	if( ( retcode = utime( file_name, buf ) ) == -1 ){
@@ -648,7 +648,7 @@ int gdt_utime( char *file_name, struct utimbuf *buf )
 }
 
 // mode ( ex : "777" )
-int gdt_chmod_char( char *file_name, char* mode )
+int qs_chmod_char( char *file_name, char* mode )
 {
 	int retcode = 0;
 	int i_mode;
@@ -662,14 +662,14 @@ int gdt_chmod_char( char *file_name, char* mode )
 	return retcode;
 }
 
-int gdt_ls( char* path )
+int qs_ls( char* path )
 {
 	int error_code = 0;
 	do{
 		DIR * d;
 		struct dirent *ent;
 		if( !( d = opendir( path ) ) ){
-			printf( "[gdt_ls] opendir error\n" );
+			printf( "[qs_ls] opendir error\n" );
 			break;
 		}
 		do{
@@ -690,7 +690,7 @@ int gdt_ls( char* path )
 /*
  * mode ( ex:0777 )
  */
-int gdt_mkdir( char* path, mode_t mode )
+int qs_mkdir( char* path, mode_t mode )
 {
 	int error_code = 0;
 	do{
@@ -702,7 +702,7 @@ int gdt_mkdir( char* path, mode_t mode )
 	return error_code;
 }
 
-int gdt_rmdir( char* path )
+int qs_rmdir( char* path )
 {
 	int error_code = 0;
 	do{
@@ -714,7 +714,7 @@ int gdt_rmdir( char* path )
 	return error_code;
 }
 
-int gdt_link( const char* src, const char* dest )
+int qs_link( const char* src, const char* dest )
 {
 	int error_code = 0;
 	do{
@@ -726,7 +726,7 @@ int gdt_link( const char* src, const char* dest )
 	return error_code;
 }
 
-int gdt_symlink( const char* src, const char* dest )
+int qs_symlink( const char* src, const char* dest )
 {
 	int error_code = 0;
 	do{
@@ -738,20 +738,20 @@ int gdt_symlink( const char* src, const char* dest )
 	return error_code;
 }
 
-int32_t gdt_readlink( QS_MEMORY_POOL* _ppool, const char* path )
+int32_t qs_readlink( QS_MEMORY_POOL* _ppool, const char* path )
 {
 	int32_t muPathBuffer = -1;
 	do{
-		muPathBuffer = gdt_create_memory_block( _ppool, MAXPATHLEN );
-		char* pbuf = (char*)gdt_upointer( _ppool, muPathBuffer );
+		muPathBuffer = qs_create_memory_block( _ppool, MAXPATHLEN );
+		char* pbuf = (char*)qs_upointer( _ppool, muPathBuffer );
 		if( pbuf == NULL ){
-			printf( "[gdt_readlink]gdt_upointer error\n" );
+			printf( "[qs_readlink]qs_upointer error\n" );
 			muPathBuffer = -1;
 			break;
 		}
-		if( readlink( path, pbuf, gdt_usize( _ppool, muPathBuffer ) ) < 0 )
+		if( readlink( path, pbuf, qs_usize( _ppool, muPathBuffer ) ) < 0 )
 		{
-			printf( "[gdt_readlink]readlink error\n" );
+			printf( "[qs_readlink]readlink error\n" );
 			muPathBuffer = -1;
 			break;
 		}
@@ -759,7 +759,7 @@ int32_t gdt_readlink( QS_MEMORY_POOL* _ppool, const char* path )
 	return muPathBuffer;
 }
 
-char* gdt_filetype2char( mode_t mode )
+char* qs_filetype2char( mode_t mode )
 {
 	if( S_ISREG(mode) ) return "file";
 	if( S_ISDIR(mode) ) return "directory";

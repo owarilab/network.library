@@ -27,7 +27,7 @@
 
 #include "qs_base64.h"
 
-uint8_t gdt_base64_char2ascii( uint8_t c )
+uint8_t qs_base64_char2ascii( uint8_t c )
 {
 	uint8_t cnv = '\0';
 	if( c >= 0x30 && c <= 0x39 ){ // 0~9
@@ -55,7 +55,7 @@ uint8_t gdt_base64_char2ascii( uint8_t c )
  * @param src
  * @param length
  */
-void gdt_base64_encode(char* dest, uint16_t destlength, const void* src, uint16_t length)
+void qs_base64_encode(char* dest, uint16_t destlength, const void* src, uint16_t length)
 {
 	int i = -1;
 	int tmpv = 0;
@@ -100,7 +100,7 @@ void gdt_base64_encode(char* dest, uint16_t destlength, const void* src, uint16_
  * @param src
  * @param length( \0までのサイズではなく文字数を指定 )
  */
-void gdt_base64_decode( char* dest, uint16_t destlength, const void* src, uint16_t length )
+void qs_base64_decode( char* dest, uint16_t destlength, const void* src, uint16_t length )
 {
 	int i = -1;
 	int tmpv = 0;
@@ -111,8 +111,8 @@ void gdt_base64_decode( char* dest, uint16_t destlength, const void* src, uint16
 	do{
 		i++;
 		tmpv = i % 3;
-		c1 = gdt_base64_char2ascii( *ps );
-		c2 = gdt_base64_char2ascii( *(ps+1) );
+		c1 = qs_base64_char2ascii( *ps );
+		c2 = qs_base64_char2ascii( *(ps+1) );
 		switch( tmpv )
 		{
 			case 0:

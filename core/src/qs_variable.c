@@ -27,7 +27,7 @@
 
 #include "qs_variable.h"
 
-size_t gdt_set_cache_alloc_info(QS_CACHE_SERVER_DATA* data, size_t page_size, size_t json_memory_size)
+size_t qs_set_cache_alloc_info(QS_CACHE_SERVER_DATA* data, size_t page_size, size_t json_memory_size)
 {
 	data->page_size = page_size;
 	data->key_size = 128;
@@ -52,22 +52,22 @@ size_t gdt_set_cache_alloc_info(QS_CACHE_SERVER_DATA* data, size_t page_size, si
 	return data->alloc_size;
 }
 
-size_t gdt_cache_alloc(QS_CACHE_SERVER_DATA* data)
+size_t qs_cache_alloc(QS_CACHE_SERVER_DATA* data)
 {
 	size_t size;
-	if( (size = gdt_initialize_memory_f64( &data->memory_pool, data->alloc_size) ) <= 0 ){
+	if( (size = qs_initialize_memory_f64( &data->memory_pool, data->alloc_size) ) <= 0 ){
 		return -1;
 	}
-	if(-1==(data->cache_id = gdt_create_cache(data->memory_pool, data->chain_size,data->cache_size, data->page_size,data->hash_size,data->key_size))){
-		gdt_free(data->memory_pool);
+	if(-1==(data->cache_id = qs_create_cache(data->memory_pool, data->chain_size,data->cache_size, data->page_size,data->hash_size,data->key_size))){
+		qs_free(data->memory_pool);
 		return -1;
 	}
 	return size;
 }
 
-int32_t gdt_create_cache( QS_MEMORY_POOL* memory,size_t chain_allocate_size,size_t max_cache_size,size_t page_allocate_size,size_t page_hash_size,size_t max_key_size)
+int32_t qs_create_cache( QS_MEMORY_POOL* memory,size_t chain_allocate_size,size_t max_cache_size,size_t page_allocate_size,size_t page_hash_size,size_t max_key_size)
 {
-	int32_t cache_id = gdt_create_munit(memory,sizeof(QS_CACHE),MEMORY_TYPE_DEFAULT);
+	int32_t cache_id = qs_create_munit(memory,sizeof(QS_CACHE),MEMORY_TYPE_DEFAULT);
 	if(cache_id==-1){
 		return -1;
 	}
@@ -81,53 +81,53 @@ int32_t gdt_create_cache( QS_MEMORY_POOL* memory,size_t chain_allocate_size,size
 	cache->page = 0;
 	cache->swap_count = 0;
 	cache->is_swap = 1;
-	cache->chain_memory = gdt_create_mini_memory(cache->memory,cache->chain_allocate_size);
+	cache->chain_memory = qs_create_mini_memory(cache->memory,cache->chain_allocate_size);
 	if(-1==cache->chain_memory){
 		return -1;
 	}
 	QS_MEMORY_POOL* chain_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(cache->memory,cache->chain_memory);
-	gdt_memory_clean(chain_memory);
-	cache->chain = gdt_create_chain_array(chain_memory,cache->max_cache_size,sizeof(int8_t)*cache->max_key_size);
+	qs_memory_clean(chain_memory);
+	cache->chain = qs_create_chain_array(chain_memory,cache->max_cache_size,sizeof(int8_t)*cache->max_key_size);
 	if(-1==cache->chain){
 		return -1;
 	}
-	cache->memory_page1 = gdt_create_mini_memory(cache->memory,cache->page_allocate_size);
+	cache->memory_page1 = qs_create_mini_memory(cache->memory,cache->page_allocate_size);
 	if(-1==cache->memory_page1){
 		return -1;
 	}
-	cache->memory_page2 = gdt_create_mini_memory(cache->memory,cache->page_allocate_size);
+	cache->memory_page2 = qs_create_mini_memory(cache->memory,cache->page_allocate_size);
 	if(-1==cache->memory_page2){
 		return -1;
 	}
 	QS_MEMORY_POOL* page1 = (QS_MEMORY_POOL*)QS_GET_POINTER(cache->memory,cache->memory_page1);
 	QS_MEMORY_POOL* page2 = (QS_MEMORY_POOL*)QS_GET_POINTER(cache->memory,cache->memory_page2);
-	gdt_memory_clean(page1);
-	gdt_memory_clean(page2);
-	cache->page1_hash = gdt_create_hash(page1,cache->hash_size);
+	qs_memory_clean(page1);
+	qs_memory_clean(page2);
+	cache->page1_hash = qs_create_hash(page1,cache->hash_size);
 	if(-1==cache->page1_hash){
 		return -1;
 	}
-	cache->page2_hash = gdt_create_hash(page2,cache->hash_size);
+	cache->page2_hash = qs_create_hash(page2,cache->hash_size);
 	if(-1==cache->page2_hash){
 		return -1;
 	}
 	return cache_id;
 }
 
-int32_t gdt_create_storage_cache( const char* store_name, QS_MEMORY_POOL** pp_memory,size_t max_cache_size,size_t page_allocate_size,size_t page_hash_size,size_t max_key_size)
+int32_t qs_create_storage_cache( const char* store_name, QS_MEMORY_POOL** pp_memory,size_t max_cache_size,size_t page_allocate_size,size_t page_hash_size,size_t max_key_size)
 {
 	int is_swap = 0;
 	size_t page_size = (is_swap==1) ? (page_allocate_size * 2) : page_allocate_size;
 	size_t chain_allocate_size = (max_cache_size * (max_key_size + 8)) + SIZE_KBYTE;
 	size_t allocate_size = chain_allocate_size + page_size + SIZE_KBYTE * 4;
-	if(0>=gdt_initialize_mmapmemory_f( store_name, pp_memory, allocate_size )){
-		printf("gdt_initialize_mmapmemory_f error\n");
+	if(0>=qs_initialize_mmapmemory_f( store_name, pp_memory, allocate_size )){
+		printf("qs_initialize_mmapmemory_f error\n");
 		return -1;
 	}
 	QS_MEMORY_POOL* memory = *pp_memory;
 	int32_t cache_id = -1;
 	if(memory->memory_buf_munit == -1){
-		cache_id = gdt_create_munit(memory,sizeof(QS_CACHE),MEMORY_TYPE_DEFAULT);
+		cache_id = qs_create_munit(memory,sizeof(QS_CACHE),MEMORY_TYPE_DEFAULT);
 		if(cache_id==-1){
 			printf("create cache error\n");
 			return -1;
@@ -142,46 +142,46 @@ int32_t gdt_create_storage_cache( const char* store_name, QS_MEMORY_POOL** pp_me
 		cache->page = 0;
 		cache->swap_count = 0;
 		cache->is_swap = is_swap;
-		cache->chain_memory = gdt_create_mini_memory(cache->memory,cache->chain_allocate_size);
+		cache->chain_memory = qs_create_mini_memory(cache->memory,cache->chain_allocate_size);
 		if(-1==cache->chain_memory){
-			printf("gdt_create_mini_memory error\n");
+			printf("qs_create_mini_memory error\n");
 			return -1;
 		}
 		QS_MEMORY_POOL* chain_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(cache->memory,cache->chain_memory);
-		gdt_memory_clean(chain_memory);
-		cache->chain = gdt_create_chain_array(chain_memory,cache->max_cache_size,sizeof(int8_t)*cache->max_key_size);
+		qs_memory_clean(chain_memory);
+		cache->chain = qs_create_chain_array(chain_memory,cache->max_cache_size,sizeof(int8_t)*cache->max_key_size);
 		if(-1==cache->chain){
-			printf("gdt_create_chain_array error\n");
+			printf("qs_create_chain_array error\n");
 			return -1;
 		}
-		cache->memory_page1 = gdt_create_mini_memory(cache->memory,cache->page_allocate_size);
+		cache->memory_page1 = qs_create_mini_memory(cache->memory,cache->page_allocate_size);
 		if(-1==cache->memory_page1){
-			printf("gdt_create_mini_memory page1 error\n");
+			printf("qs_create_mini_memory page1 error\n");
 			return -1;
 		}
 		QS_MEMORY_POOL* page1 = (QS_MEMORY_POOL*)QS_GET_POINTER(cache->memory,cache->memory_page1);
-		gdt_memory_clean(page1);
-		cache->page1_hash = gdt_create_hash(page1,cache->hash_size);
+		qs_memory_clean(page1);
+		cache->page1_hash = qs_create_hash(page1,cache->hash_size);
 		if(-1==cache->page1_hash){
 			printf("page1_hash error\n");
 			return -1;
 		}
 		if(cache->is_swap==1){
-			cache->memory_page2 = gdt_create_mini_memory(cache->memory,cache->page_allocate_size);
+			cache->memory_page2 = qs_create_mini_memory(cache->memory,cache->page_allocate_size);
 			if(-1==cache->memory_page2){
-				printf("gdt_create_mini_memory page2 error\n");
+				printf("qs_create_mini_memory page2 error\n");
 				return -1;
 			}
 			QS_MEMORY_POOL* page2 = (QS_MEMORY_POOL*)QS_GET_POINTER(cache->memory,cache->memory_page2);
-			gdt_memory_clean(page2);
-			cache->page2_hash = gdt_create_hash(page2,cache->hash_size);
+			qs_memory_clean(page2);
+			cache->page2_hash = qs_create_hash(page2,cache->hash_size);
 			if(-1==cache->page2_hash){
 				printf("page2_hash error\n");
 				return -1;
 			}
 		}
 		memory->memory_buf_munit = cache_id;
-		gdt_sync_mmap_memory(memory);
+		qs_sync_mmap_memory(memory);
 	} else{
 		cache_id = memory->memory_buf_munit;
 		QS_CACHE* cache = (QS_CACHE*)QS_GET_POINTER(memory,cache_id);
@@ -196,7 +196,7 @@ int32_t gdt_create_storage_cache( const char* store_name, QS_MEMORY_POOL** pp_me
 	return cache_id;
 }
 
-void gdt_get_cache_page(QS_CACHE* cache,QS_CACHE_PAGE* page)
+void qs_get_cache_page(QS_CACHE* cache,QS_CACHE_PAGE* page)
 {
 	if(cache->page==0){
 		page->memory = (QS_MEMORY_POOL*)QS_GET_POINTER(cache->memory,cache->memory_page1);
@@ -207,7 +207,7 @@ void gdt_get_cache_page(QS_CACHE* cache,QS_CACHE_PAGE* page)
 	}
 }
 
-void gdt_swap_page(QS_CACHE* cache,QS_CACHE_PAGE* page)
+void qs_swap_page(QS_CACHE* cache,QS_CACHE_PAGE* page)
 {
 	if(cache->is_swap==0){
 		return;
@@ -221,32 +221,32 @@ void gdt_swap_page(QS_CACHE* cache,QS_CACHE_PAGE* page)
 		current_page = (QS_MEMORY_POOL*)QS_GET_POINTER(cache->memory,cache->memory_page1);
 		current_hash_id = cache->page1_hash;
 		backup_page = (QS_MEMORY_POOL*)QS_GET_POINTER(cache->memory,cache->memory_page2);
-		gdt_memory_clean(backup_page);
-		cache->page2_hash = gdt_create_hash(backup_page,cache->hash_size);
+		qs_memory_clean(backup_page);
+		cache->page2_hash = qs_create_hash(backup_page,cache->hash_size);
 		backup_hash_id = cache->page2_hash;
 	} else {
 		backup_page = (QS_MEMORY_POOL*)QS_GET_POINTER(cache->memory,cache->memory_page1);
-		gdt_memory_clean(backup_page);
-		cache->page1_hash = gdt_create_hash(backup_page,cache->hash_size);
+		qs_memory_clean(backup_page);
+		cache->page1_hash = qs_create_hash(backup_page,cache->hash_size);
 		backup_hash_id = cache->page1_hash;
 		current_page = (QS_MEMORY_POOL*)QS_GET_POINTER(cache->memory,cache->memory_page2);
 		current_hash_id = cache->page2_hash;
 	}
 	void* current=NULL;
-	while( NULL != (current=gdt_get_chain(chain_memory,cache->chain,current)) ){
+	while( NULL != (current=qs_get_chain(chain_memory,cache->chain,current)) ){
 		uint8_t* chain = (uint8_t*)current;
 		char* key = (char*)(chain);
-		QS_HASH_ELEMENT* elm = gdt_get_hash_element(current_page,current_hash_id,key);
+		QS_HASH_ELEMENT* elm = qs_get_hash_element(current_page,current_hash_id,key);
 		if(elm!=NULL){
 			if(elm->id==ELEMENT_LITERAL_NUM){
 				int32_t value = QS_INT32(current_page, elm->elm_munit);
-				if(NULL==gdt_add_hash_integer( backup_page, backup_hash_id, key, value )){
+				if(NULL==qs_add_hash_integer( backup_page, backup_hash_id, key, value )){
 					// error
 				}
 				//printf("ELEMENT_LITERAL_NUM k = %s, h = %d, id = %d, value = %d\n",key,elm->elm_munit,elm->id,value);
 			} else if( elm->id==ELEMENT_LITERAL_STR ){
 				char* value = (char*)QS_GET_POINTER(current_page, elm->elm_munit);
-				if(NULL==gdt_add_hash_string( backup_page, backup_hash_id, key, value )){
+				if(NULL==qs_add_hash_string( backup_page, backup_hash_id, key, value )){
 					// error
 				}
 			} else {
@@ -260,96 +260,96 @@ void gdt_swap_page(QS_CACHE* cache,QS_CACHE_PAGE* page)
 	cache->swap_count++;
 }
 
-void gdt_add_cache_key(QS_CACHE* cache,char* key)
+void qs_add_cache_key(QS_CACHE* cache,char* key)
 {
 	QS_MEMORY_POOL* chain_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(cache->memory,cache->chain_memory);
-	char* pstr = (char*)gdt_add_chain(chain_memory,cache->chain);
+	char* pstr = (char*)qs_add_chain(chain_memory,cache->chain);
 	if(pstr!=NULL){
-		memcpy(pstr,key,gdt_strlen(key));
+		memcpy(pstr,key,qs_strlen(key));
 	} else {
-		void* c = gdt_get_chain(chain_memory,cache->chain,NULL);
+		void* c = qs_get_chain(chain_memory,cache->chain,NULL);
 		if(c!=NULL){
-			gdt_remove_chain(chain_memory,cache->chain,c);
-			pstr = (char*)gdt_add_chain(chain_memory,cache->chain);
+			qs_remove_chain(chain_memory,cache->chain,c);
+			pstr = (char*)qs_add_chain(chain_memory,cache->chain);
 			if(pstr!=NULL){
-				memcpy(pstr,key,gdt_strlen(key));
+				memcpy(pstr,key,qs_strlen(key));
 			}
 		}
 	}
 }
 
-int32_t gdt_cache_int(QS_CACHE* cache,char* key,int32_t value, int32_t life_time)
+int32_t qs_cache_int(QS_CACHE* cache,char* key,int32_t value, int32_t life_time)
 {
 	QS_CACHE_PAGE cache_page;
-	gdt_get_cache_page(cache,&cache_page);
+	qs_get_cache_page(cache,&cache_page);
 	QS_HASH_ELEMENT* elm = NULL;
-	if(NULL==(elm=gdt_add_hash_integer( cache_page.memory, cache_page.hash_id, key, value ))){
-		gdt_swap_page(cache,&cache_page);
-		if(NULL==(elm=gdt_add_hash_integer( cache_page.memory, cache_page.hash_id, key, value ))){
+	if(NULL==(elm=qs_add_hash_integer( cache_page.memory, cache_page.hash_id, key, value ))){
+		qs_swap_page(cache,&cache_page);
+		if(NULL==(elm=qs_add_hash_integer( cache_page.memory, cache_page.hash_id, key, value ))){
 			return QS_SYSTEM_ERROR;
 		}
 	}
 	elm->create_time = time(NULL);
 	elm->life_time = life_time;
 	if(cache->is_swap==1){
-		gdt_add_cache_key(cache,key);
+		qs_add_cache_key(cache,key);
 	}
 	return QS_SYSTEM_OK;
 }
 
-int32_t gdt_cache_string(QS_CACHE* cache,char* key,char* value, int32_t life_time)
+int32_t qs_cache_string(QS_CACHE* cache,char* key,char* value, int32_t life_time)
 {
 	QS_CACHE_PAGE cache_page;
-	gdt_get_cache_page(cache,&cache_page);
+	qs_get_cache_page(cache,&cache_page);
 	QS_HASH_ELEMENT* elm = NULL;
-	if(NULL==(elm=gdt_add_hash_string( cache_page.memory, cache_page.hash_id, key, value ))){
-		gdt_swap_page(cache,&cache_page);
-		if(NULL==(elm=gdt_add_hash_string( cache_page.memory, cache_page.hash_id, key, value ))){
+	if(NULL==(elm=qs_add_hash_string( cache_page.memory, cache_page.hash_id, key, value ))){
+		qs_swap_page(cache,&cache_page);
+		if(NULL==(elm=qs_add_hash_string( cache_page.memory, cache_page.hash_id, key, value ))){
 			return QS_SYSTEM_ERROR;
 		}
 	}
 	elm->create_time = time(NULL);
 	elm->life_time = life_time;
 	if(cache->is_swap==1){
-		gdt_add_cache_key(cache,key);
+		qs_add_cache_key(cache,key);
 	}
 	return QS_SYSTEM_OK;
 }
 
-int32_t gdt_cache_binary(QS_CACHE* cache,char* key,uint8_t* bin,size_t bin_size, int32_t life_time)
+int32_t qs_cache_binary(QS_CACHE* cache,char* key,uint8_t* bin,size_t bin_size, int32_t life_time)
 {
 	QS_CACHE_PAGE cache_page;
-	gdt_get_cache_page(cache,&cache_page);
+	qs_get_cache_page(cache,&cache_page);
 	QS_HASH_ELEMENT* elm = NULL;
-	if(NULL==(elm=gdt_add_hash_binary( cache_page.memory, cache_page.hash_id, key, bin, bin_size ))){
-		gdt_swap_page(cache,&cache_page);
-		if(NULL==(elm=gdt_add_hash_binary( cache_page.memory, cache_page.hash_id, key, bin, bin_size ))){
+	if(NULL==(elm=qs_add_hash_binary( cache_page.memory, cache_page.hash_id, key, bin, bin_size ))){
+		qs_swap_page(cache,&cache_page);
+		if(NULL==(elm=qs_add_hash_binary( cache_page.memory, cache_page.hash_id, key, bin, bin_size ))){
 			return QS_SYSTEM_ERROR;
 		}
 	}
 	elm->create_time = time(NULL);
 	elm->life_time = life_time;
 	if(cache->is_swap==1){
-		gdt_add_cache_key(cache,key);
+		qs_add_cache_key(cache,key);
 	}
 	return QS_SYSTEM_OK;
 }
 
-int32_t gdt_remove_cache(QS_CACHE* cache,char* key)
+int32_t qs_remove_cache(QS_CACHE* cache,char* key)
 {
 	QS_CACHE_PAGE cache_page;
-	gdt_get_cache_page(cache,&cache_page);
-	return gdt_remove_hash(cache_page.memory,cache_page.hash_id,key);
+	qs_get_cache_page(cache,&cache_page);
+	return qs_remove_hash(cache_page.memory,cache_page.hash_id,key);
 }
 
-int32_t gdt_cache_length(QS_CACHE* cache)
+int32_t qs_cache_length(QS_CACHE* cache)
 {
 	QS_CACHE_PAGE cache_page;
-	gdt_get_cache_page(cache,&cache_page);
-	return gdt_hash_length(cache_page.memory,cache_page.hash_id);
+	qs_get_cache_page(cache,&cache_page);
+	return qs_hash_length(cache_page.memory,cache_page.hash_id);
 }
 
-void gdt_array_dump( QS_MEMORY_POOL* _ppool, int32_t munit, int index )
+void qs_array_dump( QS_MEMORY_POOL* _ppool, int32_t munit, int index )
 {
 	QS_ARRAY* parray;
 	QS_ARRAY_ELEMENT* elm;
@@ -376,11 +376,11 @@ void gdt_array_dump( QS_MEMORY_POOL* _ppool, int32_t munit, int index )
 		else if( (elm+i)->id == ELEMENT_ARRAY ){
 			if( i > 0 ){ printf(",\n"); }
 			for( k=0;k<index+1;k++ ){ printf("  ");}
-			gdt_array_dump( _ppool, (elm+i)->munit, index+1 );
+			qs_array_dump( _ppool, (elm+i)->munit, index+1 );
 		}
 		else if( (elm+i)->id==ELEMENT_HASH){
 			if( i > 0 ){ printf(",\n"); }
-			gdt_hash_dump( _ppool, (elm+i)->munit, index+1 );
+			qs_hash_dump( _ppool, (elm+i)->munit, index+1 );
 		}
 	}
 	printf("\n");
@@ -388,7 +388,7 @@ void gdt_array_dump( QS_MEMORY_POOL* _ppool, int32_t munit, int index )
 	printf("]\n");
 }
 
-void gdt_hash_dump( QS_MEMORY_POOL* _ppool, int32_t h_munit, int index )
+void qs_hash_dump( QS_MEMORY_POOL* _ppool, int32_t h_munit, int index )
 {
 	struct QS_HASH *hash;
 	struct QS_HASH *hashchild;
@@ -414,7 +414,7 @@ void gdt_hash_dump( QS_MEMORY_POOL* _ppool, int32_t h_munit, int index )
 						printf( "\"%s\":"
 								, (char*)QS_GET_POINTER( _ppool, hashelement[i].hashname_munit )
 							  );
-						gdt_hash_dump( _ppool, hashelement[i].elm_munit, index+1 );
+						qs_hash_dump( _ppool, hashelement[i].elm_munit, index+1 );
 						cnt++;
 					}
 					else if( hashelement[i].id==ELEMENT_ARRAY){
@@ -423,7 +423,7 @@ void gdt_hash_dump( QS_MEMORY_POOL* _ppool, int32_t h_munit, int index )
 						printf( "\"%s\":"
 								, (char*)QS_GET_POINTER( _ppool, hashelement[i].hashname_munit )
 							  );
-						gdt_array_dump( _ppool, hashelement[i].elm_munit, index+1 );
+						qs_array_dump( _ppool, hashelement[i].elm_munit, index+1 );
 						cnt++;
 					}
 					else{
@@ -454,7 +454,7 @@ void gdt_hash_dump( QS_MEMORY_POOL* _ppool, int32_t h_munit, int index )
 	printf("}\n");
 }
 
-int32_t gdt_opendir( QS_MEMORY_POOL* _ppool, const char* path )
+int32_t qs_opendir( QS_MEMORY_POOL* _ppool, const char* path )
 {
 	char tmppath[MAXPATHLEN];
 	char* pathstart = tmppath;
@@ -484,7 +484,7 @@ int32_t gdt_opendir( QS_MEMORY_POOL* _ppool, const char* path )
 	}
 	dent = readdir(dir);
 #endif
-	int32_t path_array_munit = gdt_create_array( _ppool, 128, 0 );
+	int32_t path_array_munit = qs_create_array( _ppool, 128, 0 );
 	do{
 #ifdef __WINDOWS__
 		if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
@@ -527,7 +527,7 @@ int32_t gdt_opendir( QS_MEMORY_POOL* _ppool, const char* path )
 			*(pathstart + strlen(dent->d_name)) = '/';
 			*(pathstart + strlen(dent->d_name) + 1) = '\0';
 #endif
-			int32_t tmp_array = gdt_opendir( _ppool, tmppath );
+			int32_t tmp_array = qs_opendir( _ppool, tmppath );
 			if( -1 != tmp_array )
 			{
 				QS_ARRAY* parray;
@@ -536,7 +536,7 @@ int32_t gdt_opendir( QS_MEMORY_POOL* _ppool, const char* path )
 				parray = (QS_ARRAY*)QS_GET_POINTER( _ppool, tmp_array );
 				elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit );
 				for( i = 0; i < parray->len; i++ ){
-					gdt_array_push(_ppool,&path_array_munit,ELEMENT_LITERAL_STR,(elm+i)->munit);
+					qs_array_push(_ppool,&path_array_munit,ELEMENT_LITERAL_STR,(elm+i)->munit);
 				}
 			}
 		}
@@ -546,7 +546,7 @@ int32_t gdt_opendir( QS_MEMORY_POOL* _ppool, const char* path )
 		// file
 		else if (S_ISREG(st.st_mode)) {
 #endif
-			gdt_array_push_string(_ppool, &path_array_munit, tmppath);
+			qs_array_push_string(_ppool, &path_array_munit, tmppath);
 		}
 #ifdef __WINDOWS__
 		} while (FindNextFile(handle, &fd));

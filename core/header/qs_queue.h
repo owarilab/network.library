@@ -58,11 +58,11 @@ typedef struct QS_MSG_INFO
 	uint8_t status;
 } QS_MSG_INFO;
 
-void gdt_create_message_queue( QS_MEMORY_POOL* _ppool, int32_t *q_munit, size_t qlen, size_t size );
-int gdt_enqueue( QS_MEMORY_POOL* _ppool, int32_t q_munit, const char* pbuf, size_t size );
-int gdt_safe_enqueue( QS_MEMORY_POOL* _ppool, int32_t q_munit, const char* pbuf, size_t size );
-int32_t gdt_dequeue( QS_MEMORY_POOL* _ppool, int32_t q_munit );
-int32_t gdt_get_queue_length( QS_MEMORY_POOL* _ppool, int32_t q_munit );
+void qs_create_message_queue( QS_MEMORY_POOL* _ppool, int32_t *q_munit, size_t qlen, size_t size );
+int qs_enqueue( QS_MEMORY_POOL* _ppool, int32_t q_munit, const char* pbuf, size_t size );
+int qs_safe_enqueue( QS_MEMORY_POOL* _ppool, int32_t q_munit, const char* pbuf, size_t size );
+int32_t qs_dequeue( QS_MEMORY_POOL* _ppool, int32_t q_munit );
+int32_t qs_get_queue_length( QS_MEMORY_POOL* _ppool, int32_t q_munit );
 
 #endif /*_QS_QUEUE_H_*/
 

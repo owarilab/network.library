@@ -1,13 +1,13 @@
 #include "qs_chain_array.h"
 
-int32_t gdt_create_chain_array(QS_MEMORY_POOL* memory,size_t chain_size, size_t data_size)
+int32_t qs_create_chain_array(QS_MEMORY_POOL* memory,size_t chain_size, size_t data_size)
 {
 	chain_size = chain_size+1;
 	int32_t header_size = (sizeof(int32_t)*8);
 	int32_t block_size = data_size+(sizeof(int32_t)*2);
-	int32_t chain_id = gdt_create_memory_block(memory,header_size+(block_size*chain_size));
+	int32_t chain_id = qs_create_memory_block(memory,header_size+(block_size*chain_size));
 	uint8_t* chain_root = (uint8_t*)QS_GET_POINTER(memory,chain_id);
-	memset(chain_root,0,gdt_usize(memory,chain_id));
+	memset(chain_root,0,qs_usize(memory,chain_id));
 	int32_t* pv = (int32_t*)chain_root;
 	*pv = 0;                // start
 	*(pv+1) = 0;            // tail
@@ -34,7 +34,7 @@ int32_t gdt_create_chain_array(QS_MEMORY_POOL* memory,size_t chain_size, size_t 
 	return chain_id;
 }
 
-int32_t gdt_resize_chain_array(QS_MEMORY_POOL* memory,int32_t chain_id)
+int32_t qs_resize_chain_array(QS_MEMORY_POOL* memory,int32_t chain_id)
 {
 	uint8_t* chain_root = (uint8_t*)QS_GET_POINTER(memory,chain_id);
 	//int32_t start = *(((int32_t*)chain_root));
@@ -46,14 +46,14 @@ int32_t gdt_resize_chain_array(QS_MEMORY_POOL* memory,int32_t chain_id)
 	int32_t end = *(((int32_t*)chain_root)+6);
 	
 	size_t new_chain_size = ((chain_size-1)*2)+1;
-	int32_t new_chain_id = gdt_create_memory_block(memory,header_size+(block_size*(chain_size*2)));
+	int32_t new_chain_id = qs_create_memory_block(memory,header_size+(block_size*(chain_size*2)));
 	if( -1 == new_chain_id){
 		return -1;
 	}
 	
 	uint8_t* new_chain_root = (uint8_t*)QS_GET_POINTER(memory,new_chain_id);
-	memset(new_chain_root,0,gdt_usize(memory,new_chain_id));
-	memcpy(new_chain_root,chain_root,gdt_usize(memory,chain_id));
+	memset(new_chain_root,0,qs_usize(memory,new_chain_id));
+	memcpy(new_chain_root,chain_root,qs_usize(memory,chain_id));
 	*(((int32_t*)new_chain_root)+2) = new_chain_size;
 	*(((int32_t*)new_chain_root)+6) = new_chain_size-1;
 	
@@ -75,7 +75,7 @@ int32_t gdt_resize_chain_array(QS_MEMORY_POOL* memory,int32_t chain_id)
 	return new_chain_id;
 }
 
-void* gdt_add_chain(QS_MEMORY_POOL* memory,int32_t chain_id)
+void* qs_add_chain(QS_MEMORY_POOL* memory,int32_t chain_id)
 {
 	uint8_t* chain_root = (uint8_t*)QS_GET_POINTER(memory,chain_id);
 	int32_t *ptail = (((int32_t*)chain_root)+1);
@@ -92,7 +92,7 @@ void* gdt_add_chain(QS_MEMORY_POOL* memory,int32_t chain_id)
 	return ret;
 }
 
-int32_t gdt_add_chain_i(QS_MEMORY_POOL* memory,int32_t chain_id)
+int32_t qs_add_chain_i(QS_MEMORY_POOL* memory,int32_t chain_id)
 {
 	uint8_t* chain_root = (uint8_t*)QS_GET_POINTER(memory,chain_id);
 	int32_t *ptail = (((int32_t*)chain_root)+1);
@@ -109,7 +109,7 @@ int32_t gdt_add_chain_i(QS_MEMORY_POOL* memory,int32_t chain_id)
 	return ret;
 }
 
-void* gdt_get_chain(QS_MEMORY_POOL* memory,int32_t chain_id,void* current)
+void* qs_get_chain(QS_MEMORY_POOL* memory,int32_t chain_id,void* current)
 {
 	uint8_t* chain_root = (uint8_t*)QS_GET_POINTER(memory,chain_id);
 	int32_t start = *(((int32_t*)chain_root));
@@ -135,7 +135,7 @@ void* gdt_get_chain(QS_MEMORY_POOL* memory,int32_t chain_id,void* current)
 	return (void*)(chain_root+header_size+(next*block_size));
 }
 
-void* gdt_get_chain_i(QS_MEMORY_POOL* memory,int32_t chain_id,int32_t offset)
+void* qs_get_chain_i(QS_MEMORY_POOL* memory,int32_t chain_id,int32_t offset)
 {
 	uint8_t* chain_root = (uint8_t*)QS_GET_POINTER(memory,chain_id);
 	int32_t block_size = *(((int32_t*)chain_root)+4);
@@ -144,7 +144,7 @@ void* gdt_get_chain_i(QS_MEMORY_POOL* memory,int32_t chain_id,int32_t offset)
 	return chain;
 }
 
-int32_t gdt_remove_chain(QS_MEMORY_POOL* memory,int32_t chain_id,void* chain)
+int32_t qs_remove_chain(QS_MEMORY_POOL* memory,int32_t chain_id,void* chain)
 {
 	uint8_t* chain_root = (uint8_t*)QS_GET_POINTER(memory,chain_id);
 	//int32_t tail = *(((int32_t*)chain_root)+1);
@@ -181,7 +181,7 @@ int32_t gdt_remove_chain(QS_MEMORY_POOL* memory,int32_t chain_id,void* chain)
 	return 1;
 }
 
-void gdt_dump_chain_array(QS_MEMORY_POOL* memory,int32_t chain_id)
+void qs_dump_chain_array(QS_MEMORY_POOL* memory,int32_t chain_id)
 {
 	int32_t print_length=0;
 	uint8_t* chain_root = (uint8_t*)QS_GET_POINTER(memory,chain_id);
@@ -194,7 +194,7 @@ void gdt_dump_chain_array(QS_MEMORY_POOL* memory,int32_t chain_id)
 	int32_t end = *(((int32_t*)chain_root)+6);
 	void* current=NULL;
 	uint8_t* temp_current = NULL;
-	while( NULL != (current=gdt_get_chain(memory,chain_id,current)) ){
+	while( NULL != (current=qs_get_chain(memory,chain_id,current)) ){
 		uint8_t* chain = (uint8_t*)current;
 		if(temp_current==chain){
 			printf("loop error.\n");
@@ -210,7 +210,7 @@ void gdt_dump_chain_array(QS_MEMORY_POOL* memory,int32_t chain_id)
 	printf("total : %d\n",print_length);
 }
 
-int gdt_show_chain_info(QS_MEMORY_POOL* memory,int32_t chain_id,void* chain, int debug)
+int qs_show_chain_info(QS_MEMORY_POOL* memory,int32_t chain_id,void* chain, int debug)
 {
 	uint8_t* chain_root = (uint8_t*)QS_GET_POINTER(memory,chain_id);
 	int32_t start = *(((int32_t*)chain_root));
@@ -247,18 +247,18 @@ int gdt_show_chain_info(QS_MEMORY_POOL* memory,int32_t chain_id,void* chain, int
 	return 0;
 }
 
-int32_t gdt_get_chain_start(QS_MEMORY_POOL* memory,int32_t chain_id)
+int32_t qs_get_chain_start(QS_MEMORY_POOL* memory,int32_t chain_id)
 {
 	uint8_t* chain_root = (uint8_t*)QS_GET_POINTER(memory,chain_id);
 	int32_t start = *(((int32_t*)chain_root));
 	return start;
 }
 
-int32_t gdt_get_chain_length(QS_MEMORY_POOL* memory,int32_t chain_id)
+int32_t qs_get_chain_length(QS_MEMORY_POOL* memory,int32_t chain_id)
 {
 	int32_t print_length=0;
 	void* current=NULL;
-	while( NULL != (current=gdt_get_chain(memory,chain_id,current)) ){
+	while( NULL != (current=qs_get_chain(memory,chain_id,current)) ){
 		print_length++;
 	}
 	return print_length;

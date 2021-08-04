@@ -57,19 +57,19 @@ typedef struct QS_HTTP_REQUEST_COMMON
 	QS_FILE_INFO file_info;
 } QS_HTTP_REQUEST_COMMON;
 
-ssize_t gdt_get_protocol_buffer_size(ssize_t payload_size);
-uint8_t gdt_get_protocol_header_size_byte(ssize_t payload_size);
-uint32_t gdt_get_protocol_header_size(ssize_t payload_size);
-uint32_t gdt_make_protocol_header(uint8_t* bin,ssize_t payload_size, uint32_t payload_type, uint32_t seq_num);
-ssize_t gdt_make_protocol_buffer(uint8_t* bin, uint8_t* payload,ssize_t payload_size, uint32_t payload_type, uint32_t seq_num);
+ssize_t qs_get_protocol_buffer_size(ssize_t payload_size);
+uint8_t qs_get_protocol_header_size_byte(ssize_t payload_size);
+uint32_t qs_get_protocol_header_size(ssize_t payload_size);
+uint32_t qs_make_protocol_header(uint8_t* bin,ssize_t payload_size, uint32_t payload_type, uint32_t seq_num);
+ssize_t qs_make_protocol_buffer(uint8_t* bin, uint8_t* payload,ssize_t payload_size, uint32_t payload_type, uint32_t seq_num);
 
-int gdt_http_protocol_filter(QS_RECV_INFO* rinfo);
-int gdt_http_parser( QS_RECV_INFO *rinfo );
-int gdt_http_parse_header( QS_RECV_INFO *rinfo );
-size_t gdt_http_add_response_common(char* dest, size_t dest_size, int http_response_code, char* content_type, size_t content_length);
-size_t gdt_http_add_cache_control(char* dest, size_t dest_size, size_t start, int max_age, QS_FILE_INFO* info);
-size_t gdt_http_document_path(char* dest, size_t dest_size,char* document_root, char* default_file, char* path);
-int32_t gdt_http_parse_request_parameter(QS_MEMORY_POOL * memory,char *get_params);
+int qs_http_protocol_filter(QS_RECV_INFO* rinfo);
+int qs_http_parser( QS_RECV_INFO *rinfo );
+int qs_http_parse_header( QS_RECV_INFO *rinfo );
+size_t qs_http_add_response_common(char* dest, size_t dest_size, int http_response_code, char* content_type, size_t content_length);
+size_t qs_http_add_cache_control(char* dest, size_t dest_size, size_t start, int max_age, QS_FILE_INFO* info);
+size_t qs_http_document_path(char* dest, size_t dest_size,char* document_root, char* default_file, char* path);
+int32_t qs_http_parse_request_parameter(QS_MEMORY_POOL * memory,char *get_params);
 int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_request, QS_MEMORY_POOL* temporary_memory);
 
 #endif /*_QS_PROTOCOL_H_*/

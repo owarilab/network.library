@@ -144,7 +144,7 @@ typedef struct QS_SERVER_CONNECTION_INFO
 	int32_t recvinfo_munit; // QS_RECV_INFO
 	int32_t recvmsg_munit; // char[]
 	int32_t user_information;
-	void* gdt_socket_option;
+	void* qs_socket_option;
 	QS_SOCKPARAM sockparam;
 } QS_SERVER_CONNECTION_INFO;
 
@@ -164,7 +164,7 @@ typedef struct QS_SEND_INFO
 
 typedef void* (*QS_CALLBACK)( void* args );
 typedef int (*QS_CONNECTION_EVENT_CALLBACK)( QS_SERVER_CONNECTION_INFO* connection );
-typedef int32_t (*QS_ON_RECV)(uint32_t payload_type, uint8_t* payload, size_t payload_len, QS_RECV_INFO *gdt_recv_info );
+typedef int32_t (*QS_ON_RECV)(uint32_t payload_type, uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info );
 typedef int (*QS_USER_RECV)( void* connection, QS_SOCKET_ID id, char* buf, size_t buffer_size, int flag );
 typedef int (*QS_USER_SEND)( void* connection, QS_SOCKET_ID id, char *buf, size_t buffer_size, int flag );
 typedef int (*QS_USER_PROTOCOL_FILTER)( QS_RECV_INFO* recv_info );
@@ -222,21 +222,21 @@ typedef struct QS_SOCKET_OPTION
 	struct addrinfo *addr;
 } QS_SOCKET_OPTION;
 
-QS_SOCKET_OPTION* gdt_create_tcp_server(char* hostname, char* portnum);
-QS_SOCKET_OPTION* gdt_create_tcp_server_plane(char* hostname, char* portnum);
-QS_SOCKET_OPTION* gdt_create_udp_server(char* hostname, char* portnum);
-QS_SOCKET_OPTION* gdt_create_tcp_client(char* hostname, char* portnum);
-QS_SOCKET_OPTION* gdt_create_tcp_client_plane(char* hostname, char* portnum);
-QS_SOCKET_OPTION* gdt_create_udp_client(char* hostname, char* portnum);
-ssize_t gdt_send_message(uint32_t payload_type, char* payload, size_t payload_len, QS_RECV_INFO *gdt_recv_info);
-ssize_t gdt_send_message_broadcast(uint32_t payload_type, char* payload, size_t payload_len, QS_RECV_INFO *gdt_recv_info);
-ssize_t gdt_send_message_othercast(uint32_t payload_type, char* payload, size_t payload_len, QS_RECV_INFO *gdt_recv_info);
-ssize_t gdt_send_message_multicast(uint32_t payload_type, char* payload, size_t payload_len, QS_RECV_INFO *gdt_recv_info, QS_MEMORY_POOL* array_memory, int32_t array_munit);
-ssize_t gdt_send_message_multiothercast(uint32_t payload_type, char* payload, size_t payload_len, QS_RECV_INFO *gdt_recv_info, QS_MEMORY_POOL* array_memory, int32_t array_munit);
-ssize_t gdt_client_send_message(uint32_t payload_type, char* payload, size_t payload_len, QS_SOCKET_OPTION *option);
-int32_t gdt_set_client_id(QS_SOCKET_OPTION *option,uint32_t id);
+QS_SOCKET_OPTION* qs_create_tcp_server(char* hostname, char* portnum);
+QS_SOCKET_OPTION* qs_create_tcp_server_plane(char* hostname, char* portnum);
+QS_SOCKET_OPTION* qs_create_udp_server(char* hostname, char* portnum);
+QS_SOCKET_OPTION* qs_create_tcp_client(char* hostname, char* portnum);
+QS_SOCKET_OPTION* qs_create_tcp_client_plane(char* hostname, char* portnum);
+QS_SOCKET_OPTION* qs_create_udp_client(char* hostname, char* portnum);
+ssize_t qs_send_message(uint32_t payload_type, char* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
+ssize_t qs_send_message_broadcast(uint32_t payload_type, char* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
+ssize_t qs_send_message_othercast(uint32_t payload_type, char* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
+ssize_t qs_send_message_multicast(uint32_t payload_type, char* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info, QS_MEMORY_POOL* array_memory, int32_t array_munit);
+ssize_t qs_send_message_multiothercast(uint32_t payload_type, char* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info, QS_MEMORY_POOL* array_memory, int32_t array_munit);
+ssize_t qs_client_send_message(uint32_t payload_type, char* payload, size_t payload_len, QS_SOCKET_OPTION *option);
+int32_t qs_set_client_id(QS_SOCKET_OPTION *option,uint32_t id);
 
-int gdt_initialize_socket_option( 
+int qs_initialize_socket_option( 
 	  QS_SOCKET_OPTION *option
 	, char* hostname
 	, char* portnum
@@ -256,62 +256,62 @@ void set_on_close_event( QS_SOCKET_OPTION *option, QS_CONNECTION_EVENT_CALLBACK 
 void set_user_recv_event( QS_SOCKET_OPTION *option, QS_USER_RECV func );
 void set_user_send_event( QS_SOCKET_OPTION *option, QS_USER_SEND func);
 void set_user_protocol_filter(QS_SOCKET_OPTION *option, QS_USER_PROTOCOL_FILTER func);
-void gdt_set_timeout_event( QS_SOCKET_OPTION *option, QS_CALLBACK func );
-void gdt_set_connection_timeout( QS_SOCKET_OPTION *option, int32_t sec, int32_t usec );
-void gdt_set_select_timeout( QS_SOCKET_OPTION *option, int32_t sec, int32_t usec );
-void gdt_set_recv_buffer( QS_SOCKET_OPTION* option, size_t buffer_size );
-void gdt_set_send_buffer( QS_SOCKET_OPTION* option, size_t buffer_size );
-void gdt_set_message_buffer( QS_SOCKET_OPTION* option, size_t buffer_size );
+void qs_set_timeout_event( QS_SOCKET_OPTION *option, QS_CALLBACK func );
+void qs_set_connection_timeout( QS_SOCKET_OPTION *option, int32_t sec, int32_t usec );
+void qs_set_select_timeout( QS_SOCKET_OPTION *option, int32_t sec, int32_t usec );
+void qs_set_recv_buffer( QS_SOCKET_OPTION* option, size_t buffer_size );
+void qs_set_send_buffer( QS_SOCKET_OPTION* option, size_t buffer_size );
+void qs_set_message_buffer( QS_SOCKET_OPTION* option, size_t buffer_size );
 
-QS_SOCKET_OPTION* gdt_get_backend( QS_SOCKET_OPTION* option, int index );
+QS_SOCKET_OPTION* qs_get_backend( QS_SOCKET_OPTION* option, int index );
 
-void gdt_init_socket_param( QS_SOCKPARAM *psockparam );
-void gdt_free_sockparam( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockparam );
-int gdt_close_socket(QS_SOCKET_ID* sock, char* error );
+void qs_init_socket_param( QS_SOCKPARAM *psockparam );
+void qs_free_sockparam( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockparam );
+int qs_close_socket(QS_SOCKET_ID* sock, char* error );
 
-int32_t gdt_make_connection_info( QS_SOCKET_OPTION *option );
-int32_t gdt_make_connection_info_core( QS_SOCKET_OPTION *option, QS_SERVER_CONNECTION_INFO* tinfo, int index );
-void gdt_initialize_connection_info( QS_SOCKET_OPTION *option, QS_SERVER_CONNECTION_INFO* tinfo );
+int32_t qs_make_connection_info( QS_SOCKET_OPTION *option );
+int32_t qs_make_connection_info_core( QS_SOCKET_OPTION *option, QS_SERVER_CONNECTION_INFO* tinfo, int index );
+void qs_initialize_connection_info( QS_SOCKET_OPTION *option, QS_SERVER_CONNECTION_INFO* tinfo );
 
-ssize_t gdt_send_broadcast( QS_SOCKET_OPTION *option, char *buf, size_t size, uint32_t payload_type );
-ssize_t gdt_send_one( QS_SOCKET_OPTION *option, uint32_t connection, char *buf, size_t size, uint32_t payload_type );
-ssize_t gdt_send( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockparam, char *buf, size_t size, uint32_t payload_type );
-ssize_t gdt_send_all(QS_SOCKET_ID soc, char *buf, size_t size, int flag );
-ssize_t gdt_sendto_all(QS_SOCKET_ID soc, char *buf, size_t size, int flag, struct sockaddr *pfrom, socklen_t fromlen );
+ssize_t qs_send_broadcast( QS_SOCKET_OPTION *option, char *buf, size_t size, uint32_t payload_type );
+ssize_t qs_send_one( QS_SOCKET_OPTION *option, uint32_t connection, char *buf, size_t size, uint32_t payload_type );
+ssize_t qs_send( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockparam, char *buf, size_t size, uint32_t payload_type );
+ssize_t qs_send_all(QS_SOCKET_ID soc, char *buf, size_t size, int flag );
+ssize_t qs_sendto_all(QS_SOCKET_ID soc, char *buf, size_t size, int flag, struct sockaddr *pfrom, socklen_t fromlen );
 
-int gdt_set_block(QS_SOCKET_ID fd, int flag );
-int gdt_get_sockaddr_info( QS_SOCKET_OPTION *option, struct sockaddr_storage *saddr, socklen_t *addr_len );
-QS_SOCKET_ID gdt_server_socket( QS_SOCKET_OPTION *option, int is_ipv6 );
-QS_SOCKET_ID gdt_client_socket( QS_SOCKET_OPTION *option );
-QS_SOCKET_ID gdt_wait_client_socket(QS_SOCKET_ID sock, QS_SOCKET_OPTION *option);
+int qs_set_block(QS_SOCKET_ID fd, int flag );
+int qs_get_sockaddr_info( QS_SOCKET_OPTION *option, struct sockaddr_storage *saddr, socklen_t *addr_len );
+QS_SOCKET_ID qs_server_socket( QS_SOCKET_OPTION *option, int is_ipv6 );
+QS_SOCKET_ID qs_client_socket( QS_SOCKET_OPTION *option );
+QS_SOCKET_ID qs_wait_client_socket(QS_SOCKET_ID sock, QS_SOCKET_OPTION *option);
 
-int gdt_check_socket_error(QS_SOCKET_ID sock);
-void gdt_free_addrinfo(QS_SOCKET_OPTION* option);
-void gdt_disconnect( QS_SOCKPARAM *psockparam );
-void gdt_set_sock_option( QS_SOCKET_OPTION *option );
-void* gdt_make_socket( QS_SOCKET_OPTION *option );
-void* gdt_socket( QS_SOCKET_OPTION *option );
-void gdt_free_socket( QS_SOCKET_OPTION *option );
+int qs_check_socket_error(QS_SOCKET_ID sock);
+void qs_free_addrinfo(QS_SOCKET_OPTION* option);
+void qs_disconnect( QS_SOCKPARAM *psockparam );
+void qs_set_sock_option( QS_SOCKET_OPTION *option );
+void* qs_make_socket( QS_SOCKET_OPTION *option );
+void* qs_socket( QS_SOCKET_OPTION *option );
+void qs_free_socket( QS_SOCKET_OPTION *option );
 
-void gdt_recv_event(QS_SOCKET_OPTION *option, QS_SERVER_CONNECTION_INFO *child, socklen_t srlen);
+void qs_recv_event(QS_SOCKET_OPTION *option, QS_SERVER_CONNECTION_INFO *child, socklen_t srlen);
 
-void gdt_nonblocking_server(QS_SOCKET_OPTION *option);
-void gdt_server_update(QS_SOCKET_OPTION *option);
-void gdt_nonblocking_client(QS_SOCKET_OPTION *option);
-void gdt_client_update(QS_SOCKET_OPTION *option);
-int gdt_client_is_connecting(QS_SOCKET_OPTION *option);
+void qs_nonblocking_server(QS_SOCKET_OPTION *option);
+void qs_server_update(QS_SOCKET_OPTION *option);
+void qs_nonblocking_client(QS_SOCKET_OPTION *option);
+void qs_client_update(QS_SOCKET_OPTION *option);
+int qs_client_is_connecting(QS_SOCKET_OPTION *option);
 
-void gdt_print_payload(uint32_t payload_type, uint8_t* payload, size_t payload_len,size_t view_max);
-int gdt_pre_packetfilter( QS_SOCKET_OPTION *option, struct QS_RECV_INFO *rinfo, QS_SOCKPARAM *psockparam, int32_t recvmsg_munit );
+void qs_print_payload(uint32_t payload_type, uint8_t* payload, size_t payload_len,size_t view_max);
+int qs_pre_packetfilter( QS_SOCKET_OPTION *option, struct QS_RECV_INFO *rinfo, QS_SOCKPARAM *psockparam, int32_t recvmsg_munit );
 
-ssize_t gdt_parse_socket_binary( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockparam, uint8_t* u8buf, size_t size, uint32_t basebuf_munit );
+ssize_t qs_parse_socket_binary( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockparam, uint8_t* u8buf, size_t size, uint32_t basebuf_munit );
 uint64_t get_parse_header(QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockparam, uint8_t* u8buf, size_t size);
-uint32_t gdt_make_size_header(uint8_t* head_ptr,ssize_t size);
-int32_t gdt_make_message_buffer(QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockparam, size_t size);
-size_t gdt_make_msg( QS_SOCKET_OPTION* option,QS_SOCKPARAM *psockparam, void* sendbin, const char* msg, ssize_t size, uint32_t payload_type,int is_binary );
-ssize_t gdt_send_msg( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockparam, const char* msg, ssize_t size, uint32_t payload_type );
-size_t gdt_make_udpmsg( void* sendbin, const char* msg, ssize_t size, uint32_t payload_type );
-ssize_t gdt_send_udpmsg( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockparam, const char* msg, ssize_t size, uint32_t payload_type, struct sockaddr *pfrom, socklen_t fromlen );
+uint32_t qs_make_size_header(uint8_t* head_ptr,ssize_t size);
+int32_t qs_make_message_buffer(QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockparam, size_t size);
+size_t qs_make_msg( QS_SOCKET_OPTION* option,QS_SOCKPARAM *psockparam, void* sendbin, const char* msg, ssize_t size, uint32_t payload_type,int is_binary );
+ssize_t qs_send_msg( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockparam, const char* msg, ssize_t size, uint32_t payload_type );
+size_t qs_make_udpmsg( void* sendbin, const char* msg, ssize_t size, uint32_t payload_type );
+ssize_t qs_send_udpmsg( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockparam, const char* msg, ssize_t size, uint32_t payload_type, struct sockaddr *pfrom, socklen_t fromlen );
 
 #endif /*_QS_SOCKET_H_*/
 

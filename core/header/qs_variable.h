@@ -82,23 +82,23 @@ typedef struct QS_CACHE_PAGE
 	int32_t hash_id;
 } QS_CACHE_PAGE;
 
-size_t gdt_set_cache_alloc_info(QS_CACHE_SERVER_DATA* data, size_t page_size, size_t json_memory_size);
-size_t gdt_cache_alloc(QS_CACHE_SERVER_DATA* data);
+size_t qs_set_cache_alloc_info(QS_CACHE_SERVER_DATA* data, size_t page_size, size_t json_memory_size);
+size_t qs_cache_alloc(QS_CACHE_SERVER_DATA* data);
 
-int32_t gdt_create_cache( QS_MEMORY_POOL* memory,size_t chain_allocate_size,size_t max_cache_size,size_t page_allocate_size,size_t page_hash_size,size_t max_key_size);
-int32_t gdt_create_storage_cache( const char* store_name, QS_MEMORY_POOL** pp_memory,size_t max_cache_size,size_t page_allocate_size,size_t page_hash_size,size_t max_key_size);
-void gdt_get_cache_page(QS_CACHE* cache,QS_CACHE_PAGE* page);
-void gdt_swap_page(QS_CACHE* cache,QS_CACHE_PAGE* page);
-void gdt_add_cache_key(QS_CACHE* cache,char* key);
-int32_t gdt_cache_int(QS_CACHE* cache,char* key,int32_t value,int32_t life_time);
-int32_t gdt_cache_string(QS_CACHE* cache,char* key,char* value, int32_t life_time);
-int32_t gdt_cache_binary(QS_CACHE* cache,char* key,uint8_t* bin,size_t bin_size, int32_t life_time);
-int32_t gdt_remove_cache(QS_CACHE* cache,char* key);
-int32_t gdt_cache_length(QS_CACHE* cache);
+int32_t qs_create_cache( QS_MEMORY_POOL* memory,size_t chain_allocate_size,size_t max_cache_size,size_t page_allocate_size,size_t page_hash_size,size_t max_key_size);
+int32_t qs_create_storage_cache( const char* store_name, QS_MEMORY_POOL** pp_memory,size_t max_cache_size,size_t page_allocate_size,size_t page_hash_size,size_t max_key_size);
+void qs_get_cache_page(QS_CACHE* cache,QS_CACHE_PAGE* page);
+void qs_swap_page(QS_CACHE* cache,QS_CACHE_PAGE* page);
+void qs_add_cache_key(QS_CACHE* cache,char* key);
+int32_t qs_cache_int(QS_CACHE* cache,char* key,int32_t value,int32_t life_time);
+int32_t qs_cache_string(QS_CACHE* cache,char* key,char* value, int32_t life_time);
+int32_t qs_cache_binary(QS_CACHE* cache,char* key,uint8_t* bin,size_t bin_size, int32_t life_time);
+int32_t qs_remove_cache(QS_CACHE* cache,char* key);
+int32_t qs_cache_length(QS_CACHE* cache);
 
-void gdt_array_dump( QS_MEMORY_POOL* _ppool, int32_t munit, int index );
-void gdt_hash_dump( QS_MEMORY_POOL* _ppool, int32_t h_munit, int index );
-int32_t gdt_opendir( QS_MEMORY_POOL* _ppool, const char* path );
+void qs_array_dump( QS_MEMORY_POOL* _ppool, int32_t munit, int index );
+void qs_hash_dump( QS_MEMORY_POOL* _ppool, int32_t h_munit, int index );
+int32_t qs_opendir( QS_MEMORY_POOL* _ppool, const char* path );
 
 #endif /*_QS_VARIABLE_H_*/
 

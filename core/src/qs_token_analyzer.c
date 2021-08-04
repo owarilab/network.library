@@ -30,10 +30,10 @@
 /*
  * allocate memory of QS_TOKENS and initialize parameters
  */
-int32_t gdt_inittoken( QS_MEMORY_POOL* _ppool, int32_t allocsize )
+int32_t qs_inittoken( QS_MEMORY_POOL* _ppool, int32_t allocsize )
 {
 	int32_t tokens_munit = -1;
-	if( -1 == ( tokens_munit = gdt_create_munit( _ppool, sizeof( QS_TOKENS ), MEMORY_TYPE_DEFAULT ) ) ){
+	if( -1 == ( tokens_munit = qs_create_munit( _ppool, sizeof( QS_TOKENS ), MEMORY_TYPE_DEFAULT ) ) ){
 		return -1;
 	}
 	QS_TOKENS *ptokens = (QS_TOKENS*)QS_GET_POINTER(_ppool,tokens_munit);
@@ -48,7 +48,7 @@ int32_t gdt_inittoken( QS_MEMORY_POOL* _ppool, int32_t allocsize )
 /*
  * analyze input strings
  */
-int gdt_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr )
+int qs_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr )
 {
 	int32_t tmpbuf_munit = -1;
 	char* tokenbuf = NULL;
@@ -56,20 +56,20 @@ int gdt_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr
 	int tokensize = 0;
 	int token_type = ID_UNK;
 	int ret = 0;
-	if( -1 == ( tmpbuf_munit = gdt_create_munit( _ppool, sizeof( char ) * STRBUF_SIZE, MEMORY_TYPE_DEFAULT ) ) ){
+	if( -1 == ( tmpbuf_munit = qs_create_munit( _ppool, sizeof( char ) * STRBUF_SIZE, MEMORY_TYPE_DEFAULT ) ) ){
 #ifdef __QS_DEBUG__
 		printf("can not allocate memory of tokenbuf\n");
 #endif
 		return QS_SYSTEM_ERROR;
 	}
-	tokenbuf = (char*)gdt_upointer( _ppool, tmpbuf_munit );
+	tokenbuf = (char*)qs_upointer( _ppool, tmpbuf_munit );
 	ptoken = tokenbuf;
 	for(;;)
 	{
 		if( *pstr == '\0' )
 		{
 			if( tokensize > 0 ){
-				if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) ){
+				if( 0 == qs_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) ){
 					printf( "add token error.\n" );
 					break;
 				}
@@ -78,7 +78,7 @@ int gdt_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr
 		}
 		if( tokensize >= STRBUF_SIZE-8){
 			printf( "token buffer size over\n" );
-			if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) ){
+			if( 0 == qs_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) ){
 				printf( "add token error.\n" );
 				break;
 			}
@@ -108,7 +108,7 @@ int gdt_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr
 //		if( *pstr == '\n' )
 //		{
 //			if( tokensize > 0 ){
-//				if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) ){
+//				if( 0 == qs_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) ){
 //					printf("add token error.\n");
 //					break;
 //				}
@@ -135,7 +135,7 @@ int gdt_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr
 				}
 				*(ptoken+(tokensize++)) = *(pstr++);
 			}
-			if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
+			if( 0 == qs_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
 			{
 				printf("add token error.\n");
 				break;
@@ -184,14 +184,14 @@ int gdt_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr
 				}
 				if( tokensize >= STRBUF_SIZE-8){
 					printf( "string buffer size over\n" );
-					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
+					if( 0 == qs_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
 					{
 						printf( "add token error.\n" );
 						break;
 					}
 				}
 			}
-			if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
+			if( 0 == qs_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
 			{
 				printf("add token error.\n");
 				break;
@@ -224,14 +224,14 @@ int gdt_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr
 //				}
 				if( tokensize >= STRBUF_SIZE-8){
 					printf( "string buffer size over\n" );
-					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
+					if( 0 == qs_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
 					{
 						printf( "add token error.\n" );
 						break;
 					}
 				}
 			}
-			if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
+			if( 0 == qs_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
 			{
 				printf("add token error.\n");
 				break;
@@ -241,7 +241,7 @@ int gdt_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr
 		}
 		else if( *pstr == '\n' || isspace(*pstr)){
 			if( tokensize > 0 ){
-				if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) ){
+				if( 0 == qs_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) ){
 					printf("add token error.\n");
 					break;
 				}
@@ -276,7 +276,7 @@ int gdt_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr
 					else if( c == '=' && *pstr == '>' ){
 						*(ptoken+(tokensize++)) = *(pstr++);
 					}
-					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
+					if( 0 == qs_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
 					{
 						printf("add token error.\n");
 						break;
@@ -289,7 +289,7 @@ int gdt_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr
 					if( *pstr == '=' ){
 						*(ptoken+(tokensize++)) = *(pstr++);
 					}
-					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
+					if( 0 == qs_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
 					{
 						printf("add token error.\n");
 						break;
@@ -302,7 +302,7 @@ int gdt_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr
 					if( *pstr == ':' ){
 						*(ptoken+(tokensize++)) = *(pstr++);
 					}
-					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
+					if( 0 == qs_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
 					{
 						printf("add token error.\n");
 						break;
@@ -312,7 +312,7 @@ int gdt_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr
 				else{
 					token_type = ID_SIGN;
 					*(ptoken+(tokensize++)) = *(pstr++);
-					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
+					if( 0 == qs_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
 					{
 						printf("add token error.\n");
 						break;
@@ -325,13 +325,13 @@ int gdt_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr
 					
 				}
 				else if( *pstr =='(' || *pstr == '{' || *pstr == '[' ){
-					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) ){
+					if( 0 == qs_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) ){
 						printf("add token error.\n");
 						break;
 					}
 					token_type = ID_SIGN;
 					*(ptoken+(tokensize++)) = *(pstr++);
-					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
+					if( 0 == qs_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
 					{
 						printf("add token error.\n");
 						break;
@@ -339,13 +339,13 @@ int gdt_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr
 					continue;
 				}
 				else if( *pstr ==';' || *pstr == ')' || *pstr == '}' || *pstr == ']' || *pstr == ',' ){
-					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) ){
+					if( 0 == qs_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) ){
 						printf("add token error.\n");
 						break;
 					}
 					token_type = ID_SIGN;
 					*(ptoken+(tokensize++)) = *(pstr++);
-					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
+					if( 0 == qs_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
 					{
 						printf("add token error.\n");
 						break;
@@ -354,7 +354,7 @@ int gdt_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr
 				}
 				else if( *pstr == '+' || *pstr == '-' || *pstr == '=' || *pstr == '<' || *pstr == '>' || *pstr == '|' || *pstr == '&' ){
 					char c = ' ';
-					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) ){
+					if( 0 == qs_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) ){
 						printf("add token error.\n");
 						break;
 					}
@@ -370,7 +370,7 @@ int gdt_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr
 					else if( c == '-' && *pstr == '>' ){
 						*(ptoken+(tokensize++)) = *(pstr++);
 					}
-					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
+					if( 0 == qs_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
 					{
 						printf("add token error.\n");
 						break;
@@ -379,7 +379,7 @@ int gdt_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr
 				}
 				else if( *pstr == '*' || *pstr == '/' || *pstr == '%' || *pstr == '!' || *pstr == '^' )
 				{
-					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
+					if( 0 == qs_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
 					{
 						printf("add token error.\n");
 						break;
@@ -389,7 +389,7 @@ int gdt_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr
 					if( *pstr == '=' ){
 						*(ptoken+(tokensize++)) = *(pstr++);
 					}
-					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
+					if( 0 == qs_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) )
 					{
 						printf("add token error.\n");
 						break;
@@ -397,7 +397,7 @@ int gdt_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr
 					continue;
 				}
 				else if( *pstr == ':' ){
-					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) ){
+					if( 0 == qs_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) ){
 						printf("add token error.\n");
 						break;
 					}
@@ -406,7 +406,7 @@ int gdt_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr
 					if( *pstr == ':' ){
 						*(ptoken+(tokensize++)) = *(pstr++);
 					}
-					if( 0 == gdt_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) ){
+					if( 0 == qs_addtoken(_ppool,tokens_munit,tokenbuf,&tokensize,token_type) ){
 						printf("add token error.\n");
 						break;
 					}
@@ -419,7 +419,7 @@ int gdt_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr
 	return ret;
 }
 
-int gdt_addtoken( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* tokenbuf, int* tokensize, int type )
+int qs_addtoken( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* tokenbuf, int* tokensize, int type )
 {
 	char *pbuf = NULL;
 	int tmptype = 0;
@@ -428,7 +428,7 @@ int gdt_addtoken( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* tokenbuf, 
 	QS_TOKEN *ptoken = NULL;
 	if( ptokens->token_munit == -1 )
 	{
-		if( -1 == ( ptokens->token_munit = gdt_create_munit( _ppool, sizeof( QS_TOKEN ) * ptokens->allocsize, MEMORY_TYPE_DEFAULT ) ) ){
+		if( -1 == ( ptokens->token_munit = qs_create_munit( _ppool, sizeof( QS_TOKEN ) * ptokens->allocsize, MEMORY_TYPE_DEFAULT ) ) ){
 			return -1;
 		}
 		ptokens->size = ptokens->allocsize;
@@ -437,7 +437,7 @@ int gdt_addtoken( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* tokenbuf, 
 		if( ptokens->currentpos >= ptokens->size )
 		{
 			int32_t resize = ptokens->size * 2;
-			if( -1 == ( tmpmunit = gdt_create_munit( _ppool, sizeof( QS_TOKEN ) * ( resize ), MEMORY_TYPE_DEFAULT ) ) ){
+			if( -1 == ( tmpmunit = qs_create_munit( _ppool, sizeof( QS_TOKEN ) * ( resize ), MEMORY_TYPE_DEFAULT ) ) ){
 				printf("realloc token memory error\n");
 				return -1;
 			}
@@ -446,7 +446,7 @@ int gdt_addtoken( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* tokenbuf, 
 				, (QS_TOKEN*)QS_GET_POINTER(_ppool,ptokens->token_munit)
 				, sizeof( QS_TOKEN )*ptokens->size
 			);
-			gdt_free_memory_unit( _ppool, &ptokens->token_munit );
+			qs_free_memory_unit( _ppool, &ptokens->token_munit );
 			ptokens->token_munit = tmpmunit;
 			ptokens->size = resize;
 		}
@@ -454,17 +454,17 @@ int gdt_addtoken( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* tokenbuf, 
 	ptoken = ( QS_TOKEN* )QS_GET_POINTER(_ppool,ptokens->token_munit)+ptokens->currentpos;
 	*(tokenbuf+((*tokensize)++)) = '\0';
 	if( type == ID_NUM ){
-		if( -1 == ( ptoken->buf_munit = gdt_create_munit( _ppool, sizeof(char)*(*tokensize) + sizeof( int32_t ), MEMORY_TYPE_DEFAULT ) ) ){
+		if( -1 == ( ptoken->buf_munit = qs_create_munit( _ppool, sizeof(char)*(*tokensize) + sizeof( int32_t ), MEMORY_TYPE_DEFAULT ) ) ){
 			printf("allocate token buf munit error.\n");
 			return -1;
 		}
 		pbuf = (char*)QS_GET_POINTER(_ppool,ptoken->buf_munit);
 		ptoken->size = (*tokensize);
 		memcpy(pbuf,tokenbuf,(*tokensize));
-		(*(int32_t*)(QS_GET_POINTER(_ppool,ptoken->buf_munit)+gdt_usize(_ppool,ptoken->buf_munit)-sizeof(int32_t))) = atoi(tokenbuf);
+		(*(int32_t*)(QS_GET_POINTER(_ppool,ptoken->buf_munit)+qs_usize(_ppool,ptoken->buf_munit)-sizeof(int32_t))) = atoi(tokenbuf);
 	}
 	else{
-		if( -1 == ( ptoken->buf_munit = gdt_create_munit( _ppool, sizeof(char)*(*tokensize), MEMORY_TYPE_DEFAULT ) ) ){
+		if( -1 == ( ptoken->buf_munit = qs_create_munit( _ppool, sizeof(char)*(*tokensize), MEMORY_TYPE_DEFAULT ) ) ){
 			printf("allocate token buf munit error.\n");
 			return -1;
 		}
@@ -473,7 +473,7 @@ int gdt_addtoken( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* tokenbuf, 
 		memcpy(pbuf,tokenbuf,(*tokensize));
 	}
 	if( type == ID_SYMBOL ){
-		tmptype = gdt_check_systemword( pbuf );
+		tmptype = qs_check_systemword( pbuf );
 	}
 	if( tmptype != 0 ){
 		ptoken->type = tmptype;
@@ -487,7 +487,7 @@ int gdt_addtoken( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* tokenbuf, 
 	return 1;
 }
 
-int gdt_check_systemword( char* token )
+int qs_check_systemword( char* token )
 {
 	int is_sys = 0;
 	if( !strcmp(token, SYS_IF ) ){
@@ -508,7 +508,7 @@ int gdt_check_systemword( char* token )
 	return is_sys;
 }
 
-void gdt_tokendump( QS_MEMORY_POOL* _ppool, int32_t tokens_munit )
+void qs_tokendump( QS_MEMORY_POOL* _ppool, int32_t tokens_munit )
 {
 	int i;
 	int type;
@@ -532,11 +532,11 @@ void gdt_tokendump( QS_MEMORY_POOL* _ppool, int32_t tokens_munit )
 	printf("-----------------------------------------------------------------------\n");
 	printf("- token info\n");
 	printf("-----------------------------------------------------------------------\n");
-	token_list = ( QS_TOKEN* )gdt_upointer( _ppool, ptokens->token_munit );
+	token_list = ( QS_TOKEN* )qs_upointer( _ppool, ptokens->token_munit );
 	for( i = 0; i < ptokens->currentpos; i++ )
 	{
 		type = token_list[i].type;
-		pbuf = (char*)gdt_upointer( _ppool, token_list[i].buf_munit );
+		pbuf = (char*)qs_upointer( _ppool, token_list[i].buf_munit );
 		printf("token(%s , %d byte) : %s\n",typelist[type],token_list[i].size,pbuf);
 	}
 	printf("-----------------------------------------------------------------------\n");

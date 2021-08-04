@@ -27,7 +27,7 @@
 
 #include "qs_string.h"
 
-int gdt_itoa( int32_t value, char* target, size_t size )
+int qs_itoa( int32_t value, char* target, size_t size )
 {
 	int error_code = 0;
 	int isminus = false;
@@ -66,7 +66,7 @@ int gdt_itoa( int32_t value, char* target, size_t size )
 	return error_code;
 }
 
-int32_t gdt_find_char( char* target, size_t target_size, char delimiter_ch )
+int32_t qs_find_char( char* target, size_t target_size, char delimiter_ch )
 {
 	char* ps = target;
 	while( *ps != '\0' ){
@@ -78,7 +78,7 @@ int32_t gdt_find_char( char* target, size_t target_size, char delimiter_ch )
 	return -1;
 }
 
-char* gdt_readline( char* buf, size_t buffer_size, char* target, char delimiter_ch )
+char* qs_readline( char* buf, size_t buffer_size, char* target, char delimiter_ch )
 {
 	char *bufstart = buf;
 	if( buf == NULL || target == NULL ){
@@ -87,7 +87,7 @@ char* gdt_readline( char* buf, size_t buffer_size, char* target, char delimiter_
 	while( (*target) != '\0' )
 	{
 		if( buf - bufstart >= buffer_size -1 ){
-			printf("gdt_readline : buffer size over\n");
+			printf("qs_readline : buffer size over\n");
 			break;
 		}
 		if( (*target) == delimiter_ch ){
@@ -102,7 +102,7 @@ char* gdt_readline( char* buf, size_t buffer_size, char* target, char delimiter_
 	return target;
 }
 
-char* gdt_read_line_delimiter( char* buf, size_t buffer_size,char* target, char delimiter_ch )
+char* qs_read_line_delimiter( char* buf, size_t buffer_size,char* target, char delimiter_ch )
 {
 	char *bufstart = buf;
 	if( buf == NULL || target == NULL ){
@@ -111,7 +111,7 @@ char* gdt_read_line_delimiter( char* buf, size_t buffer_size,char* target, char 
 	while( (*target) != '\r' && (*target) != '\n' && (*target) != '\0' )
 	{
 		if( buf - bufstart >= buffer_size -1 ){
-			printf("gdt_read_line_delimiter : buffer size over\n");
+			printf("qs_read_line_delimiter : buffer size over\n");
 			break;
 		}
 		if( (*target) == delimiter_ch )
@@ -127,7 +127,7 @@ char* gdt_read_line_delimiter( char* buf, size_t buffer_size,char* target, char 
 	return target;
 }
 
-char* gdt_read_delimiter( char* buf, size_t buffer_size,char* target, char delimiter_ch )
+char* qs_read_delimiter( char* buf, size_t buffer_size,char* target, char delimiter_ch )
 {
 	char *bufstart = buf;
 	if( buf == NULL || target == NULL ){
@@ -135,7 +135,7 @@ char* gdt_read_delimiter( char* buf, size_t buffer_size,char* target, char delim
 	}
 	while( (*target) != '\0' ){
 		if( buf - bufstart >= buffer_size -1 ){
-			printf("gdt_read_delimiter : buffer size over\n");
+			printf("qs_read_delimiter : buffer size over\n");
 			break;
 		}
 		if( (*target) == delimiter_ch ){
@@ -148,7 +148,7 @@ char* gdt_read_delimiter( char* buf, size_t buffer_size,char* target, char delim
 	return target;
 }
 
-size_t gdt_strlcat( char *dst, const char *src, size_t size )
+size_t qs_strlcat( char *dst, const char *src, size_t size )
 {
 	size_t s = 0;
 	const char *ps;
@@ -177,7 +177,7 @@ size_t gdt_strlcat( char *dst, const char *src, size_t size )
 	return s;
 }
 
-size_t gdt_strlink( char *pmain, size_t mainsize, char *psub, size_t subsize, size_t max_size )
+size_t qs_strlink( char *pmain, size_t mainsize, char *psub, size_t subsize, size_t max_size )
 {
 	size_t s = 0;
 	char *pm = pmain;
@@ -187,7 +187,7 @@ size_t gdt_strlink( char *pmain, size_t mainsize, char *psub, size_t subsize, si
 		return s;
 	}
 	if( mainsize + subsize >= max_size-1 ){
-		printf("gdt_strlink : buffer size over\n");
+		printf("qs_strlink : buffer size over\n");
 		return s;
 	}
 	do{
@@ -198,7 +198,7 @@ size_t gdt_strlink( char *pmain, size_t mainsize, char *psub, size_t subsize, si
 	return s;
 }
 
-int gdt_escape_directory_traversal( char* dest, const char *src, size_t size )
+int qs_escape_directory_traversal( char* dest, const char *src, size_t size )
 {
 	int error_code = QS_SYSTEM_OK;
 	const char *ps;
@@ -240,7 +240,7 @@ int gdt_escape_directory_traversal( char* dest, const char *src, size_t size )
 	return error_code;
 }
 
-void gdt_nl2br( char* dest, const char *src, size_t size )
+void qs_nl2br( char* dest, const char *src, size_t size )
 {
 	const char *ps;
 	char* dstart;
@@ -277,7 +277,7 @@ void gdt_nl2br( char* dest, const char *src, size_t size )
 	}while( false );
 }
 
-void gdt_nl2char( char* dest, const char *src, size_t size )
+void qs_nl2char( char* dest, const char *src, size_t size )
 {
 	const char *ps;
 	char* dstart;
@@ -332,7 +332,7 @@ void gdt_nl2char( char* dest, const char *src, size_t size )
 	}while( false );
 }
 
-void gdt_strcopy( char* dest, const char*src, size_t size )
+void qs_strcopy( char* dest, const char*src, size_t size )
 {
 	char* dstart = dest;
 	const char* ps = src;
@@ -347,7 +347,7 @@ void gdt_strcopy( char* dest, const char*src, size_t size )
 	*dest = '\0';
 }
 
-size_t gdt_strlen( const char* src )
+size_t qs_strlen( const char* src )
 {
 	size_t s = 0;
 	const char* ps = src;
@@ -358,7 +358,7 @@ size_t gdt_strlen( const char* src )
 	return s;
 }
 
-uint32_t gdt_ihash( const char* s, uint32_t range )
+uint32_t qs_ihash( const char* s, uint32_t range )
 {
 	uint32_t v = 0;
 	const char* ps = s;
@@ -370,7 +370,7 @@ uint32_t gdt_ihash( const char* s, uint32_t range )
 	return ( v % range );
 }
 
-int gdt_utc_time( char* dest, size_t dest_size )
+int qs_utc_time( char* dest, size_t dest_size )
 {
 #ifdef __WINDOWS__
 	__time64_t long_time;
@@ -388,7 +388,7 @@ int gdt_utc_time( char* dest, size_t dest_size )
 	return QS_SYSTEM_OK;
 }
 
-int gdt_urlencode( char* dest, size_t dest_size, char* src )
+int qs_urlencode( char* dest, size_t dest_size, char* src )
 {
 	int error_code = QS_SYSTEM_OK;
 	char* ps = src;
@@ -425,7 +425,7 @@ int gdt_urlencode( char* dest, size_t dest_size, char* src )
 	return error_code;
 }
 
-int gdt_urldecode( char* dest, size_t dest_size, char* src )
+int qs_urldecode( char* dest, size_t dest_size, char* src )
 {
 	int error_code = QS_SYSTEM_OK;
 	char* ps = src;
@@ -452,10 +452,10 @@ int gdt_urldecode( char* dest, size_t dest_size, char* src )
 	return error_code;
 }
 
-int gdt_get_extension( char* dest, size_t dest_size, char* src )
+int qs_get_extension( char* dest, size_t dest_size, char* src )
 {
 	int error_code = QS_SYSTEM_OK;
-	size_t s_pos = gdt_strlen( src )-1;
+	size_t s_pos = qs_strlen( src )-1;
 	size_t pos = s_pos;
 	while( pos > 0 ){
 		if( *(src+pos) == '.' ){
@@ -475,7 +475,7 @@ int gdt_get_extension( char* dest, size_t dest_size, char* src )
 	return error_code;
 }
 
-void gdt_print_hex( uint8_t* hex, size_t size, size_t view_max )
+void qs_print_hex( uint8_t* hex, size_t size, size_t view_max )
 {
 	if( size <= 0 || view_max <= 0 ){
 		return;

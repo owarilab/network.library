@@ -31,7 +31,7 @@
 #endif
 
 // 64bit example -> 1024LLU * 1024LLU * 1024LLU * 4LLU
-size_t gdt_initialize_memory( QS_MEMORY_POOL** _ppool, size_t allocate_size, size_t max_allocate_size, size_t alignment_size, size_t fix_memory_unit, size_t free_memory_unit, size_t min_realloc )
+size_t qs_initialize_memory( QS_MEMORY_POOL** _ppool, size_t allocate_size, size_t max_allocate_size, size_t alignment_size, size_t fix_memory_unit, size_t free_memory_unit, size_t min_realloc )
 {
 	size_t memory_size		= 0;
 	size_t byte_size		= 0;
@@ -69,7 +69,7 @@ size_t gdt_initialize_memory( QS_MEMORY_POOL** _ppool, size_t allocate_size, siz
 		(*_ppool)->lock_munit		= -1;
 		(*_ppool)->memory_buf_munit	= -1;
 		(*_ppool)->alloc_type			= MEMORY_ALLOCATE_TYPE_MALLOC;
-		(*_ppool)->endian			= gdt_endian();
+		(*_ppool)->endian			= qs_endian();
 		(*_ppool)->debug			= MEMORY_DEBUG;
 		memory_unit_one_size = QS_ALIGNUP( sizeof( QS_MEMORY_UNIT ), alignment_size );
 		memoryUnitSize = memory_unit_one_size * ( fix_memory_unit + free_memory_unit );
@@ -78,7 +78,7 @@ size_t gdt_initialize_memory( QS_MEMORY_POOL** _ppool, size_t allocate_size, siz
 		for( i = ((*_ppool)->unit_size-1); i >= 0; i-- )
 		{
 			unit = (QS_MEMORY_UNIT*)( ( (uint8_t*)(*_ppool)->memory + (*_ppool)->end ) - ( memory_unit_one_size * ( (*_ppool)->unit_size - i ) ) );
-			gdt_initialize_memory_unit( unit );
+			qs_initialize_memory_unit( unit );
 			unit->id = ( ((*_ppool)->unit_size-1) - i );
 		}
 		memory_size = (*_ppool)->size;
@@ -86,12 +86,12 @@ size_t gdt_initialize_memory( QS_MEMORY_POOL** _ppool, size_t allocate_size, siz
 	return memory_size;
 }
 
-size_t gdt_initialize_memory_f64( QS_MEMORY_POOL** _ppool, size_t allocate_size )
+size_t qs_initialize_memory_f64( QS_MEMORY_POOL** _ppool, size_t allocate_size )
 {
-	return gdt_initialize_memory(_ppool, allocate_size, allocate_size, MEMORY_ALIGNMENT_SIZE_BIT_64, 0, 0, 0);
+	return qs_initialize_memory(_ppool, allocate_size, allocate_size, MEMORY_ALIGNMENT_SIZE_BIT_64, 0, 0, 0);
 }
 
-size_t gdt_initialize_mmapmemory( QS_MEMORY_POOL** _ppool, size_t allocate_size, size_t max_allocate_size, size_t alignment_size, size_t fix_memory_unit, size_t free_memory_unit, size_t min_realloc )
+size_t qs_initialize_mmapmemory( QS_MEMORY_POOL** _ppool, size_t allocate_size, size_t max_allocate_size, size_t alignment_size, size_t fix_memory_unit, size_t free_memory_unit, size_t min_realloc )
 {
 	size_t memory_size			= 0;
 #if defined(__LINUX__) || defined(__BSD_UNIX__)
@@ -135,7 +135,7 @@ size_t gdt_initialize_mmapmemory( QS_MEMORY_POOL** _ppool, size_t allocate_size,
 		(*_ppool)->memory_buf_munit	= -1;
 		(*_ppool)->mmap_fd			= -1;
 		(*_ppool)->alloc_type			= MEMORY_ALLOCATE_TYPE_MMAP;
-		(*_ppool)->endian			= gdt_endian();
+		(*_ppool)->endian			= qs_endian();
 		(*_ppool)->debug			= MEMORY_DEBUG;
 		memory_unit_one_size = QS_ALIGNUP( sizeof( QS_MEMORY_UNIT ), alignment_size );
 		memoryUnitSize = memory_unit_one_size * ( fix_memory_unit + free_memory_unit );
@@ -144,7 +144,7 @@ size_t gdt_initialize_mmapmemory( QS_MEMORY_POOL** _ppool, size_t allocate_size,
 		for( i = ((*_ppool)->unit_size-1); i >= 0; i-- )
 		{
 			unit = (QS_MEMORY_UNIT*)( ( (*_ppool)->memory + (*_ppool)->end ) - ( memory_unit_one_size * ( (*_ppool)->unit_size - i ) ) );
-			gdt_initialize_memory_unit( unit );
+			qs_initialize_memory_unit( unit );
 			unit->id = ( ((*_ppool)->unit_size-1) - i );
 		}
 		memory_size = (*_ppool)->size;
@@ -153,12 +153,12 @@ size_t gdt_initialize_mmapmemory( QS_MEMORY_POOL** _ppool, size_t allocate_size,
 	return memory_size;
 }
 
-size_t gdt_initialize_mmapmemory_f64( QS_MEMORY_POOL** _ppool, size_t allocate_size )
+size_t qs_initialize_mmapmemory_f64( QS_MEMORY_POOL** _ppool, size_t allocate_size )
 {
-	return gdt_initialize_memory(_ppool, allocate_size, allocate_size, MEMORY_ALIGNMENT_SIZE_BIT_64, 0, 0, 0);
+	return qs_initialize_memory(_ppool, allocate_size, allocate_size, MEMORY_ALIGNMENT_SIZE_BIT_64, 0, 0, 0);
 }
 
-size_t gdt_initialize_mmapmemory_f( const char* file_name, QS_MEMORY_POOL** _ppool, size_t allocate_size )
+size_t qs_initialize_mmapmemory_f( const char* file_name, QS_MEMORY_POOL** _ppool, size_t allocate_size )
 {
 	size_t memory_size			= 0;
 #if defined(__LINUX__) || defined(__BSD_UNIX__)
@@ -226,7 +226,7 @@ size_t gdt_initialize_mmapmemory_f( const char* file_name, QS_MEMORY_POOL** _ppo
 	(*_ppool)->memory_buf_munit	= -1;
 	(*_ppool)->mmap_fd			= fd;
 	(*_ppool)->alloc_type		= MEMORY_ALLOCATE_TYPE_MMAP;
-	(*_ppool)->endian			= gdt_endian();
+	(*_ppool)->endian			= qs_endian();
 	(*_ppool)->debug			= MEMORY_DEBUG;
 	memory_unit_one_size = QS_ALIGNUP( sizeof( QS_MEMORY_UNIT ), MEMORY_ALIGNMENT_SIZE_BIT_64 );
 	memoryUnitSize = memory_unit_one_size * ( fix_memory_unit + free_memory_unit );
@@ -238,7 +238,7 @@ size_t gdt_initialize_mmapmemory_f( const char* file_name, QS_MEMORY_POOL** _ppo
 		QS_MEMORY_UNIT* unit		= NULL;
 		for( i = ((*_ppool)->unit_size-1); i >= 0; i-- ){
 			unit = (QS_MEMORY_UNIT*)( ( (*_ppool)->memory + (*_ppool)->end ) - ( memory_unit_one_size * ( (*_ppool)->unit_size - i ) ) );
-			gdt_initialize_memory_unit( unit );
+			qs_initialize_memory_unit( unit );
 			unit->id = ( ((*_ppool)->unit_size-1) - i );
 		}
 		// make memory header
@@ -249,7 +249,7 @@ size_t gdt_initialize_mmapmemory_f( const char* file_name, QS_MEMORY_POOL** _ppo
 		buffer.buffer = (uint8_t*)((*_ppool)->memory);
 		buffer.pos = buffer.buffer;
 		buffer.size = header_size; // 4byte * 14
-		gdt_create_memory_info((*_ppool),&buffer);
+		qs_create_memory_info((*_ppool),&buffer);
 	} else{
 		int32_t* pv = (*_ppool)->memory;
 		(*_ppool)->end = *(pv++);
@@ -364,7 +364,7 @@ size_t gdt_initialize_mmapmemory_f( const char* file_name, QS_MEMORY_POOL** _ppo
 	(*_ppool)->memory_buf_munit = -1;
 	(*_ppool)->mmap_fd = 0;
 	(*_ppool)->alloc_type = MEMORY_ALLOCATE_TYPE_MMAP;
-	(*_ppool)->endian = gdt_endian();
+	(*_ppool)->endian = qs_endian();
 	(*_ppool)->debug = MEMORY_DEBUG;
 	memory_unit_one_size = QS_ALIGNUP(sizeof(QS_MEMORY_UNIT), MEMORY_ALIGNMENT_SIZE_BIT_64);
 	memoryUnitSize = memory_unit_one_size * (fix_memory_unit + free_memory_unit);
@@ -376,7 +376,7 @@ size_t gdt_initialize_mmapmemory_f( const char* file_name, QS_MEMORY_POOL** _ppo
 		QS_MEMORY_UNIT* unit = NULL;
 		for (i = ((*_ppool)->unit_size - 1); i >= 0; i--) {
 			unit = (QS_MEMORY_UNIT*)(((uint8_t*)(*_ppool)->memory + (*_ppool)->end) - (memory_unit_one_size * ((*_ppool)->unit_size - i)));
-			gdt_initialize_memory_unit(unit);
+			qs_initialize_memory_unit(unit);
 			unit->id = (((*_ppool)->unit_size - 1) - i);
 		}
 		// make memory header
@@ -387,7 +387,7 @@ size_t gdt_initialize_mmapmemory_f( const char* file_name, QS_MEMORY_POOL** _ppo
 		buffer.buffer = (uint8_t*)((*_ppool)->memory);
 		buffer.pos = buffer.buffer;
 		buffer.size = header_size; // 4byte * 14
-		gdt_create_memory_info((*_ppool), &buffer);
+		qs_create_memory_info((*_ppool), &buffer);
 	}
 	else {
 		int32_t* pv = (*_ppool)->memory;
@@ -412,7 +412,7 @@ size_t gdt_initialize_mmapmemory_f( const char* file_name, QS_MEMORY_POOL** _ppo
 	return memory_size;
 }
 
-int32_t gdt_sync_mmap_memory(QS_MEMORY_POOL* memory_pool)
+int32_t qs_sync_mmap_memory(QS_MEMORY_POOL* memory_pool)
 {
 	// make memory header
 	int32_t header_size = 56;
@@ -421,14 +421,14 @@ int32_t gdt_sync_mmap_memory(QS_MEMORY_POOL* memory_pool)
 	buffer.buffer = (uint8_t*)(memory_pool->memory);
 	buffer.pos = buffer.buffer;
 	buffer.size = header_size; // 4byte * 14
-	gdt_create_memory_info(memory_pool, &buffer);
+	qs_create_memory_info(memory_pool, &buffer);
 #if defined(__LINUX__) || defined(__BSD_UNIX__)
 		msync(memory_pool->memory,memory_pool->size,MS_SYNC);
 #endif // #if defined(__LINUX__) || defined(__BSD_UNIX__)
 	return QS_SYSTEM_OK;
 }
 
-int32_t gdt_async_mmap_memory(QS_MEMORY_POOL* memory_pool)
+int32_t qs_async_mmap_memory(QS_MEMORY_POOL* memory_pool)
 {
 	// make memory header
 	int32_t header_size = 56;
@@ -437,27 +437,27 @@ int32_t gdt_async_mmap_memory(QS_MEMORY_POOL* memory_pool)
 	buffer.buffer = (uint8_t*)(memory_pool->memory);
 	buffer.pos = buffer.buffer;
 	buffer.size = header_size; // 4byte * 14
-	gdt_create_memory_info(memory_pool, &buffer);
+	qs_create_memory_info(memory_pool, &buffer);
 #if defined(__LINUX__) || defined(__BSD_UNIX__)
 		msync(memory_pool->memory,memory_pool->size,MS_ASYNC);
 #endif // #if defined(__LINUX__) || defined(__BSD_UNIX__)
 	return QS_SYSTEM_OK;
 }
 
-int32_t gdt_create_mini_memory( QS_MEMORY_POOL* _ppool, size_t allocate_size )
+int32_t qs_create_mini_memory( QS_MEMORY_POOL* _ppool, size_t allocate_size )
 {
 	int32_t tiny_pool_munit = -1;
 	allocate_size = QS_ALIGNUP( allocate_size, _ppool->alignment );
-	if( -1 == (tiny_pool_munit = gdt_create_munit( _ppool, sizeof(QS_MEMORY_POOL), MEMORY_TYPE_DEFAULT )) ){
+	if( -1 == (tiny_pool_munit = qs_create_munit( _ppool, sizeof(QS_MEMORY_POOL), MEMORY_TYPE_DEFAULT )) ){
 		return tiny_pool_munit;
 	}
 	QS_MEMORY_POOL* tiny_pool = ( QS_MEMORY_POOL * )QS_GET_POINTER( _ppool, tiny_pool_munit );
 	memset( tiny_pool, 0, sizeof( QS_MEMORY_POOL ) );
 	size_t max_byte_size = sizeof( uint8_t ) * allocate_size;
-	int32_t memory_buf_munit = gdt_create_munit( _ppool, max_byte_size, MEMORY_TYPE_DEFAULT );
+	int32_t memory_buf_munit = qs_create_munit( _ppool, max_byte_size, MEMORY_TYPE_DEFAULT );
 	if(-1==memory_buf_munit){
 		if(_ppool->debug){
-			printf("gdt_create_mini_memory error\n");
+			printf("qs_create_mini_memory error\n");
 		}
 		return -1;
 	}
@@ -475,7 +475,7 @@ int32_t gdt_create_mini_memory( QS_MEMORY_POOL* _ppool, size_t allocate_size )
 	tiny_pool->lock_munit		= -1;
 	tiny_pool->memory_buf_munit = memory_buf_munit;
 	tiny_pool->alloc_type			= MEMORY_ALLOCATE_TYPE_MINI;
-	tiny_pool->endian			= gdt_endian();
+	tiny_pool->endian			= qs_endian();
 	tiny_pool->debug			= MEMORY_DEBUG;
 	uint32_t memory_unit_one_size = QS_ALIGNUP( sizeof( QS_MEMORY_UNIT ), _ppool->alignment );
 	uint32_t memoryUnitSize = memory_unit_one_size * ( FIX_MUNIT_SIZE );
@@ -486,22 +486,22 @@ int32_t gdt_create_mini_memory( QS_MEMORY_POOL* _ppool, size_t allocate_size )
 	for( i = (tiny_pool->unit_size-1); i >= 0; i-- )
 	{
 		unit = (QS_MEMORY_UNIT*)( ( (uint8_t*)tiny_pool->memory + tiny_pool->end ) - ( memory_unit_one_size * ( tiny_pool->unit_size - i ) ) );
-		gdt_initialize_memory_unit( unit );
+		qs_initialize_memory_unit( unit );
 		unit->id = ( (tiny_pool->unit_size-1) - i );
 	}
 	return tiny_pool_munit;
 }
 
-int32_t gdt_create_clone_mini_memory( QS_MEMORY_POOL* _ppool, QS_MEMORY_POOL* _mini_ppool )
+int32_t qs_create_clone_mini_memory( QS_MEMORY_POOL* _ppool, QS_MEMORY_POOL* _mini_ppool )
 {
 	int32_t tiny_pool_munit = -1;
-	if( 0 >= (tiny_pool_munit = gdt_create_munit( _ppool, sizeof(QS_MEMORY_POOL), MEMORY_TYPE_DEFAULT )) ){
+	if( 0 >= (tiny_pool_munit = qs_create_munit( _ppool, sizeof(QS_MEMORY_POOL), MEMORY_TYPE_DEFAULT )) ){
 		return tiny_pool_munit;
 	}
 	QS_MEMORY_POOL* tiny_pool = ( QS_MEMORY_POOL * )QS_GET_POINTER( _ppool, tiny_pool_munit );
 	memset( tiny_pool, 0, sizeof( QS_MEMORY_POOL ) );
 	size_t max_byte_size = _mini_ppool->size;
-	int32_t memory_buf_munit = gdt_create_munit( _ppool, max_byte_size, MEMORY_TYPE_DEFAULT );
+	int32_t memory_buf_munit = qs_create_munit( _ppool, max_byte_size, MEMORY_TYPE_DEFAULT );
 	tiny_pool->memory = ( void* )QS_GET_POINTER( _ppool, memory_buf_munit );
 	memcpy((uint8_t*)tiny_pool->memory,(uint8_t*)_mini_ppool->memory,_mini_ppool->size);
 	tiny_pool->top				= _mini_ppool->top;
@@ -523,7 +523,7 @@ int32_t gdt_create_clone_mini_memory( QS_MEMORY_POOL* _ppool, QS_MEMORY_POOL* _m
 	return tiny_pool_munit;
 }
 
-int32_t gdt_copy_mini_memory( QS_MEMORY_POOL* _dest_ppool, QS_MEMORY_POOL* _src_ppool )
+int32_t qs_copy_mini_memory( QS_MEMORY_POOL* _dest_ppool, QS_MEMORY_POOL* _src_ppool )
 {
 	if( _dest_ppool->alloc_type != MEMORY_ALLOCATE_TYPE_MINI || _src_ppool->alloc_type != MEMORY_ALLOCATE_TYPE_MINI ){
 		return QS_SYSTEM_ERROR;
@@ -549,11 +549,11 @@ int32_t gdt_copy_mini_memory( QS_MEMORY_POOL* _dest_ppool, QS_MEMORY_POOL* _src_
 	_dest_ppool->endian			= _src_ppool->endian;
 	_dest_ppool->debug			= _src_ppool->debug;
 	_dest_ppool->memory_unit_size_one 	= _src_ppool->memory_unit_size_one;
-	//gdt_memory_info( _dest_ppool );
+	//qs_memory_info( _dest_ppool );
 	return QS_SYSTEM_OK;
 }
 
-void gdt_memory_clean( QS_MEMORY_POOL* _ppool )
+void qs_memory_clean( QS_MEMORY_POOL* _ppool )
 {
 	QS_MEMORY_UNIT* unit;
 	int i;
@@ -568,12 +568,12 @@ void gdt_memory_clean( QS_MEMORY_POOL* _ppool )
 	_ppool->memory_unit_size_one = QS_ALIGNUP( sizeof( QS_MEMORY_UNIT ), _ppool->alignment );
 	for( i = (_ppool->unit_size-1); i >= 0; i-- ){
 		unit = (QS_MEMORY_UNIT*)( ( (uint8_t*)_ppool->memory + _ppool->end ) - ( _ppool->memory_unit_size_one * ( _ppool->unit_size - i ) ) );
-		gdt_initialize_memory_unit( unit );
+		qs_initialize_memory_unit( unit );
 		unit->id = ( (_ppool->unit_size-1) - i );
 	}
 }
 
-size_t gdt_realloc_memory( QS_MEMORY_POOL* _ppool, size_t allocate_size, QS_MEMORY_UNIT** current_unit )
+size_t qs_realloc_memory( QS_MEMORY_POOL* _ppool, size_t allocate_size, QS_MEMORY_UNIT** current_unit )
 {
 	size_t memory_size	= 0;
 	size_t byte_size	= 0;
@@ -597,7 +597,7 @@ size_t gdt_realloc_memory( QS_MEMORY_POOL* _ppool, size_t allocate_size, QS_MEMO
 		else{
 			if( allocate_size < _ppool->min_realloc ){
 #ifdef __QS_DEBUG__
-					printf( "[gdt_realloc_memory] min size check s : %zd -> s2 : %"PRIu64"\n", allocate_size, _ppool->min_realloc );
+					printf( "[qs_realloc_memory] min size check s : %zd -> s2 : %"PRIu64"\n", allocate_size, _ppool->min_realloc );
 #endif
 				allocate_size = _ppool->min_realloc;
 			}
@@ -639,12 +639,12 @@ size_t gdt_realloc_memory( QS_MEMORY_POOL* _ppool, size_t allocate_size, QS_MEMO
 	return memory_size;
 }
 
-size_t gdt_mgetsize( QS_MEMORY_POOL* _ppool, size_t size )
+size_t qs_mgetsize( QS_MEMORY_POOL* _ppool, size_t size )
 {
 	return QS_ALIGNUP( size, _ppool->alignment );
 }
 
-uint32_t gdt_initialize_memory_unit( QS_MEMORY_UNIT * unit )
+uint32_t qs_initialize_memory_unit( QS_MEMORY_UNIT * unit )
 {
 	unit->p			= 0;
 	unit->top		= 0;
@@ -657,7 +657,7 @@ uint32_t gdt_initialize_memory_unit( QS_MEMORY_UNIT * unit )
 	return 0;
 }
 
-uint32_t gdt_free_memory_unit( QS_MEMORY_POOL* _ppool, int32_t *munit_id )
+uint32_t qs_free_memory_unit( QS_MEMORY_POOL* _ppool, int32_t *munit_id )
 {
 	QS_MEMORY_UNIT *unit;
 	if( *munit_id < _ppool->fix_unit_size ){
@@ -666,7 +666,7 @@ uint32_t gdt_free_memory_unit( QS_MEMORY_POOL* _ppool, int32_t *munit_id )
 	}
 	unit = QS_PUNIT( _ppool, *munit_id );
 	if( unit == NULL ){
-		printf( "[gdt_free_memory_unit] unit is NULL \n" );
+		printf( "[qs_free_memory_unit] unit is NULL \n" );
 		return QS_SYSTEM_ERROR;
 	}
 	if( unit->status == MEMORY_STATUS_USE ){
@@ -680,43 +680,43 @@ uint32_t gdt_free_memory_unit( QS_MEMORY_POOL* _ppool, int32_t *munit_id )
 	return QS_SYSTEM_OK;
 }
 
-uint32_t gdt_malloc( QS_MEMORY_POOL* _ppool, size_t allocate_size, QS_MEMORY_UNIT** unit )
+uint32_t qs_malloc( QS_MEMORY_POOL* _ppool, size_t allocate_size, QS_MEMORY_UNIT** unit )
 {
 	size_t reallocSize = 0;
 	size_t over_size = 0;
 	QS_MEMORY_UNIT *_parentunit;
 //#ifdef __QS_DEBUG__
-//		printf( "[gdt_malloc:%d] allocate_size %zd Byte\n", _ppool->alloc_type, allocate_size );
+//		printf( "[qs_malloc:%d] allocate_size %zd Byte\n", _ppool->alloc_type, allocate_size );
 //#endif
 	allocate_size = QS_ALIGNUP( allocate_size, _ppool->alignment );
 	if( allocate_size > _ppool->max_size ){
-		printf( "[gdt_malloc] allocate_size over max_size = %"PRIu64", allocate_size = %zd \n" , _ppool->max_size, allocate_size );
+		printf( "[qs_malloc] allocate_size over max_size = %"PRIu64", allocate_size = %zd \n" , _ppool->max_size, allocate_size );
 		return QS_SYSTEM_ERROR;
 	}
 	if( allocate_size <= 0 )
 	{
-		printf( "[gdt_malloc] invalid allocate_size : %"PRIu64", %zd \n" , _ppool->max_size, allocate_size );
+		printf( "[qs_malloc] invalid allocate_size : %"PRIu64", %zd \n" , _ppool->max_size, allocate_size );
 		return QS_SYSTEM_ERROR;
 	}
 	if( _ppool->top + allocate_size >= _ppool->bottom )
 	{
 //#ifdef __QS_DEBUG__
-//		printf( "[gdt_malloc] gdt_realloc_memory : %p\n", (*unit) );
+//		printf( "[qs_malloc] qs_realloc_memory : %p\n", (*unit) );
 //#endif
 		if( _ppool->alloc_type == MEMORY_ALLOCATE_TYPE_MALLOC ){
-			reallocSize = gdt_realloc_memory( _ppool, allocate_size, unit );
+			reallocSize = qs_realloc_memory( _ppool, allocate_size, unit );
 		}
 		if( _ppool->top + allocate_size >= _ppool->bottom )
 		{
 			over_size = ( _ppool->top + allocate_size ) - _ppool->bottom;
 			if(_ppool->debug){
-				printf( "[gdt_malloc] _ppool allocate size over %zd Byte\n", over_size );
-				printf( "[gdt_malloc] reallocSize %zd Byte\n", reallocSize );
+				printf( "[qs_malloc] _ppool allocate size over %zd Byte\n", over_size );
+				printf( "[qs_malloc] reallocSize %zd Byte\n", reallocSize );
 			}
 			return QS_SYSTEM_ERROR;
 		}
 //#ifdef __QS_DEBUG__
-//		printf( "[gdt_malloc] new pointer : %p\n", (*unit) );
+//		printf( "[qs_malloc] new pointer : %p\n", (*unit) );
 //#endif
 	}
 	(*unit)->p			= _ppool->top;
@@ -740,41 +740,41 @@ uint32_t gdt_malloc( QS_MEMORY_POOL* _ppool, size_t allocate_size, QS_MEMORY_UNI
 	return QS_SYSTEM_OK;
 }
 
-uint32_t gdt_safe_malloc( QS_MEMORY_POOL* _ppool, size_t allocate_size, QS_MEMORY_UNIT** unit )
+uint32_t qs_safe_malloc( QS_MEMORY_POOL* _ppool, size_t allocate_size, QS_MEMORY_UNIT** unit )
 {
 	uint32_t error_code = 0;
 	do{
-		error_code = gdt_initialize_memory_unit( (*unit) );
+		error_code = qs_initialize_memory_unit( (*unit) );
 		if( error_code != 0 )
 		{
-			printf(  "[gdt_safe_malloc]gdt_initialize_memory_unit error = %d\n", error_code );
+			printf(  "[qs_safe_malloc]qs_initialize_memory_unit error = %d\n", error_code );
 			break;
 		}
-		error_code = gdt_malloc( _ppool, allocate_size, unit );
+		error_code = qs_malloc( _ppool, allocate_size, unit );
 		if( error_code != 0 ){
-			printf(  "[gdt_safe_malloc]gdt_malloc error = %d\n", error_code );
+			printf(  "[qs_safe_malloc]qs_malloc error = %d\n", error_code );
 			break;
 		}
 	}while( false );
 	return error_code;
 }
 
-int32_t gdt_create_fixmunit( QS_MEMORY_POOL* _ppool, int32_t id, size_t size )
+int32_t qs_create_fixmunit( QS_MEMORY_POOL* _ppool, int32_t id, size_t size )
 {
 	QS_MEMORY_UNIT* _unit = NULL;
 	QS_MEMORY_UNIT* unit = NULL;
 	uint32_t error_code = 0;
 	do{
-		_unit = gdt_get_fixmunit( _ppool, id );
+		_unit = qs_get_fixmunit( _ppool, id );
 		if( _unit == NULL ){
-			printf( "[gdt_create_fixmunit]gdt_get_fixmunit error\n" );
+			printf( "[qs_create_fixmunit]qs_get_fixmunit error\n" );
 			break;
 		}
 		if( _unit->status == MEMORY_STATUS_FREE )
 		{
-			error_code = gdt_safe_malloc( _ppool, size, &_unit );
+			error_code = qs_safe_malloc( _ppool, size, &_unit );
 			if( error_code != 0 ){
-				printf( "[gdt_create_fixmunit]gdt_safe_malloc error = %d\n", error_code );
+				printf( "[qs_create_fixmunit]qs_safe_malloc error = %d\n", error_code );
 				break;
 			}
 		}
@@ -783,17 +783,17 @@ int32_t gdt_create_fixmunit( QS_MEMORY_POOL* _ppool, int32_t id, size_t size )
 	return ( unit != NULL ) ? unit->id : -1;
 }
 
-QS_MEMORY_UNIT* gdt_get_fixmunit( QS_MEMORY_POOL* _ppool, int32_t id )
+QS_MEMORY_UNIT* qs_get_fixmunit( QS_MEMORY_POOL* _ppool, int32_t id )
 {
 	QS_MEMORY_UNIT* unit = NULL;
 	size_t memory_unit_one_size = 0;
 	do{
 		if( _ppool == NULL ){
-			printf(  "[gdt_get_fixmunit]_ppool is null\n" );
+			printf(  "[qs_get_fixmunit]_ppool is null\n" );
 			break;
 		}
 		if( id < 0 || id >= _ppool->fix_unit_size ){
-			printf(  "[gdt_get_fixmunit] out of range\n" );
+			printf(  "[qs_get_fixmunit] out of range\n" );
 			break;
 		}
 		memory_unit_one_size = QS_ALIGNUP( sizeof( QS_MEMORY_UNIT ), _ppool->alignment );
@@ -802,26 +802,26 @@ QS_MEMORY_UNIT* gdt_get_fixmunit( QS_MEMORY_POOL* _ppool, int32_t id )
 	return unit;
 }
 
-int32_t gdt_create_munit( QS_MEMORY_POOL* _ppool, size_t size, uint8_t type )
+int32_t qs_create_munit( QS_MEMORY_POOL* _ppool, size_t size, uint8_t type )
 {
 	QS_MEMORY_UNIT* unit = NULL;
 	if( QS_ALIGNUP( size, _ppool->alignment ) > _ppool->max_size ){
-		printf( "[gdt_create_munit] allocate_size over max_size = %"PRIu64", allocate_size = %zd \n" , _ppool->max_size, size );
+		printf( "[qs_create_munit] allocate_size over max_size = %"PRIu64", allocate_size = %zd \n" , _ppool->max_size, size );
 		return -1;
 	}
-	unit = gdt_find_freemunit( _ppool, size );
+	unit = qs_find_freemunit( _ppool, size );
 	if( unit == NULL ){
 		if(_ppool->debug){
-			printf( "[gdt_create_munit]gdt_find_freemunit error\n" );
+			printf( "[qs_create_munit]qs_find_freemunit error\n" );
 		}
 		return -1;
 	}
 	if( unit->status == MEMORY_STATUS_FREE )
 	{
-		if( ( gdt_malloc( _ppool, size, &unit ) ) != 0 )
+		if( ( qs_malloc( _ppool, size, &unit ) ) != 0 )
 		{
 			if(_ppool->debug){
-				printf( "[gdt_create_munit]gdt_malloc error\n" );
+				printf( "[qs_create_munit]qs_malloc error\n" );
 			}
 			return -1;
 		}
@@ -830,12 +830,12 @@ int32_t gdt_create_munit( QS_MEMORY_POOL* _ppool, size_t size, uint8_t type )
 	return unit->id;
 }
 
-int32_t gdt_create_memory_block( QS_MEMORY_POOL* _ppool, size_t size )
+int32_t qs_create_memory_block( QS_MEMORY_POOL* _ppool, size_t size )
 {
-	return gdt_create_munit( _ppool, size, MEMORY_TYPE_DEFAULT );
+	return qs_create_munit( _ppool, size, MEMORY_TYPE_DEFAULT );
 }
 
-QS_MEMORY_UNIT* gdt_find_freemunit( QS_MEMORY_POOL* _ppool, size_t size )
+QS_MEMORY_UNIT* qs_find_freemunit( QS_MEMORY_POOL* _ppool, size_t size )
 {
 	QS_MEMORY_UNIT* unit			= NULL;
 	size_t memory_unit_one_size		= QS_ALIGNUP( sizeof( QS_MEMORY_UNIT ), _ppool->alignment );
@@ -845,7 +845,7 @@ QS_MEMORY_UNIT* gdt_find_freemunit( QS_MEMORY_POOL* _ppool, size_t size )
 		{
 			size_t reallocSize = 0;
 			if( _ppool->alloc_type == MEMORY_ALLOCATE_TYPE_MALLOC ){
-				reallocSize = gdt_realloc_memory( _ppool, memory_unit_one_size, NULL );
+				reallocSize = qs_realloc_memory( _ppool, memory_unit_one_size, NULL );
 			}
 			if( ( _ppool->bottom - memory_unit_one_size ) <= _ppool->top )
 			{
@@ -867,7 +867,7 @@ QS_MEMORY_UNIT* gdt_find_freemunit( QS_MEMORY_POOL* _ppool, size_t size )
 					}
 				}
 				if( garbageunit != NULL){
-					gdt_resize_garbage(_ppool,garbageunit,freeunit,size);
+					qs_resize_garbage(_ppool,garbageunit,freeunit,size);
 					unit = garbageunit;
 					unit->status = MEMORY_STATUS_USE;
 				}
@@ -877,8 +877,8 @@ QS_MEMORY_UNIT* gdt_find_freemunit( QS_MEMORY_POOL* _ppool, size_t size )
 				else{
 					size_t over_size = ( _ppool->bottom - memory_unit_one_size ) - _ppool->top;
 					if(_ppool->debug){
-						printf( "[gdt_find_freemunit] QS_MEMORY_UNIT allocate size over %zd Byte\n", over_size );
-						printf( "[gdt_find_freemunit] reallocSize %zd Byte\n", reallocSize );
+						printf( "[qs_find_freemunit] QS_MEMORY_UNIT allocate size over %zd Byte\n", over_size );
+						printf( "[qs_find_freemunit] reallocSize %zd Byte\n", reallocSize );
 					}
 					break;
 				}
@@ -886,7 +886,7 @@ QS_MEMORY_UNIT* gdt_find_freemunit( QS_MEMORY_POOL* _ppool, size_t size )
 			else{
 				_ppool->bottom = _ppool->bottom - memory_unit_one_size;
 				unit = (QS_MEMORY_UNIT*)( ( (uint8_t*)_ppool->memory + _ppool->bottom ) );
-				gdt_initialize_memory_unit( unit );
+				qs_initialize_memory_unit( unit );
 				unit->id = _ppool->unit_size;
 				++_ppool->unit_size;
 			}
@@ -894,7 +894,7 @@ QS_MEMORY_UNIT* gdt_find_freemunit( QS_MEMORY_POOL* _ppool, size_t size )
 		else{
 			_ppool->bottom = _ppool->bottom - memory_unit_one_size;
 			unit = (QS_MEMORY_UNIT*)( ( (uint8_t*)_ppool->memory + _ppool->bottom ) );
-			gdt_initialize_memory_unit( unit );
+			qs_initialize_memory_unit( unit );
 			unit->id = _ppool->unit_size;
 			++_ppool->unit_size;
 		}
@@ -902,7 +902,7 @@ QS_MEMORY_UNIT* gdt_find_freemunit( QS_MEMORY_POOL* _ppool, size_t size )
 	return unit;
 }
 
-int gdt_resize_garbage(QS_MEMORY_POOL* _ppool,QS_MEMORY_UNIT* garbageunit,QS_MEMORY_UNIT* freeunit, size_t size )
+int qs_resize_garbage(QS_MEMORY_POOL* _ppool,QS_MEMORY_UNIT* garbageunit,QS_MEMORY_UNIT* freeunit, size_t size )
 {
 	QS_MEMORY_UNIT* child_unit		= NULL;
 	size_t memory_unit_one_size		= QS_ALIGNUP( sizeof( QS_MEMORY_UNIT ), _ppool->alignment );
@@ -912,19 +912,19 @@ int gdt_resize_garbage(QS_MEMORY_POOL* _ppool,QS_MEMORY_UNIT* garbageunit,QS_MEM
 			{
 				size_t reallocSize = 0;
 				if( _ppool->alloc_type == MEMORY_ALLOCATE_TYPE_MALLOC ){
-					reallocSize = gdt_realloc_memory( _ppool, memory_unit_one_size, NULL );
+					reallocSize = qs_realloc_memory( _ppool, memory_unit_one_size, NULL );
 				}
 				if( ( _ppool->bottom - memory_unit_one_size ) <= _ppool->top )
 				{
 					size_t over_size = ( _ppool->bottom - memory_unit_one_size ) - _ppool->top;
-					printf( "[gdt_resize_garbage] QS_MEMORY_UNIT allocate size over %zd Byte\n", over_size );
-					printf( "[gdt_resize_garbage] reallocSize %zd Byte\n", reallocSize );
+					printf( "[qs_resize_garbage] QS_MEMORY_UNIT allocate size over %zd Byte\n", over_size );
+					printf( "[qs_resize_garbage] reallocSize %zd Byte\n", reallocSize );
 					return QS_SYSTEM_ERROR;
 				}
 			}
 			_ppool->bottom = _ppool->bottom - memory_unit_one_size;
 			freeunit = (QS_MEMORY_UNIT*)( ( (uint8_t*)_ppool->memory + _ppool->bottom ) );
-			gdt_initialize_memory_unit( freeunit );
+			qs_initialize_memory_unit( freeunit );
 			freeunit->id = _ppool->unit_size;
 			++_ppool->unit_size;
 		}
@@ -953,24 +953,24 @@ int gdt_resize_garbage(QS_MEMORY_POOL* _ppool,QS_MEMORY_UNIT* garbageunit,QS_MEM
 	return QS_SYSTEM_OK;
 }
 
-QS_MEMORY_UNIT* gdt_get_munit( QS_MEMORY_POOL* _ppool, int32_t id )
+QS_MEMORY_UNIT* qs_get_munit( QS_MEMORY_POOL* _ppool, int32_t id )
 {
 	QS_MEMORY_UNIT* unit = NULL;
 	if( id < _ppool->fix_unit_size || id >= _ppool->unit_size ){
-		printf(  "[gdt_get_munit]unit id out of range : %d\n", id );
+		printf(  "[qs_get_munit]unit id out of range : %d\n", id );
 		return unit;
 	}
 	unit = (QS_MEMORY_UNIT*)( ( (uint8_t*)_ppool->memory + _ppool->end ) - ( _ppool->memory_unit_size_one * ( id + 1 ) ) );
 	return unit;
 }
 
-void* gdt_upointer( QS_MEMORY_POOL* _ppool, int32_t id )
+void* qs_upointer( QS_MEMORY_POOL* _ppool, int32_t id )
 {
 	void* pt = NULL;
 	QS_MEMORY_UNIT* unit = NULL;
 	do{
 		if( id < _ppool->fix_unit_size || id >= _ppool->unit_size ){
-			printf(  "[gdt_upointer]unit id out of range[%d]\n", id );
+			printf(  "[qs_upointer]unit id out of range[%d]\n", id );
 			break;
 		}
 		unit = (QS_MEMORY_UNIT*)( ( (uint8_t*)_ppool->memory + _ppool->end ) - ( _ppool->memory_unit_size_one * ( id + 1 ) ) );
@@ -979,13 +979,13 @@ void* gdt_upointer( QS_MEMORY_POOL* _ppool, int32_t id )
 	return pt;
 }
 
-void* gdt_fixupointer( QS_MEMORY_POOL* _ppool, int32_t id )
+void* qs_fixupointer( QS_MEMORY_POOL* _ppool, int32_t id )
 {
 	void* pt = NULL;
 	QS_MEMORY_UNIT* unit = NULL;
 	do{
 		if( id < 0 || id >= _ppool->fix_unit_size ){
-			printf(  "[gdt_upointer]unit id out of range[%d]\n", id );
+			printf(  "[qs_upointer]unit id out of range[%d]\n", id );
 			break;
 		}
 		unit = (QS_MEMORY_UNIT*)( ( (uint8_t*)_ppool->memory + _ppool->end ) - ( _ppool->memory_unit_size_one * ( id + 1 ) ) );
@@ -994,35 +994,35 @@ void* gdt_fixupointer( QS_MEMORY_POOL* _ppool, int32_t id )
 	return pt;
 }
 
-void* gdt_offsetpointer( QS_MEMORY_POOL* _ppool, int32_t id, size_t size, int32_t offset )
+void* qs_offsetpointer( QS_MEMORY_POOL* _ppool, int32_t id, size_t size, int32_t offset )
 {
 	void* pt = NULL;
 	QS_MEMORY_UNIT* unit = NULL;
 	if( id < 0 || id >= _ppool->unit_size ){
-		printf(  "[gdt_offsetpointer]unit id out of range[%d]\n", id );
+		printf(  "[qs_offsetpointer]unit id out of range[%d]\n", id );
 		return pt;
 	}
 	unit = (QS_MEMORY_UNIT*)( ( (uint8_t*)_ppool->memory + _ppool->end ) - ( _ppool->memory_unit_size_one * ( id + 1 ) ) );
 	if( ( size * offset ) >= unit->size ){
-		printf(  "[gdt_offsetpointer]unit memory size out of range\n" );
+		printf(  "[qs_offsetpointer]unit memory size out of range\n" );
 		return pt;
 	}
 	pt = ((uint8_t*)_ppool->memory + unit->p + ( size * offset ) );
 	return pt;
 }
 
-size_t gdt_usize( QS_MEMORY_POOL* _ppool, int32_t id )
+size_t qs_usize( QS_MEMORY_POOL* _ppool, int32_t id )
 {
 	QS_MEMORY_UNIT* unit = NULL;
 	if( id < 0 || id >= _ppool->unit_size ){
-		printf(  "[gdt_usize]unit id out of range[%d]\n", id );
+		printf(  "[qs_usize]unit id out of range[%d]\n", id );
 		return 0;
 	}
 	unit = (QS_MEMORY_UNIT*)( ( (uint8_t*)_ppool->memory + _ppool->end ) - ( _ppool->memory_unit_size_one * ( id + 1 ) ) );
 	return unit->size;
 }
 
-size_t gdt_free( QS_MEMORY_POOL* _ppool )
+size_t qs_free( QS_MEMORY_POOL* _ppool )
 {
 	size_t memory_size = 0;
 	if( _ppool != NULL ){
@@ -1064,10 +1064,10 @@ size_t gdt_free( QS_MEMORY_POOL* _ppool )
 	return memory_size;
 }
 
-void gdt_set_buffer( QS_MEMORY_POOL* _ppool, int32_t id, QS_BYTE_BUFFER* pbuffer )
+void qs_set_buffer( QS_MEMORY_POOL* _ppool, int32_t id, QS_BYTE_BUFFER* pbuffer )
 {
 	if( id < _ppool->fix_unit_size || id >= _ppool->unit_size ){
-		printf(  "[gdt_upointer]unit id out of range[%d]\n", id );
+		printf(  "[qs_upointer]unit id out of range[%d]\n", id );
 		return;
 	}
 	QS_MEMORY_UNIT* unit = (QS_MEMORY_UNIT*)( ( (uint8_t*)_ppool->memory + _ppool->end ) - ( _ppool->memory_unit_size_one * ( id + 1 ) ) );
@@ -1077,7 +1077,7 @@ void gdt_set_buffer( QS_MEMORY_POOL* _ppool, int32_t id, QS_BYTE_BUFFER* pbuffer
 	pbuffer->size = unit->size;
 }
 
-uint16_t gdt_pop_little_to_host_bit16( QS_BYTE_BUFFER* pbuffer )
+uint16_t qs_pop_little_to_host_bit16( QS_BYTE_BUFFER* pbuffer )
 {
 	uint16_t v = 0;
 	if( pbuffer->endian == QS_BIG_ENDIAN ){
@@ -1090,7 +1090,7 @@ uint16_t gdt_pop_little_to_host_bit16( QS_BYTE_BUFFER* pbuffer )
 	return v;
 }
 
-uint16_t gdt_pop_big_to_host_bit16( QS_BYTE_BUFFER* pbuffer )
+uint16_t qs_pop_big_to_host_bit16( QS_BYTE_BUFFER* pbuffer )
 {
 	uint16_t v = 0;
 	if( pbuffer->endian == QS_LITTLE_ENDIAN ){
@@ -1103,7 +1103,7 @@ uint16_t gdt_pop_big_to_host_bit16( QS_BYTE_BUFFER* pbuffer )
 	return v;
 }
 
-uint32_t gdt_pop_little_to_host_bit32( QS_BYTE_BUFFER* pbuffer )
+uint32_t qs_pop_little_to_host_bit32( QS_BYTE_BUFFER* pbuffer )
 {
 	uint32_t v = 0;
 	if( pbuffer->endian == QS_BIG_ENDIAN ){
@@ -1116,7 +1116,7 @@ uint32_t gdt_pop_little_to_host_bit32( QS_BYTE_BUFFER* pbuffer )
 	return v;
 }
 
-uint32_t gdt_pop_big_to_host_bit32( QS_BYTE_BUFFER* pbuffer )
+uint32_t qs_pop_big_to_host_bit32( QS_BYTE_BUFFER* pbuffer )
 {
 	uint32_t v = 0;
 	if( pbuffer->endian == QS_LITTLE_ENDIAN ){
@@ -1129,7 +1129,7 @@ uint32_t gdt_pop_big_to_host_bit32( QS_BYTE_BUFFER* pbuffer )
 	return v;
 }
 
-uint64_t gdt_pop_little_to_host_bit64( QS_BYTE_BUFFER* pbuffer )
+uint64_t qs_pop_little_to_host_bit64( QS_BYTE_BUFFER* pbuffer )
 {
 	uint64_t v = 0;
 	if( pbuffer->endian == QS_BIG_ENDIAN ){
@@ -1142,7 +1142,7 @@ uint64_t gdt_pop_little_to_host_bit64( QS_BYTE_BUFFER* pbuffer )
 	return v;
 }
 
-uint64_t gdt_pop_big_to_host_bit64( QS_BYTE_BUFFER* pbuffer )
+uint64_t qs_pop_big_to_host_bit64( QS_BYTE_BUFFER* pbuffer )
 {
 	uint64_t v = 0;
 	if( pbuffer->endian == QS_LITTLE_ENDIAN ){
@@ -1155,7 +1155,7 @@ uint64_t gdt_pop_big_to_host_bit64( QS_BYTE_BUFFER* pbuffer )
 	return v;
 }
 
-int32_t gdt_create_memory_info( QS_MEMORY_POOL* _ppool, QS_BYTE_BUFFER* pbuffer )
+int32_t qs_create_memory_info( QS_MEMORY_POOL* _ppool, QS_BYTE_BUFFER* pbuffer )
 {
 	MEMORY_PUSH_BIT32_L( _ppool, pbuffer->pos, _ppool->end );
 	MEMORY_PUSH_BIT32_L( _ppool, pbuffer->pos, _ppool->top );
@@ -1174,29 +1174,29 @@ int32_t gdt_create_memory_info( QS_MEMORY_POOL* _ppool, QS_BYTE_BUFFER* pbuffer 
 	
 //	pbuffer->pos = pbuffer->buffer;
 //	printf("pbuffer size : %dbyte\n",(int)pbuffer->size);
-//	printf("memory_pool->end : %d ?? %d\n", _ppool->end, gdt_pop_little_to_host_bit32( pbuffer ));
-//	printf("memory_pool->top : %d ?? %d\n", _ppool->top, gdt_pop_little_to_host_bit32( pbuffer ));
-//	printf("memory_pool->bottom : %d ?? %d\n", _ppool->bottom, gdt_pop_little_to_host_bit32( pbuffer ));
-//	printf("memory_pool->size : %d ?? %d\n", _ppool->size, gdt_pop_little_to_host_bit32( pbuffer ));
-//	printf("memory_pool->max_size : %d ?? %d\n", _ppool->max_size, gdt_pop_little_to_host_bit32( pbuffer ));
-//	printf("memory_pool->alignment : %d ?? %d\n", _ppool->alignment, gdt_pop_little_to_host_bit32( pbuffer ));
-//	printf("memory_pool->memory_unit_size_one : %d ?? %d\n", _ppool->memory_unit_size_one, gdt_pop_little_to_host_bit32( pbuffer ));
-//	printf("memory_pool->min_realloc : %d ?? %d\n", _ppool->min_realloc, gdt_pop_little_to_host_bit32( pbuffer ));
-//	printf("memory_pool->fix_unit_size : %d ?? %d\n", _ppool->fix_unit_size, gdt_pop_little_to_host_bit32( pbuffer ));
-//	printf("memory_pool->unit_size : %d ?? %d\n", _ppool->unit_size, gdt_pop_little_to_host_bit32( pbuffer ));
-//	printf("memory_pool->tail_munit : %d ?? %d\n", _ppool->tail_munit, gdt_pop_little_to_host_bit32( pbuffer ));
-//	printf("memory_pool->lock_munit : %d ?? %d\n", _ppool->lock_munit, gdt_pop_little_to_host_bit32( pbuffer ));
-//	printf("memory_pool->alloc_type : %d ?? %d\n", _ppool->alloc_type, gdt_pop_little_to_host_bit32( pbuffer ));
-//	printf("memory_pool->endian : %d ?? %d\n", _ppool->endian, gdt_pop_little_to_host_bit32( pbuffer ));
+//	printf("memory_pool->end : %d ?? %d\n", _ppool->end, qs_pop_little_to_host_bit32( pbuffer ));
+//	printf("memory_pool->top : %d ?? %d\n", _ppool->top, qs_pop_little_to_host_bit32( pbuffer ));
+//	printf("memory_pool->bottom : %d ?? %d\n", _ppool->bottom, qs_pop_little_to_host_bit32( pbuffer ));
+//	printf("memory_pool->size : %d ?? %d\n", _ppool->size, qs_pop_little_to_host_bit32( pbuffer ));
+//	printf("memory_pool->max_size : %d ?? %d\n", _ppool->max_size, qs_pop_little_to_host_bit32( pbuffer ));
+//	printf("memory_pool->alignment : %d ?? %d\n", _ppool->alignment, qs_pop_little_to_host_bit32( pbuffer ));
+//	printf("memory_pool->memory_unit_size_one : %d ?? %d\n", _ppool->memory_unit_size_one, qs_pop_little_to_host_bit32( pbuffer ));
+//	printf("memory_pool->min_realloc : %d ?? %d\n", _ppool->min_realloc, qs_pop_little_to_host_bit32( pbuffer ));
+//	printf("memory_pool->fix_unit_size : %d ?? %d\n", _ppool->fix_unit_size, qs_pop_little_to_host_bit32( pbuffer ));
+//	printf("memory_pool->unit_size : %d ?? %d\n", _ppool->unit_size, qs_pop_little_to_host_bit32( pbuffer ));
+//	printf("memory_pool->tail_munit : %d ?? %d\n", _ppool->tail_munit, qs_pop_little_to_host_bit32( pbuffer ));
+//	printf("memory_pool->lock_munit : %d ?? %d\n", _ppool->lock_munit, qs_pop_little_to_host_bit32( pbuffer ));
+//	printf("memory_pool->alloc_type : %d ?? %d\n", _ppool->alloc_type, qs_pop_little_to_host_bit32( pbuffer ));
+//	printf("memory_pool->endian : %d ?? %d\n", _ppool->endian, qs_pop_little_to_host_bit32( pbuffer ));
 //	pbuffer->pos = pbuffer->buffer;
 	return QS_SYSTEM_OK;
 }
 
-void gdt_memory_info( QS_MEMORY_POOL* _ppool )
+void qs_memory_info( QS_MEMORY_POOL* _ppool )
 {
 	size_t freeSize = 0;
 	if( _ppool == NULL ){
-		printf(  "[gdt_memory_info]_ppool is null\n" );
+		printf(  "[qs_memory_info]_ppool is null\n" );
 		return;
 	}
 	printf(  "#############################################################\n");
@@ -1215,13 +1215,13 @@ void gdt_memory_info( QS_MEMORY_POOL* _ppool )
 	printf(  "#############################################################\n");
 }
 
-void gdt_memory_size( QS_MEMORY_POOL* _ppool )
+void qs_memory_size( QS_MEMORY_POOL* _ppool )
 {
 	size_t freeSize = ( ( _ppool->bottom - _ppool->top ) );
 	printf(  "use   : %zd Byte\n", _ppool->size - freeSize );
 }
 
-void gdt_memory_unit_info( QS_MEMORY_POOL* _ppool )
+void qs_memory_unit_info( QS_MEMORY_POOL* _ppool )
 {
 	int i;
 	uint32_t freeUnitCount = 0;
@@ -1229,7 +1229,7 @@ void gdt_memory_unit_info( QS_MEMORY_POOL* _ppool )
 	QS_MEMORY_UNIT* unit;
 	size_t memory_unit_one_size = 0;
 	if( _ppool == NULL ){
-		printf(  "[gdt_memory_unit_info]_ppool is null\n" );
+		printf(  "[qs_memory_unit_info]_ppool is null\n" );
 		return;
 	}
 	printf(  "#############################################################\n");
@@ -1267,7 +1267,7 @@ void gdt_memory_unit_info( QS_MEMORY_POOL* _ppool )
 	printf(  "#############################################################\n");
 }
 
-int gdt_endian()
+int qs_endian()
 {
 	int v = 1;
 	if( *(char*)&v ){

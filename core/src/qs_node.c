@@ -27,11 +27,11 @@
 
 #include "qs_node.h"
 
-int32_t gdt_createrootnode( QS_MEMORY_POOL* _ppool )
+int32_t qs_createrootnode( QS_MEMORY_POOL* _ppool )
 {
 	int32_t rootnode_munit = -1;
 	QS_NODE *rootnode = NULL;
-	if( -1 == ( rootnode_munit = gdt_create_munit( _ppool, sizeof( QS_NODE ), MEMORY_TYPE_DEFAULT ) ) ){
+	if( -1 == ( rootnode_munit = qs_create_munit( _ppool, sizeof( QS_NODE ), MEMORY_TYPE_DEFAULT ) ) ){
 		return rootnode_munit;
 	}
 	rootnode = (QS_NODE*)QS_GET_POINTER( _ppool, rootnode_munit );
@@ -45,11 +45,11 @@ int32_t gdt_createrootnode( QS_MEMORY_POOL* _ppool )
 	return rootnode_munit;
 }
 
-int32_t gdt_addnodeelement( QS_MEMORY_POOL* _ppool, QS_NODE* node )
+int32_t qs_addnodeelement( QS_MEMORY_POOL* _ppool, QS_NODE* node )
 {
 	int32_t element_munit;
 	QS_NODE* childnode;
-	if( -1 == ( element_munit = gdt_create_munit( _ppool, sizeof( QS_NODE ), MEMORY_TYPE_DEFAULT ) ) ){
+	if( -1 == ( element_munit = qs_create_munit( _ppool, sizeof( QS_NODE ), MEMORY_TYPE_DEFAULT ) ) ){
 		return element_munit;
 	}
 	childnode = (QS_NODE*)QS_GET_POINTER( _ppool, element_munit );
@@ -59,11 +59,11 @@ int32_t gdt_addnodeelement( QS_MEMORY_POOL* _ppool, QS_NODE* node )
 	childnode->elmsize        = 0;
 	childnode->exec_tmp_munit = -1;
 	childnode->exec_tmp_id = -1;
-	gdt_addelement( _ppool, node, ELEMENT_CHILD, element_munit );
+	qs_addelement( _ppool, node, ELEMENT_CHILD, element_munit );
 	return element_munit;
 }
 
-int32_t gdt_addelement( QS_MEMORY_POOL* _ppool, QS_NODE* node, int id, int32_t data_munit )
+int32_t qs_addelement( QS_MEMORY_POOL* _ppool, QS_NODE* node, int id, int32_t data_munit )
 {
 	int allocsize = 8;
 	int32_t tmpmunit;
@@ -71,7 +71,7 @@ int32_t gdt_addelement( QS_MEMORY_POOL* _ppool, QS_NODE* node, int id, int32_t d
 	QS_NODE* workelemlist = NULL;
 	int i;
 	if( node->element_munit == -1 ){
-		if( -1 == ( node->element_munit = gdt_create_munit( _ppool, sizeof( QS_NODE ) * allocsize, MEMORY_TYPE_DEFAULT ) ) ){
+		if( -1 == ( node->element_munit = qs_create_munit( _ppool, sizeof( QS_NODE ) * allocsize, MEMORY_TYPE_DEFAULT ) ) ){
 			return -1;
 		}
 		node->elmsize = allocsize;
@@ -85,7 +85,7 @@ int32_t gdt_addelement( QS_MEMORY_POOL* _ppool, QS_NODE* node, int id, int32_t d
 	else{
 		if( node->pos >= node->elmsize ){
 			tmplist1 = ( QS_NODE* )QS_GET_POINTER( _ppool, node->element_munit );
-			if( -1 == ( tmpmunit = gdt_create_munit( _ppool, sizeof( QS_NODE ) * ( node->elmsize + allocsize ), MEMORY_TYPE_DEFAULT ) ) ){
+			if( -1 == ( tmpmunit = qs_create_munit( _ppool, sizeof( QS_NODE ) * ( node->elmsize + allocsize ), MEMORY_TYPE_DEFAULT ) ) ){
 				return -1;
 			}
 			tmplist2 = ( QS_NODE* )QS_GET_POINTER( _ppool, tmpmunit );
@@ -96,7 +96,7 @@ int32_t gdt_addelement( QS_MEMORY_POOL* _ppool, QS_NODE* node, int id, int32_t d
 				workelemlist[i].exec_tmp_munit = -1;
 				workelemlist[i].exec_tmp_id    = -1;
 			}
-			gdt_free_memory_unit( _ppool, &node->element_munit );
+			qs_free_memory_unit( _ppool, &node->element_munit );
 			node->element_munit = tmpmunit;
 			node->elmsize += allocsize;
 		}
@@ -110,16 +110,16 @@ int32_t gdt_addelement( QS_MEMORY_POOL* _ppool, QS_NODE* node, int id, int32_t d
 	return node->element_munit;
 }
 
-void gdt_elementdump( QS_MEMORY_POOL* _ppool, QS_NODE* node )
+void qs_elementdump( QS_MEMORY_POOL* _ppool, QS_NODE* node )
 {
 	printf("-----------------------------------------------------------------------\n");
 	printf("element dump\n");
 	printf("-----------------------------------------------------------------------\n");
-	gdt_elementdumpchild( _ppool, node, 0 );
+	qs_elementdumpchild( _ppool, node, 0 );
 	printf("-----------------------------------------------------------------------\n");
 }
 
-void gdt_elementdumpchild( QS_MEMORY_POOL* _ppool, QS_NODE* node, int32_t index )
+void qs_elementdumpchild( QS_MEMORY_POOL* _ppool, QS_NODE* node, int32_t index )
 {
 	int i,j;
 	QS_NODE* childnode;
@@ -127,7 +127,7 @@ void gdt_elementdumpchild( QS_MEMORY_POOL* _ppool, QS_NODE* node, int32_t index 
 	do{
 		if( node->element_munit == -1 )
 		{
-			printf("[debug] gdt_elementdumpchild node->element_munit == -1[%d]\n",node->id);
+			printf("[debug] qs_elementdumpchild node->element_munit == -1[%d]\n",node->id);
 			break;
 		}
 		workelemlist = ( QS_NODE* )QS_GET_POINTER( _ppool, node->element_munit );
@@ -135,7 +135,7 @@ void gdt_elementdumpchild( QS_MEMORY_POOL* _ppool, QS_NODE* node, int32_t index 
 		printf("element_munit : %d\n", node->element_munit );
 		if( workelemlist == NULL )
 		{
-			printf("[debug] gdt_elementdumpchild workelemlist == NULL\n");
+			printf("[debug] qs_elementdumpchild workelemlist == NULL\n");
 			break;
 		}
 		for( i = 0; i < node->pos; i++ )
@@ -144,7 +144,7 @@ void gdt_elementdumpchild( QS_MEMORY_POOL* _ppool, QS_NODE* node, int32_t index 
 				for( j=0;j<index;j++ ){ printf("  "); }
 				printf("find child, element_munit : %d\n", workelemlist[i].element_munit);
 				childnode = (QS_NODE*)QS_GET_POINTER( _ppool, workelemlist[i].element_munit );
-				gdt_elementdumpchild( _ppool, childnode, index+1 );
+				qs_elementdumpchild( _ppool, childnode, index+1 );
 			}else{
 				for( j=0;j<index;j++ ){ printf("  "); }
 				if( workelemlist[i].id == ELEMENT_ARRAY){

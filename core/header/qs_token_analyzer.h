@@ -76,11 +76,11 @@ typedef struct QS_TOKENS
 	int32_t allocsize;
 } QS_TOKENS;
 
-int32_t gdt_inittoken( QS_MEMORY_POOL* _ppool, int32_t allocsize );
-int gdt_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr );
-int  gdt_addtoken( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* tokenbuf, int* tokensize, int type );
-int  gdt_check_systemword( char* token );
-void gdt_tokendump( QS_MEMORY_POOL* _ppool, int32_t tokens_munit );
+int32_t qs_inittoken( QS_MEMORY_POOL* _ppool, int32_t allocsize );
+int qs_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr );
+int  qs_addtoken( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* tokenbuf, int* tokensize, int type );
+int  qs_check_systemword( char* token );
+void qs_tokendump( QS_MEMORY_POOL* _ppool, int32_t tokens_munit );
 
 #endif /*_QS_TOKEN_ANALYZER_H_*/
 

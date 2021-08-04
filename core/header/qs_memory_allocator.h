@@ -55,7 +55,7 @@ extern "C"{
 
 #define MEMORY_ALIGNMENT_SIZE_BIT_64 ( SIZE_BYTE * 8 )
 #define MEMORY_ALIGNMENT_SIZE_BIT_32 ( SIZE_BYTE * 4 )
-// memory types of gdt_memory_allocator
+// memory types of qs_memory_allocator
 #define MEMORY_TYPE_DEFAULT 0
 
 #define MEMORY_ALLOCATE_TYPE_MALLOC 0
@@ -177,51 +177,51 @@ typedef struct QS_BYTE_BUFFER
 } QS_BYTE_BUFFER;
 
 // public
-size_t gdt_initialize_memory( QS_MEMORY_POOL** _ppool, size_t allocate_size, size_t max_allocate_size, size_t alignment_size, size_t fix_memory_unit, size_t free_memory_unit, size_t min_realloc );
-size_t gdt_initialize_memory_f64( QS_MEMORY_POOL** _ppool, size_t allocate_size );
-size_t gdt_initialize_mmapmemory( QS_MEMORY_POOL** _ppool, size_t allocate_size, size_t max_allocate_size, size_t alignment_size, size_t fix_memory_unit, size_t free_memory_unit, size_t min_realloc );
-size_t gdt_initialize_mmapmemory_f64( QS_MEMORY_POOL** _ppool, size_t allocate_size );
-size_t gdt_initialize_mmapmemory_f( const char* file_name, QS_MEMORY_POOL** _ppool, size_t allocate_size );
-int32_t gdt_sync_mmap_memory(QS_MEMORY_POOL* memory_pool);
-int32_t gdt_async_mmap_memory(QS_MEMORY_POOL* memory_pool);
-int32_t gdt_create_mini_memory( QS_MEMORY_POOL* _ppool, size_t allocate_size );
-int32_t gdt_create_clone_mini_memory( QS_MEMORY_POOL* _ppool, QS_MEMORY_POOL* _mini_ppool );
-int32_t gdt_copy_mini_memory( QS_MEMORY_POOL* _dest_ppool, QS_MEMORY_POOL* _src_ppool );
-void gdt_memory_clean( QS_MEMORY_POOL* _ppool );
-size_t gdt_mgetsize( QS_MEMORY_POOL* _ppool, size_t size );
-uint32_t gdt_free_memory_unit( QS_MEMORY_POOL* _ppool, int32_t *munit_id );
-int32_t gdt_create_fixmunit( QS_MEMORY_POOL* _ppool, int32_t id, size_t size );
-QS_MEMORY_UNIT* gdt_get_fixmunit( QS_MEMORY_POOL* _ppool, int32_t id );
-int32_t gdt_create_munit( QS_MEMORY_POOL* _ppool, size_t size, uint8_t type );
-int32_t gdt_create_memory_block( QS_MEMORY_POOL* _ppool, size_t size );
-QS_MEMORY_UNIT* gdt_get_munit( QS_MEMORY_POOL* _ppool, int32_t id );
-void* gdt_upointer( QS_MEMORY_POOL* _ppool, int32_t id );
-void* gdt_fixupointer( QS_MEMORY_POOL* _ppool, int32_t id );
-void* gdt_offsetpointer( QS_MEMORY_POOL* _ppool, int32_t id, size_t size, int32_t offset );
-size_t gdt_usize( QS_MEMORY_POOL* _ppool, int32_t id );
-size_t gdt_free( QS_MEMORY_POOL* _ppool );
-void gdt_set_buffer( QS_MEMORY_POOL* _ppool, int32_t id, QS_BYTE_BUFFER* pbuffer );
-uint16_t gdt_pop_little_to_host_bit16( QS_BYTE_BUFFER* pbuffer );
-uint16_t gdt_pop_big_to_host_bit16( QS_BYTE_BUFFER* pbuffer );
-uint32_t gdt_pop_little_to_host_bit32( QS_BYTE_BUFFER* pbuffer );
-uint32_t gdt_pop_big_to_host_bit32( QS_BYTE_BUFFER* pbuffer );
-uint64_t gdt_pop_little_to_host_bit64( QS_BYTE_BUFFER* pbuffer );
-uint64_t gdt_pop_big_to_host_bit64( QS_BYTE_BUFFER* pbuffer );
-int32_t gdt_create_memory_info( QS_MEMORY_POOL* _ppool, QS_BYTE_BUFFER* pbuffer );
+size_t qs_initialize_memory( QS_MEMORY_POOL** _ppool, size_t allocate_size, size_t max_allocate_size, size_t alignment_size, size_t fix_memory_unit, size_t free_memory_unit, size_t min_realloc );
+size_t qs_initialize_memory_f64( QS_MEMORY_POOL** _ppool, size_t allocate_size );
+size_t qs_initialize_mmapmemory( QS_MEMORY_POOL** _ppool, size_t allocate_size, size_t max_allocate_size, size_t alignment_size, size_t fix_memory_unit, size_t free_memory_unit, size_t min_realloc );
+size_t qs_initialize_mmapmemory_f64( QS_MEMORY_POOL** _ppool, size_t allocate_size );
+size_t qs_initialize_mmapmemory_f( const char* file_name, QS_MEMORY_POOL** _ppool, size_t allocate_size );
+int32_t qs_sync_mmap_memory(QS_MEMORY_POOL* memory_pool);
+int32_t qs_async_mmap_memory(QS_MEMORY_POOL* memory_pool);
+int32_t qs_create_mini_memory( QS_MEMORY_POOL* _ppool, size_t allocate_size );
+int32_t qs_create_clone_mini_memory( QS_MEMORY_POOL* _ppool, QS_MEMORY_POOL* _mini_ppool );
+int32_t qs_copy_mini_memory( QS_MEMORY_POOL* _dest_ppool, QS_MEMORY_POOL* _src_ppool );
+void qs_memory_clean( QS_MEMORY_POOL* _ppool );
+size_t qs_mgetsize( QS_MEMORY_POOL* _ppool, size_t size );
+uint32_t qs_free_memory_unit( QS_MEMORY_POOL* _ppool, int32_t *munit_id );
+int32_t qs_create_fixmunit( QS_MEMORY_POOL* _ppool, int32_t id, size_t size );
+QS_MEMORY_UNIT* qs_get_fixmunit( QS_MEMORY_POOL* _ppool, int32_t id );
+int32_t qs_create_munit( QS_MEMORY_POOL* _ppool, size_t size, uint8_t type );
+int32_t qs_create_memory_block( QS_MEMORY_POOL* _ppool, size_t size );
+QS_MEMORY_UNIT* qs_get_munit( QS_MEMORY_POOL* _ppool, int32_t id );
+void* qs_upointer( QS_MEMORY_POOL* _ppool, int32_t id );
+void* qs_fixupointer( QS_MEMORY_POOL* _ppool, int32_t id );
+void* qs_offsetpointer( QS_MEMORY_POOL* _ppool, int32_t id, size_t size, int32_t offset );
+size_t qs_usize( QS_MEMORY_POOL* _ppool, int32_t id );
+size_t qs_free( QS_MEMORY_POOL* _ppool );
+void qs_set_buffer( QS_MEMORY_POOL* _ppool, int32_t id, QS_BYTE_BUFFER* pbuffer );
+uint16_t qs_pop_little_to_host_bit16( QS_BYTE_BUFFER* pbuffer );
+uint16_t qs_pop_big_to_host_bit16( QS_BYTE_BUFFER* pbuffer );
+uint32_t qs_pop_little_to_host_bit32( QS_BYTE_BUFFER* pbuffer );
+uint32_t qs_pop_big_to_host_bit32( QS_BYTE_BUFFER* pbuffer );
+uint64_t qs_pop_little_to_host_bit64( QS_BYTE_BUFFER* pbuffer );
+uint64_t qs_pop_big_to_host_bit64( QS_BYTE_BUFFER* pbuffer );
+int32_t qs_create_memory_info( QS_MEMORY_POOL* _ppool, QS_BYTE_BUFFER* pbuffer );
 // private
-QS_MEMORY_UNIT* gdt_find_freemunit( QS_MEMORY_POOL* _ppool, size_t size );
-int gdt_resize_garbage(QS_MEMORY_POOL* _ppool,QS_MEMORY_UNIT* garbageunit,QS_MEMORY_UNIT* freeunit, size_t size);
-int gdt_endian();
+QS_MEMORY_UNIT* qs_find_freemunit( QS_MEMORY_POOL* _ppool, size_t size );
+int qs_resize_garbage(QS_MEMORY_POOL* _ppool,QS_MEMORY_UNIT* garbageunit,QS_MEMORY_UNIT* freeunit, size_t size);
+int qs_endian();
 
-uint32_t gdt_safe_malloc( QS_MEMORY_POOL* _ppool, size_t allocate_size, QS_MEMORY_UNIT** unit );
-uint32_t gdt_malloc( QS_MEMORY_POOL* _ppool, size_t allocate_size, QS_MEMORY_UNIT** unit );
-size_t gdt_realloc_memory( QS_MEMORY_POOL* _ppool, size_t allocate_size, QS_MEMORY_UNIT** current_unit );
-uint32_t gdt_initialize_memory_unit( QS_MEMORY_UNIT * unit );
+uint32_t qs_safe_malloc( QS_MEMORY_POOL* _ppool, size_t allocate_size, QS_MEMORY_UNIT** unit );
+uint32_t qs_malloc( QS_MEMORY_POOL* _ppool, size_t allocate_size, QS_MEMORY_UNIT** unit );
+size_t qs_realloc_memory( QS_MEMORY_POOL* _ppool, size_t allocate_size, QS_MEMORY_UNIT** current_unit );
+uint32_t qs_initialize_memory_unit( QS_MEMORY_UNIT * unit );
 
 // debug
-void gdt_memory_info( QS_MEMORY_POOL* _ppool );
-void gdt_memory_size( QS_MEMORY_POOL* _ppool );
-void gdt_memory_unit_info( QS_MEMORY_POOL* _ppool );
+void qs_memory_info( QS_MEMORY_POOL* _ppool );
+void qs_memory_size( QS_MEMORY_POOL* _ppool );
+void qs_memory_unit_info( QS_MEMORY_POOL* _ppool );
 
 #endif /*_QS_MEMORY_ALLOCATOR_H_*/
 

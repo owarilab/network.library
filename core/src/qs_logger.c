@@ -34,14 +34,14 @@ int32_t qs_make_log_file_path(char* dest, size_t dest_size,char* base_path,char*
 	time_t nowtime = time(NULL) - offset;
 	struct tm t;
 	char date[20];
-	gdt_localtime(&t, &nowtime);
+	qs_localtime(&t, &nowtime);
 	strftime( date, sizeof(date), "%Y%m%d", &t );
 	size_t path_len = 0;
-	path_len = gdt_strlink( path, 0, base_path, gdt_strlen(base_path), path_buffer_len );
-	path_len = gdt_strlink( path, path_len, file_name_prefix, gdt_strlen(file_name_prefix), path_buffer_len );
-	path_len = gdt_strlink( path, path_len, "_", 1, path_buffer_len );
-	path_len = gdt_strlink( path, path_len, date, gdt_strlen(date), path_buffer_len );
-	path_len = gdt_strlink( path, path_len, ".log", 4, path_buffer_len );
+	path_len = qs_strlink( path, 0, base_path, qs_strlen(base_path), path_buffer_len );
+	path_len = qs_strlink( path, path_len, file_name_prefix, qs_strlen(file_name_prefix), path_buffer_len );
+	path_len = qs_strlink( path, path_len, "_", 1, path_buffer_len );
+	path_len = qs_strlink( path, path_len, date, qs_strlen(date), path_buffer_len );
+	path_len = qs_strlink( path, path_len, ".log", 4, path_buffer_len );
 	path[path_len] = '\0';
 	return QS_SYSTEM_OK;
 }
@@ -53,8 +53,8 @@ int32_t qs_log_rotate(QS_FILE_INFO* log_file_info,char* base_path,char* file_nam
 	// base_path : "./" , file_name_prefix : "access" , offset : 0
 	qs_make_log_file_path(path_buffer, sizeof(path_buffer), base_path, file_name_prefix, offset);
 	if (strcmp(log_file_info->path, path_buffer)) {
-		gdt_fclose(log_file_info);
-		if (QS_SYSTEM_ERROR == gdt_fopen(path_buffer, "a", log_file_info)) {
+		qs_fclose(log_file_info);
+		if (QS_SYSTEM_ERROR == qs_fopen(path_buffer, "a", log_file_info)) {
 			return QS_SYSTEM_ERROR;
 		}
 	}
@@ -66,30 +66,30 @@ int32_t qs_http_access_log(QS_FILE_INFO* log_file_info,char* http_version, char*
 	char log_buffer[SIZE_KBYTE*4];
 	size_t log_buffer_size = sizeof(log_buffer);
 	char status_code_buffer[20];
-	gdt_itoa( http_status_code, status_code_buffer, sizeof(status_code_buffer) );
+	qs_itoa( http_status_code, status_code_buffer, sizeof(status_code_buffer) );
 	char date_buffer[128];
 	struct tm t;
 	time_t nowtime = time(NULL);
-	gdt_localtime(&t, &nowtime);
+	qs_localtime(&t, &nowtime);
 	strftime( date_buffer, sizeof(date_buffer), "%Y-%m-%d %H:%M:%S", &t);
 	size_t log_len = 0;
-	log_len = gdt_strlink( log_buffer, log_len, client_ip, gdt_strlen(client_ip), log_buffer_size );
-	log_len = gdt_strlink( log_buffer, log_len, " ", 1, log_buffer_size );
-	log_len = gdt_strlink( log_buffer, log_len, method, gdt_strlen(method), log_buffer_size );
-	log_len = gdt_strlink( log_buffer, log_len, " ", 1, log_buffer_size );
-	log_len = gdt_strlink( log_buffer, log_len, http_version, gdt_strlen(http_version), log_buffer_size );
-	log_len = gdt_strlink( log_buffer, log_len, " ", 1, log_buffer_size );
-	log_len = gdt_strlink( log_buffer, log_len, request, gdt_strlen(request), log_buffer_size );
-	log_len = gdt_strlink( log_buffer, log_len, " ", 1, log_buffer_size );
-	log_len = gdt_strlink( log_buffer, log_len, status_code_buffer, gdt_strlen(status_code_buffer), log_buffer_size );
-	log_len = gdt_strlink( log_buffer, log_len, " [", 2, log_buffer_size );
-	log_len = gdt_strlink( log_buffer, log_len, date_buffer, gdt_strlen(date_buffer), log_buffer_size );
-	log_len = gdt_strlink( log_buffer, log_len, "] ", 2, log_buffer_size );
-	log_len = gdt_strlink( log_buffer, log_len, user_agent, gdt_strlen(user_agent), log_buffer_size );
+	log_len = qs_strlink( log_buffer, log_len, client_ip, qs_strlen(client_ip), log_buffer_size );
+	log_len = qs_strlink( log_buffer, log_len, " ", 1, log_buffer_size );
+	log_len = qs_strlink( log_buffer, log_len, method, qs_strlen(method), log_buffer_size );
+	log_len = qs_strlink( log_buffer, log_len, " ", 1, log_buffer_size );
+	log_len = qs_strlink( log_buffer, log_len, http_version, qs_strlen(http_version), log_buffer_size );
+	log_len = qs_strlink( log_buffer, log_len, " ", 1, log_buffer_size );
+	log_len = qs_strlink( log_buffer, log_len, request, qs_strlen(request), log_buffer_size );
+	log_len = qs_strlink( log_buffer, log_len, " ", 1, log_buffer_size );
+	log_len = qs_strlink( log_buffer, log_len, status_code_buffer, qs_strlen(status_code_buffer), log_buffer_size );
+	log_len = qs_strlink( log_buffer, log_len, " [", 2, log_buffer_size );
+	log_len = qs_strlink( log_buffer, log_len, date_buffer, qs_strlen(date_buffer), log_buffer_size );
+	log_len = qs_strlink( log_buffer, log_len, "] ", 2, log_buffer_size );
+	log_len = qs_strlink( log_buffer, log_len, user_agent, qs_strlen(user_agent), log_buffer_size );
 	log_buffer[log_len++] = '\n';
 	log_buffer[log_len] = '\0';
 	if(log_file_info->f!=NULL){
-		gdt_fwrite2(log_file_info,log_buffer,gdt_strlen(log_buffer));
+		qs_fwrite2(log_file_info,log_buffer,qs_strlen(log_buffer));
 		fflush(log_file_info->f);
 	}
 	return QS_SYSTEM_OK;

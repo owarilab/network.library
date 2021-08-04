@@ -103,29 +103,29 @@ void gnt_print_argv();
 int gnt_get_argc();
 char* gnt_get_argv( int index );
 
-int gdt_error( char* err );
+int qs_error( char* err );
 #ifdef __WINDOWS__
 #else
-int gdt_get_current_directory( QS_MEMORY_POOL* _ppool );
-int gdt_daemonize( int nochdir , int noclose );
-int gdt_descriptor_flags_on( int fd, int flag );
-int gdt_descriptor_flags_off( int fd, int flag );
-int gdt_set_defaultsignal();
-int gdt_set_sigaction( int signum, SIG_HANDLER sh, int sa_flags );
-void gdt_sig_hangup_handler( int sig );
-void gdt_sig_chld_handler( int sig );
-void gdt_sig_int_handler( int sig );
-void gdt_init_child_pid();
-void gdt_set_child_pid(pid_t pid,int32_t offset);
-int gdt_set_execute_user(SYSTEM_SERVER_OPTION* sys_option);
+int qs_get_current_directory( QS_MEMORY_POOL* _ppool );
+int qs_daemonize( int nochdir , int noclose );
+int qs_descriptor_flags_on( int fd, int flag );
+int qs_descriptor_flags_off( int fd, int flag );
+int qs_set_defaultsignal();
+int qs_set_sigaction( int signum, SIG_HANDLER sh, int sa_flags );
+void qs_sig_hangup_handler( int sig );
+void qs_sig_chld_handler( int sig );
+void qs_sig_int_handler( int sig );
+void qs_init_child_pid();
+void qs_set_child_pid(pid_t pid,int32_t offset);
+int qs_set_execute_user(SYSTEM_SERVER_OPTION* sys_option);
 #endif
 
-void gdt_localtime(struct tm* ptm, time_t* ptime );
-void gdt_getopt(SYSTEM_SERVER_OPTION* sys_option, const char* hostname, const char* portnum, const char* pid_file_path, const char* log_file_path, const char* execute_user_name);
-void gdt_set_pid(SYSTEM_SERVER_OPTION* sys_option);
-void gdt_sleep(int time);
-void gdt_initialize_scheduler(SYSTEM_UPDATE_SCHEDULER* scheduler);
-void gdt_update_scheduler(SYSTEM_UPDATE_SCHEDULER* scheduler);
+void qs_localtime(struct tm* ptm, time_t* ptime );
+void qs_getopt(SYSTEM_SERVER_OPTION* sys_option, const char* hostname, const char* portnum, const char* pid_file_path, const char* log_file_path, const char* execute_user_name);
+void qs_set_pid(SYSTEM_SERVER_OPTION* sys_option);
+void qs_sleep(int time);
+void qs_initialize_scheduler(SYSTEM_UPDATE_SCHEDULER* scheduler);
+void qs_update_scheduler(SYSTEM_UPDATE_SCHEDULER* scheduler);
 
 #endif /*_QS_SYSTEM_H_*/
 

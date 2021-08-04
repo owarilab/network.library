@@ -99,10 +99,10 @@ extern "C"{
 
 # define snprintf(s, n, format, ...) \
 	_snprintf_s(s, n, _TRUNCATE, format, __VA_ARGS__)
-# define gdt_sprintf(s, n, format, ...) \
+# define qs_sprintf(s, n, format, ...) \
 	sprintf_s(s, n, format, __VA_ARGS__)
 #else
-# define gdt_sprintf(s, n, format, ...) \
+# define qs_sprintf(s, n, format, ...) \
 	sprintf(s, format, __VA_ARGS__)
 #endif
 

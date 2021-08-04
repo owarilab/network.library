@@ -27,18 +27,18 @@
 
 #include "qs_hash.h"
 
-int32_t gdt_create_hash( QS_MEMORY_POOL* _ppool, size_t hlen )
+int32_t qs_create_hash( QS_MEMORY_POOL* _ppool, size_t hlen )
 {
 	int32_t h_munit = -1;
 	if( hlen <= 0 ){
 		return -1;
 	}
-	if( -1 == (h_munit = gdt_create_memory_block( _ppool, sizeof( struct QS_HASH ) )) ){
+	if( -1 == (h_munit = qs_create_memory_block( _ppool, sizeof( struct QS_HASH ) )) ){
 		return -1;
 	}
 	QS_HASH *hash = (struct QS_HASH *)QS_GET_POINTER( _ppool, h_munit );
 	hash->hash_size = hlen;
-	hash->hash_munit = gdt_create_memory_block( _ppool, sizeof( struct QS_HASH ) * hlen );
+	hash->hash_munit = qs_create_memory_block( _ppool, sizeof( struct QS_HASH ) * hlen );
 	if( -1 == hash->hash_munit ){
 		return -1;
 	}
@@ -52,7 +52,7 @@ int32_t gdt_create_hash( QS_MEMORY_POOL* _ppool, size_t hlen )
 	return h_munit;
 }
 
-QS_HASH_ELEMENT* gdt_add_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, int32_t name_munit, int32_t data_munit, int32_t id )
+QS_HASH_ELEMENT* qs_add_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, int32_t name_munit, int32_t data_munit, int32_t id )
 {
 	struct QS_HASH *hash;
 	struct QS_HASH *hashchild;
@@ -65,11 +65,11 @@ QS_HASH_ELEMENT* gdt_add_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, int32_t 
 	}
 	char* hash_name = (char*)QS_GET_POINTER( _ppool, name_munit );
 	hash = (struct QS_HASH *)QS_GET_POINTER( _ppool, h_munit );
-	hashkey = gdt_ihash( (char*)QS_GET_POINTER( _ppool, name_munit ), hash->hash_size );
+	hashkey = qs_ihash( (char*)QS_GET_POINTER( _ppool, name_munit ), hash->hash_size );
 	hashchild = (struct QS_HASH *)QS_GET_POINTER( _ppool, hash->hash_munit );
 	if( -1 == hashchild[hashkey].hash_munit )
 	{
-		if( -1 == (hashchild[hashkey].hash_munit = gdt_create_memory_block( _ppool, sizeof( struct QS_HASH_ELEMENT ) * QS_HASH_ELEMENT_SIZE ))){
+		if( -1 == (hashchild[hashkey].hash_munit = qs_create_memory_block( _ppool, sizeof( struct QS_HASH_ELEMENT ) * QS_HASH_ELEMENT_SIZE ))){
 			return is_push;
 		}
 		hashchild[hashkey].hash_size = QS_HASH_ELEMENT_SIZE;
@@ -92,7 +92,7 @@ QS_HASH_ELEMENT* gdt_add_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, int32_t 
 			if( !strcmp( (char*)QS_GET_POINTER( _ppool, hashelement[i].hashname_munit ), hash_name ) )
 			{
 				if( hashelement[i].elm_munit != data_munit ){
-					gdt_free_memory_unit( _ppool, &hashelement[i].elm_munit );
+					qs_free_memory_unit( _ppool, &hashelement[i].elm_munit );
 				}
 				hashelement[i].elm_munit = data_munit;
 				hashelement[i].id = id;
@@ -114,7 +114,7 @@ QS_HASH_ELEMENT* gdt_add_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, int32_t 
 		int32_t resize_munit = -1;
 		size_t resize = hashchild[hashkey].hash_size * 2;
 		//printf("resize hash : %d -> %d\n",(int)(hashchild[hashkey].hash_size),(int)(resize));
-		if( -1 == (resize_munit = gdt_create_memory_block( _ppool, sizeof( struct QS_HASH_ELEMENT ) * resize ))){
+		if( -1 == (resize_munit = qs_create_memory_block( _ppool, sizeof( struct QS_HASH_ELEMENT ) * resize ))){
 			return is_push;
 		}
 		hashelement = (struct QS_HASH_ELEMENT*)QS_GET_POINTER( _ppool, resize_munit );
@@ -147,237 +147,237 @@ QS_HASH_ELEMENT* gdt_add_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, int32_t 
 	return is_push;
 }
 
-int32_t gdt_make_hash_name( QS_MEMORY_POOL* _ppool, int32_t h_munit,const char* name)
+int32_t qs_make_hash_name( QS_MEMORY_POOL* _ppool, int32_t h_munit,const char* name)
 {
-	int32_t name_munit = gdt_get_hash_name( _ppool, h_munit, name );
+	int32_t name_munit = qs_get_hash_name( _ppool, h_munit, name );
 	if( name_munit == -1 ){
-		if( -1 == (name_munit = gdt_create_memory_block( _ppool, strlen( name )+1 ))){
+		if( -1 == (name_munit = qs_create_memory_block( _ppool, strlen( name )+1 ))){
 			return -1;
 		}
 		char* pbuf = (char*)QS_GET_POINTER( _ppool, name_munit );
-		gdt_strcopy( pbuf, name, gdt_usize( _ppool, name_munit ) );
+		qs_strcopy( pbuf, name, qs_usize( _ppool, name_munit ) );
 	}
 	return name_munit;
 }
 
-void gdt_add_hash_value( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, const char* value, int32_t id )
+void qs_add_hash_value( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, const char* value, int32_t id )
 {
 	char* pbuf;
 	int32_t datamunit;
-	int32_t namemunit = gdt_make_hash_name( _ppool, h_munit, name );
+	int32_t namemunit = qs_make_hash_name( _ppool, h_munit, name );
 	if( namemunit == -1 ){
 		return;
 	}
-	if( -1 == (datamunit = gdt_create_memory_block( _ppool, strlen( value )+1 ))){
+	if( -1 == (datamunit = qs_create_memory_block( _ppool, strlen( value )+1 ))){
 		return;
 	}
 	pbuf = (char*)QS_GET_POINTER( _ppool, datamunit );
-	memcpy( pbuf, value, gdt_usize( _ppool, datamunit ) );
-	QS_HASH_ELEMENT* is_push = gdt_add_hash( _ppool, h_munit, namemunit, datamunit, id );
+	memcpy( pbuf, value, qs_usize( _ppool, datamunit ) );
+	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, namemunit, datamunit, id );
 	if( NULL==is_push){
 		printf("is_push is NULL\n");
 	}
 }
 
-void gdt_add_hash_array(QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, int32_t array_id)
+void qs_add_hash_array(QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, int32_t array_id)
 {
-	int32_t namemunit = gdt_make_hash_name(_ppool, h_munit, name);
+	int32_t namemunit = qs_make_hash_name(_ppool, h_munit, name);
 	if (namemunit == -1) {
 		return;
 	}
-	int32_t array_munit = gdt_get_hash(_ppool, h_munit, name);
+	int32_t array_munit = qs_get_hash(_ppool, h_munit, name);
 	if (array_munit != -1) {
 		printf("array exist\n");
 	}
-	QS_HASH_ELEMENT* is_push = gdt_add_hash(_ppool, h_munit, namemunit, array_id, ELEMENT_ARRAY);
+	QS_HASH_ELEMENT* is_push = qs_add_hash(_ppool, h_munit, namemunit, array_id, ELEMENT_ARRAY);
 	if (NULL == is_push) {
 		printf("is_push is NULL\n");
 	}
 }
 
-void gdt_add_hash_array_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, const char* value )
+void qs_add_hash_array_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, const char* value )
 {
-	int32_t namemunit = gdt_make_hash_name( _ppool, h_munit, name );
+	int32_t namemunit = qs_make_hash_name( _ppool, h_munit, name );
 	if( namemunit == -1 ){
 		return;
 	}
-	int32_t array_munit = gdt_get_hash( _ppool, h_munit, name );
+	int32_t array_munit = qs_get_hash( _ppool, h_munit, name );
 	if( array_munit == -1 ){
-		array_munit = gdt_create_array( _ppool, 8, 0 );
+		array_munit = qs_create_array( _ppool, 8, 0 );
 		if( -1 == array_munit ){
 			return;
 		}
 	}
-	if( QS_SYSTEM_ERROR == gdt_array_push_string( _ppool, &array_munit, value ) ){
+	if( QS_SYSTEM_ERROR == qs_array_push_string( _ppool, &array_munit, value ) ){
 		return;
 	}
-	QS_HASH_ELEMENT* is_push = gdt_add_hash( _ppool, h_munit, namemunit, array_munit, ELEMENT_ARRAY );
+	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, namemunit, array_munit, ELEMENT_ARRAY );
 	if( NULL==is_push){
 		printf("is_push is NULL\n");
 	}
 }
 
-void gdt_add_hash_array_empty_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, size_t size )
+void qs_add_hash_array_empty_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, size_t size )
 {
-	int32_t namemunit = gdt_make_hash_name( _ppool, h_munit, name );
+	int32_t namemunit = qs_make_hash_name( _ppool, h_munit, name );
 	if( namemunit == -1 ){
 		return;
 	}
-	int32_t array_munit = gdt_get_hash( _ppool, h_munit, name );
+	int32_t array_munit = qs_get_hash( _ppool, h_munit, name );
 	if( array_munit == -1 ){
-		array_munit = gdt_create_array( _ppool, 8, 0 );
+		array_munit = qs_create_array( _ppool, 8, 0 );
 		if( -1 == array_munit ){
 			return;
 		}
 	}
-	if( QS_SYSTEM_ERROR == gdt_array_push_empty_string( _ppool, &array_munit, size ) ){
+	if( QS_SYSTEM_ERROR == qs_array_push_empty_string( _ppool, &array_munit, size ) ){
 		return;
 	}
-	QS_HASH_ELEMENT* is_push = gdt_add_hash( _ppool, h_munit, namemunit, array_munit, ELEMENT_ARRAY );
+	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, namemunit, array_munit, ELEMENT_ARRAY );
 	if( NULL==is_push){
 		printf("is_push is NULL\n");
 	}
 }
 
-QS_HASH_ELEMENT* gdt_add_hash_binary( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, uint8_t* binary, size_t size )
+QS_HASH_ELEMENT* qs_add_hash_binary( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, uint8_t* binary, size_t size )
 {
 	uint8_t* bin;
-	int32_t namemunit = gdt_make_hash_name( _ppool, h_munit, name );
+	int32_t namemunit = qs_make_hash_name( _ppool, h_munit, name );
 	if( namemunit == -1 ){
 		return NULL;
 	}
-	int32_t datamunit = gdt_get_hash( _ppool, h_munit, name );
+	int32_t datamunit = qs_get_hash( _ppool, h_munit, name );
 	if( datamunit == -1 ){
-		if( -1 == ( datamunit = gdt_create_memory_block( _ppool, size ) ) ){
+		if( -1 == ( datamunit = qs_create_memory_block( _ppool, size ) ) ){
 			return NULL;
 		}
 	}
 	else{
-		if( gdt_usize(_ppool,datamunit) < size ){
-			if( -1 == ( datamunit = gdt_create_memory_block( _ppool, size ) ) ){
+		if( qs_usize(_ppool,datamunit) < size ){
+			if( -1 == ( datamunit = qs_create_memory_block( _ppool, size ) ) ){
 				return NULL;
 			}
 		}
 	}
 	bin = (uint8_t*)QS_GET_POINTER( _ppool, datamunit );
 	memcpy( bin, binary, size );
-	QS_MEMORY_UNIT* punit = gdt_get_munit( _ppool, datamunit );
+	QS_MEMORY_UNIT* punit = qs_get_munit( _ppool, datamunit );
 	punit->top = size;
-	QS_HASH_ELEMENT* is_push = gdt_add_hash( _ppool, h_munit, namemunit, datamunit, ELEMENT_LITERAL_BIN );
+	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, namemunit, datamunit, ELEMENT_LITERAL_BIN );
 	return is_push;
 }
 
-QS_HASH_ELEMENT* gdt_add_hash_integer( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, int32_t value )
+QS_HASH_ELEMENT* qs_add_hash_integer( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, int32_t value )
 {
-	int32_t namemunit = gdt_make_hash_name( _ppool, h_munit, name );
+	int32_t namemunit = qs_make_hash_name( _ppool, h_munit, name );
 	if( namemunit == -1 ){
 		return NULL;
 	}
-	int32_t datamunit = gdt_get_hash( _ppool, h_munit, name );
+	int32_t datamunit = qs_get_hash( _ppool, h_munit, name );
 	if( datamunit == -1 ){
-		if( -1 == ( datamunit = gdt_create_memory_block( _ppool, NUMERIC_BUFFER_SIZE ) ) ){
+		if( -1 == ( datamunit = qs_create_memory_block( _ppool, NUMERIC_BUFFER_SIZE ) ) ){
 			return NULL;
 		}
 	}
-	size_t data_size = gdt_usize(_ppool,datamunit);
-	gdt_itoa( value, (char*)QS_GET_POINTER(_ppool,datamunit), data_size );
+	size_t data_size = qs_usize(_ppool,datamunit);
+	qs_itoa( value, (char*)QS_GET_POINTER(_ppool,datamunit), data_size );
 	(*(int32_t*)(QS_GET_POINTER(_ppool,datamunit)+data_size-sizeof(int32_t))) = value;
-	QS_HASH_ELEMENT* is_push = gdt_add_hash( _ppool, h_munit, namemunit, datamunit, ELEMENT_LITERAL_NUM );
+	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, namemunit, datamunit, ELEMENT_LITERAL_NUM );
 	//if( NULL==is_push){ printf("is_push is NULL\n"); }
 	return is_push;
 }
 
-void gdt_add_hash_integer_kint( QS_MEMORY_POOL* _ppool, int32_t h_munit, int32_t name_munit, int32_t value )
+void qs_add_hash_integer_kint( QS_MEMORY_POOL* _ppool, int32_t h_munit, int32_t name_munit, int32_t value )
 {
 	int32_t datamunit;
-	if( -1 == ( datamunit = gdt_create_memory_block( _ppool, NUMERIC_BUFFER_SIZE ) ) ){
+	if( -1 == ( datamunit = qs_create_memory_block( _ppool, NUMERIC_BUFFER_SIZE ) ) ){
 		return;
 	}
-	size_t data_size = gdt_usize(_ppool,datamunit);
-	gdt_itoa( value, (char*)QS_GET_POINTER(_ppool,datamunit), data_size );
+	size_t data_size = qs_usize(_ppool,datamunit);
+	qs_itoa( value, (char*)QS_GET_POINTER(_ppool,datamunit), data_size );
 	(*(int32_t*)(QS_GET_POINTER(_ppool,datamunit)+data_size-sizeof(int32_t))) = value;
-	QS_HASH_ELEMENT* is_push = gdt_add_hash( _ppool, h_munit, name_munit, datamunit, ELEMENT_LITERAL_NUM );
+	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, name_munit, datamunit, ELEMENT_LITERAL_NUM );
 	if( NULL==is_push){
 		printf("is_push is NULL\n");
 	}
 }
 
-QS_HASH_ELEMENT* gdt_add_hash_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, const char* value )
+QS_HASH_ELEMENT* qs_add_hash_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, const char* value )
 {
 	char* pbuf;
-	int32_t namemunit = gdt_make_hash_name( _ppool, h_munit, name );
+	int32_t namemunit = qs_make_hash_name( _ppool, h_munit, name );
 	if( namemunit == -1 ){
 		return NULL;
 	}
-	int32_t datamunit = gdt_get_hash( _ppool, h_munit, name );
+	int32_t datamunit = qs_get_hash( _ppool, h_munit, name );
 	size_t data_size = 0;
 	if( datamunit == -1 ){
-		if( -1 == ( datamunit = gdt_create_memory_block( _ppool, strlen( value )+1 ) ) ){
+		if( -1 == ( datamunit = qs_create_memory_block( _ppool, strlen( value )+1 ) ) ){
 			return NULL;
 		}
-		data_size = gdt_usize( _ppool, datamunit );
+		data_size = qs_usize( _ppool, datamunit );
 	}
 	else{
 		size_t size = strlen( value )+1;
-		data_size = gdt_usize( _ppool, datamunit );
+		data_size = qs_usize( _ppool, datamunit );
 		if( data_size < size ){
-			if( -1 == ( datamunit = gdt_create_memory_block( _ppool, strlen( value )+1 ) ) ){
+			if( -1 == ( datamunit = qs_create_memory_block( _ppool, strlen( value )+1 ) ) ){
 				return NULL;
 			}
 		}
 	}
 	pbuf = (char*)QS_GET_POINTER( _ppool, datamunit );
 	memcpy( pbuf, value, data_size );
-	QS_HASH_ELEMENT* is_push = gdt_add_hash( _ppool, h_munit, namemunit, datamunit, ELEMENT_LITERAL_STR );
+	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, namemunit, datamunit, ELEMENT_LITERAL_STR );
 	//if( NULL==is_push){printf("is_push is NULL\n");}
 	return is_push;
 }
 
-void gdt_add_hash_emptystring( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, size_t string_size )
+void qs_add_hash_emptystring( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, size_t string_size )
 {
 	char* pbuf;
 	int32_t datamunit;
-	int32_t namemunit = gdt_make_hash_name( _ppool, h_munit, name );
+	int32_t namemunit = qs_make_hash_name( _ppool, h_munit, name );
 	if( namemunit == -1 ){
 		return;
 	}
-	if( -1 == ( datamunit = gdt_create_memory_block( _ppool, string_size ) ) ){
+	if( -1 == ( datamunit = qs_create_memory_block( _ppool, string_size ) ) ){
 		return;
 	}
 	pbuf = (char*)QS_GET_POINTER( _ppool, datamunit );
-	//memset( pbuf, 0, gdt_usize( _ppool, datamunit ) );
+	//memset( pbuf, 0, qs_usize( _ppool, datamunit ) );
 	pbuf[0] = '\0';
-	QS_HASH_ELEMENT* is_push = gdt_add_hash( _ppool, h_munit, namemunit, datamunit, ELEMENT_LITERAL_STR );
+	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, namemunit, datamunit, ELEMENT_LITERAL_STR );
 	if( NULL==is_push){
 		printf("is_push is NULL\n");
 	}
 }
 
-void gdt_add_hash_value_kstring( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, int32_t data_munit, int32_t id )
+void qs_add_hash_value_kstring( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, int32_t data_munit, int32_t id )
 {
-	int32_t namemunit = gdt_make_hash_name( _ppool, h_munit, name );
+	int32_t namemunit = qs_make_hash_name( _ppool, h_munit, name );
 	if( namemunit == -1 ){
 		return;
 	}
-	QS_HASH_ELEMENT* is_push = gdt_add_hash( _ppool, h_munit, namemunit, data_munit, id );
+	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, namemunit, data_munit, id );
 	if( NULL==is_push){
 		printf("is_push is NULL\n");
 	}
 }
 
-int32_t gdt_move_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname_from, const char* hashname_to )
+int32_t qs_move_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname_from, const char* hashname_to )
 {
 	if( h_munit == -1 ){
 		return -1;
 	}
 	struct QS_HASH *hash = (struct QS_HASH *)QS_GET_POINTER( _ppool, h_munit );
 	struct QS_HASH *hashchild = (struct QS_HASH *)QS_GET_POINTER( _ppool, hash->hash_munit );
-	uint32_t hashkey = gdt_ihash( hashname_from, hash->hash_size );
+	uint32_t hashkey = qs_ihash( hashname_from, hash->hash_size );
 	int32_t retmunit = -1;
 	if( -1 == hashchild[hashkey].hash_munit ){
 		return retmunit;
 	}
-	if( gdt_strlen(hashname_from) != gdt_strlen(hashname_to) ){
+	if( qs_strlen(hashname_from) != qs_strlen(hashname_to) ){
 		return retmunit;
 	}
 	QS_HASH_ELEMENT *hashelement = (struct QS_HASH_ELEMENT*)QS_GET_POINTER( _ppool, hashchild[hashkey].hash_munit );
@@ -389,8 +389,8 @@ int32_t gdt_move_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hash
 			char* tmpname = (char*)QS_GET_POINTER( _ppool, hashelement[i].hashname_munit );
 			if( !strcmp( tmpname, hashname_from ) )
 			{
-				memcpy(tmpname,hashname_to,gdt_strlen(hashname_to));
-				QS_HASH_ELEMENT* elm = gdt_add_hash( _ppool, h_munit, hashelement[i].hashname_munit, hashelement[i].elm_munit, hashelement[i].id );
+				memcpy(tmpname,hashname_to,qs_strlen(hashname_to));
+				QS_HASH_ELEMENT* elm = qs_add_hash( _ppool, h_munit, hashelement[i].hashname_munit, hashelement[i].elm_munit, hashelement[i].id );
 				if( elm != &hashelement[i] ){
 					hashelement[i].hashname_munit = -1;
 					hashelement[i].elm_munit = -1;
@@ -405,11 +405,11 @@ int32_t gdt_move_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hash
 	return retmunit;
 }
 
-int32_t gdt_remove_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname )
+int32_t qs_remove_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname )
 {
 	struct QS_HASH *hash = (struct QS_HASH *)QS_GET_POINTER( _ppool, h_munit );
 	struct QS_HASH *hashchild = (struct QS_HASH *)QS_GET_POINTER( _ppool, hash->hash_munit );
-	uint32_t hashkey = gdt_ihash( hashname, hash->hash_size );
+	uint32_t hashkey = qs_ihash( hashname, hash->hash_size );
 	QS_HASH_ELEMENT *hashelement = (struct QS_HASH_ELEMENT*)QS_GET_POINTER( _ppool, hashchild[hashkey].hash_munit );
 	uint32_t i;
 	for( i = 0; i < hashchild[hashkey].hash_size; i++ )
@@ -430,15 +430,15 @@ int32_t gdt_remove_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* ha
 	return QS_SYSTEM_OK;
 }
 
-char* gdt_get_hash_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname )
+char* qs_get_hash_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname )
 {
 	if( h_munit == -1 ){
 		return NULL;
 	}
 	struct QS_HASH *hash = (struct QS_HASH *)QS_GET_POINTER( _ppool, h_munit );
 	struct QS_HASH *hashchild = (struct QS_HASH *)QS_GET_POINTER( _ppool, hash->hash_munit );
-	uint32_t hashkey = gdt_ihash( hashname, hash->hash_size );
-	QS_HASH_ELEMENT* elm = gdt_get_hash_core( _ppool, hash, hashchild, hashname, hashkey );
+	uint32_t hashkey = qs_ihash( hashname, hash->hash_size );
+	QS_HASH_ELEMENT* elm = qs_get_hash_core( _ppool, hash, hashchild, hashname, hashkey );
 	if(elm==NULL){
 		return NULL;
 	}
@@ -448,15 +448,15 @@ char* gdt_get_hash_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* 
 	return (char*)QS_GET_POINTER(_ppool,elm->elm_munit);
 }
 
-int32_t* gdt_get_hash_integer( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname )
+int32_t* qs_get_hash_integer( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname )
 {
 	if( h_munit == -1 ){
 		return NULL;
 	}
 	struct QS_HASH *hash = (struct QS_HASH *)QS_GET_POINTER( _ppool, h_munit );
 	struct QS_HASH *hashchild = (struct QS_HASH *)QS_GET_POINTER( _ppool, hash->hash_munit );
-	uint32_t hashkey = gdt_ihash( hashname, hash->hash_size );
-	QS_HASH_ELEMENT* elm = gdt_get_hash_core( _ppool, hash, hashchild, hashname, hashkey );
+	uint32_t hashkey = qs_ihash( hashname, hash->hash_size );
+	QS_HASH_ELEMENT* elm = qs_get_hash_core( _ppool, hash, hashchild, hashname, hashkey );
 	if(elm==NULL){
 		return NULL;
 	}
@@ -466,22 +466,22 @@ int32_t* gdt_get_hash_integer( QS_MEMORY_POOL* _ppool, int32_t h_munit, const ch
 	return QS_PINT32(_ppool,elm->elm_munit);
 }
 
-int32_t gdt_get_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname )
+int32_t qs_get_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname )
 {
 	if( h_munit == -1 ){
 		return -1;
 	}
 	struct QS_HASH *hash = (struct QS_HASH *)QS_GET_POINTER( _ppool, h_munit );
 	struct QS_HASH *hashchild = (struct QS_HASH *)QS_GET_POINTER( _ppool, hash->hash_munit );
-	uint32_t hashkey = gdt_ihash( hashname, hash->hash_size );
-	QS_HASH_ELEMENT* elm = gdt_get_hash_core( _ppool, hash, hashchild, hashname, hashkey );
+	uint32_t hashkey = qs_ihash( hashname, hash->hash_size );
+	QS_HASH_ELEMENT* elm = qs_get_hash_core( _ppool, hash, hashchild, hashname, hashkey );
 	if(elm==NULL){
 		return -1;
 	}
 	return elm->elm_munit;
 }
 
-int32_t gdt_get_hash_fix_ihash( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname, uint32_t hashkey )
+int32_t qs_get_hash_fix_ihash( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname, uint32_t hashkey )
 {
 	if( h_munit == -1 ){
 		return -1;
@@ -510,7 +510,7 @@ int32_t gdt_get_hash_fix_ihash( QS_MEMORY_POOL* _ppool, int32_t h_munit, const c
 	return retmunit;
 }
 
-QS_HASH_ELEMENT* gdt_get_hash_core( QS_MEMORY_POOL* _ppool, struct QS_HASH *hash, QS_HASH *hashchild, const char* hashname, uint32_t hashkey )
+QS_HASH_ELEMENT* qs_get_hash_core( QS_MEMORY_POOL* _ppool, struct QS_HASH *hash, QS_HASH *hashchild, const char* hashname, uint32_t hashkey )
 {
 	QS_HASH_ELEMENT* ret = NULL;
 	if( -1 == hashchild[hashkey].hash_munit )
@@ -534,18 +534,18 @@ QS_HASH_ELEMENT* gdt_get_hash_core( QS_MEMORY_POOL* _ppool, struct QS_HASH *hash
 	return ret;
 }
 
-void gdt_clear_hash_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name )
+void qs_clear_hash_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name )
 {
-	int32_t data_munit = gdt_get_hash( _ppool, h_munit, name );
+	int32_t data_munit = qs_get_hash( _ppool, h_munit, name );
 	if( data_munit >= 0 ){
 		//memset( (char*)QS_GET_POINTER(_ppool,data_munit), 0, QS_PUNIT_USIZE(_ppool,data_munit) );
 		*((char*)QS_GET_POINTER(_ppool,data_munit)) = '\0';
 	}
 }
 
-int32_t gdt_replace_hash_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, const char* value )
+int32_t qs_replace_hash_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, const char* value )
 {
-	int32_t data_munit = gdt_get_hash( _ppool, h_munit, name );
+	int32_t data_munit = qs_get_hash( _ppool, h_munit, name );
 	if( data_munit >= 0 ){
 		memcpy( (char*)QS_GET_POINTER(_ppool,data_munit), value, QS_PUNIT_USIZE(_ppool,data_munit) );
 		*( ((char*)QS_GET_POINTER(_ppool,data_munit))+QS_PUNIT_USIZE(_ppool,data_munit)-1 ) = '\0';
@@ -553,7 +553,7 @@ int32_t gdt_replace_hash_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const 
 	return data_munit;
 }
 
-int32_t gdt_get_hash_name( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname )
+int32_t qs_get_hash_name( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname )
 {
 	int32_t retmunit = -1;
 	QS_HASH *hash;
@@ -563,7 +563,7 @@ int32_t gdt_get_hash_name( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* 
 	if( hash->hash_size == 0 ){
 		return retmunit;
 	}
-	hashkey = gdt_ihash( hashname, hash->hash_size );
+	hashkey = qs_ihash( hashname, hash->hash_size );
 	hashchild = (QS_HASH *)QS_GET_POINTER( _ppool, hash->hash_munit );
 	if( -1 == hashchild[hashkey].hash_munit ){
 		return retmunit;
@@ -581,14 +581,14 @@ int32_t gdt_get_hash_name( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* 
 	return retmunit;
 }
 
-int32_t gdt_get_hash_id( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname )
+int32_t qs_get_hash_id( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname )
 {
 	int32_t retid = -1;
 	QS_HASH *hash;
 	QS_HASH *hashchild;
 	uint32_t hashkey;
 	hash = (QS_HASH *)QS_GET_POINTER( _ppool, h_munit );
-	hashkey = gdt_ihash( hashname, hash->hash_size );
+	hashkey = qs_ihash( hashname, hash->hash_size );
 	hashchild = (QS_HASH *)QS_GET_POINTER( _ppool, hash->hash_munit );
 	if( -1 == hashchild[hashkey].hash_munit )
 	{
@@ -610,14 +610,14 @@ int32_t gdt_get_hash_id( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* ha
 	return retid;
 }
 
-QS_HASH_ELEMENT* gdt_get_hash_element( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname )
+QS_HASH_ELEMENT* qs_get_hash_element( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname )
 {
 	QS_HASH_ELEMENT* ret = NULL;
 	QS_HASH *hash;
 	QS_HASH *hashchild;
 	uint32_t hashkey;
 	hash = (QS_HASH *)QS_GET_POINTER( _ppool, h_munit );
-	hashkey = gdt_ihash( hashname, hash->hash_size );
+	hashkey = qs_ihash( hashname, hash->hash_size );
 	hashchild = (QS_HASH *)QS_GET_POINTER( _ppool, hash->hash_munit );
 	if( -1 == hashchild[hashkey].hash_munit )
 	{
@@ -639,7 +639,7 @@ QS_HASH_ELEMENT* gdt_get_hash_element( QS_MEMORY_POOL* _ppool, int32_t h_munit, 
 	return ret;
 }
 
-int32_t gdt_hash_length( QS_MEMORY_POOL* _ppool, int32_t h_munit )
+int32_t qs_hash_length( QS_MEMORY_POOL* _ppool, int32_t h_munit )
 {
 	int32_t length = 0;
 	struct QS_HASH *hash;
@@ -666,7 +666,7 @@ int32_t gdt_hash_length( QS_MEMORY_POOL* _ppool, int32_t h_munit )
 }
 
 
-int32_t gdt_init_hash_foreach( QS_MEMORY_POOL* _ppool, int32_t h_munit, QS_HASH_FOREACH* hf )
+int32_t qs_init_hash_foreach( QS_MEMORY_POOL* _ppool, int32_t h_munit, QS_HASH_FOREACH* hf )
 {
 	hf->p1 = 0;
 	hf->p2 = 0;
@@ -677,7 +677,7 @@ int32_t gdt_init_hash_foreach( QS_MEMORY_POOL* _ppool, int32_t h_munit, QS_HASH_
 }
 
 
-QS_HASH_ELEMENT* gdt_hash_foreach( QS_MEMORY_POOL* _ppool, QS_HASH_FOREACH* hf )
+QS_HASH_ELEMENT* qs_hash_foreach( QS_MEMORY_POOL* _ppool, QS_HASH_FOREACH* hf )
 {
 	QS_HASH_ELEMENT* ret = NULL;
 	do{
