@@ -43,14 +43,14 @@ int on_close(QS_SERVER_CONNECTION_INFO* connection);
 
 int main( int argc, char *argv[], char *envp[] )
 {
-	gdt_finit(&log_file_info);
-	gdt_set_defaultsignal();
-	QS_SOCKET_OPTION* option = gdt_create_tcp_server_plane(NULL, "8080");
-	memid_temporary_memory = gdt_create_mini_memory( option->memory_pool, SIZE_KBYTE * 256 );
+	qs_finit(&log_file_info);
+	qs_set_defaultsignal();
+	QS_SOCKET_OPTION* option = qs_create_tcp_server_plane(NULL, "8080");
+	memid_temporary_memory = qs_create_mini_memory( option->memory_pool, SIZE_KBYTE * 256 );
 	set_on_connect_event(option,on_connect);
 	set_on_packet_recv_event(option,on_recv);
 	set_on_close_event(option,on_close);
-	gdt_socket(option);
+	qs_socket(option);
 	time_t current_time = time(NULL);
 	time_t update_time = 0;
 	while(1){
@@ -61,11 +61,11 @@ int main( int argc, char *argv[], char *envp[] )
 			}
 			update_time = current_time;
 		}
-		gdt_server_update(option);
+		qs_server_update(option);
 		usleep(100);
 	}
-	gdt_free_socket(option);
-	gdt_free(option->memory_pool);
+	qs_free_socket(option);
+	qs_free(option->memory_pool);
 	return 0;
 }
 
@@ -78,13 +78,13 @@ void* on_recv( void* args )
 {
 	QS_RECV_INFO *rinfo = (QS_RECV_INFO *)args;
 	QS_SERVER_CONNECTION_INFO * tinfo = (QS_SERVER_CONNECTION_INFO *)rinfo->tinfo;
-	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->gdt_socket_option;
-	switch( gdt_http_protocol_filter(rinfo) )
+	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
+	switch( qs_http_protocol_filter(rinfo) )
 	{
 		case -1:
 		{
 			QS_SOCKPARAM* psockparam = &tinfo->sockparam;
-			gdt_disconnect( psockparam );
+			qs_disconnect( psockparam );
 			return ( (void *) NULL );
 		}
 		case 0:
@@ -94,27 +94,27 @@ void* on_recv( void* args )
 	}
 
 	QS_MEMORY_POOL * temporary_memory = ( QS_MEMORY_POOL* )QS_GET_POINTER( option->memory_pool, memid_temporary_memory );
-	gdt_memory_clean( temporary_memory );
+	qs_memory_clean( temporary_memory );
 
 	QS_HTTP_REQUEST_COMMON http_request;
 	int32_t http_status_code = http_request_common(rinfo, &http_request, temporary_memory);
 
 	if( http_status_code != 200 ){
 		if( http_status_code == 304 ){
-			gdt_send( option, &tinfo->sockparam, HTTP_NOT_MODIFIED, gdt_strlen( HTTP_NOT_MODIFIED ), 0 );
+			qs_send( option, &tinfo->sockparam, HTTP_NOT_MODIFIED, qs_strlen( HTTP_NOT_MODIFIED ), 0 );
 		}
 		else if( http_status_code == 404 ){
-			gdt_send( option, &tinfo->sockparam, HTTP_NOT_FOUND, gdt_strlen( HTTP_NOT_FOUND ), 0 );
+			qs_send( option, &tinfo->sockparam, HTTP_NOT_FOUND, qs_strlen( HTTP_NOT_FOUND ), 0 );
 		}
 		else{
-			gdt_send( option, &tinfo->sockparam, HTTP_INTERNAL_SERVER_ERROR, gdt_strlen( HTTP_INTERNAL_SERVER_ERROR ), 0 );
+			qs_send( option, &tinfo->sockparam, HTTP_INTERNAL_SERVER_ERROR, qs_strlen( HTTP_INTERNAL_SERVER_ERROR ), 0 );
 		}
 	}
 
 	// log
 	qs_http_access_log(&log_file_info, http_request.http_version,http_request.user_agent,tinfo->hbuf, http_request.method, http_request.request, http_status_code);
 
-	gdt_disconnect(&tinfo->sockparam);
+	qs_disconnect(&tinfo->sockparam);
 	return ((void *)NULL);
 }
 
