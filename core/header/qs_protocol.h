@@ -71,6 +71,7 @@ size_t qs_http_add_cache_control(char* dest, size_t dest_size, size_t start, int
 size_t qs_http_document_path(char* dest, size_t dest_size,char* document_root, char* default_file, char* path);
 int32_t qs_http_parse_request_parameter(QS_MEMORY_POOL * memory,char *get_params);
 int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_request, QS_MEMORY_POOL* temporary_memory);
+int32_t http_json_response_common(QS_SERVER_CONNECTION_INFO * connection, QS_SOCKET_OPTION* option,QS_MEMORY_POOL* temporary_memory,int32_t memid_response_hash, size_t json_buffer_size);
 
 #endif /*_QS_PROTOCOL_H_*/
 

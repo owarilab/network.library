@@ -114,6 +114,24 @@ int32_t qs_json_encode_b( QS_MEMORY_POOL* _ppool, QS_NODE* node, int32_t buf_mun
 	return buf_munit;
 }
 
+int32_t qs_json_encode_hash( QS_MEMORY_POOL* _ppool, int32_t memid_hash, size_t buffer_size )
+{
+	int32_t memid_node = qs_make_json_root(_ppool,memid_hash,ELEMENT_HASH);
+	if(-1==memid_node){
+		return -1;
+	}
+	return qs_json_encode( _ppool, (QS_NODE*)QS_GET_POINTER(_ppool, memid_node), buffer_size );
+}
+
+int32_t qs_json_encode_array( QS_MEMORY_POOL* _ppool, int32_t memid_hash, size_t buffer_size )
+{
+	int32_t memid_node = qs_make_json_root(_ppool,memid_hash,ELEMENT_ARRAY);
+	if(-1==memid_node){
+		return -1;
+	}
+	return qs_json_encode( _ppool, (QS_NODE*)QS_GET_POINTER(_ppool, memid_node), buffer_size );
+}
+
 int32_t qs_json_encode_parser_hash( QS_MEMORY_POOL* _ppool, int32_t buf_munit, int32_t h_munit )
 {
 	struct QS_HASH *hash;

@@ -547,14 +547,14 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 	http_request->user_agent = (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, memid_headers, "USER_AGENT" ));
 	printf("method : %s , request : %s\n",http_request->method,http_request->request);
 
-	int32_t memid_get_parameter_hash = -1;
+	http_request->memid_get_parameter_hash = -1;
 	do{
 		// get parameter
-		if(-1==(memid_get_parameter_hash = qs_http_parse_request_parameter(temporary_memory,http_request->get_params))){
+		if(-1==(http_request->memid_get_parameter_hash = qs_http_parse_request_parameter(temporary_memory,http_request->get_params))){
 			break;
 		}
 		printf("get params\n");
-		qs_hash_dump(temporary_memory, memid_get_parameter_hash,0);
+		qs_hash_dump(temporary_memory, http_request->memid_get_parameter_hash,0);
 	}while(false);
 
 	do{
@@ -575,7 +575,7 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 		qs_get_extension( http_request->extension, 32, http_request->request_path );
 	}while(false);
 
-	int32_t memid_post_parameter_hash = -1;
+	http_request->memid_post_parameter_hash = -1;
 	if( !strcmp("POST",http_request->method) ){
 		// parse post parameters
 		char *body = (char*)qs_upointer(option->memory_pool, rinfo->recvbuf_munit);
@@ -586,15 +586,15 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 				if (NULL == hashroot || hashroot->id != ELEMENT_HASH) {
 					break;
 				}
-				memid_post_parameter_hash = hashroot->element_munit;
+				http_request->memid_post_parameter_hash = hashroot->element_munit;
 			}else{
-				if(-1==(memid_post_parameter_hash = qs_http_parse_request_parameter(temporary_memory,body))){
+				if(-1==(http_request->memid_post_parameter_hash = qs_http_parse_request_parameter(temporary_memory,body))){
 					break;
 				}
 			}
 		}while(false);
 		printf("post params\n");
-		qs_hash_dump(temporary_memory, memid_post_parameter_hash,0);
+		qs_hash_dump(temporary_memory, http_request->memid_post_parameter_hash,0);
 	}
 
 	do{
@@ -705,4 +705,23 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 		qs_send( option, &tinfo->sockparam, response_buffer, response_len, 0 );
 	}while(false);
 	return http_request->http_status_code;
+}
+
+int32_t http_json_response_common(QS_SERVER_CONNECTION_INFO * connection, QS_SOCKET_OPTION* option,QS_MEMORY_POOL* temporary_memory,int32_t memid_response_hash, size_t json_buffer_size)
+{
+	int32_t http_status_code = 200;
+	int32_t memid_response_body = qs_json_encode_hash(temporary_memory, memid_response_hash, json_buffer_size);
+	char* json = (char*)QS_GET_POINTER(temporary_memory, memid_response_body);
+	size_t body_len = qs_strlen(json);
+	int32_t response_buffer_munit = qs_create_memory_block(temporary_memory, body_len + SIZE_KBYTE);
+	char* response_buffer = (char*)QS_GET_POINTER(temporary_memory, response_buffer_munit);
+	size_t response_buffer_size = qs_usize(temporary_memory, response_buffer_munit);
+	memset(response_buffer, 0, response_buffer_size); // memory over ( windows only )
+	size_t response_len = 0;
+	response_len = qs_http_add_response_common(response_buffer, response_buffer_size, http_status_code, "application/json", body_len);
+	response_len = qs_strlink(response_buffer, response_len, "\r\n", 2, response_buffer_size);
+	response_len = qs_strlink(response_buffer, response_len, json, body_len, response_buffer_size);
+	response_buffer[response_len] = '\0';
+	qs_send(option, &connection->sockparam, response_buffer, response_len, 0);
+	return http_status_code;
 }

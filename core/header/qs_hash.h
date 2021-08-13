@@ -69,6 +69,7 @@ typedef struct QS_HASH_FOREACH
 int32_t qs_create_hash( QS_MEMORY_POOL* _ppool, size_t hlen );
 QS_HASH_ELEMENT* qs_add_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, int32_t name_munit, int32_t data_munit, int32_t id );
 int32_t qs_make_hash_name( QS_MEMORY_POOL* _ppool, int32_t h_munit,const char* name);
+void qs_add_hash_hash(QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, int32_t hash_id);
 void qs_add_hash_array(QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, int32_t array_id);
 void qs_add_hash_array_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, const char* value );
 void qs_add_hash_array_empty_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, size_t size );

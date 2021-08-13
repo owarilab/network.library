@@ -160,6 +160,22 @@ int32_t qs_make_hash_name( QS_MEMORY_POOL* _ppool, int32_t h_munit,const char* n
 	return name_munit;
 }
 
+void qs_add_hash_hash(QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, int32_t hash_id)
+{
+	int32_t namemunit = qs_make_hash_name(_ppool, h_munit, name);
+	if (namemunit == -1) {
+		return;
+	}
+	int32_t hash_munit = qs_get_hash(_ppool, h_munit, name);
+	if (hash_munit != -1) {
+		printf("hash exist\n");
+	}
+	QS_HASH_ELEMENT* is_push = qs_add_hash(_ppool, h_munit, namemunit, hash_id, ELEMENT_HASH);
+	if (NULL == is_push) {
+		printf("is_push is NULL\n");
+	}
+}
+
 void qs_add_hash_value( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, const char* value, int32_t id )
 {
 	char* pbuf;
