@@ -112,7 +112,7 @@ QS_HASH_ELEMENT* qs_add_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, int32_t n
 	}
 	if( is_push == NULL ){
 		int32_t resize_munit = -1;
-		size_t resize = hashchild[hashkey].hash_size * 2;
+		size_t resize = hashchild[hashkey].hash_size * QS_HASH_ELEMENT_RESIZE_QUANTITY;
 		//printf("resize hash : %d -> %d\n",(int)(hashchild[hashkey].hash_size),(int)(resize));
 		if( -1 == (resize_munit = qs_create_memory_block( _ppool, sizeof( struct QS_HASH_ELEMENT ) * resize ))){
 			return is_push;
@@ -219,7 +219,7 @@ void qs_add_hash_array_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const ch
 	}
 	int32_t array_munit = qs_get_hash( _ppool, h_munit, name );
 	if( array_munit == -1 ){
-		array_munit = qs_create_array( _ppool, 8, 0 );
+		array_munit = qs_create_array( _ppool, QS_HASH_ELEMENT_ARRAY_SIZE, 0 );
 		if( -1 == array_munit ){
 			return;
 		}
@@ -241,7 +241,7 @@ void qs_add_hash_array_empty_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, co
 	}
 	int32_t array_munit = qs_get_hash( _ppool, h_munit, name );
 	if( array_munit == -1 ){
-		array_munit = qs_create_array( _ppool, 8, 0 );
+		array_munit = qs_create_array( _ppool, QS_HASH_ELEMENT_ARRAY_SIZE, 0 );
 		if( -1 == array_munit ){
 			return;
 		}
@@ -341,6 +341,7 @@ QS_HASH_ELEMENT* qs_add_hash_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, co
 				return NULL;
 			}
 		}
+		data_size = qs_usize( _ppool, datamunit );
 	}
 	pbuf = (char*)QS_GET_POINTER( _ppool, datamunit );
 	memcpy( pbuf, value, data_size );

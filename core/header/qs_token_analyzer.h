@@ -39,7 +39,8 @@ extern "C"{
 #include <string.h>
 #include <ctype.h>
 
-#define STRBUF_SIZE			SIZE_KBYTE * 8
+#define QS_TOKEN_RESIZE_QUANTITY 4
+#define QS_TOKEN_READ_BUFFER_SIZE_MIN SIZE_KBYTE * 8
 #define ID_UNK				0
 #define ID_NUM				1
 #define ID_OP				2
@@ -70,15 +71,16 @@ typedef struct QS_TOKEN
 typedef struct QS_TOKENS
 {
 	int32_t token_munit;
+	size_t read_buffer_size;
 	size_t size;
 	uint32_t currentpos;
 	uint32_t workpos;
 	int32_t allocsize;
 } QS_TOKENS;
 
-int32_t qs_inittoken( QS_MEMORY_POOL* _ppool, int32_t allocsize );
+int32_t qs_inittoken( QS_MEMORY_POOL* _ppool, int32_t allocsize, size_t read_buffer_size );
 int qs_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr );
-int  qs_addtoken( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* tokenbuf, int* tokensize, int type );
+int  qs_addtoken( QS_MEMORY_POOL* _ppool, QS_TOKENS *ptokens, char* tokenbuf, int* tokensize, int type );
 int  qs_check_systemword( char* token );
 void qs_tokendump( QS_MEMORY_POOL* _ppool, int32_t tokens_munit );
 

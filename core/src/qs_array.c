@@ -93,13 +93,13 @@ int32_t qs_create_array_buffer( QS_MEMORY_POOL* _ppool, size_t allocsize, size_t
 	return tmpmunit;
 }
 
-void qs_reset_array( QS_MEMORY_POOL* _ppool, int32_t munit )
+int32_t qs_reset_array( QS_MEMORY_POOL* _ppool, int32_t munit )
 {
 	QS_ARRAY* parray;
 	QS_ARRAY_ELEMENT* elm;
 	int i;
 	if( -1 == ( munit = qs_resize_array( _ppool, munit ) ) ){
-		return;
+		return -1;
 	}
 	parray = (QS_ARRAY*)QS_GET_POINTER( _ppool, munit );
 	parray->max_size = parray->max_size;
@@ -109,6 +109,7 @@ void qs_reset_array( QS_MEMORY_POOL* _ppool, int32_t munit )
 		(elm+i)->id = 0;
 		//(*(char*)QS_GET_POINTER(_ppool,(elm+i)->munit)) = '\0';
 	}
+	return 0;
 }
 
 int32_t qs_resize_array( QS_MEMORY_POOL* _ppool, int32_t munit )

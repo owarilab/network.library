@@ -38,6 +38,9 @@ extern "C"{
 #include "qs_hash.h"
 #include "qs_array.h"
 
+#define QS_NODE_SIZE 16
+#define QS_NODE_RESIZE_QUANTITY 4
+
 typedef struct QS_NODE
 {
 	int id;

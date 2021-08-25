@@ -65,11 +65,11 @@ int32_t qs_addnodeelement( QS_MEMORY_POOL* _ppool, QS_NODE* node )
 
 int32_t qs_addelement( QS_MEMORY_POOL* _ppool, QS_NODE* node, int id, int32_t data_munit )
 {
-	int allocsize = 8;
+	size_t allocsize = QS_NODE_SIZE;
 	int32_t tmpmunit;
 	QS_NODE* tmplist1, *tmplist2;
 	QS_NODE* workelemlist = NULL;
-	int i;
+	size_t i;
 	if( node->element_munit == -1 ){
 		if( -1 == ( node->element_munit = qs_create_munit( _ppool, sizeof( QS_NODE ) * allocsize, MEMORY_TYPE_DEFAULT ) ) ){
 			return -1;
@@ -84,21 +84,22 @@ int32_t qs_addelement( QS_MEMORY_POOL* _ppool, QS_NODE* node, int id, int32_t da
 	}
 	else{
 		if( node->pos >= node->elmsize ){
+			size_t resize_size = node->elmsize * QS_NODE_RESIZE_QUANTITY;
 			tmplist1 = ( QS_NODE* )QS_GET_POINTER( _ppool, node->element_munit );
-			if( -1 == ( tmpmunit = qs_create_munit( _ppool, sizeof( QS_NODE ) * ( node->elmsize + allocsize ), MEMORY_TYPE_DEFAULT ) ) ){
+			if( -1 == ( tmpmunit = qs_create_munit( _ppool, sizeof( QS_NODE ) * ( resize_size ), MEMORY_TYPE_DEFAULT ) ) ){
 				return -1;
 			}
 			tmplist2 = ( QS_NODE* )QS_GET_POINTER( _ppool, tmpmunit );
 			memcpy( tmplist2, tmplist1, sizeof( QS_NODE ) * node->elmsize );
 			workelemlist = ( QS_NODE* )QS_GET_POINTER( _ppool, tmpmunit );
-			for( i = node->elmsize; i < node->elmsize+allocsize; i++ ){
+			for( i = node->elmsize; i < resize_size; i++ ){
 				workelemlist[i].element_munit  = -1;
 				workelemlist[i].exec_tmp_munit = -1;
 				workelemlist[i].exec_tmp_id    = -1;
 			}
 			qs_free_memory_unit( _ppool, &node->element_munit );
 			node->element_munit = tmpmunit;
-			node->elmsize += allocsize;
+			node->elmsize = resize_size;
 		}
 		else{
 			workelemlist = ( QS_NODE* )QS_GET_POINTER( _ppool, node->element_munit );

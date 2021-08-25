@@ -533,9 +533,9 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 	QS_SERVER_CONNECTION_INFO * tinfo = (QS_SERVER_CONNECTION_INFO *)rinfo->tinfo;
 	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
 
-	printf("headers\n");
 	int32_t memid_headers = tinfo->sockparam.http_header_munit;
-	qs_hash_dump(option->memory_pool, memid_headers,0);
+	//printf("headers\n");
+	//qs_hash_dump(option->memory_pool, memid_headers,0);
 
 	http_request->temporary_memory = temporary_memory;
 	http_request->method = (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, memid_headers, "HTTP_METHOD" ));
@@ -545,7 +545,7 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 	http_request->cache_control = (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, memid_headers, "CACHE_CONTROL" ));
 	http_request->http_version = (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, memid_headers, "HTTP_VERSION" ));
 	http_request->user_agent = (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, memid_headers, "USER_AGENT" ));
-	printf("method : %s , request : %s\n",http_request->method,http_request->request);
+	//printf("method : %s , request : %s\n",http_request->method,http_request->request);
 
 	http_request->memid_get_parameter_hash = -1;
 	do{
@@ -553,8 +553,8 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 		if(-1==(http_request->memid_get_parameter_hash = qs_http_parse_request_parameter(temporary_memory,http_request->get_params))){
 			break;
 		}
-		printf("get params\n");
-		qs_hash_dump(temporary_memory, http_request->memid_get_parameter_hash,0);
+		//printf("get params\n");
+		//qs_hash_dump(temporary_memory, http_request->memid_get_parameter_hash,0);
 	}while(false);
 
 	do{
@@ -579,7 +579,6 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 	if( !strcmp("POST",http_request->method) ){
 		// parse post parameters
 		char *body = (char*)qs_upointer(option->memory_pool, rinfo->recvbuf_munit);
-		printf("body : %s\n",body);
 		do{
 			if( !strcmp("application/json",http_request->content_type)){
 				QS_NODE* hashroot = qs_get_json_root(temporary_memory, qs_json_decode_h(temporary_memory, body, 8, 128));
@@ -593,8 +592,9 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 				}
 			}
 		}while(false);
-		printf("post params\n");
-		qs_hash_dump(temporary_memory, http_request->memid_post_parameter_hash,0);
+		//printf("body : %s\n",body);
+		//printf("post params\n");
+		//qs_hash_dump(temporary_memory, http_request->memid_post_parameter_hash,0);
 	}
 
 	do{

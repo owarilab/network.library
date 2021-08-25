@@ -65,6 +65,8 @@ typedef struct QS_HASH_FOREACH
 } QS_HASH_FOREACH;
 
 #define QS_HASH_ELEMENT_SIZE 2
+#define QS_HASH_ELEMENT_RESIZE_QUANTITY 4
+#define QS_HASH_ELEMENT_ARRAY_SIZE 8
 
 int32_t qs_create_hash( QS_MEMORY_POOL* _ppool, size_t hlen );
 QS_HASH_ELEMENT* qs_add_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, int32_t name_munit, int32_t data_munit, int32_t id );

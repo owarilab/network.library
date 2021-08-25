@@ -65,6 +65,19 @@ size_t qs_cache_alloc(QS_CACHE_SERVER_DATA* data)
 	return size;
 }
 
+int32_t qs_create_cache_B1MB( QS_MEMORY_POOL* memory)
+{
+	size_t key_size = 64;
+	size_t hash_size = 128;
+	size_t cache_size = 700;
+	int32_t cache_id = qs_create_cache(memory,cache_size*(key_size+20),cache_size,SIZE_KBYTE*470,hash_size,key_size);
+	if(-1==cache_id){
+		printf("qs_create_cache error\n");
+		return -1;
+	}
+	return cache_id;
+}
+
 int32_t qs_create_cache( QS_MEMORY_POOL* memory,size_t chain_allocate_size,size_t max_cache_size,size_t page_allocate_size,size_t page_hash_size,size_t max_key_size)
 {
 	int32_t cache_id = qs_create_munit(memory,sizeof(QS_CACHE),MEMORY_TYPE_DEFAULT);
@@ -252,6 +265,9 @@ void qs_swap_page(QS_CACHE* cache,QS_CACHE_PAGE* page)
 			} else {
 				printf("other hash k = %s, h = %d, id = %d\n",key,elm->elm_munit,elm->id);
 			}
+		}
+		if(qs_memory_available_size(backup_page) < backup_page->size / 4){
+			break;
 		}
 	}
 	page->memory = backup_page;

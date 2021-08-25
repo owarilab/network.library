@@ -600,12 +600,7 @@ void qs_lstateout( QS_MEMORY_POOL* _ppool, const char* path )
 #ifdef __WINDOWS__
 
 #else
-/*
- * ユーザー権限の変更( シンボリックリンクの場合はシンボリックリンク先のファイル権限を変更 )
- * @param file_name ファイル名
- * @param owner 権限を付与するユーザー( 変更したくない場合は-1 )
- * @param group 権限を付与するグループ( 変更したくない場合は-1 )
- */
+
 int qs_chown( char* file_name, uid_t owner, gid_t group )
 {
 	int retcode = 0;
@@ -618,12 +613,6 @@ int qs_chown( char* file_name, uid_t owner, gid_t group )
 	return retcode;
 }
 
-/*
- * ユーザー権限の変更( シンボリックリンクの場合はシンボリックリンクの権限を変更 )
- * @param file_name ファイル名
- * @param owner 権限を付与するユーザー( 変更したくない場合は-1 )
- * @param group 権限を付与するグループ( 変更したくない場合は-1 )
- */
 int qs_lchown( char* file_name, uid_t owner, gid_t group )
 {
 	int retcode = 0;
@@ -633,11 +622,6 @@ int qs_lchown( char* file_name, uid_t owner, gid_t group )
 	return retcode;
 }
 
-/*
- * ファイルの最終アクセス、最終更新時間を変更する
- * @param file_name ファイル名
- * @param buf 更新時間( NULLの場合は現在時間 )
- */
 int qs_utime( char *file_name, struct utimbuf *buf )
 {
 	int retcode = 0;
@@ -647,7 +631,7 @@ int qs_utime( char *file_name, struct utimbuf *buf )
 	return retcode;
 }
 
-// mode ( ex : "777" )
+// mode ( example : "777" )
 int qs_chmod_char( char *file_name, char* mode )
 {
 	int retcode = 0;
@@ -688,7 +672,7 @@ int qs_ls( char* path )
 }
 
 /*
- * mode ( ex:0777 )
+ * mode ( example : 0777 )
  */
 int qs_mkdir( char* path, mode_t mode )
 {

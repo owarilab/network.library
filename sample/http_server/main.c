@@ -28,14 +28,19 @@
 #include "qs_socket.h"
 #include "qs_protocol.h"
 #include "qs_variable.h"
+#include "qs_random.h"
 #include "qs_logger.h"
 
-// api sample
-// curl -X POST -H "Content-Type: application/json" -d '{"id":"id_12345678", "password":"jsontest"}' http://localhost:8080/api/v1/login
-// curl -X POST -d 'id=id_12345678&password=test' http://localhost:8080/api/v1/login?t=1
-// curl -X POST -d 'name=totoro&password=test' http://localhost:8080/api/v1/create
+// get api sample
+// curl -X POST -H "Content-Type: application/json" -d '{"k":"id_12345678", "v":"kvs_value1"}' http://localhost:8080/api/v1/set
+// curl -X POST -d 'k=id_12345678&v=kvs_value1' http://localhost:8080/api/v1/set
+// set api sample
+// curl -X POST -H "Content-Type: application/json" -d '{"k":"id_12345678"}' http://localhost:8080/api/v1/get
+// curl -X POST -d 'k=id_12345678' http://localhost:8080/api/v1/get
 
 int32_t memid_temporary_memory = -1;
+int32_t memid_kvs_memory = -1;
+int32_t memid_kvs_id = -1;
 QS_FILE_INFO log_file_info;
 
 int on_connect(QS_SERVER_CONNECTION_INFO* connection);
@@ -50,8 +55,18 @@ int main( int argc, char *argv[], char *envp[] )
 #else
 	SetConsoleOutputCP(CP_UTF8);
 #endif
+	qs_srand_32();
 	QS_SOCKET_OPTION* option = qs_create_tcp_server_plane(NULL, "8080");
 	memid_temporary_memory = qs_create_mini_memory( option->memory_pool, SIZE_KBYTE * 512 );
+	memid_kvs_memory = qs_create_mini_memory(option->memory_pool, SIZE_MBYTE * 1);
+
+	QS_MEMORY_POOL* cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(option->memory_pool,memid_kvs_memory);
+	memid_kvs_id = qs_create_cache_B1MB(cache_memory);
+	if(-1 == memid_kvs_id) {
+		printf("create cache memory error\n");
+		return -1;
+	}
+
 	set_on_connect_event(option,on_connect);
 	set_on_packet_recv_event(option,on_recv);
 	set_on_close_event(option,on_close);
@@ -115,44 +130,59 @@ void* on_recv( void* args )
 
 			int32_t memid_response_data = qs_create_hash(temporary_memory, 32);
 
-			if (!strcmp(http_request.request, "/api/v1/create")) {
+			if (!strcmp(http_request.request, "/api/v1/set")) {
 				do {
 					if (-1 == http_request.memid_post_parameter_hash) {
 						break;
 					}
-					if (-1 == qs_get_hash(http_request.temporary_memory, http_request.memid_post_parameter_hash, "name")) {
+					if (-1 == qs_get_hash(http_request.temporary_memory, http_request.memid_post_parameter_hash, "k")) {
 						break;
 					}
-					if (-1 == qs_get_hash(http_request.temporary_memory, http_request.memid_post_parameter_hash, "password")) {
+					if (-1 == qs_get_hash(http_request.temporary_memory, http_request.memid_post_parameter_hash, "v")) {
 						break;
 					}
-					char* name = (char*)QS_GET_POINTER(http_request.temporary_memory, qs_get_hash(http_request.temporary_memory, http_request.memid_post_parameter_hash, "name"));
-					char* password = (char*)QS_GET_POINTER(http_request.temporary_memory, qs_get_hash(http_request.temporary_memory, http_request.memid_post_parameter_hash, "password"));
+					char* key = (char*)QS_GET_POINTER(http_request.temporary_memory, qs_get_hash(http_request.temporary_memory, http_request.memid_post_parameter_hash, "k"));
+					char* value = (char*)QS_GET_POINTER(http_request.temporary_memory, qs_get_hash(http_request.temporary_memory, http_request.memid_post_parameter_hash, "v"));
 
-					qs_add_hash_string(temporary_memory, memid_response_data, "name", name);
-					qs_add_hash_string(temporary_memory, memid_response_data, "password", password);
+					QS_MEMORY_POOL* cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(option->memory_pool,memid_kvs_memory);
+					QS_CACHE* cache = (QS_CACHE*)QS_GET_POINTER(cache_memory,memid_kvs_id);
+					size_t key_size = strlen(key);
+					if( key_size >= cache->max_key_size && key_size <= 0){
+						printf("invalid key size : %d\n",(int)key_size);
+					} else{
+						qs_cache_string(cache,key,value,0);
+					}
 
-					printf("/api/v1/create api %s, %s\n", name, password);
+					qs_add_hash_string(temporary_memory, memid_response_data, "key", key);
+					qs_add_hash_string(temporary_memory, memid_response_data, "value", value);
+
+					printf("/api/v1/set api %s, %s\n", key, value);
 				} while (false);
 			}
-			if (!strcmp(http_request.request, "/api/v1/login")) {
+			if (!strcmp(http_request.request, "/api/v1/get")) {
 				do {
 					if (-1 == http_request.memid_post_parameter_hash) {
 						break;
 					}
-					if (-1 == qs_get_hash(http_request.temporary_memory, http_request.memid_post_parameter_hash, "id")) {
+					if (-1 == qs_get_hash(http_request.temporary_memory, http_request.memid_post_parameter_hash, "k")) {
 						break;
 					}
-					if (-1 == qs_get_hash(http_request.temporary_memory, http_request.memid_post_parameter_hash, "password")) {
-						break;
+					char* key = (char*)QS_GET_POINTER(http_request.temporary_memory, qs_get_hash(http_request.temporary_memory, http_request.memid_post_parameter_hash, "k"));
+					char* value = NULL;
+					QS_MEMORY_POOL* cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(option->memory_pool,memid_kvs_memory);
+					QS_CACHE* cache = (QS_CACHE*)QS_GET_POINTER(cache_memory,memid_kvs_id);
+					QS_CACHE_PAGE cache_page;
+					qs_get_cache_page(cache,&cache_page);
+					int32_t hash_id = qs_get_hash(cache_page.memory,cache_page.hash_id,key);
+					qs_hash_dump(cache_page.memory,cache_page.hash_id,0);
+					if(-1 != hash_id){
+						value = (char*)QS_GET_POINTER(cache_page.memory, hash_id);
 					}
-					char* id = (char*)QS_GET_POINTER(http_request.temporary_memory, qs_get_hash(http_request.temporary_memory, http_request.memid_post_parameter_hash, "id"));
-					char* password = (char*)QS_GET_POINTER(http_request.temporary_memory, qs_get_hash(http_request.temporary_memory, http_request.memid_post_parameter_hash, "password"));
-
-					qs_add_hash_string(temporary_memory, memid_response_data, "id", id);
-					qs_add_hash_string(temporary_memory, memid_response_data, "password", password);
-
-					printf("/api/v1/login api %s, %s\n",id,password);
+					qs_add_hash_string(temporary_memory, memid_response_data, "key", key);
+					if(NULL!=value){
+						qs_add_hash_string(temporary_memory, memid_response_data, "value", value);
+					}
+					printf("/api/v1/get api %s, %s\n",key,value);
 				} while (false);
 			}
 

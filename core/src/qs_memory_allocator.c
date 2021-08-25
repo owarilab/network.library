@@ -43,7 +43,7 @@ size_t qs_initialize_memory( QS_MEMORY_POOL** _ppool, size_t allocate_size, size
 	do{
 		allocate_size = QS_ALIGNUP( allocate_size, alignment_size );
 		if( ( (*_ppool) = ( QS_MEMORY_POOL * )malloc( sizeof( QS_MEMORY_POOL ) ) ) == NULL ){
-			printf( "_ppool allocate error\n" );
+			printf( "memory struct allocate error\n" );
 			break;
 		}
 		memset( (*_ppool), 0, sizeof( QS_MEMORY_POOL ) );
@@ -53,7 +53,7 @@ size_t qs_initialize_memory( QS_MEMORY_POOL** _ppool, size_t allocate_size, size
 			max_byte_size = byte_size;
 		}
 		if( ( (*_ppool)->memory = ( void* )malloc( byte_size ) ) == NULL ){
-			printf( "_ppool memory allocate error" );
+			printf( "memory allocate error\n" );
 			break;
 		}
 		(*_ppool)->top				= 0;
@@ -71,6 +71,7 @@ size_t qs_initialize_memory( QS_MEMORY_POOL** _ppool, size_t allocate_size, size
 		(*_ppool)->alloc_type			= MEMORY_ALLOCATE_TYPE_MALLOC;
 		(*_ppool)->endian			= qs_endian();
 		(*_ppool)->debug			= MEMORY_DEBUG;
+		(*_ppool)->error_code       = 0;
 		memory_unit_one_size = QS_ALIGNUP( sizeof( QS_MEMORY_UNIT ), alignment_size );
 		memoryUnitSize = memory_unit_one_size * ( fix_memory_unit + free_memory_unit );
 		(*_ppool)->bottom = (*_ppool)->end - memoryUnitSize;
@@ -107,7 +108,7 @@ size_t qs_initialize_mmapmemory( QS_MEMORY_POOL** _ppool, size_t allocate_size, 
 		}
 		allocate_size = QS_ALIGNUP( allocate_size, alignment_size );
 		if( ( (*_ppool) = ( QS_MEMORY_POOL * )mmap( 0, sizeof( QS_MEMORY_POOL ), PROT_READ | PROT_WRITE, MAP_ANON | MAP_SHARED, -1, 0 ) ) == NULL ){
-			printf( "_ppool allocate error\n" );
+			printf( "memory struct allocate error\n" );
 			break;
 		}
 		memset( (*_ppool), 0, sizeof( QS_MEMORY_POOL ) );
@@ -117,7 +118,7 @@ size_t qs_initialize_mmapmemory( QS_MEMORY_POOL** _ppool, size_t allocate_size, 
 			max_byte_size = byte_size;
 		}
 		if( ( (*_ppool)->memory = ( void* )mmap( 0, byte_size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_SHARED, -1, 0 ) ) == NULL ){
-			printf( "_ppool memory allocate error" );
+			printf( "memory allocate error" );
 			break;
 		}
 		memset( (*_ppool)->memory, 0, byte_size );
@@ -134,9 +135,10 @@ size_t qs_initialize_mmapmemory( QS_MEMORY_POOL** _ppool, size_t allocate_size, 
 		(*_ppool)->lock_munit		= -1;
 		(*_ppool)->memory_buf_munit	= -1;
 		(*_ppool)->mmap_fd			= -1;
-		(*_ppool)->alloc_type			= MEMORY_ALLOCATE_TYPE_MMAP;
+		(*_ppool)->alloc_type		= MEMORY_ALLOCATE_TYPE_MMAP;
 		(*_ppool)->endian			= qs_endian();
 		(*_ppool)->debug			= MEMORY_DEBUG;
+		(*_ppool)->error_code	    = 0;
 		memory_unit_one_size = QS_ALIGNUP( sizeof( QS_MEMORY_UNIT ), alignment_size );
 		memoryUnitSize = memory_unit_one_size * ( fix_memory_unit + free_memory_unit );
 		(*_ppool)->bottom = (*_ppool)->end - memoryUnitSize;
@@ -228,6 +230,7 @@ size_t qs_initialize_mmapmemory_f( const char* file_name, QS_MEMORY_POOL** _ppoo
 	(*_ppool)->alloc_type		= MEMORY_ALLOCATE_TYPE_MMAP;
 	(*_ppool)->endian			= qs_endian();
 	(*_ppool)->debug			= MEMORY_DEBUG;
+	(*_ppool)->error_code		= 0;
 	memory_unit_one_size = QS_ALIGNUP( sizeof( QS_MEMORY_UNIT ), MEMORY_ALIGNMENT_SIZE_BIT_64 );
 	memoryUnitSize = memory_unit_one_size * ( fix_memory_unit + free_memory_unit );
 	(*_ppool)->bottom = (*_ppool)->end - memoryUnitSize;
@@ -272,7 +275,7 @@ size_t qs_initialize_mmapmemory_f( const char* file_name, QS_MEMORY_POOL** _ppoo
 #endif // #if defined(__LINUX__) || defined(__BSD_UNIX__)
 #ifdef __WINDOWS__
 	if (((*_ppool) = (QS_MEMORY_POOL *)malloc(sizeof(QS_MEMORY_POOL))) == NULL) {
-		printf("_ppool allocate error\n");
+		printf("memory allocate error\n");
 		return 0;
 	}
 	memset((*_ppool), 0, sizeof(QS_MEMORY_POOL));
@@ -474,9 +477,10 @@ int32_t qs_create_mini_memory( QS_MEMORY_POOL* _ppool, size_t allocate_size )
 	tiny_pool->tail_munit		= -1;
 	tiny_pool->lock_munit		= -1;
 	tiny_pool->memory_buf_munit = memory_buf_munit;
-	tiny_pool->alloc_type			= MEMORY_ALLOCATE_TYPE_MINI;
+	tiny_pool->alloc_type		= MEMORY_ALLOCATE_TYPE_MINI;
 	tiny_pool->endian			= qs_endian();
 	tiny_pool->debug			= MEMORY_DEBUG;
+	tiny_pool->error_code		= 0;
 	uint32_t memory_unit_one_size = QS_ALIGNUP( sizeof( QS_MEMORY_UNIT ), _ppool->alignment );
 	uint32_t memoryUnitSize = memory_unit_one_size * ( FIX_MUNIT_SIZE );
 	tiny_pool->bottom = tiny_pool->end - memoryUnitSize;
@@ -519,6 +523,7 @@ int32_t qs_create_clone_mini_memory( QS_MEMORY_POOL* _ppool, QS_MEMORY_POOL* _mi
 	tiny_pool->alloc_type		= _mini_ppool->alloc_type;
 	tiny_pool->endian			= _mini_ppool->endian;
 	tiny_pool->debug			= _mini_ppool->debug;
+	tiny_pool->error_code       = _mini_ppool->error_code;
 	tiny_pool->memory_unit_size_one 	= _mini_ppool->memory_unit_size_one;
 	return tiny_pool_munit;
 }
@@ -548,6 +553,7 @@ int32_t qs_copy_mini_memory( QS_MEMORY_POOL* _dest_ppool, QS_MEMORY_POOL* _src_p
 	_dest_ppool->alloc_type		= _src_ppool->alloc_type;
 	_dest_ppool->endian			= _src_ppool->endian;
 	_dest_ppool->debug			= _src_ppool->debug;
+	_dest_ppool->error_code		= _src_ppool->error_code;
 	_dest_ppool->memory_unit_size_one 	= _src_ppool->memory_unit_size_one;
 	//qs_memory_info( _dest_ppool );
 	return QS_SYSTEM_OK;
@@ -587,7 +593,10 @@ size_t qs_realloc_memory( QS_MEMORY_POOL* _ppool, size_t allocate_size, QS_MEMOR
 	size_t newBottomPosition;
 	do{
 		if( _ppool->size == _ppool->max_size ){
-			printf( "_ppool memory size is full\n" );
+			if(_ppool->debug){
+				printf( "_ppool memory size is full\n" );
+			}
+			_ppool->error_code = QS_MEMORY_ERROR_CODE_RESIZE;
 			break;
 		}
 		allocate_size = QS_ALIGNUP( allocate_size, _ppool->alignment );
@@ -596,16 +605,18 @@ size_t qs_realloc_memory( QS_MEMORY_POOL* _ppool, size_t allocate_size, QS_MEMOR
 		}
 		else{
 			if( allocate_size < _ppool->min_realloc ){
-#ifdef __QS_DEBUG__
+				if(_ppool->debug){
 					printf( "[qs_realloc_memory] min size check s : %zd -> s2 : %"PRIu64"\n", allocate_size, _ppool->min_realloc );
-#endif
+				}
 				allocate_size = _ppool->min_realloc;
 			}
 		}
 		byte_size = sizeof( uint8_t ) * allocate_size;
 		newmemory = ( void* )realloc( _ppool->memory, ( _ppool->size + byte_size ) );
 		if( newmemory == NULL ){
-			printf( "newmemory reallocate error" );
+			if(_ppool->debug){
+				printf( "newmemory reallocate error" );
+			}
 			break;
 		}
 		_ppool->memory = newmemory;
@@ -661,12 +672,16 @@ uint32_t qs_free_memory_unit( QS_MEMORY_POOL* _ppool, int32_t *munit_id )
 {
 	QS_MEMORY_UNIT *unit;
 	if( *munit_id < _ppool->fix_unit_size ){
-		printf("fix memory unit can not free\n");
+		if(_ppool->debug){
+			printf("fix memory unit can not free\n");
+		}
 		return QS_SYSTEM_ERROR;
 	}
 	unit = QS_PUNIT( _ppool, *munit_id );
 	if( unit == NULL ){
-		printf( "[qs_free_memory_unit] unit is NULL \n" );
+		if(_ppool->debug){
+			printf( "[qs_free_memory_unit] unit is NULL \n" );
+		}
 		return QS_SYSTEM_ERROR;
 	}
 	if( unit->status == MEMORY_STATUS_USE ){
@@ -690,12 +705,16 @@ uint32_t qs_malloc( QS_MEMORY_POOL* _ppool, size_t allocate_size, QS_MEMORY_UNIT
 //#endif
 	allocate_size = QS_ALIGNUP( allocate_size, _ppool->alignment );
 	if( allocate_size > _ppool->max_size ){
-		printf( "[qs_malloc] allocate_size over max_size = %"PRIu64", allocate_size = %zd \n" , _ppool->max_size, allocate_size );
+		if(_ppool->debug){
+			printf( "[qs_malloc] allocate_size over max_size = %"PRIu64", allocate_size = %zd \n" , _ppool->max_size, allocate_size );
+		}
 		return QS_SYSTEM_ERROR;
 	}
 	if( allocate_size <= 0 )
 	{
-		printf( "[qs_malloc] invalid allocate_size : %"PRIu64", %zd \n" , _ppool->max_size, allocate_size );
+		if(_ppool->debug){
+			printf( "[qs_malloc] invalid allocate_size : %"PRIu64", %zd \n" , _ppool->max_size, allocate_size );
+		}
 		return QS_SYSTEM_ERROR;
 	}
 	if( _ppool->top + allocate_size >= _ppool->bottom )
@@ -705,6 +724,9 @@ uint32_t qs_malloc( QS_MEMORY_POOL* _ppool, size_t allocate_size, QS_MEMORY_UNIT
 //#endif
 		if( _ppool->alloc_type == MEMORY_ALLOCATE_TYPE_MALLOC ){
 			reallocSize = qs_realloc_memory( _ppool, allocate_size, unit );
+			if(_ppool->error_code == QS_MEMORY_ERROR_CODE_RESIZE){
+				return QS_SYSTEM_ERROR;
+			}
 		}
 		if( _ppool->top + allocate_size >= _ppool->bottom )
 		{
@@ -806,7 +828,9 @@ int32_t qs_create_munit( QS_MEMORY_POOL* _ppool, size_t size, uint8_t type )
 {
 	QS_MEMORY_UNIT* unit = NULL;
 	if( QS_ALIGNUP( size, _ppool->alignment ) > _ppool->max_size ){
-		printf( "[qs_create_munit] allocate_size over max_size = %"PRIu64", allocate_size = %zd \n" , _ppool->max_size, size );
+		if(_ppool->debug){
+			printf( "[qs_create_munit] allocate_size over max_size = %"PRIu64", allocate_size = %zd \n" , _ppool->max_size, size );
+		}
 		return -1;
 	}
 	unit = qs_find_freemunit( _ppool, size );
@@ -917,8 +941,10 @@ int qs_resize_garbage(QS_MEMORY_POOL* _ppool,QS_MEMORY_UNIT* garbageunit,QS_MEMO
 				if( ( _ppool->bottom - memory_unit_one_size ) <= _ppool->top )
 				{
 					size_t over_size = ( _ppool->bottom - memory_unit_one_size ) - _ppool->top;
-					printf( "[qs_resize_garbage] QS_MEMORY_UNIT allocate size over %zd Byte\n", over_size );
-					printf( "[qs_resize_garbage] reallocSize %zd Byte\n", reallocSize );
+					if(_ppool->debug){
+						printf( "[qs_resize_garbage] QS_MEMORY_UNIT allocate size over %zd Byte\n", over_size );
+						printf( "[qs_resize_garbage] reallocSize %zd Byte\n", reallocSize );
+					}
 					return QS_SYSTEM_ERROR;
 				}
 			}
@@ -957,7 +983,9 @@ QS_MEMORY_UNIT* qs_get_munit( QS_MEMORY_POOL* _ppool, int32_t id )
 {
 	QS_MEMORY_UNIT* unit = NULL;
 	if( id < _ppool->fix_unit_size || id >= _ppool->unit_size ){
-		printf(  "[qs_get_munit]unit id out of range : %d\n", id );
+		if(_ppool->debug){
+			printf(  "[qs_get_munit]unit id out of range : %d\n", id );
+		}
 		return unit;
 	}
 	unit = (QS_MEMORY_UNIT*)( ( (uint8_t*)_ppool->memory + _ppool->end ) - ( _ppool->memory_unit_size_one * ( id + 1 ) ) );
@@ -970,7 +998,9 @@ void* qs_upointer( QS_MEMORY_POOL* _ppool, int32_t id )
 	QS_MEMORY_UNIT* unit = NULL;
 	do{
 		if( id < _ppool->fix_unit_size || id >= _ppool->unit_size ){
-			printf(  "[qs_upointer]unit id out of range[%d]\n", id );
+			if(_ppool->debug){
+				printf(  "[qs_upointer]unit id out of range[%d]\n", id );
+			}
 			break;
 		}
 		unit = (QS_MEMORY_UNIT*)( ( (uint8_t*)_ppool->memory + _ppool->end ) - ( _ppool->memory_unit_size_one * ( id + 1 ) ) );
@@ -985,7 +1015,9 @@ void* qs_fixupointer( QS_MEMORY_POOL* _ppool, int32_t id )
 	QS_MEMORY_UNIT* unit = NULL;
 	do{
 		if( id < 0 || id >= _ppool->fix_unit_size ){
-			printf(  "[qs_upointer]unit id out of range[%d]\n", id );
+			if(_ppool->debug){
+				printf(  "[qs_upointer]unit id out of range[%d]\n", id );
+			}
 			break;
 		}
 		unit = (QS_MEMORY_UNIT*)( ( (uint8_t*)_ppool->memory + _ppool->end ) - ( _ppool->memory_unit_size_one * ( id + 1 ) ) );
@@ -1067,7 +1099,9 @@ size_t qs_free( QS_MEMORY_POOL* _ppool )
 void qs_set_buffer( QS_MEMORY_POOL* _ppool, int32_t id, QS_BYTE_BUFFER* pbuffer )
 {
 	if( id < _ppool->fix_unit_size || id >= _ppool->unit_size ){
-		printf(  "[qs_upointer]unit id out of range[%d]\n", id );
+		if(_ppool->debug){
+			printf(  "[qs_upointer]unit id out of range[%d]\n", id );
+		}
 		return;
 	}
 	QS_MEMORY_UNIT* unit = (QS_MEMORY_UNIT*)( ( (uint8_t*)_ppool->memory + _ppool->end ) - ( _ppool->memory_unit_size_one * ( id + 1 ) ) );
@@ -1192,11 +1226,19 @@ int32_t qs_create_memory_info( QS_MEMORY_POOL* _ppool, QS_BYTE_BUFFER* pbuffer )
 	return QS_SYSTEM_OK;
 }
 
+size_t qs_memory_available_size( QS_MEMORY_POOL* _ppool )
+{
+	size_t freeSize = ( ( _ppool->bottom - _ppool->top ) );
+	return freeSize;
+}
+
 void qs_memory_info( QS_MEMORY_POOL* _ppool )
 {
 	size_t freeSize = 0;
 	if( _ppool == NULL ){
-		printf(  "[qs_memory_info]_ppool is null\n" );
+		if(_ppool->debug){
+			printf(  "[qs_memory_info]_ppool is null\n" );
+		}
 		return;
 	}
 	printf(  "#############################################################\n");
@@ -1229,7 +1271,9 @@ void qs_memory_unit_info( QS_MEMORY_POOL* _ppool )
 	QS_MEMORY_UNIT* unit;
 	size_t memory_unit_one_size = 0;
 	if( _ppool == NULL ){
-		printf(  "[qs_memory_unit_info]_ppool is null\n" );
+		if(_ppool->debug){
+			printf(  "[qs_memory_unit_info]_ppool is null\n" );
+		}
 		return;
 	}
 	printf(  "#############################################################\n");

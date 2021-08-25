@@ -387,7 +387,7 @@ int32_t qs_json_decode( QS_MEMORY_POOL* _ppool, const char* src )
 {
 	int32_t rootnode_munit = -1;
 	int32_t tokens_munit = -1;
-	if( -1 == ( tokens_munit = qs_inittoken( _ppool, 10000 ) ) ){
+	if( -1 == ( tokens_munit = qs_inittoken( _ppool, 10000, QS_TOKEN_READ_BUFFER_SIZE_MIN ) ) ){
 		return -1;
 	}
 	qs_token_analyzer( _ppool, tokens_munit, (char*)src );
@@ -409,7 +409,7 @@ int32_t qs_json_decode_h( QS_MEMORY_POOL* _ppool, const char* src, int32_t hash_
 {
 	int32_t rootnode_munit = -1;
 	int32_t tokens_munit = -1;
-	if( -1 == ( tokens_munit = qs_inittoken( _ppool, init_token_size ) ) ){
+	if( -1 == ( tokens_munit = qs_inittoken( _ppool, init_token_size, QS_TOKEN_READ_BUFFER_SIZE_MIN ) ) ){
 		return -1;
 	}
 	qs_token_analyzer( _ppool, tokens_munit, (char*)src );
