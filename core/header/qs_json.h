@@ -53,8 +53,8 @@ int32_t qs_get_json_root_hash(QS_MEMORY_POOL* _ppool, int32_t json_root_munit);
 int32_t qs_json_decode( QS_MEMORY_POOL* _ppool, const char* src );
 int32_t qs_json_decode_h( QS_MEMORY_POOL* _ppool, const char* src, int32_t hash_size, int32_t init_token_size );
 int32_t qs_json_decode_parser( QS_MEMORY_POOL* _ppool, QS_NODE* node, QS_TOKENS *ptokens, QS_TOKEN *token_list, int32_t hash_size );
-int32_t qs_json_decode_parser_hash( QS_MEMORY_POOL* _ppool, QS_NODE* node, QS_TOKENS *ptokens, QS_TOKEN *token_list, int32_t hash_size );
-int32_t qs_json_decode_parser_array( QS_MEMORY_POOL* _ppool, QS_NODE* node, QS_TOKENS *ptokens, QS_TOKEN *token_list );
+int32_t qs_json_decode_parser_hash( QS_MEMORY_POOL* _ppool, QS_NODE* node, QS_TOKENS *ptokens, QS_TOKEN *token_list, int32_t hash_size, int index );
+int32_t qs_json_decode_parser_array( QS_MEMORY_POOL* _ppool, QS_NODE* node, QS_TOKENS *ptokens, QS_TOKEN *token_list, int index );
 int32_t qs_make_json_root( QS_MEMORY_POOL* _ppool, int32_t data_munit, int id ); 
 
 #endif /*_QS_JSON_H_*/

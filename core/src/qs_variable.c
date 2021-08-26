@@ -389,9 +389,12 @@ void qs_array_dump( QS_MEMORY_POOL* _ppool, int32_t munit, int index )
 		return;
 	}
 	//if(1){for( k=0;k<index;k++ ){ printf("  ");}}
-	printf("[\n");
 	parray = (QS_ARRAY*)QS_GET_POINTER( _ppool, munit );
+	if( -1 == parray->munit){
+		return;
+	}
 	elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit );
+	printf("[\n");
 	for( i = 0; i < parray->len; i++ )
 	{
 		if( (elm+i)->id == ELEMENT_LITERAL_NUM ){

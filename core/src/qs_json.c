@@ -39,13 +39,13 @@ int32_t qs_json_encode( QS_MEMORY_POOL* _ppool, QS_NODE* node, size_t buf_size )
 		}
 		if( node->element_munit == -1 )
 		{
-			printf("[debug] qs_elementdumpchild node->element_munit == -1[%d]\n",node->id);
+			//printf("[debug] qs_elementdumpchild node->element_munit == -1[%d]\n",node->id);
 			break;
 		}
 		workelemlist = ( QS_NODE* )QS_GET_POINTER( _ppool, node->element_munit );
 		if( workelemlist == NULL )
 		{
-			printf("[debug] qs_elementdumpchild workelemlist == NULL\n");
+			//printf("[debug] qs_elementdumpchild workelemlist == NULL\n");
 			break;
 		}
 		for( i = 0; i < node->pos; i++ )
@@ -61,7 +61,7 @@ int32_t qs_json_encode( QS_MEMORY_POOL* _ppool, QS_NODE* node, size_t buf_size )
 					qs_json_encode_parser_hash( _ppool, buf_munit, workelemlist[i].element_munit );
 				}
 				else{
-					printf("invalid element[%d][%d] : %s\n" , workelemlist[i].element_munit, workelemlist[i].id, (char*)QS_GET_POINTER( _ppool, workelemlist[i].element_munit ) );
+					//printf("invalid element[%d][%d] : %s\n" , workelemlist[i].element_munit, workelemlist[i].id, (char*)QS_GET_POINTER( _ppool, workelemlist[i].element_munit ) );
 				}
 			}
 		}
@@ -78,18 +78,18 @@ int32_t qs_json_encode_b( QS_MEMORY_POOL* _ppool, QS_NODE* node, int32_t buf_mun
 	do{
 		if( buf_munit == -1 )
 		{
-			printf("[debug] null buffer\n");
+			//printf("[debug] null buffer\n");
 			break;
 		}
 		if( node->element_munit == -1 )
 		{
-			printf("[debug] qs_elementdumpchild node->element_munit == -1[%d]\n",node->id);
+			//printf("[debug] qs_elementdumpchild node->element_munit == -1[%d]\n",node->id);
 			break;
 		}
 		workelemlist = ( QS_NODE* )QS_GET_POINTER( _ppool, node->element_munit );
 		if( workelemlist == NULL )
 		{
-			printf("[debug] qs_elementdumpchild workelemlist == NULL\n");
+			//printf("[debug] qs_elementdumpchild workelemlist == NULL\n");
 			break;
 		}
 		for( i = 0; i < node->pos; i++ )
@@ -105,7 +105,7 @@ int32_t qs_json_encode_b( QS_MEMORY_POOL* _ppool, QS_NODE* node, int32_t buf_mun
 					qs_json_encode_parser_hash( _ppool, buf_munit, workelemlist[i].element_munit );
 				}
 				else{
-					printf("invalid element[%d][%d] : %s\n" , workelemlist[i].element_munit, workelemlist[i].id, (char*)QS_GET_POINTER( _ppool, workelemlist[i].element_munit ) );
+					//printf("invalid element[%d][%d] : %s\n" , workelemlist[i].element_munit, workelemlist[i].id, (char*)QS_GET_POINTER( _ppool, workelemlist[i].element_munit ) );
 				}
 			}
 		}
@@ -259,11 +259,11 @@ int qs_add_json_element( QS_MEMORY_POOL* _ppool, int32_t buf_munit, char* src, s
 {
 	do{
 		if( buf_munit <= 0 ){
-			printf("null buf_munit\n");
+			//printf("null buf_munit\n");
 			break;
 		}
 		if( src_size == -1 ){
-			printf("src_size == -1\n");
+			//printf("src_size == -1\n");
 			return 0;
 		}
 		if( src_size == 0 ){
@@ -272,8 +272,7 @@ int qs_add_json_element( QS_MEMORY_POOL* _ppool, int32_t buf_munit, char* src, s
 		QS_MEMORY_UNIT* punit = qs_get_munit( _ppool, buf_munit );
 		uint32_t buf_size = punit->size - (punit->top - punit->p)-1;
 		if( src_size > buf_size ){
-			//printf("buffer out of range %d: %d\n", src_size, (int)( punit->size ) );
-			printf("buffer out of range %d: %d\n", (int)( src_size + ( punit->top - punit->p ) ), (int)( punit->size ) );
+			//printf("buffer out of range %d: %d\n", (int)( src_size + ( punit->top - punit->p ) ), (int)( punit->size ) );
 			break;
 		}
 		char* pbuf = (char*)QS_GET_POINTER( _ppool, buf_munit ) + ( punit->top - punit->p );
@@ -340,7 +339,7 @@ int qs_add_json_element( QS_MEMORY_POOL* _ppool, int32_t buf_munit, char* src, s
 					break;
 				}
 				if (addlen >= buf_size) {
-					printf("buffer out of range\n");
+					//printf("buffer out of range\n");
 					break;
 				}
 			}
@@ -398,10 +397,10 @@ int32_t qs_json_decode( QS_MEMORY_POOL* _ppool, const char* src )
 	QS_TOKEN *token_list = (QS_TOKEN*)QS_GET_POINTER(_ppool,ptokens->token_munit);
 	rootnode_munit = qs_createrootnode( _ppool );
 	QS_NODE *rootnode = (QS_NODE*)QS_GET_POINTER( _ppool, rootnode_munit );
-	//qs_tokendump(_ppool,tokens_munit);
 	if(0!=qs_json_decode_parser( _ppool, rootnode, ptokens, token_list, 128 )){
 		return -1;
 	}
+	//qs_tokendump(_ppool,tokens_munit);
 	return rootnode_munit;
 }
 
@@ -427,64 +426,63 @@ int32_t qs_json_decode_h( QS_MEMORY_POOL* _ppool, const char* src, int32_t hash_
 int32_t qs_json_decode_parser( QS_MEMORY_POOL* _ppool, QS_NODE* node, QS_TOKENS *ptokens, QS_TOKEN *token_list, int32_t hash_size )
 {
 	int32_t error = 0;
-	while( ptokens->workpos < ptokens->currentpos )
+	if( ptokens->workpos < ptokens->currentpos )
 	{
-		if( token_list[ptokens->workpos].type == ID_SIGN ){
-			if( *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos].buf_munit)) == '{' ){
-				node->id = ELEMENT_HASH;
-				ptokens->workpos++;
-				int32_t parser_child_munit = -1;
-				if( -1 == ( parser_child_munit = qs_json_decode_parser_hash( _ppool, node, ptokens, token_list, hash_size ) ) ){
+		do{
+			if( token_list[ptokens->workpos].type == ID_SIGN ){
+				if( *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos].buf_munit)) == '{' ){
+					node->id = ELEMENT_HASH;
+					ptokens->workpos++;
+					int32_t parser_child_munit = -1;
+					if( -1 == ( parser_child_munit = qs_json_decode_parser_hash( _ppool, node, ptokens, token_list, hash_size, 0 ) ) ){
+						error = 1;
+						break;
+					}
+					qs_addelement( _ppool, node, ELEMENT_HASH, parser_child_munit );
+				}
+				else if( *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos].buf_munit)) == '[' ){
+					node->id = ELEMENT_ARRAY;
+					ptokens->workpos++;
+					int32_t parser_child_munit = -1;
+					if( -1 == ( parser_child_munit = qs_json_decode_parser_array( _ppool, node, ptokens, token_list, 0 ) ) ){
+						error = 1;
+						break;
+					}
+					qs_addelement( _ppool, node, ELEMENT_ARRAY, parser_child_munit );
+				}
+				else{
 					error = 1;
 					break;
 				}
-				qs_addelement( _ppool, node, ELEMENT_HASH, parser_child_munit );
-			}
-			else if( *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos].buf_munit)) == '[' ){
-				node->id = ELEMENT_ARRAY;
-				ptokens->workpos++;
-				int32_t parser_child_munit = -1;
-				if( -1 == ( parser_child_munit = qs_json_decode_parser_array( _ppool, node, ptokens, token_list ) ) ){
-					error = 1;
-					break;
-				}
-				qs_addelement( _ppool, node, ELEMENT_ARRAY, parser_child_munit );
-			}
-			else if( 
-				*((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos].buf_munit)) == '}' 
-				|| *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos].buf_munit)) == ']' 
-			){
-				ptokens->workpos++;
+			}else{
+				error = 1;
 				break;
 			}
-		}
-		else{
-			break;
-		}
-		ptokens->workpos++;
+		}while(false);
 	}
 	return error;
 }
 
-int32_t qs_json_decode_parser_hash( QS_MEMORY_POOL* _ppool, QS_NODE* node, QS_TOKENS *ptokens, QS_TOKEN *token_list, int32_t hash_size )
+int32_t qs_json_decode_parser_hash( QS_MEMORY_POOL* _ppool, QS_NODE* node, QS_TOKENS *ptokens, QS_TOKEN *token_list, int32_t hash_size, int index )
 {
 	int32_t working_munit = -1;
+	int finish = 0;
 	while( ptokens->workpos < ptokens->currentpos )
 	{
 		if( token_list[ptokens->workpos].type == ID_STR ) {
 			if( -1 == working_munit ){
 				if( -1 == ( working_munit = qs_create_hash( _ppool, hash_size ) ) ){
-					printf( "create_hash is failed\n" );
+					//printf( "create_hash is failed\n" );
 					break;
 				}
 			}
 			if( ptokens->workpos+2 >= ptokens->currentpos ){
-				printf( "invalid json format1\n" );
+				//printf( "invalid json format1\n" );
 				working_munit = -1;
 				break;
 			}
 			if( token_list[ptokens->workpos+1].type != ID_SIGN || *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+1].buf_munit)) != ':' ){
-				printf( "invalid json format2, %d, %s\n", ptokens->workpos, (char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+1].buf_munit) );
+				//printf( "invalid json format2, %d, %s\n", ptokens->workpos, (char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+1].buf_munit) );
 				working_munit = -1;
 				break;
 			}
@@ -502,14 +500,14 @@ int32_t qs_json_decode_parser_hash( QS_MEMORY_POOL* _ppool, QS_NODE* node, QS_TO
 					int32_t parser_child_munit = -1;
 					int32_t hash_name_munit = token_list[ptokens->workpos].buf_munit;
 					ptokens->workpos+=3;
-					if( -1 == ( parser_child_munit = qs_json_decode_parser_hash( _ppool, node, ptokens, token_list, 8 ) ) ){
+					if( -1 == ( parser_child_munit = qs_json_decode_parser_hash( _ppool, node, ptokens, token_list, 8, index+1 ) ) ){
 						working_munit = -1;
 						break;
 					}
 					qs_add_hash( _ppool, working_munit, hash_name_munit, parser_child_munit, ELEMENT_HASH );
 					if( ptokens->workpos+1 < ptokens->currentpos ){
 						if( *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+1].buf_munit)) != '}' && *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+1].buf_munit)) != ',' ){
-							printf( "invalid json hash : %c\n", *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+1].buf_munit)) );
+							//printf( "invalid json hash : %c\n", *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+1].buf_munit)) );
 							working_munit = -1;
 							break;
 						}
@@ -519,14 +517,14 @@ int32_t qs_json_decode_parser_hash( QS_MEMORY_POOL* _ppool, QS_NODE* node, QS_TO
 					int32_t parser_child_munit = -1;
 					int32_t hash_name_munit = token_list[ptokens->workpos].buf_munit;
 					ptokens->workpos+=3;
-					if( -1 == ( parser_child_munit = qs_json_decode_parser_array( _ppool, node, ptokens, token_list ) ) ){
+					if( -1 == ( parser_child_munit = qs_json_decode_parser_array( _ppool, node, ptokens, token_list, index+1 ) ) ){
 						working_munit = -1;
 						break;
 					}
 					qs_add_hash( _ppool, working_munit, hash_name_munit, parser_child_munit, ELEMENT_ARRAY );
 					if( ptokens->workpos+1 < ptokens->currentpos ){
 						if( *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+1].buf_munit)) != '}' && *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+1].buf_munit)) != ',' ){
-							printf( "invalid json hash : %c\n", *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+1].buf_munit)) );
+							//printf( "invalid json hash : %c\n", *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+1].buf_munit)) );
 							working_munit = -1;
 							break;
 						}
@@ -536,22 +534,29 @@ int32_t qs_json_decode_parser_hash( QS_MEMORY_POOL* _ppool, QS_NODE* node, QS_TO
 		}
 		else if( token_list[ptokens->workpos].type == ID_SIGN ){
 			if( *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos].buf_munit)) == '}' ){
+				finish = 1;
 				break;
 			}
 			else if( *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos].buf_munit)) == ',' ){
 			}
 		}
 		else{
-			printf("invalid token type:%d , %s\n",token_list[ptokens->workpos].type, (char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos].buf_munit));
+			//printf("invalid token type:%d , %s\n",token_list[ptokens->workpos].type, (char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos].buf_munit));
+			working_munit = -1;
+			break;
 		}
 		ptokens->workpos++;
+	}
+	if(finish==0){
+		working_munit = -1;
 	}
 	return working_munit;
 }
 
-int32_t qs_json_decode_parser_array( QS_MEMORY_POOL* _ppool, QS_NODE* node, QS_TOKENS *ptokens, QS_TOKEN *token_list )
+int32_t qs_json_decode_parser_array( QS_MEMORY_POOL* _ppool, QS_NODE* node, QS_TOKENS *ptokens, QS_TOKEN *token_list, int index )
 {
 	int32_t working_munit = -1;
+	int finish = 0;
 	while( ptokens->workpos < ptokens->currentpos )
 	{
 		if( token_list[ptokens->workpos].type == ID_STR ) {
@@ -565,6 +570,7 @@ int32_t qs_json_decode_parser_array( QS_MEMORY_POOL* _ppool, QS_NODE* node, QS_T
 		}
 		else if( token_list[ptokens->workpos].type == ID_SIGN ){
 			if( *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos].buf_munit)) == ']' ){
+				finish = 1;
 				if(working_munit==-1){
 					working_munit = qs_create_array( _ppool, 8, NUMERIC_BUFFER_SIZE );
 				}
@@ -575,14 +581,14 @@ int32_t qs_json_decode_parser_array( QS_MEMORY_POOL* _ppool, QS_NODE* node, QS_T
 			else if( *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos].buf_munit)) == '{' ){
 				int32_t parser_child_munit = -1;
 				ptokens->workpos++;
-				if( -1 == ( parser_child_munit = qs_json_decode_parser_hash( _ppool, node, ptokens, token_list, 4 ) ) ){
+				if( -1 == ( parser_child_munit = qs_json_decode_parser_hash( _ppool, node, ptokens, token_list, 4, index+1 ) ) ){
 					working_munit = -1;
 					break;
 				}
 				qs_array_push( _ppool, &working_munit, ELEMENT_HASH, parser_child_munit );
 				if( ptokens->workpos+1 < ptokens->currentpos ){
 					if( *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+1].buf_munit)) != ']' && *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+1].buf_munit)) != ',' ){
-						printf( "json array error : %c\n", *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+1].buf_munit)) );
+						//printf( "json array error : %c\n", *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+1].buf_munit)) );
 						working_munit = -1;
 						break;
 					}
@@ -591,14 +597,14 @@ int32_t qs_json_decode_parser_array( QS_MEMORY_POOL* _ppool, QS_NODE* node, QS_T
 			else if( *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos].buf_munit)) == '[' ){
 				int32_t parser_child_munit = -1;
 				ptokens->workpos++;
-				if( -1 == ( parser_child_munit = qs_json_decode_parser_array( _ppool, node, ptokens, token_list ) ) ){
+				if( -1 == ( parser_child_munit = qs_json_decode_parser_array( _ppool, node, ptokens, token_list, index+1 ) ) ){
 					working_munit = -1;
 					break;
 				}
 				qs_array_push( _ppool, &working_munit, ELEMENT_ARRAY, parser_child_munit );
 				if( ptokens->workpos+1 < ptokens->currentpos ){
 					if( *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+1].buf_munit)) != ']' && *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+1].buf_munit)) != ',' ){
-						printf( "json array error : %c\n", *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+1].buf_munit)) );
+						//printf( "json array error : %c\n", *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+1].buf_munit)) );
 						working_munit = -1;
 						break;
 					}
@@ -606,16 +612,19 @@ int32_t qs_json_decode_parser_array( QS_MEMORY_POOL* _ppool, QS_NODE* node, QS_T
 			}
 			else{
 				working_munit = -1;
-				printf("invalid token type:%d\n",token_list[ptokens->workpos].type);
+				//printf("invalid token type:%d\n",token_list[ptokens->workpos].type);
 				break;
 			}
 		}
 		else{
 			working_munit = -1;
-			printf("invalid token type:%d\n",token_list[ptokens->workpos].type);
+			//printf("invalid token type:%d\n",token_list[ptokens->workpos].type);
 			break;
 		}
 		ptokens->workpos++;
+	}
+	if(finish==0){
+		working_munit = -1;
 	}
 	return working_munit;
 }

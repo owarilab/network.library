@@ -102,7 +102,7 @@ int qs_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr 
 			{
 				if( *pstr == '\0' )
 				{
-					printf("syntax error : comment\n");
+					//printf("syntax error : comment\n");
 					break;
 				}
 				++pstr;
@@ -127,7 +127,7 @@ int qs_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr 
 //			printf("invalid char : %c\n", (*pstr) );
 //			break;
 //		}
-		if (*pstr < 0)
+		if (*pstr < 0) // ascii = 0 ~ 127
 		{
 			pstr++;
 			continue;
@@ -161,7 +161,7 @@ int qs_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr 
 				//if( *pstr == '\0' || *pstr == '\n' || *pstr == '\r' )
 				if( *pstr == '\0' )
 				{
-					printf("syntax error : \"\n");
+					//printf("syntax error : \"\n");
 					return 1;
 				}
 				if( *pstr == '\\' )
@@ -215,7 +215,7 @@ int qs_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr 
 			while(*pstr != '\''){
 				//if( *pstr == '\0' || *pstr == '\n' || *pstr == '\r' )
 				if( *pstr == '\0' ){
-					printf("syntax error : \'\n");
+					//printf("syntax error : \'\n");
 					return 1;
 				}
 //				// multi byte
