@@ -127,6 +127,11 @@ int qs_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr 
 //			printf("invalid char : %c\n", (*pstr) );
 //			break;
 //		}
+		if (*pstr < 0)
+		{
+			pstr++;
+			continue;
+		}
 		if( ( tokensize == 0 && isdigit( *pstr ) ) || ( tokensize > 0 && token_type == ID_NUM ) )
 		{
 			int dot = 0;
