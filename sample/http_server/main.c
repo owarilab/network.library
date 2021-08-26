@@ -38,6 +38,10 @@
 // curl -X POST -H "Content-Type: application/json" -d '{"k":"id_12345678"}' http://localhost:8080/api/v1/get
 // curl -X POST -d 'k=id_12345678' http://localhost:8080/api/v1/get
 
+// set api sample
+// curl -X POST -H "Content-Type: application/json" -d '[]' http://localhost:8080/api/v1/dump
+// curl -X POST -d '' http://localhost:8080/api/v1/dump
+
 QS_MEMORY_POOL* kvs_storage_memory_pool = NULL;
 int32_t memid_kvs_storage_id = -1;
 int32_t memid_temporary_memory = -1;
@@ -59,7 +63,7 @@ int main( int argc, char *argv[], char *envp[] )
 #endif
 	qs_srand_32();
 	QS_SOCKET_OPTION* option = qs_create_tcp_server_plane(NULL, "8080");
-	memid_temporary_memory = qs_create_mini_memory( option->memory_pool, SIZE_KBYTE * 512 );
+	memid_temporary_memory = qs_create_mini_memory( option->memory_pool, SIZE_MBYTE * 8 );
 	memid_kvs_memory = qs_create_mini_memory(option->memory_pool, SIZE_MBYTE * 1);
 
 	QS_MEMORY_POOL* cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(option->memory_pool,memid_kvs_memory);
@@ -169,6 +173,9 @@ void* on_recv( void* args )
 					qs_add_hash_string(temporary_memory, memid_response_data, "value", value);
 
 					//printf("/api/v1/set api %s, %s\n", key, value);
+					qs_add_hash_hash(temporary_memory, memid_response, "data", memid_response_data);
+					//response
+					http_status_code = http_json_response_common(tinfo, option, temporary_memory, memid_response, SIZE_KBYTE * 4);
 				} while (false);
 			}
 			if (!strcmp(http_request.request, "/api/v1/get")) {
@@ -193,13 +200,23 @@ void* on_recv( void* args )
 						qs_add_hash_string(temporary_memory, memid_response_data, "value", value);
 					}
 					//printf("/api/v1/get api %s, %s\n",key,value);
+					qs_add_hash_hash(temporary_memory, memid_response, "data", memid_response_data);
+					//response
+					http_status_code = http_json_response_common(tinfo, option, temporary_memory, memid_response, SIZE_KBYTE * 4);
 				} while (false);
 			}
-
-			qs_add_hash_hash(temporary_memory, memid_response, "data", memid_response_data);
-
-			//response
-			http_status_code = http_json_response_common(tinfo,option,temporary_memory,memid_response, SIZE_KBYTE * 4);
+			if (!strcmp(http_request.request, "/api/v1/dump")) {
+				do {
+					QS_CACHE_PAGE cache_page;
+					qs_get_cache_page(cache, &cache_page);
+					int32_t memid_temporary_json_memory = qs_create_mini_memory(temporary_memory, SIZE_MBYTE * 5);
+					QS_MEMORY_POOL * temporary_json_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(temporary_memory, memid_temporary_json_memory);
+					qs_memory_clean(temporary_json_memory);
+					qs_resize_copy_mini_memory(temporary_json_memory, cache_page.memory);
+					//printf("/api/v1/dump api);
+					http_status_code = http_json_response_common(tinfo, option, temporary_json_memory, cache_page.hash_id, SIZE_MBYTE * 2);
+				} while (false);
+			}
 		}
 	}
 

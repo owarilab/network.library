@@ -710,6 +710,9 @@ int32_t http_json_response_common(QS_SERVER_CONNECTION_INFO * connection, QS_SOC
 {
 	int32_t http_status_code = 200;
 	int32_t memid_response_body = qs_json_encode_hash(temporary_memory, memid_response_hash, json_buffer_size);
+	if (-1 == memid_response_body) {
+		return 500;
+	}
 	char* json = (char*)QS_GET_POINTER(temporary_memory, memid_response_body);
 	size_t body_len = qs_strlen(json);
 	int32_t response_buffer_munit = qs_create_memory_block(temporary_memory, body_len + SIZE_KBYTE);

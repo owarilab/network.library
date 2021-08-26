@@ -559,6 +559,41 @@ int32_t qs_copy_mini_memory( QS_MEMORY_POOL* _dest_ppool, QS_MEMORY_POOL* _src_p
 	return QS_SYSTEM_OK;
 }
 
+int32_t qs_resize_copy_mini_memory(QS_MEMORY_POOL* _dest_ppool, QS_MEMORY_POOL* _src_ppool)
+{
+	if (_dest_ppool->alloc_type != MEMORY_ALLOCATE_TYPE_MINI || _src_ppool->alloc_type != MEMORY_ALLOCATE_TYPE_MINI) {
+		return QS_SYSTEM_ERROR;
+	}
+	if (_dest_ppool->max_size < _src_ppool->max_size) {
+		return QS_SYSTEM_ERROR;
+	}
+	if (_dest_ppool->size < _src_ppool->size) {
+		return QS_SYSTEM_ERROR;
+	}
+	//memcpy((uint8_t*)_dest_ppool->memory,(uint8_t*)_src_ppool->memory,_src_ppool->size);
+	uint8_t* pbottom = ((uint8_t*)_dest_ppool->memory) + (_dest_ppool->size - ((int)(_src_ppool->size - _src_ppool->bottom)));
+	memcpy((uint8_t*)_dest_ppool->memory, (uint8_t*)_src_ppool->memory, _src_ppool->top);
+	memcpy(pbottom, ((uint8_t*)_src_ppool->memory) + _src_ppool->bottom, _src_ppool->size - _src_ppool->bottom);
+	_dest_ppool->top = _src_ppool->top;
+	//_dest_ppool->end = _src_ppool->end;
+	_dest_ppool->bottom = (_dest_ppool->size - ((int)(_src_ppool->size - _src_ppool->bottom)));
+	//_dest_ppool->size = _src_ppool->size;
+	//_dest_ppool->max_size = _src_ppool->max_size;
+	_dest_ppool->alignment = _src_ppool->alignment;
+	_dest_ppool->min_realloc = _src_ppool->min_realloc;
+	_dest_ppool->fix_unit_size = _src_ppool->fix_unit_size;
+	_dest_ppool->unit_size = _src_ppool->unit_size;
+	_dest_ppool->tail_munit = _src_ppool->tail_munit;
+	_dest_ppool->lock_munit = _src_ppool->lock_munit;
+	_dest_ppool->alloc_type = _src_ppool->alloc_type;
+	_dest_ppool->endian = _src_ppool->endian;
+	_dest_ppool->debug = _src_ppool->debug;
+	_dest_ppool->error_code = _src_ppool->error_code;
+	_dest_ppool->memory_unit_size_one = _src_ppool->memory_unit_size_one;
+	//qs_memory_info( _dest_ppool );
+	return QS_SYSTEM_OK;
+}
+
 void qs_memory_clean( QS_MEMORY_POOL* _ppool )
 {
 	QS_MEMORY_UNIT* unit;

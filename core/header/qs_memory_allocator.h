@@ -190,6 +190,7 @@ int32_t qs_async_mmap_memory(QS_MEMORY_POOL* memory_pool);
 int32_t qs_create_mini_memory( QS_MEMORY_POOL* _ppool, size_t allocate_size );
 int32_t qs_create_clone_mini_memory( QS_MEMORY_POOL* _ppool, QS_MEMORY_POOL* _mini_ppool );
 int32_t qs_copy_mini_memory( QS_MEMORY_POOL* _dest_ppool, QS_MEMORY_POOL* _src_ppool );
+int32_t qs_resize_copy_mini_memory(QS_MEMORY_POOL* _dest_ppool, QS_MEMORY_POOL* _src_ppool);
 void qs_memory_clean( QS_MEMORY_POOL* _ppool );
 size_t qs_mgetsize( QS_MEMORY_POOL* _ppool, size_t size );
 uint32_t qs_free_memory_unit( QS_MEMORY_POOL* _ppool, int32_t *munit_id );
