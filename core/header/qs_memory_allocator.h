@@ -203,6 +203,7 @@ void* qs_fixupointer( QS_MEMORY_POOL* _ppool, int32_t id );
 void* qs_offsetpointer( QS_MEMORY_POOL* _ppool, int32_t id, size_t size, int32_t offset );
 size_t qs_usize( QS_MEMORY_POOL* _ppool, int32_t id );
 size_t qs_free( QS_MEMORY_POOL* _ppool );
+size_t qs_memory_available_size( QS_MEMORY_POOL* _ppool );
 void qs_set_buffer( QS_MEMORY_POOL* _ppool, int32_t id, QS_BYTE_BUFFER* pbuffer );
 uint16_t qs_pop_little_to_host_bit16( QS_BYTE_BUFFER* pbuffer );
 uint16_t qs_pop_big_to_host_bit16( QS_BYTE_BUFFER* pbuffer );
@@ -211,7 +212,6 @@ uint32_t qs_pop_big_to_host_bit32( QS_BYTE_BUFFER* pbuffer );
 uint64_t qs_pop_little_to_host_bit64( QS_BYTE_BUFFER* pbuffer );
 uint64_t qs_pop_big_to_host_bit64( QS_BYTE_BUFFER* pbuffer );
 int32_t qs_create_memory_info( QS_MEMORY_POOL* _ppool, QS_BYTE_BUFFER* pbuffer );
-size_t qs_memory_available_size( QS_MEMORY_POOL* _ppool );
 // private
 QS_MEMORY_UNIT* qs_find_freemunit( QS_MEMORY_POOL* _ppool, size_t size );
 int qs_resize_garbage(QS_MEMORY_POOL* _ppool,QS_MEMORY_UNIT* garbageunit,QS_MEMORY_UNIT* freeunit, size_t size);

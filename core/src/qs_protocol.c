@@ -689,7 +689,6 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 		response_len = qs_strlink( response_buffer, response_len, "\r\n", 2, response_buffer_size );
 		if( !(!strcmp("HEAD",http_request->method)) )
 		{
-			response_len = qs_strlink( response_buffer, response_len, "\r\n", 2, response_buffer_size );
 			char* pstart = response_buffer+response_len;
 			size_t plen = response_buffer_size-response_len;
 			if(is_binary==0){

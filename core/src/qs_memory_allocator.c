@@ -1096,6 +1096,12 @@ size_t qs_free( QS_MEMORY_POOL* _ppool )
 	return memory_size;
 }
 
+size_t qs_memory_available_size( QS_MEMORY_POOL* _ppool )
+{
+	size_t freeSize = ( ( _ppool->bottom - _ppool->top ) );
+	return freeSize;
+}
+
 void qs_set_buffer( QS_MEMORY_POOL* _ppool, int32_t id, QS_BYTE_BUFFER* pbuffer )
 {
 	if( id < _ppool->fix_unit_size || id >= _ppool->unit_size ){
@@ -1224,12 +1230,6 @@ int32_t qs_create_memory_info( QS_MEMORY_POOL* _ppool, QS_BYTE_BUFFER* pbuffer )
 //	printf("memory_pool->endian : %d ?? %d\n", _ppool->endian, qs_pop_little_to_host_bit32( pbuffer ));
 //	pbuffer->pos = pbuffer->buffer;
 	return QS_SYSTEM_OK;
-}
-
-size_t qs_memory_available_size( QS_MEMORY_POOL* _ppool )
-{
-	size_t freeSize = ( ( _ppool->bottom - _ppool->top ) );
-	return freeSize;
 }
 
 void qs_memory_info( QS_MEMORY_POOL* _ppool )

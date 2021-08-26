@@ -38,6 +38,8 @@
 // curl -X POST -H "Content-Type: application/json" -d '{"k":"id_12345678"}' http://localhost:8080/api/v1/get
 // curl -X POST -d 'k=id_12345678' http://localhost:8080/api/v1/get
 
+QS_MEMORY_POOL* kvs_storage_memory_pool = NULL;
+int32_t memid_kvs_storage_id = -1;
 int32_t memid_temporary_memory = -1;
 int32_t memid_kvs_memory = -1;
 int32_t memid_kvs_id = -1;
@@ -64,6 +66,12 @@ int main( int argc, char *argv[], char *envp[] )
 	memid_kvs_id = qs_create_cache_B1MB(cache_memory);
 	if(-1 == memid_kvs_id) {
 		printf("create cache memory error\n");
+		return -1;
+	}
+
+	memid_kvs_storage_id = qs_create_storage_cache_B1MB("./kvs_store_b1mb",&kvs_storage_memory_pool);
+	if(-1 == memid_kvs_storage_id) {
+		printf("create storage memory error\n");
 		return -1;
 	}
 
@@ -96,7 +104,6 @@ int on_connect(QS_SERVER_CONNECTION_INFO* connection)
 
 void* on_recv( void* args )
 {
-	time_t start_time = time(NULL);
 	QS_RECV_INFO *rinfo = (QS_RECV_INFO *)args;
 	QS_SERVER_CONNECTION_INFO * tinfo = (QS_SERVER_CONNECTION_INFO *)rinfo->tinfo;
 	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
@@ -123,6 +130,13 @@ void* on_recv( void* args )
 	// API
 	if (http_status_code == 404) {
 		if (!strcmp(http_request.method, "POST")) {
+			// in memory kvs
+			//QS_MEMORY_POOL* cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(option->memory_pool,memid_kvs_memory);
+			//QS_CACHE* cache = (QS_CACHE*)QS_GET_POINTER(cache_memory,memid_kvs_id);
+
+			// storage kvs
+			QS_CACHE* cache = (QS_CACHE*)QS_GET_POINTER(kvs_storage_memory_pool,memid_kvs_storage_id);
+
 			int32_t memid_response = qs_create_hash(temporary_memory,32);
 			qs_add_hash_string(temporary_memory, memid_response, "method", http_request.method);
 			qs_add_hash_string(temporary_memory, memid_response, "request", http_request.request);
@@ -144,8 +158,6 @@ void* on_recv( void* args )
 					char* key = (char*)QS_GET_POINTER(http_request.temporary_memory, qs_get_hash(http_request.temporary_memory, http_request.memid_post_parameter_hash, "k"));
 					char* value = (char*)QS_GET_POINTER(http_request.temporary_memory, qs_get_hash(http_request.temporary_memory, http_request.memid_post_parameter_hash, "v"));
 
-					QS_MEMORY_POOL* cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(option->memory_pool,memid_kvs_memory);
-					QS_CACHE* cache = (QS_CACHE*)QS_GET_POINTER(cache_memory,memid_kvs_id);
 					size_t key_size = strlen(key);
 					if( key_size >= cache->max_key_size && key_size <= 0){
 						printf("invalid key size : %d\n",(int)key_size);
@@ -156,7 +168,7 @@ void* on_recv( void* args )
 					qs_add_hash_string(temporary_memory, memid_response_data, "key", key);
 					qs_add_hash_string(temporary_memory, memid_response_data, "value", value);
 
-					printf("/api/v1/set api %s, %s\n", key, value);
+					//printf("/api/v1/set api %s, %s\n", key, value);
 				} while (false);
 			}
 			if (!strcmp(http_request.request, "/api/v1/get")) {
@@ -169,12 +181,10 @@ void* on_recv( void* args )
 					}
 					char* key = (char*)QS_GET_POINTER(http_request.temporary_memory, qs_get_hash(http_request.temporary_memory, http_request.memid_post_parameter_hash, "k"));
 					char* value = NULL;
-					QS_MEMORY_POOL* cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(option->memory_pool,memid_kvs_memory);
-					QS_CACHE* cache = (QS_CACHE*)QS_GET_POINTER(cache_memory,memid_kvs_id);
 					QS_CACHE_PAGE cache_page;
 					qs_get_cache_page(cache,&cache_page);
 					int32_t hash_id = qs_get_hash(cache_page.memory,cache_page.hash_id,key);
-					qs_hash_dump(cache_page.memory,cache_page.hash_id,0);
+					//qs_hash_dump(cache_page.memory,cache_page.hash_id,0);
 					if(-1 != hash_id){
 						value = (char*)QS_GET_POINTER(cache_page.memory, hash_id);
 					}
@@ -182,7 +192,7 @@ void* on_recv( void* args )
 					if(NULL!=value){
 						qs_add_hash_string(temporary_memory, memid_response_data, "value", value);
 					}
-					printf("/api/v1/get api %s, %s\n",key,value);
+					//printf("/api/v1/get api %s, %s\n",key,value);
 				} while (false);
 			}
 
@@ -192,8 +202,6 @@ void* on_recv( void* args )
 			http_status_code = http_json_response_common(tinfo,option,temporary_memory,memid_response, SIZE_KBYTE * 4);
 		}
 	}
-
-	qs_memory_info(option->memory_pool);
 
 	if( http_status_code != 200 ){
 		if( http_status_code == 304 ){
@@ -206,9 +214,6 @@ void* on_recv( void* args )
 			qs_send( option, &tinfo->sockparam, HTTP_INTERNAL_SERVER_ERROR, qs_strlen( HTTP_INTERNAL_SERVER_ERROR ), 0 );
 		}
 	}
-
-	time_t end_time = time(NULL);
-	printf("time : %f\n", (start_time - end_time));
 
 	// log
 	qs_http_access_log(&log_file_info, http_request.http_version,http_request.user_agent,tinfo->hbuf, http_request.method, http_request.request, http_status_code);

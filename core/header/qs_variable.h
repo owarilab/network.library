@@ -86,6 +86,7 @@ size_t qs_set_cache_alloc_info(QS_CACHE_SERVER_DATA* data, size_t page_size, siz
 size_t qs_cache_alloc(QS_CACHE_SERVER_DATA* data);
 int32_t qs_create_cache_B1MB( QS_MEMORY_POOL* memory);
 int32_t qs_create_cache( QS_MEMORY_POOL* memory,size_t chain_allocate_size,size_t max_cache_size,size_t page_allocate_size,size_t page_hash_size,size_t max_key_size);
+int32_t qs_create_storage_cache_B1MB( const char* store_name, QS_MEMORY_POOL** pp_memory );
 int32_t qs_create_storage_cache( const char* store_name, QS_MEMORY_POOL** pp_memory,size_t max_cache_size,size_t page_allocate_size,size_t page_hash_size,size_t max_key_size);
 void qs_get_cache_page(QS_CACHE* cache,QS_CACHE_PAGE* page);
 void qs_swap_page(QS_CACHE* cache,QS_CACHE_PAGE* page);
