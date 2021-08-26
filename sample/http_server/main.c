@@ -42,6 +42,19 @@
 // curl -X POST -H "Content-Type: application/json" -d '[]' http://localhost:8080/api/v1/dump
 // curl -X POST -d '' http://localhost:8080/api/v1/dump
 
+// test data
+/*
+curl -X POST -H "Content-Type: application/json" -d '{"k":"id_1", "v":"kvs_value1"}' http://localhost:8080/api/v1/set
+curl -X POST -H "Content-Type: application/json" -d '{"k":"id_2", "v":"kvs_value11"}' http://localhost:8080/api/v1/set
+curl -X POST -H "Content-Type: application/json" -d '{"k":"id_3", "v":"kvs_value111"}' http://localhost:8080/api/v1/set
+curl -X POST -H "Content-Type: application/json" -d '{"k":"id_4", "v":"kvs_value1111"}' http://localhost:8080/api/v1/set
+curl -X POST -H "Content-Type: application/json" -d '{"k":"id_5", "v":"kvs_value11111"}' http://localhost:8080/api/v1/set
+curl -X POST -H "Content-Type: application/json" -d '{"k":"id_6", "v":"kvs_value111111"}' http://localhost:8080/api/v1/set
+curl -X POST -H "Content-Type: application/json" -d '{"k":"id_7", "v":"kvs_value1111111"}' http://localhost:8080/api/v1/set
+curl -X POST -H "Content-Type: application/json" -d '{"k":"id_8", "v":"kvs_value11111111"}' http://localhost:8080/api/v1/set
+curl -X POST -H "Content-Type: application/json" -d '{"k":"id_9", "v":"kvs_value111111111"}' http://localhost:8080/api/v1/set
+*/
+
 QS_MEMORY_POOL* kvs_storage_memory_pool = NULL;
 int32_t memid_kvs_storage_id = -1;
 int32_t memid_temporary_memory = -1;
@@ -209,12 +222,12 @@ void* on_recv( void* args )
 				do {
 					QS_CACHE_PAGE cache_page;
 					qs_get_cache_page(cache, &cache_page);
-					int32_t memid_temporary_json_memory = qs_create_mini_memory(temporary_memory, SIZE_MBYTE * 5);
+					int32_t memid_temporary_json_memory = qs_create_mini_memory(temporary_memory, SIZE_MBYTE * 6);
 					QS_MEMORY_POOL * temporary_json_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(temporary_memory, memid_temporary_json_memory);
 					qs_memory_clean(temporary_json_memory);
 					qs_resize_copy_mini_memory(temporary_json_memory, cache_page.memory);
 					//printf("/api/v1/dump api);
-					http_status_code = http_json_response_common(tinfo, option, temporary_json_memory, cache_page.hash_id, SIZE_MBYTE * 2);
+					http_status_code = http_json_response_common(tinfo, option, temporary_json_memory, cache_page.hash_id, SIZE_MBYTE * 3);
 				} while (false);
 			}
 		}
