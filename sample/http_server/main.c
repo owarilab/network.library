@@ -266,6 +266,25 @@ void* on_recv( void* args )
 					http_status_code = http_json_response_common(tinfo, option, temporary_memory, memid_response, SIZE_KBYTE * 4);
 				} while (false);
 			}
+			if (!strcmp(http_request.request, "/api/v1/delete")) {
+				do {
+					if (-1 == http_request.memid_post_parameter_hash) {
+						break;
+					}
+					if (-1 == qs_get_hash(http_request.temporary_memory, http_request.memid_post_parameter_hash, "k")) {
+						break;
+					}
+					char* key = (char*)QS_GET_POINTER(http_request.temporary_memory, qs_get_hash(http_request.temporary_memory, http_request.memid_post_parameter_hash, "k"));
+					QS_CACHE_PAGE cache_page;
+					qs_get_cache_page(cache,&cache_page);
+					qs_remove_hash(cache_page.memory,cache_page.hash_id,key);
+					qs_add_hash_string(temporary_memory, memid_response_data, "key", key);
+					//printf("/api/v1/delete api %s, %s\n",key,value);
+					qs_add_hash_hash(temporary_memory, memid_response, "data", memid_response_data);
+					//response
+					http_status_code = http_json_response_common(tinfo, option, temporary_memory, memid_response, SIZE_KBYTE * 4);
+				} while (false);
+			}
 			if (!strcmp(http_request.request, "/api/v1/dump")) {
 				do {
 					QS_CACHE_PAGE cache_page;
