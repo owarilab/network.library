@@ -38,6 +38,7 @@ extern "C"{
 #include "qs_hash.h"
 #include "qs_array.h"
 #include "qs_memory_allocator.h"
+#include "qs_logger.h"
 
 #ifdef __WINDOWS__
 #include <process.h>
@@ -220,6 +221,11 @@ typedef struct QS_SOCKET_OPTION
 	QS_MEMORY_POOL* mmap_memory_pool;		// mmap memory pool
 	void* application_data;
 	struct addrinfo *addr;
+	QS_FILE_INFO log_access_file_info;      // log file
+	QS_FILE_INFO log_error_file_info;       // log file
+	QS_FILE_INFO log_warning_file_info;     // log file
+	QS_FILE_INFO log_debug_file_info;       // log file
+	QS_FILE_INFO log_metrics_file_info;     // log file
 } QS_SOCKET_OPTION;
 
 QS_SOCKET_OPTION* qs_create_tcp_server(char* hostname, char* portnum);

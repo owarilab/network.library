@@ -407,6 +407,15 @@ void qs_set_pid(SYSTEM_SERVER_OPTION* sys_option)
 void qs_sleep(int time)
 {
 #ifdef __WINDOWS__
+	fd_set fds, rfds;
+	struct timeval tv;
+	FD_ZERO(&rfds);
+	FD_SET(option.sockid, &rfds);
+	tv.tv_sec = 0;
+	tv.tv_usec = time;
+	memcpy(&fds, &rfds, sizeof(fd_set));
+	select(0, &fds, NULL, NULL, &tv);
+/*
 	if(time<=1000){
 		time=1;
 	}
@@ -414,6 +423,7 @@ void qs_sleep(int time)
 		time=time/1000;
 	}
 	Sleep(time);
+*/
 #else
 	usleep(time);
 #endif

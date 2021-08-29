@@ -388,6 +388,12 @@ int qs_initialize_socket_option(
 	option->mmap_memory_pool = mmap_memory_pool;
 	option->application_data = NULL;
 	option->addr = NULL;
+
+	qs_finit(&option->log_access_file_info);
+	qs_finit(&option->log_debug_file_info);
+	qs_finit(&option->log_error_file_info);
+	qs_finit(&option->log_warning_file_info);
+	qs_finit(&option->log_metrics_file_info);
 #ifdef __WINDOWS__
 	result = WSAStartup( MAKEWORD( 2, 2 ), &option->wsdata );
 	if( result != 0 )

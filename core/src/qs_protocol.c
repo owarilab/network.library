@@ -46,12 +46,10 @@ uint32_t qs_make_protocol_header(uint8_t* bin,ssize_t payload_size, uint32_t pay
 	*(pbin++) = header_size_byte;
 	// payload size
 	if( header_size_byte == 126 ){
-		printf("16bit\n");
 		headersize += 2;
 		MEMORY_PUSH_BIT16_B2(endian,pbin,payload_size);
 	}
 	else if( header_size_byte == 127 ){
-		printf("64bit\n");
 		headersize += 8;
 		MEMORY_PUSH_BIT64_B2(endian,pbin,payload_size);
 	}
@@ -141,7 +139,7 @@ int qs_http_parser( QS_RECV_INFO *rinfo )
 			method = HTTP_METHOD_HEAD;
 		}
 		if( method == 0 ){
-			printf("invalid method : %s\n", (char*)qs_upointer(option->memory_pool, rinfo->recvbuf_munit));
+			//printf("invalid method : %s\n", (char*)qs_upointer(option->memory_pool, rinfo->recvbuf_munit));
 			method = -1;
 			break;
 		}
@@ -189,11 +187,11 @@ int qs_http_parser( QS_RECV_INFO *rinfo )
 			char* msg = "HTTP/1.1 400 Bad Request\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n400 Bad Request\r\n";
 			if( option->user_send_function != NULL ){
 				//option->user_send_function(&childinfo, psockparam->acc, msg, strlen(msg), 0);
-				printf("call user_send_function\n");
+				//printf("call user_send_function\n");
 			}
 			else{
 				if( -1 == qs_send( option, psockparam, msg, qs_strlen( msg ), 0 ) ){
-					printf("http send error\n");
+					//printf("http send error\n");
 				}
 			}
 			method = -1;
@@ -266,92 +264,97 @@ int qs_http_parse_header( QS_RECV_INFO *rinfo )
 				psockparam->tmpmsglen = 0;
 			}
 			if( psockparam->opcode == 1 ){
-				if(qs_get_hash(option->memory_pool, psockparam->http_header_munit, "CONTENT_TYPE") != -1){
-					char* contentType = (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash(option->memory_pool, psockparam->http_header_munit, "CONTENT_TYPE"));
-					char* pt = contentType;
-					char param[256];
-					char formkey[256];
-					pt = qs_read_line_delimiter( param, sizeof(param), pt, ';' );
-					if(!strcmp(param,"multipart/form-data")){
-						pt = qs_read_line_delimiter( param, sizeof(param), pt, '=' );
-						printf("is form-data [%s] = [%s]\n",param,pt);
-						qs_unlink( "./out.data" );
-						char* ppt = target_pt;
-						ppt = qs_read_line_delimiter( param, sizeof(param), ppt, ' ' );
-						// first --key
-						// data
-						// last --key--
-						//printf("[%s] = [%s]\n",param,pt);
-						memcpy(formkey,param+2,sizeof(param)-2); // remove --
-						printf("form key : %s\n",formkey);
-						memcpy(psockparam->header,formkey,sizeof(psockparam->header));
-						if(!strcmp(pt,formkey)){
-							psockparam->header_size = qs_strlen(param) + 4 + 2; // last -- and \n * 4
-							char key[256];
-							char type[256];
-							ppt = qs_read_line_delimiter( key, sizeof(key), ppt, ':' );
-							ppt = qs_read_line_delimiter( type, sizeof(type), ppt, ' ' );
-							ppt = qs_read_line_delimiter( type, sizeof(type), ppt, ';' );
-							printf("find key : %s, key : %s, type : %s\n",param,key,type);
-							ppt = qs_read_line_delimiter( type, sizeof(type), ppt, ' ' );
-							ppt = qs_read_line_delimiter( key, sizeof(key), ppt, '=' );
-							ppt = qs_read_line_delimiter( type, sizeof(type), ppt, ';' );
-							printf("param name : key : %s value : %s\n",key,type);
-							// upload file name
-							if(*(ppt-1)==';'){
-								ppt = qs_read_line_delimiter( type, sizeof(type), ppt, ' ' );
-								ppt = qs_read_line_delimiter( key, sizeof(key), ppt, '=' );
-								ppt = qs_read_line_delimiter( type, sizeof(type), ppt, ';' );
-								printf("file name : key : %s value : %s\n",key,type);
+
+				if(false)
+				{
+					if(qs_get_hash(option->memory_pool, psockparam->http_header_munit, "CONTENT_TYPE") != -1){
+						char* contentType = (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash(option->memory_pool, psockparam->http_header_munit, "CONTENT_TYPE"));
+						char* pt = contentType;
+						char param[256];
+						char formkey[256];
+						pt = qs_read_line_delimiter( param, sizeof(param), pt, ';' );
+						if(!strcmp(param,"multipart/form-data")){
+							pt = qs_read_line_delimiter( param, sizeof(param), pt, '=' );
+							printf("is form-data [%s] = [%s]\n",param,pt);
+							qs_unlink( "./out.data" );
+							char* ppt = target_pt;
+							ppt = qs_read_line_delimiter( param, sizeof(param), ppt, ' ' );
+							// first --key
+							// data
+							// last --key--
+							//printf("[%s] = [%s]\n",param,pt);
+							memcpy(formkey,param+2,sizeof(param)-2); // remove --
+							printf("form key : %s\n",formkey);
+							memcpy(psockparam->header,formkey,sizeof(psockparam->header));
+							if(!strcmp(pt,formkey)){
+								psockparam->header_size = qs_strlen(param) + 4 + 2; // last -- and \n * 4
+								char key[256];
+								char type[256];
 								ppt = qs_read_line_delimiter( key, sizeof(key), ppt, ':' );
 								ppt = qs_read_line_delimiter( type, sizeof(type), ppt, ' ' );
 								ppt = qs_read_line_delimiter( type, sizeof(type), ppt, ';' );
-								printf("content key : %s value : %s\n",key,type);
+								printf("find key : %s, key : %s, type : %s\n",param,key,type);
 								ppt = qs_read_line_delimiter( type, sizeof(type), ppt, ' ' );
-							}
-							else{
-								ppt+=2; // \n*2
-							}
-							psockparam->opcode = 3;
+								ppt = qs_read_line_delimiter( key, sizeof(key), ppt, '=' );
+								ppt = qs_read_line_delimiter( type, sizeof(type), ppt, ';' );
+								printf("param name : key : %s value : %s\n",key,type);
+								// upload file name
+								if(*(ppt-1)==';'){
+									ppt = qs_read_line_delimiter( type, sizeof(type), ppt, ' ' );
+									ppt = qs_read_line_delimiter( key, sizeof(key), ppt, '=' );
+									ppt = qs_read_line_delimiter( type, sizeof(type), ppt, ';' );
+									printf("file name : key : %s value : %s\n",key,type);
+									ppt = qs_read_line_delimiter( key, sizeof(key), ppt, ':' );
+									ppt = qs_read_line_delimiter( type, sizeof(type), ppt, ' ' );
+									ppt = qs_read_line_delimiter( type, sizeof(type), ppt, ';' );
+									printf("content key : %s value : %s\n",key,type);
+									ppt = qs_read_line_delimiter( type, sizeof(type), ppt, ' ' );
+								}
+								else{
+									ppt+=2; // \n*2
+								}
+								psockparam->opcode = 3;
 
-							if( -1 == qs_get_hash( option->memory_pool, psockparam->http_header_munit, "CONTENT_LENGTH" ) ){
-								// error
+								if( -1 == qs_get_hash( option->memory_pool, psockparam->http_header_munit, "CONTENT_LENGTH" ) ){
+									// error
+									break;
+								}
+								int contentlen = atoi( (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, psockparam->http_header_munit, "CONTENT_LENGTH" )) );
+								size_t write_size = 0;
+								size_t current = (ppt-target_pt);
+								while(current<rinfo->recvlen){
+									if(*(target_pt+current) == '-'){
+										char tmpkey[256];
+										memcpy(tmpkey,(target_pt+current),qs_strlen(formkey));
+										tmpkey[qs_strlen(formkey)] = '\0';
+										printf("is key ? : [%s]\n",tmpkey);
+										if(!strcmp(tmpkey,formkey)){
+											write_size = current - (ppt-target_pt) - 2 -2;
+											printf("first write_size : %d\n",(int)write_size);
+											break;
+										}
+									}
+									current++;
+								}
+								//write_size = rinfo->recvlen - (ppt-target_pt);
+								//if(psockparam->tmpmsglen+rinfo->recvlen>contentlen){
+								//	write_size = rinfo->recvlen - (psockparam->tmpmsglen+rinfo->recvlen-contentlen);
+								//}
+								if(write_size>0){
+									qs_fwrite_bin_a( "./out.data", ppt, write_size );
+								}
+								psockparam->tmpmsglen +=rinfo->recvlen;
+								if( psockparam->tmpmsglen >= contentlen ){
+									psockparam->opcode = 2;
+									printf("upload dataaa size full\n");
+									//printf("form-data size : %d, %d\n",(int)contentlen,(int)psockparam->tmpmsglen);
+								}
 								break;
 							}
-							int contentlen = atoi( (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, psockparam->http_header_munit, "CONTENT_LENGTH" )) );
-							size_t write_size = 0;
-							size_t current = (ppt-target_pt);
-							while(current<rinfo->recvlen){
-								if(*(target_pt+current) == '-'){
-									char tmpkey[256];
-									memcpy(tmpkey,(target_pt+current),qs_strlen(formkey));
-									tmpkey[qs_strlen(formkey)] = '\0';
-									printf("is key ? : [%s]\n",tmpkey);
-									if(!strcmp(tmpkey,formkey)){
-										write_size = current - (ppt-target_pt) - 2 -2;
-										printf("first write_size : %d\n",(int)write_size);
-										break;
-									}
-								}
-								current++;
-							}
-							//write_size = rinfo->recvlen - (ppt-target_pt);
-							//if(psockparam->tmpmsglen+rinfo->recvlen>contentlen){
-							//	write_size = rinfo->recvlen - (psockparam->tmpmsglen+rinfo->recvlen-contentlen);
-							//}
-							if(write_size>0){
-								qs_fwrite_bin_a( "./out.data", ppt, write_size );
-							}
-							psockparam->tmpmsglen +=rinfo->recvlen;
-							if( psockparam->tmpmsglen >= contentlen ){
-								psockparam->opcode = 2;
-								printf("upload dataaa size full\n");
-								//printf("form-data size : %d, %d\n",(int)contentlen,(int)psockparam->tmpmsglen);
-							}
-							break;
 						}
 					}
 				}
+
 				if( -1 != qs_get_hash( option->memory_pool, psockparam->http_header_munit, "CONTENT_LENGTH" ) ){
 					int contentlen = atoi( (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, psockparam->http_header_munit, "CONTENT_LENGTH" )) );
 					if( contentlen > 0 )
@@ -373,15 +376,15 @@ int qs_http_parse_header( QS_RECV_INFO *rinfo )
 								break;
 							}
 						}
-						//						 while( *target_pt != '\0' ){
-						//							 *(msgbuf++) = *(target_pt++);
-						//							 psockparam->tmpmsglen++;
-						//							 if( psockparam->tmpmsglen >= contentlen ){
-						//								 *msgbuf = '\0';
-						//								 psockparam->opcode = 2;
-						//								 break;
-						//							 }
-						//						 }
+						//while( *target_pt != '\0' ){
+						//	*(msgbuf++) = *(target_pt++);
+						//	psockparam->tmpmsglen++;
+						//	if( psockparam->tmpmsglen >= contentlen ){
+						//		*msgbuf = '\0';
+						//		psockparam->opcode = 2;
+						//		break;
+						//	}
+						//}
 					}
 					else{
 						char* msgbuf = ( (char*)QS_GET_POINTER(option->memory_pool,recvmsg_munit) ) + psockparam->tmpmsglen;
