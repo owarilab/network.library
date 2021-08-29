@@ -2,7 +2,23 @@
 <html lang="ja">
     <head>
         <meta charset="utf-8">
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <meta http-equiv="Content-Style-Type" content="text/css">
+        <meta http-equiv="Content-Script-Type" content="text/javascript">
         <title>sample</title>
+        <script type="text/javascript">
+            var ws_socket = null;
+            window.onload=function()
+            {
+                ws_socket = new WebSocket('ws://localhost:8080','my_ws_protocol');
+                ws_socket.addEventListener('open', function (event) {
+                    ws_socket.send('send test');
+                });
+                ws_socket.addEventListener('message', function (event) {
+                    console.log('recv : ', event.data);
+                });
+            }
+            </script>
     </head>
     <body>
         test html

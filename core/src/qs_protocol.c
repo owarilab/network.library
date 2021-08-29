@@ -787,7 +787,7 @@ ssize_t qs_parse_websocket_binary( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psock
 	int i, j, startpos;
 	uint64_t cnt = 0;
 	uint64_t tmppayloadlen = 0;
-	char* msg = (char*)qs_upointer( option->memory_pool,basebuf_munit );
+	uint8_t* msg = (uint8_t*)qs_upointer( option->memory_pool,basebuf_munit );
 	ssize_t retsize = -1;
 	do{
 		if( psockparam->fin == 0 || ( psockparam->fin == 1 && psockparam->tmpmsglen == 0 ) )
@@ -804,10 +804,6 @@ ssize_t qs_parse_websocket_binary( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psock
 			psockparam->opcode			= ( u8buf[0] & 0x0f );
 			psockparam->mask			= u8buf[1] >> 7;
 			psockparam->ckpayloadlen	= ( u8buf[1] & 0x7f );
-			if( psockparam->opcode == 8 ){
-				//printf("opecode : 8(close)\n");
-				break;
-			}
 			if( psockparam->mask == 0 ){
 				//printf("mask : 0 not support.\n");
 				break;
@@ -899,6 +895,12 @@ ssize_t qs_parse_websocket_binary( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psock
 		//				, qs_usize( option->memory_pool, basebuf_munit )
 		//				);
 #endif
+		if( psockparam->opcode == 8 ){
+			//printf("opecode : 8(close)\n");
+			//uint16_t close_code = msg[0] << 8 | msg[1];
+			//printf("close_code : %d\n",close_code);
+			break;
+		}
 		if( psockparam->fin && psockparam->tmpmsglen >= psockparam->payloadlen )
 		{
 			psockparam->fin				= 1;
@@ -1044,7 +1046,7 @@ int qs_send_handshake_param(QS_SOCKET_ID socket, QS_SOCKET_OPTION *option, QS_SO
 				,"Connection: "
 				,"Upgrade"
 				,responseKey
-				,"chat"
+				,pprotocol
 				);
 	}
 	if( option->user_send_function != NULL ){

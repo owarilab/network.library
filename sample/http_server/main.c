@@ -124,7 +124,10 @@ void* on_recv( void* args )
 	QS_RECV_INFO *rinfo = (QS_RECV_INFO *)args;
 	QS_SERVER_CONNECTION_INFO * tinfo = (QS_SERVER_CONNECTION_INFO *)rinfo->tinfo;
 	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
-	switch( qs_http_protocol_filter(rinfo) )
+	QS_MEMORY_POOL * temporary_memory = ( QS_MEMORY_POOL* )QS_GET_POINTER( option->memory_pool, memid_temporary_memory );
+	qs_memory_clean( temporary_memory );
+
+	switch( qs_http_protocol_filter_with_websocket(rinfo) )
 	{
 		case -1:
 		{
@@ -133,13 +136,58 @@ void* on_recv( void* args )
 			return ( (void *) NULL );
 		}
 		case 0:
+		{
 			return ( (void *) NULL );
+		}
 		case 1:
+		{
 			break;
+		}
+		case QS_HTTP_SOCK_PHASE_HANDSHAKE_WEBSOCKET:
+		{
+			return ( (void *) NULL );
+		}
+		case QS_HTTP_SOCK_PHASE_MSG_WEBSOCKET:
+		{
+			QS_SOCKPARAM* psockparam = &tinfo->sockparam;
+			ssize_t _tmpmsglen = qs_parse_websocket_binary( option, psockparam, (uint8_t*)qs_upointer( option->memory_pool, rinfo->recvbuf_munit ), rinfo->recvlen, tinfo->recvmsg_munit );
+			if( _tmpmsglen < 0 ){
+				qs_disconnect( psockparam );
+				return ( (void *) NULL );
+			}
+			if( psockparam->tmpmsglen == 0 ){
+				char* msgpbuf = (char*)qs_upointer( option->memory_pool, tinfo->recvmsg_munit );
+				rinfo->recvlen = _tmpmsglen;
+				msgpbuf[rinfo->recvlen] = '\0';
+				if(rinfo->recvlen==0){ // ping packet
+					return ( (void *) NULL );
+				}
+				rinfo->recvbuf_munit = tinfo->recvmsg_munit;
+				int32_t message_buffer_munit = qs_create_munit(temporary_memory,SIZE_KBYTE*8,MEMORY_TYPE_DEFAULT);
+				void* buffer = QS_GET_POINTER(temporary_memory,message_buffer_munit);
+				size_t buffer_size = qs_usize(temporary_memory,message_buffer_munit);
+				int i;
+				ssize_t sendlen = qs_make_websocket_msg(option,buffer,buffer_size,false,msgpbuf,qs_strlen(msgpbuf));
+				ssize_t ret = 0;
+				QS_SERVER_CONNECTION_INFO *tmptinfo;
+				if( option->connection_munit == -1 ){
+					return ( (void *) NULL );
+				}
+				for( i = 0; i < option->maxconnection; i++ ){
+					tmptinfo = qs_offsetpointer( option->memory_pool, option->connection_munit, sizeof( QS_SERVER_CONNECTION_INFO ), i );
+					if( tmptinfo->sockparam.acc != -1 && tmptinfo->sockparam.phase==QS_HTTP_SOCK_PHASE_MSG_WEBSOCKET){
+						if( -1 == ( ret = qs_send_all( tmptinfo->sockparam.acc, buffer, sendlen, 0 ) ) ){
+							if( option->close_callback != NULL ){
+								option->close_callback( tmptinfo );
+							}
+							qs_free_sockparam( option, &tmptinfo->sockparam );
+						}
+					}
+				}
+			}
+			return ( (void *) NULL );
+		}
 	}
-
-	QS_MEMORY_POOL * temporary_memory = ( QS_MEMORY_POOL* )QS_GET_POINTER( option->memory_pool, memid_temporary_memory );
-	qs_memory_clean( temporary_memory );
 
 	QS_HTTP_REQUEST_COMMON http_request;
 	int32_t http_status_code = http_request_common(rinfo, &http_request, temporary_memory);
