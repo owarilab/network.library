@@ -10,6 +10,9 @@ extern "C"{
 #include "qs_socket.h"
 #include "qs_variable.h"
 
+#include "qs_sha1.h"
+#include "qs_base64.h"
+
 // HTTP method
 #define HTTP_METHOD_GET		1;
 #define HTTP_METHOD_HEAD	2;
@@ -38,6 +41,17 @@ extern "C"{
 	{"Referer:","REFERER","2048"}, \
 	{"If-Modified-Since:","IF_MODIFIED_SINCE","64"}, \
 }; \
+
+// HTTP PROTOCOL PHASE
+#define QS_HTTP_SOCK_PHASE_RECV_CONTINUE 0
+#define QS_HTTP_SOCK_PHASE_PARSE_HTTP_HEADER 1
+#define QS_HTTP_SOCK_PHASE_MSG_HTTP 2
+#define QS_HTTP_SOCK_PHASE_HANDSHAKE_WEBSOCKET 3
+#define QS_HTTP_SOCK_PHASE_MSG_WEBSOCKET 4
+
+// WEBSOCKET MESSAGE MODE
+#define WS_MODE_TEXT 1
+#define WS_MODE_BINARY 2
 
 typedef struct QS_HTTP_REQUEST_COMMON
 {
@@ -72,6 +86,11 @@ size_t qs_http_document_path(char* dest, size_t dest_size,char* document_root, c
 int32_t qs_http_parse_request_parameter(QS_MEMORY_POOL * memory,char *get_params);
 int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_request, QS_MEMORY_POOL* temporary_memory);
 int32_t http_json_response_common(QS_SERVER_CONNECTION_INFO * connection, QS_SOCKET_OPTION* option,QS_MEMORY_POOL* temporary_memory,int32_t memid_response_hash, size_t json_buffer_size);
+
+int qs_http_protocol_filter_with_websocket(QS_RECV_INFO *rinfo);
+ssize_t qs_parse_websocket_binary( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockparam, uint8_t* u8buf, size_t size, uint32_t basebuf_munit );
+ssize_t qs_make_websocket_msg( QS_SOCKET_OPTION *option, void* message_buffer, size_t message_buffer_size,int is_binary, const char* msg, ssize_t size );
+int qs_send_handshake_param(QS_SOCKET_ID socket, QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockparam );
 
 #endif /*_QS_PROTOCOL_H_*/
 

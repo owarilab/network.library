@@ -105,7 +105,7 @@ typedef struct QS_SOCKPARAM
 	int32_t buf_munit;				// socket buffer
 
 	// protocol parameter
-	int phase;						// connect phase( SOCK_PHASE_* )
+	int phase;						// connect phase( http : QS_HTTP_SOCK_PHASE_* )
 	uint8_t fin;					// FIN flag( 1:finish )
 	uint8_t rsv;					// RSV flag
 	uint8_t opcode;					// opcode( 0:connection, 1:test, 2:binary, 3-7reserved for further, 8:close, 9:ping, a:pong b-f:reserved for further )
