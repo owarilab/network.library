@@ -86,7 +86,7 @@ int main( int argc, char *argv[], char *envp[] )
 		return -1;
 	}
 
-	memid_kvs_storage_id = qs_create_storage_cache_B1MB("./kvs_store_b1mb",&kvs_storage_memory_pool);
+	memid_kvs_storage_id = qs_create_storage_cache_B1MB("./kvs_data_b1mb",&kvs_storage_memory_pool);
 	if(-1 == memid_kvs_storage_id) {
 		printf("create storage memory error\n");
 		return -1;

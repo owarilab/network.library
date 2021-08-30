@@ -410,7 +410,7 @@ void qs_sleep(int time)
 	fd_set fds, rfds;
 	struct timeval tv;
 	FD_ZERO(&rfds);
-	FD_SET(option.sockid, &rfds);
+	FD_SET(0, &rfds); // 0 : stdin
 	tv.tv_sec = 0;
 	tv.tv_usec = time;
 	memcpy(&fds, &rfds, sizeof(fd_set));
