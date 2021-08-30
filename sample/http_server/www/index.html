@@ -1,26 +1,43 @@
-<!DOCTYPE html>
-<html lang="ja">
-    <head>
-        <meta charset="utf-8">
-        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-        <meta http-equiv="Content-Style-Type" content="text/css">
-        <meta http-equiv="Content-Script-Type" content="text/javascript">
-        <title>sample</title>
-        <script type="text/javascript">
-            var ws_socket = null;
-            window.onload=function()
-            {
-                ws_socket = new WebSocket('ws://localhost:8080','my_ws_protocol');
-                ws_socket.addEventListener('open', function (event) {
-                    ws_socket.send('send test');
-                });
-                ws_socket.addEventListener('message', function (event) {
-                    console.log('recv : ', event.data);
-                });
-            }
-            </script>
-    </head>
-    <body>
-        test html
-    </body>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=0">
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta http-equiv="Content-Style-Type" content="text/css">
+<meta http-equiv="Content-Script-Type" content="text/javascript">
+<title>チャット</title>
+<script src="/jquery-3.6.0.min.js"></script>
+<script type="text/javascript">
+var ws_socket = null;
+window.onload=function()
+{
+	ws_socket = new WebSocket('ws://localhost:8080');
+	ws_socket.addEventListener('open', function (event) {
+		ws_socket.send('send test');
+	});
+	ws_socket.addEventListener('message', function (event) {
+    	console.log('recv : ', event.data);
+		var json_data = JSON.parse(event.data);
+		console.log(json_data.id);
+
+		$.post( '/api/v1/room/list', {} )
+		.done( function(data) { console.log('data : ', data); } )
+		.fail( http_error_common );
+
+		$.post( '/api/v1/room/create', {"name":json_data.id} )
+		.done( function(data) {
+			console.log('data : ', data); 
+			$.post( '/api/v1/room/join', {"room_id":data.data.room.id,"connection_id":json_data.id} )
+			.done( function(data) { console.log('data : ', data); } )
+			.fail( http_error_common );
+		})
+		.fail( http_error_common );
+	});
+}
+function http_error_common(request, status, error){
+	console.log('status : ' + status + " , error : " + error);
+}
+</script>
+</head>
+<body style="padding:0;margin:0">
+</body>
 </html>

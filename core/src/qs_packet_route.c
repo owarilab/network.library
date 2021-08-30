@@ -29,6 +29,7 @@
 
 int32_t qs_init_packet_route(QS_MEMORY_POOL* memory,size_t max_connection,size_t max_route_chain,size_t key_size,size_t data_size)
 {
+	qs_srand_32();
 	int32_t packet_route_id = qs_create_munit(memory,sizeof(QS_PACKET_ROUTE),MEMORY_TYPE_DEFAULT);
 	if(-1==packet_route_id){
 		return -1;
@@ -237,6 +238,37 @@ int32_t qs_get_packet_route_connection_offset(QS_MEMORY_POOL* memory,int32_t pac
 	QS_PACKET_ROUTE_OFFSET* offsets = (QS_PACKET_ROUTE_OFFSET*)QS_GET_POINTER(memory,packet_route->connection_node_offsets_id);
 	int32_t route_offset = offsets[connection_index].route_chain_offset;
 	return route_offset;
+}
+
+char* qs_change_packet_route_connection_id(QS_MEMORY_POOL* memory,int32_t packet_route_id,int32_t connection_index)
+{
+	QS_PACKET_ROUTE* packet_route = (QS_PACKET_ROUTE*)QS_GET_POINTER(memory,packet_route_id);
+	QS_PACKET_ROUTE_OFFSET* offsets = (QS_PACKET_ROUTE_OFFSET*)QS_GET_POINTER(memory,packet_route->connection_node_offsets_id);
+	qs_uniqid_r32(offsets[connection_index].id,sizeof(offsets[connection_index].id)-1);
+	return offsets[connection_index].id;
+}
+
+char* qs_get_packet_route_connection_id(QS_MEMORY_POOL* memory,int32_t packet_route_id,int32_t connection_index)
+{
+	QS_PACKET_ROUTE* packet_route = (QS_PACKET_ROUTE*)QS_GET_POINTER(memory,packet_route_id);
+	QS_PACKET_ROUTE_OFFSET* offsets = (QS_PACKET_ROUTE_OFFSET*)QS_GET_POINTER(memory,packet_route->connection_node_offsets_id);
+	char* id = offsets[connection_index].id;
+	return id;
+}
+
+int32_t qs_find_packet_route_connection_id(QS_MEMORY_POOL* memory,int32_t packet_route_id,char* connection_id)
+{
+	int32_t connection_index = -1;
+	QS_PACKET_ROUTE* packet_route = (QS_PACKET_ROUTE*)QS_GET_POINTER(memory,packet_route_id);
+	QS_PACKET_ROUTE_OFFSET* offsets = (QS_PACKET_ROUTE_OFFSET*)QS_GET_POINTER(memory,packet_route->connection_node_offsets_id);
+	int i = 0;
+	for(i=0;i<packet_route->offset_array_size;i++){
+		if(!strcmp(offsets[i].id,connection_id)){
+			connection_index = i;
+			break;
+		}
+	}
+	return connection_index;
 }
 
 QS_PACKET_ROUTE_NODE* qs_get_packet_route_connection_join_node(QS_MEMORY_POOL* memory,int32_t packet_route_id,int32_t connection_index)

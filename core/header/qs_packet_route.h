@@ -37,6 +37,7 @@ extern "C"{
 #include "qs_hash.h"
 #include "qs_chain_array.h"
 #include "qs_variable.h"
+#include "qs_random.h"
 
 #define QS_PACKET_ROUTE_KEY_SIZE_DEFAULT 20
 #define QS_PACKET_ROUTE_ROUTE_SIZE_DEFAULT 1000
@@ -66,6 +67,7 @@ typedef struct QS_PACKET_ROUTE_OFFSET
 {
 	int32_t route_chain_offset;
 	int32_t route_node_chain_offset;
+	char id[33];
 } QS_PACKET_ROUTE_OFFSET;
 
 typedef struct QS_PACKET_ROUTE{
@@ -89,6 +91,9 @@ int32_t qs_update_packet_route_time(QS_MEMORY_POOL* memory,int32_t packet_route_
 int32_t qs_add_packet_route_connection(QS_MEMORY_POOL* memory,int32_t packet_route_id,int32_t route_offset,int32_t connection_index);
 void* qs_get_packet_route_connection_chain(QS_MEMORY_POOL* memory,int32_t packet_route_id,int32_t connection_index);
 int32_t qs_get_packet_route_connection_offset(QS_MEMORY_POOL* memory,int32_t packet_route_id,int32_t connection_index);
+char* qs_change_packet_route_connection_id(QS_MEMORY_POOL* memory,int32_t packet_route_id,int32_t connection_index);
+char* qs_get_packet_route_connection_id(QS_MEMORY_POOL* memory,int32_t packet_route_id,int32_t connection_index);
+int32_t qs_find_packet_route_connection_id(QS_MEMORY_POOL* memory,int32_t packet_route_id,char* connection_id);
 QS_PACKET_ROUTE_NODE* qs_get_packet_route_connection_join_node(QS_MEMORY_POOL* memory,int32_t packet_route_id,int32_t connection_index);
 int32_t qs_remove_packet_route_connection(QS_MEMORY_POOL* memory,int32_t packet_route_id,int32_t connection_index);
 int32_t qs_remove_packet_route(QS_MEMORY_POOL* memory,int32_t packet_route_id,int32_t route_offset);
