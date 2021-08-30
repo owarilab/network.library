@@ -104,10 +104,10 @@ int qs_http_protocol_filter(QS_RECV_INFO* rinfo)
 			rinfo->recvlen = atoi( (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, psockparam->http_header_munit, "CONTENT_LENGTH" )) );
 		}
 		rinfo->recvbuf_munit = tinfo->recvmsg_munit;
-		return 1;
+		return psockparam->phase;
 	}
 	else{
-		return 0; // continue
+		return psockparam->phase; // continue
 	}
 	qs_disconnect( psockparam );
 	return -1;
@@ -746,9 +746,11 @@ int qs_http_protocol_filter_with_websocket(QS_RECV_INFO *rinfo)
 			case -1:
 				qs_disconnect( psockparam );
 				return -1;
-			case 0:
+			case QS_HTTP_SOCK_PHASE_RECV_CONTINUE:
 				return QS_HTTP_SOCK_PHASE_RECV_CONTINUE;
-			case 1:
+			case QS_HTTP_SOCK_PHASE_PARSE_HTTP_HEADER:
+				return QS_HTTP_SOCK_PHASE_PARSE_HTTP_HEADER;
+			case QS_HTTP_SOCK_PHASE_MSG_HTTP:
 				break;
 		}
 		int ws_hand_shake = qs_send_handshake_param( rinfo->recvfrom, option, psockparam );
@@ -757,7 +759,7 @@ int qs_http_protocol_filter_with_websocket(QS_RECV_INFO *rinfo)
 			return -1;
 		}
 		if( 0 == ws_hand_shake ){ // is not websocket
-			return 1;
+			return QS_HTTP_SOCK_PHASE_MSG_HTTP;
 		}
 		psockparam->phase = QS_HTTP_SOCK_PHASE_HANDSHAKE_WEBSOCKET;
 		return QS_HTTP_SOCK_PHASE_HANDSHAKE_WEBSOCKET;
