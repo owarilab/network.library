@@ -89,7 +89,7 @@ int32_t http_json_response_common(QS_SERVER_CONNECTION_INFO * connection, QS_SOC
 
 int qs_http_protocol_filter_with_websocket(QS_RECV_INFO *rinfo);
 ssize_t qs_parse_websocket_binary( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockparam, uint8_t* u8buf, size_t size, uint32_t basebuf_munit );
-ssize_t qs_make_websocket_msg( QS_SOCKET_OPTION *option, void* message_buffer, size_t message_buffer_size,int is_binary, const char* msg, ssize_t size );
+ssize_t qs_make_websocket_msg( void* message_buffer, size_t message_buffer_size,int is_binary, const char* msg, ssize_t size );
 int qs_send_handshake_param(QS_SOCKET_ID socket, QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockparam );
 
 #endif /*_QS_PROTOCOL_H_*/

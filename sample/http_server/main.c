@@ -24,7 +24,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 // get api sample
 // curl -X POST -H "Content-Type: application/json" -d '{"k":"id_12345678", "v":"kvs_value1"}' http://localhost:8080/api/v1/set
 // curl -X POST -d 'k=id_12345678&v=kvs_value1' http://localhost:8080/api/v1/set
@@ -81,6 +80,7 @@ void* on_recv( void* args );
 int on_close(QS_SERVER_CONNECTION_INFO* connection);
 void exec_http(QS_RECV_INFO *rinfo);
 void exec_websocket(QS_RECV_INFO *rinfo);
+ssize_t make_ws_message_common(QS_MEMORY_POOL * temporary_memory,char* connection_id,char* type,char* message,void* buffer,size_t buffer_size);
 
 int on_connect(QS_SERVER_CONNECTION_INFO* connection)
 {
@@ -130,11 +130,60 @@ void* on_recv( void* args )
 	return ( (void *) NULL );
 }
 
+ssize_t make_ws_message_common(QS_MEMORY_POOL * temporary_memory, char* connection_id,char* type,char* message,void* buffer,size_t buffer_size)
+{
+	int32_t memid_temp_data = qs_create_hash(temporary_memory, 32);
+	if (-1 == memid_temp_data) {
+		return 0;
+	}
+	qs_add_hash_string(temporary_memory, memid_temp_data, "id", connection_id);
+	qs_add_hash_string(temporary_memory, memid_temp_data, "type", type);
+	qs_add_hash_string(temporary_memory, memid_temp_data, "message", message);
+	int32_t memid_temp_data_json = qs_json_encode_hash(temporary_memory, memid_temp_data, SIZE_KBYTE * 4);
+	if (-1 == memid_temp_data_json) {
+		printf("qs_json_encode_hash error\n");
+		return 0;
+	}
+	char* json = (char*)QS_GET_POINTER(temporary_memory, memid_temp_data_json);
+	size_t json_len = qs_strlen(json);
+
+	// send message
+	 return qs_make_websocket_msg((void*)buffer, buffer_size, false, json, json_len);
+}
+
 int on_close(QS_SERVER_CONNECTION_INFO* connection)
 {
 	QS_MEMORY_POOL* route_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(memory_pool,memid_route_memory);
 	void* data = qs_get_packet_route_connection_chain(route_memory, memid_packet_route, connection->index);
 	if (NULL != data) {
+		do{
+			QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)connection->qs_socket_option;
+			QS_MEMORY_POOL * temporary_memory = ( QS_MEMORY_POOL* )QS_GET_POINTER( option->memory_pool, memid_temporary_memory );
+			qs_memory_clean( temporary_memory );
+			int32_t message_buffer_munit = qs_create_munit(temporary_memory, SIZE_KBYTE * 8, MEMORY_TYPE_DEFAULT);
+			void* buffer = QS_GET_POINTER(temporary_memory, message_buffer_munit);
+			size_t buffer_size = qs_usize(temporary_memory, message_buffer_munit);
+			char* connection_id = qs_get_packet_route_connection_id(route_memory, memid_packet_route, connection->index);
+			ssize_t sendlen = make_ws_message_common(temporary_memory, connection_id,"leave","leave",buffer,buffer_size);
+			void* current = NULL;
+			ssize_t ret = 0;
+			QS_SERVER_CONNECTION_INFO *tmptinfo;
+			while (NULL != (current = qs_foreach_packet_route_connection_chain(route_memory, memid_packet_route, connection->index, current))) {
+				QS_PACKET_ROUTE_NODE_CONNECTION* con = (QS_PACKET_ROUTE_NODE_CONNECTION*)current;
+				if(con->connection_index==connection->index){
+					continue;
+				}
+				tmptinfo = qs_offsetpointer(option->memory_pool, option->connection_munit, sizeof(QS_SERVER_CONNECTION_INFO), con->connection_index);
+				if (tmptinfo->sockparam.acc != -1 && tmptinfo->sockparam.phase == QS_HTTP_SOCK_PHASE_MSG_WEBSOCKET) {
+					if (-1 == (ret = qs_send_all(tmptinfo->sockparam.acc, buffer, sendlen, 0))) {
+						if (option->close_callback != NULL) {
+							option->close_callback(tmptinfo);
+						}
+						qs_free_sockparam(option, &tmptinfo->sockparam);
+					}
+				}
+			}
+		}while(false);
 		qs_remove_packet_route_connection(route_memory, memid_packet_route, connection->index);
 	}
 	return 0;
@@ -154,49 +203,58 @@ void exec_websocket(QS_RECV_INFO *rinfo)
 		return;
 	}
 	if( psockparam->tmpmsglen == 0 ){
-		char* msgpbuf = (char*)qs_upointer( option->memory_pool, tinfo->recvmsg_munit );
-		rinfo->recvlen = _tmpmsglen;
-		msgpbuf[rinfo->recvlen] = '\0';
 		if(rinfo->recvlen==0){ // ping packet
 			return;
 		}
-		rinfo->recvbuf_munit = tinfo->recvmsg_munit;
 
-		QS_MEMORY_POOL* route_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(memory_pool,memid_route_memory);
-		int32_t memid_temp_data = qs_create_hash(temporary_memory, 32);
-		if (-1 == memid_temp_data) {
-			return;
-		}
-		qs_add_hash_string(temporary_memory,memid_temp_data,"id",qs_change_packet_route_connection_id(route_memory,memid_packet_route,tinfo->index));
-		qs_add_hash_string(temporary_memory,memid_temp_data,"message",msgpbuf);
-		int32_t memid_temp_data_json = qs_json_encode_hash(temporary_memory, memid_temp_data, SIZE_KBYTE * 4);
-		if (-1 == memid_temp_data_json) {
-			printf("qs_json_encode_hash error\n");
-			return;
-		}
-		char* json = (char*)QS_GET_POINTER(temporary_memory, memid_temp_data_json);
-		size_t json_len = qs_strlen(json);
+		int32_t message_buffer_munit = qs_create_munit(temporary_memory, SIZE_KBYTE * 8, MEMORY_TYPE_DEFAULT);
+		void* buffer = QS_GET_POINTER(temporary_memory, message_buffer_munit);
+		size_t buffer_size = qs_usize(temporary_memory, message_buffer_munit);
 
-		int32_t message_buffer_munit = qs_create_munit(temporary_memory,SIZE_KBYTE*8,MEMORY_TYPE_DEFAULT);
-		void* buffer = QS_GET_POINTER(temporary_memory,message_buffer_munit);
-		size_t buffer_size = qs_usize(temporary_memory,message_buffer_munit);
-		int i;
-		ssize_t sendlen = qs_make_websocket_msg(option,buffer,buffer_size,false,json,json_len);
+		QS_MEMORY_POOL* route_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(memory_pool, memid_route_memory);
+
+		char* msgpbuf = (char*)qs_upointer(option->memory_pool, tinfo->recvmsg_munit);
+		char* connection_id = qs_get_packet_route_connection_id(route_memory, memid_packet_route, tinfo->index);
+		ssize_t sendlen = make_ws_message_common(temporary_memory, connection_id,"message",msgpbuf,buffer,buffer_size);
+
 		ssize_t ret = 0;
-		QS_SERVER_CONNECTION_INFO *tmptinfo;
-		if( option->connection_munit == -1 ){
-			return;
-		}
-		for( i = 0; i < option->maxconnection; i++ ){
-			tmptinfo = qs_offsetpointer( option->memory_pool, option->connection_munit, sizeof( QS_SERVER_CONNECTION_INFO ), i );
-			if( tmptinfo->sockparam.acc != -1 && tmptinfo->sockparam.phase==QS_HTTP_SOCK_PHASE_MSG_WEBSOCKET){
-				if( -1 == ( ret = qs_send_all( tmptinfo->sockparam.acc, buffer, sendlen, 0 ) ) ){
-					if( option->close_callback != NULL ){
-						option->close_callback( tmptinfo );
+		void* data = qs_get_packet_route_connection_chain(route_memory, memid_packet_route, tinfo->index);
+		if (NULL != data) {
+			void* current = NULL;
+			QS_SERVER_CONNECTION_INFO *tmptinfo;
+			while (NULL != (current = qs_foreach_packet_route_connection_chain(route_memory, memid_packet_route, tinfo->index, current))) {
+				QS_PACKET_ROUTE_NODE_CONNECTION* con = (QS_PACKET_ROUTE_NODE_CONNECTION*)current;
+				tmptinfo = qs_offsetpointer(option->memory_pool, option->connection_munit, sizeof(QS_SERVER_CONNECTION_INFO), con->connection_index);
+				if (tmptinfo->sockparam.acc != -1 && tmptinfo->sockparam.phase == QS_HTTP_SOCK_PHASE_MSG_WEBSOCKET) {
+					if (-1 == (ret = qs_send_all(tmptinfo->sockparam.acc, buffer, sendlen, 0))) {
+						if (option->close_callback != NULL) {
+							option->close_callback(tmptinfo);
+						}
+						qs_free_sockparam(option, &tmptinfo->sockparam);
 					}
-					qs_free_sockparam( option, &tmptinfo->sockparam );
 				}
 			}
+		}
+		else {
+			if (-1 == (ret = qs_send_all(psockparam->acc, buffer, sendlen, 0))) {
+
+			}
+			//int i;
+			//QS_SERVER_CONNECTION_INFO *tmptinfo;
+			//if (option->connection_munit == -1) {
+			//	return;
+			//}
+			//for (i = 0; i < option->maxconnection; i++) {
+			//	tmptinfo = qs_offsetpointer(option->memory_pool, option->connection_munit, sizeof(QS_SERVER_CONNECTION_INFO), i);
+			//	if (tmptinfo->sockparam.acc != -1 && tmptinfo->sockparam.phase == QS_HTTP_SOCK_PHASE_MSG_WEBSOCKET) {
+			//		if (-1 == (ret = qs_send_all(tmptinfo->sockparam.acc, buffer, sendlen, 0))) {
+			//			if (option->close_callback != NULL) {
+			//				option->close_callback(tmptinfo);
+			//			}
+			//			qs_free_sockparam(option, &tmptinfo->sockparam);
+			//		}
+			//	}
+			//}
 		}
 	}
 }
@@ -415,6 +473,30 @@ void exec_http(QS_RECV_INFO *rinfo)
 					qs_add_hash_hash(temporary_memory, memid_response_data, "room", memid_temp_info_hash);
 					qs_add_hash_hash(temporary_memory, memid_response, "data", memid_response_data);
 					http_status_code = http_json_response_common(tinfo, option, temporary_memory, memid_response, SIZE_KBYTE * 4);
+
+					// join message
+					{
+						int32_t message_buffer_munit = qs_create_munit(temporary_memory, SIZE_KBYTE * 8, MEMORY_TYPE_DEFAULT);
+						void* buffer = QS_GET_POINTER(temporary_memory, message_buffer_munit);
+						size_t buffer_size = qs_usize(temporary_memory, message_buffer_munit);
+						char* connection_id = qs_get_packet_route_connection_id(route_memory, memid_packet_route, connection_index);
+						ssize_t sendlen = make_ws_message_common(temporary_memory, connection_id,"join","join",buffer,buffer_size);
+						void* current = NULL;
+						ssize_t ret = 0;
+						QS_SERVER_CONNECTION_INFO *tmptinfo;
+						while (NULL != (current = qs_foreach_packet_route_connection_chain(route_memory, memid_packet_route, connection_index, current))) {
+							QS_PACKET_ROUTE_NODE_CONNECTION* con = (QS_PACKET_ROUTE_NODE_CONNECTION*)current;
+							tmptinfo = qs_offsetpointer(option->memory_pool, option->connection_munit, sizeof(QS_SERVER_CONNECTION_INFO), con->connection_index);
+							if (tmptinfo->sockparam.acc != -1 && tmptinfo->sockparam.phase == QS_HTTP_SOCK_PHASE_MSG_WEBSOCKET) {
+								if (-1 == (ret = qs_send_all(tmptinfo->sockparam.acc, buffer, sendlen, 0))) {
+									if (option->close_callback != NULL) {
+										option->close_callback(tmptinfo);
+									}
+									qs_free_sockparam(option, &tmptinfo->sockparam);
+								}
+							}
+						}
+					}
 				} while (false);
 			}
 		}

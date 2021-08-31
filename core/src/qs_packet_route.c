@@ -232,6 +232,24 @@ void* qs_get_packet_route_connection_chain(QS_MEMORY_POOL* memory,int32_t packet
 	return qs_get_chain_i(memory,route_node->connection_chain_array,connection_chain);
 }
 
+void* qs_foreach_packet_route_connection_chain(QS_MEMORY_POOL* memory, int32_t packet_route_id, int32_t connection_index, void* current)
+{
+	QS_PACKET_ROUTE* packet_route = (QS_PACKET_ROUTE*)QS_GET_POINTER(memory, packet_route_id);
+	QS_PACKET_ROUTE_OFFSET* offsets = (QS_PACKET_ROUTE_OFFSET*)QS_GET_POINTER(memory, packet_route->connection_node_offsets_id);
+	int32_t route_offset = offsets[connection_index].route_chain_offset;
+	int32_t connection_chain = offsets[connection_index].route_node_chain_offset;
+	if (route_offset == -1 || connection_chain == -1) {
+		return NULL;
+	}
+	QS_PACKET_ROUTE_NODE* route_node = (QS_PACKET_ROUTE_NODE*)qs_get_chain_i(memory, packet_route->node_chain_array, route_offset);
+	QS_PACKET_ROUTE_NODE_CONNECTION* con = (QS_PACKET_ROUTE_NODE_CONNECTION*)qs_get_chain_i(memory, route_node->connection_chain_array, connection_chain);
+	if (con->connection_index != connection_index) {
+		printf("invalid index %d, %d\n", con->connection_index, connection_index);
+		return NULL;
+	}
+	return qs_get_chain(memory, route_node->connection_chain_array, current);
+}
+
 int32_t qs_get_packet_route_connection_offset(QS_MEMORY_POOL* memory,int32_t packet_route_id,int32_t connection_index)
 {
 	QS_PACKET_ROUTE* packet_route = (QS_PACKET_ROUTE*)QS_GET_POINTER(memory,packet_route_id);

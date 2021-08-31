@@ -929,7 +929,7 @@ ssize_t qs_parse_websocket_binary( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psock
 	return retsize;
 }
  
-ssize_t qs_make_websocket_msg( QS_SOCKET_OPTION *option, void* message_buffer, size_t message_buffer_size,int is_binary, const char* msg, ssize_t size )
+ssize_t qs_make_websocket_msg( void* message_buffer, size_t message_buffer_size,int is_binary, const char* msg, ssize_t size )
 {
 	void *sendbin = message_buffer;
 	uint8_t head1;

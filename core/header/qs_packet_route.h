@@ -90,6 +90,7 @@ int64_t qs_get_packet_route_owner(QS_MEMORY_POOL* memory,int32_t packet_route_id
 int32_t qs_update_packet_route_time(QS_MEMORY_POOL* memory,int32_t packet_route_id,char* route_name);
 int32_t qs_add_packet_route_connection(QS_MEMORY_POOL* memory,int32_t packet_route_id,int32_t route_offset,int32_t connection_index);
 void* qs_get_packet_route_connection_chain(QS_MEMORY_POOL* memory,int32_t packet_route_id,int32_t connection_index);
+void* qs_foreach_packet_route_connection_chain(QS_MEMORY_POOL* memory, int32_t packet_route_id, int32_t connection_index, void* current);
 int32_t qs_get_packet_route_connection_offset(QS_MEMORY_POOL* memory,int32_t packet_route_id,int32_t connection_index);
 char* qs_change_packet_route_connection_id(QS_MEMORY_POOL* memory,int32_t packet_route_id,int32_t connection_index);
 char* qs_get_packet_route_connection_id(QS_MEMORY_POOL* memory,int32_t packet_route_id,int32_t connection_index);
