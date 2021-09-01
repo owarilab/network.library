@@ -940,11 +940,11 @@ ssize_t qs_make_websocket_msg( void* message_buffer, size_t message_buffer_size,
 	ssize_t len = 0;
 	do{
 		head1 = 0x80 | ( (is_binary) ? WS_MODE_BINARY : WS_MODE_TEXT ); // 0x81:text mode, 0x82:binary mode
-		if( size < 125 ){
+		if( size <= 125 ){
 			headersize = 2;
 			head2 = 0x00 | (uint8_t)size;
 		}
-		else if( size > 126 && size <= 65536 ){
+		else if( size >= 126 && size <= 65536 ){
 			headersize = 4;
 			head2 = 0x00 | 126;
 		}
