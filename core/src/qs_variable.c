@@ -336,6 +336,7 @@ int32_t qs_cache_string(QS_CACHE* cache,char* key,char* value, int32_t life_time
 	if(NULL==(elm=qs_add_hash_string( cache_page.memory, cache_page.hash_id, key, value ))){
 		qs_swap_page(cache,&cache_page);
 		if(NULL==(elm=qs_add_hash_string( cache_page.memory, cache_page.hash_id, key, value ))){
+			printf("qs_add_hash_string error\n");
 			return QS_SYSTEM_ERROR;
 		}
 	}

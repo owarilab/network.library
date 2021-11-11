@@ -250,6 +250,13 @@ void* qs_foreach_packet_route_connection_chain(QS_MEMORY_POOL* memory, int32_t p
 	return qs_get_chain(memory, route_node->connection_chain_array, current);
 }
 
+void* qs_system_foreach_packet_route_connection_chain(QS_MEMORY_POOL* memory, int32_t packet_route_id, int32_t route_offset, void* current)
+{
+	QS_PACKET_ROUTE* packet_route = (QS_PACKET_ROUTE*)QS_GET_POINTER(memory, packet_route_id);
+	QS_PACKET_ROUTE_NODE* route_node = (QS_PACKET_ROUTE_NODE*)qs_get_chain_i(memory, packet_route->node_chain_array, route_offset);
+	return qs_get_chain(memory, route_node->connection_chain_array, current);
+}
+
 int32_t qs_get_packet_route_connection_offset(QS_MEMORY_POOL* memory,int32_t packet_route_id,int32_t connection_index)
 {
 	QS_PACKET_ROUTE* packet_route = (QS_PACKET_ROUTE*)QS_GET_POINTER(memory,packet_route_id);

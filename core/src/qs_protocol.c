@@ -426,7 +426,7 @@ size_t qs_http_add_response_common(char* dest, size_t dest_size, int http_respon
 {
 	char content_len_string[32];
 	char time_string[256];
-	char* http_server = "Server: gdt-httpd\r\n";
+	char* http_server = "Server: qs-http-server\r\n";
 	char* http_connection = "Connection: close\r\n";
 	char* http_content = "Content-Type: ";
 	char* http_content_len = "Content-Length: ";
@@ -509,21 +509,29 @@ size_t qs_http_document_path(char* dest, size_t dest_size,char* document_root, c
 	return path_len;
 }
 
-int32_t qs_http_parse_request_parameter(QS_MEMORY_POOL * memory,char *get_params)
+int32_t qs_http_parse_request_parameter(QS_MEMORY_POOL * memory,char *get_params, size_t buffer_size)
 {
 	int32_t memid_get_parameter_hash = -1;
 	do{
 		char* pparam = get_params;
-		char param_name[2048];
-		char param_value[2048];
-		char param_urldecode[2048];
+		char param_name[1024];
+		int32_t memid_value = qs_create_memory_block(memory,buffer_size);
+		if( -1 == memid_value ){
+			break;
+		}
+		int32_t memid_decode = qs_create_memory_block(memory,buffer_size);
+		if( -1 == memid_decode ){
+			break;
+		}
+		char *param_value = (char*)QS_GET_POINTER(memory,memid_value);
+		char *param_urldecode = (char*)QS_GET_POINTER(memory,memid_decode);
 		if( -1 == ( memid_get_parameter_hash = qs_create_hash( memory, 32 ) ) ){
 			break;
 		}
 		for(;*pparam != '\0';){
-			pparam = qs_read_line_delimiter( param_name, sizeof(param_name), pparam, '=' );
-			pparam = qs_read_line_delimiter( param_value, sizeof(param_value), pparam, '&' );
-			qs_urldecode( param_urldecode, sizeof( param_urldecode ), param_value );
+			pparam = qs_read_line_delimiter( param_name, qs_usize(memory,memid_value), pparam, '=' );
+			pparam = qs_read_line_delimiter( param_value, qs_usize(memory,memid_decode), pparam, '&' );
+			qs_urldecode( param_urldecode, qs_usize(memory,memid_decode), param_value );
 			qs_add_hash_value( memory, memid_get_parameter_hash, param_name, param_urldecode,ELEMENT_LITERAL_STR );
 		}
 	}while(false);
@@ -553,7 +561,7 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 	http_request->memid_get_parameter_hash = -1;
 	do{
 		// get parameter
-		if(-1==(http_request->memid_get_parameter_hash = qs_http_parse_request_parameter(temporary_memory,http_request->get_params))){
+		if(-1==(http_request->memid_get_parameter_hash = qs_http_parse_request_parameter(temporary_memory,http_request->get_params, SIZE_KBYTE*64))){
 			break;
 		}
 		//printf("get params\n");
@@ -590,7 +598,7 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 				}
 				http_request->memid_post_parameter_hash = hashroot->element_munit;
 			}else{
-				if(-1==(http_request->memid_post_parameter_hash = qs_http_parse_request_parameter(temporary_memory,body))){
+				if(-1==(http_request->memid_post_parameter_hash = qs_http_parse_request_parameter(temporary_memory,body, SIZE_KBYTE*512))){
 					break;
 				}
 			}
@@ -612,7 +620,7 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 		}
 		char* response_buffer = (char*)QS_GET_POINTER(temporary_memory,response_buffer_munit);
 		size_t response_buffer_size = qs_usize(temporary_memory,response_buffer_munit);
-		memset(response_buffer, 0, response_buffer_size); // memory over ( windows only )
+		//memset(response_buffer, 0, response_buffer_size); // memory over ( windows only )
 		size_t response_len = 0;
 		int is_binary = 0;
 

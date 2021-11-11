@@ -37,6 +37,7 @@ extern "C"{
 #include "qs_string.h"
 #include "qs_hash.h"
 #include "qs_array.h"
+#include "qs_chain_array.h"
 #include "qs_memory_allocator.h"
 #include "qs_logger.h"
 
@@ -177,6 +178,7 @@ typedef struct QS_SOCKET_OPTION
 	int32_t port_num_munit;			// port num( char* )
 	int32_t connection_munit;		// connection array ( QS_SERVER_CONNECTION_INFO* )
 	int32_t lock_file_munit;		// lock file name( char* )
+	int32_t memid_accept_wait_pool;
 	int lock_file_fd;				// accept lock fd
 	int32_t backend_munit;			// backend connection array (QS_SOCKET_OPTION* )
 #ifdef __WINDOWS__
@@ -274,6 +276,8 @@ QS_SOCKET_OPTION* qs_get_backend( QS_SOCKET_OPTION* option, int index );
 void qs_init_socket_param( QS_SOCKPARAM *psockparam );
 void qs_free_sockparam( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockparam );
 int qs_close_socket(QS_SOCKET_ID* sock, char* error );
+int qs_add_accept_pool(QS_SOCKET_OPTION *option, QS_SERVER_CONNECTION_INFO* connection);
+int qs_close_socket_common(QS_SOCKET_OPTION *option, QS_SERVER_CONNECTION_INFO* connection, int disconnect);
 
 int32_t qs_make_connection_info( QS_SOCKET_OPTION *option );
 int32_t qs_make_connection_info_core( QS_SOCKET_OPTION *option, QS_SERVER_CONNECTION_INFO* tinfo, int index );
@@ -290,18 +294,19 @@ int qs_get_sockaddr_info( QS_SOCKET_OPTION *option, struct sockaddr_storage *sad
 QS_SOCKET_ID qs_server_socket( QS_SOCKET_OPTION *option, int is_ipv6 );
 QS_SOCKET_ID qs_client_socket( QS_SOCKET_OPTION *option );
 QS_SOCKET_ID qs_wait_client_socket(QS_SOCKET_ID sock, QS_SOCKET_OPTION *option);
+QS_SOCKET_ID qs_accept(QS_SOCKET_OPTION *option);
 
 int qs_check_socket_error(QS_SOCKET_ID sock);
 void qs_free_addrinfo(QS_SOCKET_OPTION* option);
 void qs_disconnect( QS_SOCKPARAM *psockparam );
 void qs_set_sock_option( QS_SOCKET_OPTION *option );
-void* qs_make_socket( QS_SOCKET_OPTION *option );
-void* qs_socket( QS_SOCKET_OPTION *option );
+int32_t qs_make_socket( QS_SOCKET_OPTION *option );
+int32_t qs_socket( QS_SOCKET_OPTION *option );
 void qs_free_socket( QS_SOCKET_OPTION *option );
 
 void qs_recv_event(QS_SOCKET_OPTION *option, QS_SERVER_CONNECTION_INFO *child, socklen_t srlen);
 
-void qs_nonblocking_server(QS_SOCKET_OPTION *option);
+int32_t qs_nonblocking_server(QS_SOCKET_OPTION *option);
 void qs_server_update(QS_SOCKET_OPTION *option);
 void qs_nonblocking_client(QS_SOCKET_OPTION *option);
 void qs_client_update(QS_SOCKET_OPTION *option);

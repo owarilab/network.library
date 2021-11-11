@@ -125,6 +125,7 @@ void qs_getopt(SYSTEM_SERVER_OPTION* sys_option, const char* hostname, const cha
 void qs_set_pid(SYSTEM_SERVER_OPTION* sys_option);
 void qs_sleep(int time);
 void qs_initialize_scheduler(SYSTEM_UPDATE_SCHEDULER* scheduler);
+void qs_initialize_scheduler_high_speed(SYSTEM_UPDATE_SCHEDULER* scheduler);
 void qs_update_scheduler(SYSTEM_UPDATE_SCHEDULER* scheduler);
 
 #endif /*_QS_SYSTEM_H_*/

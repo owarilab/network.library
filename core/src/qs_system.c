@@ -447,6 +447,24 @@ void qs_initialize_scheduler(SYSTEM_UPDATE_SCHEDULER* scheduler)
 	scheduler->on_update = 0;
 }
 
+void qs_initialize_scheduler_high_speed(SYSTEM_UPDATE_SCHEDULER* scheduler)
+{
+	scheduler->last_update_time = time(NULL);
+	scheduler->update_max = 10;
+	scheduler->update_high = 100;
+	scheduler->update_middle = 1000;
+	scheduler->update_low = 500;
+	scheduler->update_idle = 10000;
+	scheduler->counter_high = 100;
+	scheduler->counter_middle = 50;
+	scheduler->counter_low = 20;
+	scheduler->counter = 0;
+	scheduler->last_counter = 0;
+	scheduler->sleep_time = scheduler->update_idle;
+	scheduler->update_interval_sec = 1;
+	scheduler->on_update = 0;
+}
+
 void qs_update_scheduler(SYSTEM_UPDATE_SCHEDULER* scheduler)
 {
 	time_t t = time(NULL);

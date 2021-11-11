@@ -26,6 +26,17 @@
  */
 
 #include "qs_socket.h"
+// check kernel settings
+// sudo sysctl -a | grep somaxconn
+// sudo sysctl -a | grep tcp_max_syn_backlog
+// Temporarily
+// sudo sysctl -w net.core.somaxconn=1024
+// sudo sysctl -w net.ipv4.tcp_max_syn_backlog=1024
+// Persistence
+// echo 'net.core.somaxconn=1024' > /etc/sysctl.conf
+// echo 'net.ipv4.tcp_max_syn_backlog=1024' > /etc/sysctl.conf
+#define QS_SOMAXCONN 1024
+// SOMAXCONN
 
 QS_SOCKET_OPTION* qs_create_tcp_server(char* hostname, char* portnum)
 {
@@ -148,10 +159,7 @@ ssize_t qs_send_message(uint32_t payload_type, char* payload, size_t payload_len
 	if( option != NULL ){
 		if( qs_recv_info->tinfo->sockparam.acc != -1 ){
 			if( -1 == ( ret = qs_send(option, &qs_recv_info->tinfo->sockparam, payload, payload_len, payload_type) ) ){
-				if( option->close_callback != NULL ){
-					option->close_callback( qs_recv_info->tinfo );
-				}
-				qs_free_sockparam( option, &qs_recv_info->tinfo->sockparam );
+				qs_close_socket_common(option, qs_recv_info->tinfo, 0);
 			}
 		}
 	}
@@ -186,10 +194,7 @@ ssize_t qs_send_message_othercast(uint32_t payload_type, char* payload, size_t p
 		if(tmptinfo->sockparam.acc != -1 && qs_recv_info->tinfo->sockparam.acc != tmptinfo->sockparam.acc )
 		{
 			if( -1 == ( ret = qs_send( option, &tmptinfo->sockparam, payload, payload_len, payload_type ) ) ){
-				if( option->close_callback != NULL ){
-					option->close_callback( tmptinfo );
-				}
-				qs_free_sockparam( option, &tmptinfo->sockparam );
+				qs_close_socket_common(option, tmptinfo, 0);
 			}
 		}
 	}
@@ -224,10 +229,7 @@ ssize_t qs_send_message_multicast(uint32_t payload_type, char* payload, size_t p
 				if( tmptinfo->sockparam.acc != -1 )
 				{
 					if( -1 == ( ret = qs_send( option, &tmptinfo->sockparam, payload, payload_len, payload_type ) ) ){
-						if( option->close_callback != NULL ){
-							option->close_callback( tmptinfo );
-						}
-						qs_free_sockparam( option, &tmptinfo->sockparam );
+						qs_close_socket_common(option, tmptinfo, 0);
 					}
 				}
 			}
@@ -264,10 +266,7 @@ ssize_t qs_send_message_multiothercast(uint32_t payload_type, char* payload, siz
 				if( -1 != tmptinfo->sockparam.acc )
 				{
 					if( -1 == ( ret = qs_send( option, &tmptinfo->sockparam, payload, payload_len, payload_type ) ) ){
-						if( option->close_callback != NULL ){
-							option->close_callback( tmptinfo );
-						}
-						qs_free_sockparam( option, &tmptinfo->sockparam );
+						qs_close_socket_common(option, tmptinfo, 0);
 					}
 				}
 			}
@@ -287,11 +286,7 @@ ssize_t qs_client_send_message(uint32_t payload_type, char* payload, size_t payl
 		QS_SERVER_CONNECTION_INFO* qs_connection_info = (QS_SERVER_CONNECTION_INFO*)QS_GET_POINTER(option->memory_pool, option->connection_munit);
 		if( qs_connection_info != NULL && qs_connection_info->sockparam.acc != -1 ){
 			if( -1 == ( ret = qs_send(option, &qs_connection_info->sockparam, payload, payload_len, payload_type) ) ){
-				if( option->close_callback != NULL ){
-					option->close_callback( qs_connection_info );
-				}
-				qs_close_socket(&qs_connection_info->sockparam.acc,NULL);
-				qs_free_sockparam( option, &qs_connection_info->sockparam );
+				qs_close_socket_common(option, qs_connection_info, 1);
 			}
 		}
 	}
@@ -358,18 +353,20 @@ int qs_initialize_socket_option(
 		option->host_name_munit			= -1;
 	}
 	else{
-		if( ( option->host_name_munit = qs_create_munit( memory_pool, SIZE_BYTE * ( 128 ), MEMORY_TYPE_DEFAULT ) ) != -1 )
+		if(-1 == ( option->host_name_munit = qs_create_munit( memory_pool, SIZE_BYTE * ( 128 ), MEMORY_TYPE_DEFAULT ) ) )
 		{
-			(void)snprintf( (char *)qs_upointer( memory_pool, option->host_name_munit ), qs_usize( memory_pool, option->host_name_munit ), "%s", hostname );
+			return -1;
 		}
+		(void)snprintf((char *)qs_upointer(memory_pool, option->host_name_munit), qs_usize(memory_pool, option->host_name_munit), "%s", hostname);
 	}
 	if( portnum == NULL ){
 		option->port_num_munit = -1;
 	}else{
-		if( ( option->port_num_munit = qs_create_munit( memory_pool, SIZE_BYTE * ( 128 ), MEMORY_TYPE_DEFAULT ) ) != -1 )
+		if( -1 == ( option->port_num_munit = qs_create_munit( memory_pool, SIZE_BYTE * ( 128 ), MEMORY_TYPE_DEFAULT ) ) )
 		{
-			(void) snprintf( (char *)qs_upointer( memory_pool, option->port_num_munit ), qs_usize( memory_pool, option->port_num_munit ), "%s", portnum );
+			return -1;
 		}
+		(void)snprintf((char *)qs_upointer(memory_pool, option->port_num_munit), qs_usize(memory_pool, option->port_num_munit), "%s", portnum);
 	}
 	
 	if( -1 == ( option->backend_munit = qs_create_munit( memory_pool, sizeof(QS_SOCKET_OPTION) * option->maxconnection, MEMORY_TYPE_DEFAULT) ) ){
@@ -381,7 +378,16 @@ int qs_initialize_socket_option(
 		memset(&backend_clients[i],0,sizeof(QS_SOCKET_OPTION));
 		backend_clients[i].sockid = -1;
 	}
-	
+
+	int32_t* wait_id;
+	if (-1 == (option->memid_accept_wait_pool = qs_create_chain_array(memory_pool, option->maxconnection, sizeof(int32_t)))) {
+		return -1;
+	}
+	for (i = 0; i < option->maxconnection; i++) {
+		wait_id = (int32_t*)qs_get_chain_i(memory_pool, option->memid_accept_wait_pool, i);
+		*wait_id = -1;
+	}
+
 	option->lock_file_fd = -1;
 	option->lock_file_munit = -1;
 	option->memory_pool = memory_pool;
@@ -560,17 +566,48 @@ int qs_close_socket(QS_SOCKET_ID* sock, char* error )
 	return errorno;
 }
 
+int qs_add_accept_pool(QS_SOCKET_OPTION *option, QS_SERVER_CONNECTION_INFO* connection)
+{
+	int32_t* tempid;
+	qs_close_socket(&connection->id, NULL);
+	if (NULL != (tempid = (int32_t*)qs_add_chain(option->memory_pool, option->memid_accept_wait_pool))) {
+		*tempid = connection->index;
+	}
+	return 0;
+}
+
+int qs_close_socket_common(QS_SOCKET_OPTION *option, QS_SERVER_CONNECTION_INFO* connection, int disconnect)
+{
+	if (option->close_callback != NULL) {
+		option->close_callback(connection);
+	}
+	if (disconnect == 1) {
+		qs_close_socket(&connection->sockparam.acc, NULL);
+	}
+	qs_free_sockparam(option, &connection->sockparam);
+	return QS_SYSTEM_OK;
+}
+
 int32_t qs_make_connection_info( QS_SOCKET_OPTION *option )
 {
 	option->connection_munit = qs_create_munit( option->memory_pool, sizeof( QS_SERVER_CONNECTION_INFO ) * ( option->maxconnection ), MEMORY_TYPE_DEFAULT );
-	if( -1 != option->connection_munit )
+	if( -1 == option->connection_munit )
 	{
-		int i;
-		QS_SERVER_CONNECTION_INFO * child;
-		for( i = 0; i < option->maxconnection; i++ )
-		{
-			child = (QS_SERVER_CONNECTION_INFO *)qs_offsetpointer( option->memory_pool, option->connection_munit, sizeof( QS_SERVER_CONNECTION_INFO ), i );
-			qs_make_connection_info_core(option,child,i);
+		printf("qs_make_connection_info error\n");
+		return -1;
+	}
+	int i;
+	QS_SERVER_CONNECTION_INFO * child;
+	int32_t* tempid;
+	for (i = 0; i < option->maxconnection; i++)
+	{
+		child = (QS_SERVER_CONNECTION_INFO *)qs_offsetpointer(option->memory_pool, option->connection_munit, sizeof(QS_SERVER_CONNECTION_INFO), i);
+		if (QS_SYSTEM_ERROR == qs_make_connection_info_core(option, child, i)) {
+			printf("qs_make_connection_info_core error %d/%zd\n",i,option->maxconnection);
+			return -1;
+		}
+		if (NULL != (tempid = (int32_t*)qs_add_chain(option->memory_pool, option->memid_accept_wait_pool))) {
+			*tempid = i;
 		}
 	}
 	return option->connection_munit;
@@ -632,10 +669,7 @@ ssize_t qs_send_one( QS_SOCKET_OPTION *option, uint32_t connection, char *buf, s
 			if( -1 != tmptinfo->sockparam.acc )
 			{
 				if( -1 == ( ret = qs_send( option, &tmptinfo->sockparam, buf, size, payload_type ) ) ){
-					if( option->close_callback != NULL ){
-						option->close_callback( tmptinfo );
-					}
-					qs_free_sockparam( option, &tmptinfo->sockparam );
+					qs_close_socket_common(option, tmptinfo, 0);
 				}
 			}
 			break;
@@ -659,10 +693,7 @@ ssize_t qs_send_broadcast( QS_SOCKET_OPTION *option, char *buf, size_t size, uin
 		if( -1 != tmptinfo->sockparam.acc )
 		{
 			if( -1 == ( ret = qs_send( option, &tmptinfo->sockparam, buf, size, payload_type ) ) ){
-				if( option->close_callback != NULL ){
-					option->close_callback( tmptinfo );
-				}
-				qs_free_sockparam( option, &tmptinfo->sockparam );
+				qs_close_socket_common(option, tmptinfo, 0);
 			}
 		}
 	}
@@ -833,6 +864,10 @@ void qs_set_sock_option( QS_SOCKET_OPTION *option )
 		perror("getsockopt");
 	}
 #else
+//	int cork = 0;
+//	(void) setsockopt( option->sockid, IPPROTO_TCP, TCP_CORK, &cork, sizeof(cork) );
+	int no_delay = 1;
+	(void) setsockopt( option->sockid, IPPROTO_TCP, TCP_NODELAY, &no_delay, sizeof(no_delay) );
 	(void) setsockopt( option->sockid, SOL_SOCKET, SO_RCVBUF, &option->recvbuffer_size, sizeof( option->recvbuffer_size ) );
 	(void) setsockopt( option->sockid, SOL_SOCKET, SO_SNDBUF, &option->sendbuffer_size, sizeof( option->sendbuffer_size ) );
 	len = sizeof(option->recvbuffer_size);
@@ -1005,7 +1040,7 @@ QS_SOCKET_ID qs_server_socket( QS_SOCKET_OPTION *option, int is_ipv6 )
 		}
 		if( option->socket_type == SOCKET_TYPE_SERVER_TCP )
 		{
-			if( listen( sock, SOMAXCONN ) == -1 )
+			if( listen( sock, QS_SOMAXCONN ) == -1 )
 			{
 				qs_close_socket( &sock, "listen" );
 				break;
@@ -1250,6 +1285,113 @@ QS_SOCKET_ID qs_wait_client_socket(QS_SOCKET_ID sock,QS_SOCKET_OPTION *option)
 	return sock;
 }
 
+QS_SOCKET_ID qs_accept(QS_SOCKET_OPTION *option)
+{
+	QS_SOCKET_ID result_acc = -1;
+	QS_SERVER_CONNECTION_INFO *child;
+	QS_SOCKET_ID acc;
+	int i;
+	struct sockaddr_storage from;
+	socklen_t len = (socklen_t) sizeof(from);
+	if (-1 == (acc = accept(option->sockid, (struct sockaddr *) &from, &len))) {
+		//if (errno != 0 && errno != EINTR && errno != EAGAIN) {
+#ifdef __WINDOWS__
+		if (errno != 0 && errno != EAGAIN && errno != ENOENT && WSAGetLastError() != WSAEWOULDBLOCK)
+#else
+		if (errno != 0 && errno != EAGAIN)
+#endif
+		{
+			perror("accept");
+		}
+	}
+	if (acc == -1 && option->sockid6 != -1) {
+		if (-1 == (acc = accept(option->sockid6, (struct sockaddr *) &from, &len))) {
+			//if (errno != 0 && errno != EINTR && errno != EAGAIN) {
+#ifdef __WINDOWS__
+			if (errno != 0 && errno != EAGAIN && errno != ENOENT && WSAGetLastError() != WSAEWOULDBLOCK)
+#else
+			if (errno != 0 && errno != EAGAIN)
+#endif
+			{
+				perror("accept");
+			}
+		}
+	}
+	if (acc != -1)
+	{
+		int32_t* wait_id = (int32_t*)qs_get_chain(option->memory_pool, option->memid_accept_wait_pool, NULL);
+		if (NULL != wait_id) {
+			QS_SERVER_CONNECTION_INFO* current = (QS_SERVER_CONNECTION_INFO*)qs_offsetpointer(option->memory_pool, option->connection_munit, sizeof(QS_SERVER_CONNECTION_INFO), *wait_id);
+			child = current;
+			do {
+				if (child->id == -1)
+				{
+					if (0 != getnameinfo((struct sockaddr *) &from, len, child->hbuf, sizeof(child->hbuf), child->sbuf, sizeof(child->sbuf), NI_NUMERICHOST | NI_NUMERICSERV))
+					{
+						printf("getnameinfo error.\n");
+						break;
+					}
+					child->id = acc;
+					result_acc = acc;
+					child->sockparam.acc = child->id;
+					if (option->socket_type == SOCKET_TYPE_SERVER_UDP) {
+						child->sockparam.type = SOCK_TYPE_NORMAL_UDP;
+					}
+					else {
+						child->sockparam.type = SOCK_TYPE_NORMAL_TCP;
+					}
+					qs_set_block(child->id, 0);
+					//qs_initialize_connection_info(option, child);
+					if (option->connection_start_callback != NULL) {
+						option->connection_start_callback((void*)child);
+					}
+					acc = -1;
+					break;
+				}
+			} while (false);
+			qs_remove_chain(option->memory_pool, option->memid_accept_wait_pool, (void*)wait_id);
+		}
+	}
+	if (acc != -1)
+	{
+		QS_SERVER_CONNECTION_INFO* current = (QS_SERVER_CONNECTION_INFO*)qs_offsetpointer(option->memory_pool, option->connection_munit, sizeof(QS_SERVER_CONNECTION_INFO), 0);
+		for (i = 0; i < option->maxconnection; i++)
+		{
+			child = current++;
+			if (child->id == -1)
+			{
+				if (0 != getnameinfo((struct sockaddr *) &from, len, child->hbuf, sizeof(child->hbuf), child->sbuf, sizeof(child->sbuf), NI_NUMERICHOST | NI_NUMERICSERV))
+				{
+					printf("getnameinfo error.\n");
+					break;
+				}
+				child->id = acc;
+				result_acc = acc;
+				child->sockparam.acc = child->id;
+				if (option->socket_type == SOCKET_TYPE_SERVER_UDP) {
+					child->sockparam.type = SOCK_TYPE_NORMAL_UDP;
+				}
+				else {
+					child->sockparam.type = SOCK_TYPE_NORMAL_TCP;
+				}
+				qs_set_block(child->id, 0);
+				//qs_initialize_connection_info(option, child);
+				if (option->connection_start_callback != NULL) {
+					option->connection_start_callback((void*)child);
+				}
+				break;
+			}
+			else {
+				if (i == option->maxconnection - 1) {
+					printf("connection is full\n");
+					qs_close_socket(&acc, NULL);
+				}
+			}
+		}
+	}
+	return result_acc;
+}
+
 int qs_check_socket_error(QS_SOCKET_ID sock)
 {
 	int getopt_val;
@@ -1288,10 +1430,10 @@ void qs_disconnect( QS_SOCKPARAM *psockparam )
 	psockparam->c_status = PROTOCOL_STATUS_DEFAULT;
 }
 
-void* qs_make_socket( QS_SOCKET_OPTION *option )
+int32_t qs_make_socket( QS_SOCKET_OPTION *option )
 {
 	if( option == NULL || option->memory_pool == NULL ){
-		return NULL;
+		return -1;
 	}
 	if( option->socket_type==SOCKET_TYPE_SERVER_TCP || option->socket_type==SOCKET_TYPE_SERVER_UDP){
 		if( ( option->sockid = qs_server_socket( option, 0 ) ) <= 0 ){
@@ -1300,7 +1442,7 @@ void* qs_make_socket( QS_SOCKET_OPTION *option )
 					(char *)qs_upointer( option->memory_pool,option->host_name_munit )
 				  );
 			option->sockid=0;
-			return NULL;
+			return -1;
 		}
 		if( ( option->inetflag & INET_FLAG_BIT_IPV6 ) != 0 ){
 			if( ( option->sockid6 = qs_server_socket( option, 1 ) ) <= 0 ){
@@ -1309,7 +1451,7 @@ void* qs_make_socket( QS_SOCKET_OPTION *option )
 						(char *)qs_upointer( option->memory_pool,option->host_name_munit )
 					  );
 				option->sockid6 = -1;
-				return NULL;
+				return -1;
 			}
 		}
 		qs_set_sock_option( option );
@@ -1320,18 +1462,18 @@ void* qs_make_socket( QS_SOCKET_OPTION *option )
 				(char *)qs_upointer( option->memory_pool,option->port_num_munit ),
 				(char *)qs_upointer( option->memory_pool,option->host_name_munit )
 			);
-			return NULL;
+			return -1;
 		}
 		qs_set_sock_option( option );
 	}
-	return NULL;
+	return 0;
 }
 
-void* qs_socket( QS_SOCKET_OPTION *option )
+int32_t qs_socket( QS_SOCKET_OPTION *option )
 {
 	if( option == NULL || option->memory_pool == NULL ){
 		printf("empty memory error\n");
-		return ( (void *) NULL );
+		return -1;
 	}
 	switch( option->socket_type )
 	{
@@ -1339,32 +1481,38 @@ void* qs_socket( QS_SOCKET_OPTION *option )
 		case SOCKET_TYPE_SERVER_UDP:
 			if( -1 == ( option->sockid = qs_server_socket( option, 0 ) ) )
 			{
-				break;
+				printf("qs_server_socket error\n");
+				return -1;
 			}
 			if( ( option->inetflag & INET_FLAG_BIT_IPV6 ) != 0 )
 			{
 				if( -1 == ( option->sockid6 = qs_server_socket( option, 1 ) ) )
 				{
+					printf("qs_server_socket v6 error\n");
 					option->sockid6 = -1;
 					qs_close_socket(&option->sockid,NULL);
-					break;
+					return -1;
 				}
 			}
 			qs_set_sock_option( option );
-			qs_nonblocking_server(option);
+			if (-1 == qs_nonblocking_server(option)) {
+				printf("qs_nonblocking_server error\n");
+				return -1;
+			}
 			break;
 		case SOCKET_TYPE_CLIENT_TCP:
 		case SOCKET_TYPE_CLIENT_UDP:
 			if( -1 == ( option->sockid = qs_client_socket( option ) ) )
 			{
-				break;
+				printf("qs_client_socket error\n");
+				return -1;
 			}
 			qs_set_sock_option( option );
 			qs_nonblocking_client(option);
 			break;
 		default:
 			printf( "socket_type error\n" );
-			break;
+			return -1;
 	}
 
 	if(option->sockid==-1){
@@ -1373,9 +1521,10 @@ void* qs_socket( QS_SOCKET_OPTION *option )
 			, (char *)qs_upointer( option->memory_pool,option->port_num_munit )
 			, (char *)qs_upointer( option->memory_pool,option->host_name_munit )
 		);
+		return -1;
 	}
 
-	return ( (void *) NULL );
+	return 0;
 }
 
 /*
@@ -1419,13 +1568,13 @@ void qs_recv_event(QS_SOCKET_OPTION *option, QS_SERVER_CONNECTION_INFO *child, s
 #ifdef __WINDOWS__
 		if (WSAGetLastError() != WSAEWOULDBLOCK) {
 			//perror("recv 0byte");
-			qs_close_socket(&child->id, NULL);
+			qs_add_accept_pool(option, child);
 		}
 #else
 		if (errno != 0 && errno != EAGAIN && errno != EWOULDBLOCK){
 			//perror("recv 0byte");
 		}
-		qs_close_socket(&child->id, NULL);
+		qs_add_accept_pool(option, child);
 #endif
 		return;
 	}
@@ -1453,7 +1602,7 @@ void qs_recv_event(QS_SOCKET_OPTION *option, QS_SERVER_CONNECTION_INFO *child, s
 		{
 		case -1:
 			//printf("qs_recv_event error\n");
-			qs_close_socket(&child->id, NULL);
+			qs_add_accept_pool(option, child);
 			break;
 		case 1:
 			if (option->plane_recv_callback != NULL){
@@ -1463,7 +1612,7 @@ void qs_recv_event(QS_SOCKET_OPTION *option, QS_SERVER_CONNECTION_INFO *child, s
 				option->payload_recv_callback(child->sockparam.payload_type, (uint8_t*)QS_GET_POINTER(option->memory_pool, rinfo->recvbuf_munit), rinfo->recvlen, rinfo);
 			}
 			if (child->sockparam.c_status == PROTOCOL_STATUS_DEFAULT){
-					qs_close_socket(&child->id, NULL);
+				qs_add_accept_pool(option, child);
 			}
 			break;
 		}
@@ -1479,7 +1628,7 @@ void qs_recv_event(QS_SOCKET_OPTION *option, QS_SERVER_CONNECTION_INFO *child, s
 	}while( child->sockparam.continue_pos > 0 && -1 != child->id );
 }
 
-void qs_nonblocking_server(QS_SOCKET_OPTION *option)
+int32_t qs_nonblocking_server(QS_SOCKET_OPTION *option)
 {
 	if (option->socket_type == SOCKET_TYPE_SERVER_UDP)
 	{
@@ -1490,12 +1639,13 @@ void qs_nonblocking_server(QS_SOCKET_OPTION *option)
 	}
 	if( -1 == qs_make_connection_info( option ) ){
 		printf("qs_make_connection_info error.");
-		return;
+		return -1;
 	}
 	qs_set_block(option->sockid, 0);
 	if (option->sockid6 != -1) {
 		qs_set_block(option->sockid6, 0);
 	}
+	return 0;
 }
 
 void qs_server_update(QS_SOCKET_OPTION *option)
@@ -1506,75 +1656,19 @@ void qs_server_update(QS_SOCKET_OPTION *option)
 	size_t buffer_size = sizeof(char) * (option->recvbuffer_size);
 	socklen_t srlen;
 	QS_SERVER_CONNECTION_INFO *child;
-	socklen_t len;
+	int i;
+	for (i = 0; i < option->maxconnection; i++) {
+		if (-1 == qs_accept(option)) {
+			break;
+		}
+	}
 	if (option->socket_type == SOCKET_TYPE_SERVER_TCP)
 	{
-		QS_SOCKET_ID acc;
-		int i;
-		struct sockaddr_storage from;
-		len = (socklen_t) sizeof(from);
-		if (-1 == (acc = accept(option->sockid, (struct sockaddr *) &from, &len))) {
-			//if (errno != 0 && errno != EINTR && errno != EAGAIN) {
-#ifdef __WINDOWS__
-			if (errno != 0 && errno != EAGAIN && errno != ENOENT && WSAGetLastError() != WSAEWOULDBLOCK)
-#else
-			if (errno != 0 && errno != EAGAIN)
-#endif
-			{
-				perror("accept");
-			}
-		}
-		if (acc == -1 && option->sockid6 != -1) {
-			if (-1 == (acc = accept(option->sockid6, (struct sockaddr *) &from, &len))) {
-				//if (errno != 0 && errno != EINTR && errno != EAGAIN) {
-#ifdef __WINDOWS__
-				if (errno != 0 && errno != EAGAIN && errno != ENOENT && WSAGetLastError() != WSAEWOULDBLOCK)
-#else
-				if (errno != 0 && errno != EAGAIN)
-#endif
-				{
-					perror("accept");
-				}
-			}
-		}
-		if (acc != -1)
-		{
-			for (i = 0; i < option->maxconnection; i++)
-			{
-				child = (QS_SERVER_CONNECTION_INFO*)qs_offsetpointer(option->memory_pool, option->connection_munit, sizeof(QS_SERVER_CONNECTION_INFO), i);
-				if (child->id == -1)
-				{
-					if ( 0 != getnameinfo((struct sockaddr *) &from, len, child->hbuf, sizeof(child->hbuf), child->sbuf, sizeof(child->sbuf), NI_NUMERICHOST | NI_NUMERICSERV) )
-					{
-						printf( "getnameinfo error.\n" );
-						break;
-					}
-					child->id = acc;
-					child->sockparam.acc = child->id;
-					if (option->socket_type == SOCKET_TYPE_SERVER_UDP){
-						child->sockparam.type = SOCK_TYPE_NORMAL_UDP;
-					}
-					else{
-						child->sockparam.type = SOCK_TYPE_NORMAL_TCP;
-					}
-					qs_set_block(child->id, 0);
-					qs_initialize_connection_info(option, child);
-					if (option->connection_start_callback != NULL){
-						option->connection_start_callback((void*)child);
-					}
-					break;
-				}
-				else{
-					if( i == option->maxconnection-1 ){
-						printf("connection is full\n");
-						qs_close_socket(&acc, NULL);
-					}
-				}
-			}
-		}
+
+		QS_SERVER_CONNECTION_INFO* current = (QS_SERVER_CONNECTION_INFO*)qs_offsetpointer(option->memory_pool, option->connection_munit, sizeof(QS_SERVER_CONNECTION_INFO), 0);
 		for (i = 0; i < option->maxconnection; i++)
 		{
-			child = (QS_SERVER_CONNECTION_INFO*)qs_offsetpointer(option->memory_pool, option->connection_munit, sizeof(QS_SERVER_CONNECTION_INFO), i);
+			child = current++;;
 			if (child->id != -1)
 			{
 				if (option->user_recv_function != NULL) {
@@ -1588,23 +1682,19 @@ void qs_server_update(QS_SOCKET_OPTION *option)
 #ifdef __WINDOWS__
 					if (WSAGetLastError() != WSAEWOULDBLOCK) {
 						perror("recv");
-						qs_close_socket(&child->id, NULL);
+						qs_add_accept_pool(option, child);
 					}
 #else
 					if (errno != 0 && errno != EAGAIN && errno != EWOULDBLOCK){
 						perror("recv");
-						qs_close_socket(&child->id, NULL);
+						qs_add_accept_pool(option, child);
 					}
 #endif
 				}
 				qs_recv_event(option,child,srlen);
 				if (child->id == -1)
 				{
-					if (option->close_callback != NULL)
-					{
-						option->close_callback(child);
-					}
-					qs_free_sockparam(option, &child->sockparam);
+					qs_close_socket_common(option, child, 0);
 				}
 			}
 		}
@@ -1694,24 +1784,20 @@ void qs_client_update(QS_SOCKET_OPTION *option)
 				if (error_id != WSAEWOULDBLOCK) {
 					printf("error : %d\n",error_id);
 					perror("recv");
-					qs_close_socket(&child->id, NULL);
+					qs_add_accept_pool(option, child);
 				}
 #else
 				if (errno != 0 && errno != EAGAIN)
 				{
 					perror("recv");
-					qs_close_socket(&child->id, NULL);
+					qs_add_accept_pool(option, child);
 				}
 #endif
 			}
 			qs_recv_event(option,child,srlen);
 			if (child->id == -1)
 			{
-				qs_free_sockparam(option, &child->sockparam);
-				if (option->close_callback != NULL)
-				{
-					option->close_callback(child);
-				}
+				qs_close_socket_common(option, child, 0);
 			}
 		}
 	}
