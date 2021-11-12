@@ -53,7 +53,7 @@ typedef struct QS_SERVER_CONTEXT
 	QS_EVENT_FUNCTION on_close;
 } QS_SERVER_CONTEXT;
 
-int api_qs_init(QS_SERVER_CONTEXT** ppcontext);
+int api_qs_init(QS_SERVER_CONTEXT** ppcontext, int port);
 void api_qs_set_on_connect_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_connect );
 void api_qs_set_on_packet_recv_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_recv );
 void api_qs_set_on_close_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_close );

@@ -38,7 +38,7 @@ int main( int argc, char *argv[], char *envp[] )
 	SetConsoleOutputCP(CP_UTF8);
 #endif
 	QS_SERVER_CONTEXT* context = 0;
-	if(0 > api_qs_init(&context)){
+	if(0 > api_qs_init(&context,8080)){
 		return -1;
 	}
 	api_qs_set_on_connect_event(context, on_connect );

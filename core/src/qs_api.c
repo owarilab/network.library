@@ -27,7 +27,7 @@
 
 #include "qs_api.h"
 
-int api_qs_init(QS_SERVER_CONTEXT** ppcontext)
+int api_qs_init(QS_SERVER_CONTEXT** ppcontext, int port)
 {
 	if( ( (*ppcontext) = ( QS_SERVER_CONTEXT * )malloc( sizeof( QS_SERVER_CONTEXT ) ) ) == NULL ){
 		return -1;
@@ -40,8 +40,8 @@ int api_qs_init(QS_SERVER_CONTEXT** ppcontext)
 	context->current_time = time(NULL);
 	context->update_time = 0;
 	QS_MEMORY_POOL* main_memory_pool = NULL;
-	int32_t maxconnection = 1000;
-	if( qs_initialize_memory( &main_memory_pool, SIZE_MBYTE * 650, SIZE_MBYTE * 650, MEMORY_ALIGNMENT_SIZE_BIT_64, FIX_MUNIT_SIZE, 1, SIZE_KBYTE * 16 ) <= 0 ){
+	int32_t maxconnection = 100;
+	if( qs_initialize_memory( &main_memory_pool, SIZE_MBYTE * 16, SIZE_MBYTE * 16, MEMORY_ALIGNMENT_SIZE_BIT_64, FIX_MUNIT_SIZE, 1, SIZE_KBYTE * 16 ) <= 0 ){
 		free(context); context=NULL;
 		return -2;
 	}
@@ -58,7 +58,7 @@ int api_qs_init(QS_SERVER_CONTEXT** ppcontext)
 	QS_SOCKET_OPTION* server = (QS_SOCKET_OPTION*)QS_GET_POINTER(main_memory_pool, server_munit);
 	char portnum[32];
 	memset( portnum, 0, sizeof( portnum ) );
-	snprintf( portnum, sizeof( portnum ) -1, "%d", 8080 );
+	snprintf( portnum, sizeof( portnum ) -1, "%d", port );
 	if (-1 == qs_initialize_socket_option(server, NULL, portnum, SOCKET_TYPE_SERVER_TCP, SOCKET_MODE_NONBLOCKING, PROTOCOL_PLAIN, maxconnection, main_memory_pool, NULL)) {
 		free(context); context=NULL;
 		return -5;
@@ -80,6 +80,7 @@ int api_qs_init(QS_SERVER_CONTEXT** ppcontext)
 	qs_initialize_scheduler_high_speed(scheduler);
 	context->memid_scheduler = memid_scheduler;
 	server->application_data = (void*)context;
+	//qs_memory_info(main_memory_pool);
 	return 0;
 }
 void api_qs_set_on_connect_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_connect )
