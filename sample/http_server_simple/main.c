@@ -46,6 +46,7 @@ int main( int argc, char *argv[], char *envp[] )
 	api_qs_set_on_close_event(context, on_close );
 	for(;;){
 		api_qs_update(context);
+		api_qs_sleep(context);
 	}
 	api_qs_free(context);
 	return 0;

@@ -98,16 +98,21 @@ void api_qs_update(QS_SERVER_CONTEXT* context)
 {
 	QS_MEMORY_POOL* main_memory_pool = (QS_MEMORY_POOL*)context->memory;
 	QS_SOCKET_OPTION* server = (QS_SOCKET_OPTION*)QS_GET_POINTER(main_memory_pool, context->memid_server);
-	SYSTEM_UPDATE_SCHEDULER* scheduler = (SYSTEM_UPDATE_SCHEDULER*)QS_GET_POINTER(main_memory_pool, context->memid_scheduler);
 	context->current_time = time(NULL);
 	if (context->current_time - context->update_time > 60) {
 		if( QS_SYSTEM_ERROR == qs_log_rotate(&server->log_access_file_info, "./", "access", 0)){}
 		if( QS_SYSTEM_ERROR == qs_log_rotate(&server->log_error_file_info, "./", "error", 0)){}
 		context->update_time = context->current_time;
 	}
+	qs_server_update(server);
+}
+
+void api_qs_sleep(QS_SERVER_CONTEXT* context)
+{
+	QS_MEMORY_POOL* main_memory_pool = (QS_MEMORY_POOL*)context->memory;
+	SYSTEM_UPDATE_SCHEDULER* scheduler = (SYSTEM_UPDATE_SCHEDULER*)QS_GET_POINTER(main_memory_pool, context->memid_scheduler);
 	qs_sleep(scheduler->sleep_time);
 	qs_update_scheduler(scheduler);
-	qs_server_update(server);
 }
 
 void api_qs_free(QS_SERVER_CONTEXT* context)
