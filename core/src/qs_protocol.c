@@ -614,7 +614,8 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 			break;
 		}
 		//response
-		int32_t response_buffer_munit = qs_create_memory_block(temporary_memory,http_request->file_info.size+SIZE_KBYTE);
+		size_t header_size = SIZE_KBYTE * 2;
+		int32_t response_buffer_munit = qs_create_memory_block(temporary_memory,http_request->file_info.size+header_size);
 		if( -1 == response_buffer_munit ){
 			break;
 		}

@@ -37,6 +37,19 @@ int main( int argc, char *argv[], char *envp[] )
 #ifdef __WINDOWS__
 	SetConsoleOutputCP(CP_UTF8);
 #endif
+
+	QS_SERVER_SCRIPT_CONTEXT script;
+	if(-1==api_qs_script_init(&script, "./server.conf")){
+		return -1;
+	}
+	if(-1==api_qs_script_run(&script)){
+		return -1;
+	}
+	if(0!=api_qs_script_get_parameter(&script,"server_port")){
+		printf("config.server_port : %s\n" , api_qs_script_get_parameter(&script,"server_port"));
+	}
+	api_qs_script_free(&script);
+
 	QS_SERVER_CONTEXT* context = 0;
 	if(0 > api_qs_init(&context,8080)){
 		return -1;

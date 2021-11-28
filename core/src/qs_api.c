@@ -258,7 +258,7 @@ char* api_qs_get_http_path(void* params)
 	QS_HTTP_REQUEST_COMMON* http_request = (QS_HTTP_REQUEST_COMMON*)context->system_data;
 	return http_request->request;
 }
-char* api_qs_get_http_get_parameter(void* params, char* name)
+char* api_qs_get_http_get_parameter(void* params, const char* name)
 {
 	QS_RECV_INFO *rinfo = (QS_RECV_INFO *)params;
 	QS_SERVER_CONNECTION_INFO * tinfo = (QS_SERVER_CONNECTION_INFO *)rinfo->tinfo;
@@ -274,7 +274,7 @@ char* api_qs_get_http_get_parameter(void* params, char* name)
 	char* value = (char*)QS_GET_POINTER(http_request->temporary_memory, qs_get_hash(http_request->temporary_memory, http_request->memid_get_parameter_hash, name));
 	return value;
 }
-char* api_qs_get_http_post_parameter(void* params, char* name)
+char* api_qs_get_http_post_parameter(void* params, const char* name)
 {
 	QS_RECV_INFO *rinfo = (QS_RECV_INFO *)params;
 	QS_SERVER_CONNECTION_INFO * tinfo = (QS_SERVER_CONNECTION_INFO *)rinfo->tinfo;
@@ -290,10 +290,64 @@ char* api_qs_get_http_post_parameter(void* params, char* name)
 	char* value = (char*)QS_GET_POINTER(http_request->temporary_memory, qs_get_hash(http_request->temporary_memory, http_request->memid_post_parameter_hash, name));
 	return value;
 }
-void api_qs_send_response(void* params, char* response)
+void api_qs_send_response(void* params, const char* response)
 {
 	QS_RECV_INFO *rinfo = (QS_RECV_INFO *)params;
 	QS_SERVER_CONNECTION_INFO * tinfo = (QS_SERVER_CONNECTION_INFO *)rinfo->tinfo;
 	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
 	qs_send( option, &tinfo->sockparam, response, qs_strlen( response ), 0 );
+}
+QS_SERVER_CONTEXT* api_qs_get_server_context(QS_EVENT_PARAMETER params)
+{
+	QS_RECV_INFO *rinfo = (QS_RECV_INFO *)params;
+	QS_SERVER_CONNECTION_INFO * tinfo = (QS_SERVER_CONNECTION_INFO *)rinfo->tinfo;
+	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
+	QS_SERVER_CONTEXT* context = (QS_SERVER_CONTEXT*)option->application_data;
+	return context;
+}
+int api_qs_script_init(QS_SERVER_SCRIPT_CONTEXT* script_context,const char* file_path)
+{
+	QS_MEMORY_POOL * script_memory = NULL;
+	if( qs_initialize_memory( &script_memory, SIZE_MBYTE * 1, SIZE_MBYTE * 1, MEMORY_ALIGNMENT_SIZE_BIT_64, FIX_MUNIT_SIZE, 1, SIZE_KBYTE * 16 ) <= 0 ){
+		return -1;
+	}
+	if( -1 == ( script_context->memid_script = qs_init_script( script_memory, 256, 64, 256 ) ) ){
+		return -1;
+	}
+	qs_add_system_function( script_memory, script_context->memid_script, "echo", qs_script_system_function_echo, 0 );
+	qs_add_system_function( script_memory, script_context->memid_script, "count", qs_script_system_function_count, 0 );
+	qs_add_system_function( script_memory, script_context->memid_script, "file_exist", qs_script_system_function_file_exist, 0 );
+	qs_add_system_function( script_memory, script_context->memid_script, "file_size", qs_script_system_function_file_size, 0 );
+	qs_add_system_function( script_memory, script_context->memid_script, "file_extension", qs_script_system_function_file_extension, 0 );
+	qs_add_system_function( script_memory, script_context->memid_script, "file_get", qs_script_system_function_file_get, 0 );
+	qs_add_system_function( script_memory, script_context->memid_script, "file_put", qs_script_system_function_file_put, 0 );
+	qs_add_system_function( script_memory, script_context->memid_script, "file_add", qs_script_system_function_file_add, 0 );
+	qs_add_system_function( script_memory, script_context->memid_script, "json_encode", qs_script_system_function_json_encode, 0 );
+	qs_add_system_function( script_memory, script_context->memid_script, "json_decode", qs_script_system_function_json_decode, 0 );
+	qs_add_system_function( script_memory, script_context->memid_script, "gmtime", qs_script_system_function_gmtime, 0 );
+	qs_import_script( script_memory, &script_context->memid_script, (char*)file_path );
+	script_context->memory = (void*)script_memory;
+	return 0;
+}
+int api_qs_script_run(QS_SERVER_SCRIPT_CONTEXT* script_context)
+{
+	QS_MEMORY_POOL * script_memory = ( QS_MEMORY_POOL* )(script_context->memory);
+	qs_exec( script_memory, &script_context->memid_script );
+	return 0;
+}
+char* api_qs_script_get_parameter(QS_SERVER_SCRIPT_CONTEXT* script_context, const char* name)
+{
+	QS_MEMORY_POOL * script_memory = ( QS_MEMORY_POOL* )(script_context->memory);
+	QS_SCRIPT *pscript = (QS_SCRIPT *)QS_GET_POINTER(script_memory, script_context->memid_script);
+	int32_t memid_parameter = qs_get_hash(script_memory, pscript->v_hash_munit, name);
+	if(memid_parameter==-1){
+		return 0;
+	}
+	return (char*)QS_GET_POINTER(script_memory,memid_parameter);
+}
+int api_qs_script_free(QS_SERVER_SCRIPT_CONTEXT* script_context)
+{
+	QS_MEMORY_POOL * script_memory = ( QS_MEMORY_POOL* )(script_context->memory);
+	qs_free(script_memory);
+	return 0;
 }

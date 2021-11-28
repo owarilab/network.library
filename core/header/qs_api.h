@@ -35,6 +35,7 @@ extern "C"{
 #include "qs_socket.h"
 #include "qs_protocol.h"
 #include "qs_variable.h"
+#include "qs_script.h"
 
 #define QS_EVENT_PARAMETER void*
 typedef int (*QS_EVENT_FUNCTION)( QS_EVENT_PARAMETER params );
@@ -53,6 +54,12 @@ typedef struct QS_SERVER_CONTEXT
 	QS_EVENT_FUNCTION on_close;
 } QS_SERVER_CONTEXT;
 
+typedef struct QS_SERVER_SCRIPT_CONTEXT
+{
+	int32_t memid_script;
+	void* memory;
+} QS_SERVER_SCRIPT_CONTEXT;
+
 int api_qs_init(QS_SERVER_CONTEXT** ppcontext, int port);
 void api_qs_set_on_connect_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_connect );
 void api_qs_set_on_packet_recv_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_recv );
@@ -69,9 +76,15 @@ int api_qs_core_on_close(QS_SERVER_CONNECTION_INFO* connection);
 
 char* api_qs_get_http_method(QS_EVENT_PARAMETER params);
 char* api_qs_get_http_path(QS_EVENT_PARAMETER params);
-char* api_qs_get_http_get_parameter(QS_EVENT_PARAMETER params, char* name);
-char* api_qs_get_http_post_parameter(QS_EVENT_PARAMETER params, char* name);
-void api_qs_send_response(QS_EVENT_PARAMETER params, char* response);
+char* api_qs_get_http_get_parameter(QS_EVENT_PARAMETER params, const char* name);
+char* api_qs_get_http_post_parameter(QS_EVENT_PARAMETER params, const char* name);
+void api_qs_send_response(QS_EVENT_PARAMETER params, const char* response);
+
+QS_SERVER_CONTEXT* api_qs_get_server_context(QS_EVENT_PARAMETER params);
+int api_qs_script_init(QS_SERVER_SCRIPT_CONTEXT* script_context,const char* file_path);
+int api_qs_script_run(QS_SERVER_SCRIPT_CONTEXT* script_context);
+char* api_qs_script_get_parameter(QS_SERVER_SCRIPT_CONTEXT* script_context, const char* name);
+int api_qs_script_free(QS_SERVER_SCRIPT_CONTEXT* script_context);
 
 #endif /*_QS_API_H_*/
 
