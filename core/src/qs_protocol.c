@@ -687,6 +687,12 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 			response_len = qs_http_add_response_common(response_buffer, response_buffer_size, http_request->http_status_code, "image/png", http_request->file_info.size);
 			is_binary = 1;
 		}
+		else if (!strcmp(http_request->extension, "jpg"))
+		{
+			http_request->http_status_code = 200;
+			response_len = qs_http_add_response_common(response_buffer, response_buffer_size, http_request->http_status_code, "image/jpeg", http_request->file_info.size);
+			is_binary = 1;
+		}
 		else if (!strcmp(http_request->extension, "mp3"))
 		{
 			http_request->http_status_code = 200;
