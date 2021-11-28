@@ -172,7 +172,7 @@ void qs_add_hash_hash(QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name,
 	}
 	QS_HASH_ELEMENT* is_push = qs_add_hash(_ppool, h_munit, namemunit, hash_id, ELEMENT_HASH);
 	if (NULL == is_push) {
-		printf("is_push is NULL\n");
+		printf("[qs_add_hash_hash] is_push is NULL\n");
 	}
 }
 
@@ -191,7 +191,7 @@ void qs_add_hash_value( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* nam
 	memcpy( pbuf, value, qs_usize( _ppool, datamunit ) );
 	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, namemunit, datamunit, id );
 	if( NULL==is_push){
-		printf("is_push is NULL\n");
+		printf("[qs_add_hash_value] is_push is NULL\n");
 	}
 }
 
@@ -207,7 +207,7 @@ void qs_add_hash_array(QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name
 	}
 	QS_HASH_ELEMENT* is_push = qs_add_hash(_ppool, h_munit, namemunit, array_id, ELEMENT_ARRAY);
 	if (NULL == is_push) {
-		printf("is_push is NULL\n");
+		printf("[qs_add_hash_array] is_push is NULL\n");
 	}
 }
 
@@ -229,7 +229,7 @@ void qs_add_hash_array_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const ch
 	}
 	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, namemunit, array_munit, ELEMENT_ARRAY );
 	if( NULL==is_push){
-		printf("is_push is NULL\n");
+		printf("[qs_add_hash_array_string] is_push is NULL\n");
 	}
 }
 
@@ -251,7 +251,7 @@ void qs_add_hash_array_empty_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, co
 	}
 	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, namemunit, array_munit, ELEMENT_ARRAY );
 	if( NULL==is_push){
-		printf("is_push is NULL\n");
+		printf("[qs_add_hash_array_empty_string] is_push is NULL\n");
 	}
 }
 
@@ -299,7 +299,9 @@ QS_HASH_ELEMENT* qs_add_hash_integer( QS_MEMORY_POOL* _ppool, int32_t h_munit, c
 	qs_itoa( value, (char*)QS_GET_POINTER(_ppool,datamunit), data_size );
 	(*(int32_t*)(QS_GET_POINTER(_ppool,datamunit)+data_size-sizeof(int32_t))) = value;
 	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, namemunit, datamunit, ELEMENT_LITERAL_NUM );
-	//if( NULL==is_push){ printf("is_push is NULL\n"); }
+	if( NULL==is_push){
+		printf("[qs_add_hash_integer] is_push is NULL\n");
+	}
 	return is_push;
 }
 
@@ -314,7 +316,7 @@ void qs_add_hash_integer_kint( QS_MEMORY_POOL* _ppool, int32_t h_munit, int32_t 
 	(*(int32_t*)(QS_GET_POINTER(_ppool,datamunit)+data_size-sizeof(int32_t))) = value;
 	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, name_munit, datamunit, ELEMENT_LITERAL_NUM );
 	if( NULL==is_push){
-		printf("is_push is NULL\n");
+		printf("[qs_add_hash_integer_kint] is_push is NULL\n");
 	}
 }
 
@@ -346,7 +348,9 @@ QS_HASH_ELEMENT* qs_add_hash_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, co
 	pbuf = (char*)QS_GET_POINTER( _ppool, datamunit );
 	memcpy( pbuf, value, data_size );
 	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, namemunit, datamunit, ELEMENT_LITERAL_STR );
-	//if( NULL==is_push){printf("is_push is NULL\n");}
+	if( NULL==is_push){
+		printf("[qs_add_hash_string] is_push is NULL\n");
+	}
 	return is_push;
 }
 
@@ -366,7 +370,7 @@ void qs_add_hash_emptystring( QS_MEMORY_POOL* _ppool, int32_t h_munit, const cha
 	pbuf[0] = '\0';
 	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, namemunit, datamunit, ELEMENT_LITERAL_STR );
 	if( NULL==is_push){
-		printf("is_push is NULL\n");
+		printf("[qs_add_hash_emptystring] is_push is NULL\n");
 	}
 }
 
@@ -378,7 +382,7 @@ void qs_add_hash_value_kstring( QS_MEMORY_POOL* _ppool, int32_t h_munit, const c
 	}
 	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, namemunit, data_munit, id );
 	if( NULL==is_push){
-		printf("is_push is NULL\n");
+		printf("[qs_add_hash_value_kstring] is_push is NULL\n");
 	}
 }
 
