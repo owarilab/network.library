@@ -622,6 +622,7 @@ int32_t qs_make_connection_info_core( QS_SOCKET_OPTION *option, QS_SERVER_CONNEC
 	tinfo->qs_socket_option= option;
 	tinfo->create_time = time(NULL);
 	tinfo->update_time = tinfo->create_time;
+	tinfo->recv_counter = 0;
 	if( -1 == ( tinfo->recvbuf_munit = qs_create_munit( option->memory_pool, recvbuffer_size, MEMORY_TYPE_DEFAULT ) ) ){
 		return QS_SYSTEM_ERROR;
 	}
@@ -1334,6 +1335,9 @@ QS_SOCKET_ID qs_accept(QS_SOCKET_OPTION *option)
 					child->id = acc;
 					result_acc = acc;
 					child->sockparam.acc = child->id;
+					child->create_time = time(NULL);
+					child->update_time = child->create_time;
+					child->recv_counter = 0;
 					if (option->socket_type == SOCKET_TYPE_SERVER_UDP) {
 						child->sockparam.type = SOCK_TYPE_NORMAL_UDP;
 					}
@@ -1591,7 +1595,7 @@ void qs_recv_event(QS_SOCKET_OPTION *option, QS_SERVER_CONNECTION_INFO *child, s
 	if(option->socket_type == SOCKET_TYPE_SERVER_UDP){
 		child->sockparam.acc = option->sockid;
 	}
-	
+	child->recv_counter++;
 	rinfo->tinfo = child;
 	size_t old_pos = 0;
 	do{
@@ -1664,7 +1668,7 @@ void qs_server_update(QS_SOCKET_OPTION *option)
 	}
 	if (option->socket_type == SOCKET_TYPE_SERVER_TCP)
 	{
-
+		time_t temp_time = time(NULL);
 		QS_SERVER_CONNECTION_INFO* current = (QS_SERVER_CONNECTION_INFO*)qs_offsetpointer(option->memory_pool, option->connection_munit, sizeof(QS_SERVER_CONNECTION_INFO), 0);
 		for (i = 0; i < option->maxconnection; i++)
 		{
@@ -1692,6 +1696,12 @@ void qs_server_update(QS_SOCKET_OPTION *option)
 #endif
 				}
 				qs_recv_event(option,child,srlen);
+				if(child->recv_counter==0){
+					if(temp_time - child->create_time > option->s_usec){
+						//printf("recv timeout\n");
+						qs_add_accept_pool(option, child);
+					}
+				}
 				if (child->id == -1)
 				{
 					qs_close_socket_common(option, child, 0);

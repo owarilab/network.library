@@ -132,6 +132,7 @@ typedef struct QS_SERVER_CONNECTION_INFO
 	char sbuf[NI_MAXHOST];
 	time_t create_time;
 	time_t update_time;
+	uint64_t recv_counter;
 #ifdef __WINDOWS__
 	HANDLE	parentid;
 	HANDLE	currentid;

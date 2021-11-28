@@ -33,7 +33,7 @@
 int32_t qs_inittoken( QS_MEMORY_POOL* _ppool, int32_t allocsize, size_t read_buffer_size )
 {
 	int32_t tokens_munit = -1;
-	if( -1 == ( tokens_munit = qs_create_munit( _ppool, sizeof( QS_TOKENS ), MEMORY_TYPE_DEFAULT ) ) ){
+	if( -1 == ( tokens_munit = qs_create_memory_block( _ppool, sizeof( QS_TOKENS ) ) ) ){
 		return -1;
 	}
 	QS_TOKENS *ptokens = (QS_TOKENS*)QS_GET_POINTER(_ppool,tokens_munit);
@@ -49,6 +49,26 @@ int32_t qs_inittoken( QS_MEMORY_POOL* _ppool, int32_t allocsize, size_t read_buf
 	return tokens_munit;
 }
 
+int32_t qs_resize_token_buffer(QS_MEMORY_POOL* _ppool, int32_t tokens_munit, int32_t memid_currend_buffer, int tokensize)
+{
+	QS_TOKENS *ptokens = (QS_TOKENS*)QS_GET_POINTER(_ppool,tokens_munit);
+	if(memid_currend_buffer==-1){
+		return qs_create_memory_block( _ppool, sizeof( char ) * ptokens->read_buffer_size );
+	}
+#ifdef __QS_DEBUG__
+	printf( "resize token buffer, %zd bytes -> %zd bytes\n" , ptokens->read_buffer_size, ptokens->read_buffer_size*2 );
+#endif
+	ptokens->read_buffer_size = ptokens->read_buffer_size*2;
+	int32_t memid_new_buffer = qs_create_memory_block( _ppool, sizeof( char ) * ptokens->read_buffer_size );
+	if(-1==memid_new_buffer){
+		return -1;
+	}
+	char *tokenbuf = (char*)qs_upointer( _ppool, memid_currend_buffer );
+	char *new_tokenbuf = (char*)qs_upointer( _ppool, memid_new_buffer );
+	memcpy(new_tokenbuf,tokenbuf,tokensize);
+	return memid_new_buffer;
+}
+
 /*
  * analyze input strings
  */
@@ -61,7 +81,7 @@ int qs_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr 
 	int token_type = ID_UNK;
 	int ret = 0;
 	QS_TOKENS *ptokens = (QS_TOKENS*)QS_GET_POINTER(_ppool,tokens_munit);
-	if( -1 == ( tmpbuf_munit = qs_create_munit( _ppool, sizeof( char ) * ptokens->read_buffer_size, MEMORY_TYPE_DEFAULT ) ) ){
+	if( -1 == ( tmpbuf_munit = qs_create_memory_block( _ppool, sizeof( char ) * ptokens->read_buffer_size ) ) ){
 #ifdef __QS_DEBUG__
 		printf("can not allocate memory of tokenbuf\n");
 #endif
@@ -81,12 +101,20 @@ int qs_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr 
 			}
 			break;
 		}
+		// buffer size over
 		if( tokensize >= ptokens->read_buffer_size-8){
-			printf( "token buffer size over\n" );
-			if( 0 == qs_addtoken(_ppool,ptokens,tokenbuf,&tokensize,token_type) ){
-				printf( "add token error.\n" );
-				break;
+			int32_t memid_new_buffer;
+			if(-1==(memid_new_buffer=qs_resize_token_buffer(_ppool,tokens_munit,tmpbuf_munit,tokensize))){
+#ifdef __QS_DEBUG__
+				printf( "token buffer size over\n" );
+#endif
+				return QS_SYSTEM_ERROR;
 			}
+			char *new_tokenbuf = (char*)qs_upointer( _ppool, memid_new_buffer );
+			tokenbuf = new_tokenbuf;
+			ptoken = tokenbuf;
+			qs_free_memory_unit(_ppool,&tmpbuf_munit);
+			tmpbuf_munit = memid_new_buffer;
 		}
 		// "//"
 		if( *pstr == '/' && *(pstr+1) == '/')
@@ -193,12 +221,15 @@ int qs_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr 
 					*(ptoken+(tokensize++)) = *(pstr++);
 				}
 				if( tokensize >= ptokens->read_buffer_size-8){
-					printf( "string buffer size over\n" );
-					if( 0 == qs_addtoken(_ppool,ptokens,tokenbuf,&tokensize,token_type) )
-					{
-						printf( "add token error.\n" );
-						break;
+					int32_t memid_new_buffer;
+					if(-1==(memid_new_buffer=qs_resize_token_buffer(_ppool,tokens_munit,tmpbuf_munit,tokensize))){
+						return QS_SYSTEM_ERROR;
 					}
+					char *new_tokenbuf = (char*)qs_upointer( _ppool, memid_new_buffer );
+					tokenbuf = new_tokenbuf;
+					ptoken = tokenbuf;
+					qs_free_memory_unit(_ppool,&tmpbuf_munit);
+					tmpbuf_munit = memid_new_buffer;
 				}
 			}
 			if( 0 == qs_addtoken(_ppool,ptokens,tokenbuf,&tokensize,token_type) )
@@ -233,12 +264,15 @@ int qs_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr 
 					*(ptoken+(tokensize++)) = *(pstr++);
 //				}
 				if( tokensize >= ptokens->read_buffer_size-8){
-					printf( "string buffer size over\n" );
-					if( 0 == qs_addtoken(_ppool,ptokens,tokenbuf,&tokensize,token_type) )
-					{
-						printf( "add token error.\n" );
-						break;
+					int32_t memid_new_buffer;
+					if(-1==(memid_new_buffer=qs_resize_token_buffer(_ppool,tokens_munit,tmpbuf_munit,tokensize))){
+						return QS_SYSTEM_ERROR;
 					}
+					char *new_tokenbuf = (char*)qs_upointer( _ppool, memid_new_buffer );
+					tokenbuf = new_tokenbuf;
+					ptoken = tokenbuf;
+					qs_free_memory_unit(_ppool,&tmpbuf_munit);
+					tmpbuf_munit = memid_new_buffer;
 				}
 			}
 			if( 0 == qs_addtoken(_ppool,ptokens,tokenbuf,&tokensize,token_type) )
@@ -437,7 +471,7 @@ int qs_addtoken( QS_MEMORY_POOL* _ppool, QS_TOKENS *ptokens, char* tokenbuf, int
 	QS_TOKEN *ptoken = NULL;
 	if( ptokens->token_munit == -1 )
 	{
-		if( -1 == ( ptokens->token_munit = qs_create_munit( _ppool, sizeof( QS_TOKEN ) * ptokens->allocsize, MEMORY_TYPE_DEFAULT ) ) ){
+		if( -1 == ( ptokens->token_munit = qs_create_memory_block( _ppool, sizeof( QS_TOKEN ) * ptokens->allocsize ) ) ){
 			return -1;
 		}
 		ptokens->size = ptokens->allocsize;
@@ -446,7 +480,7 @@ int qs_addtoken( QS_MEMORY_POOL* _ppool, QS_TOKENS *ptokens, char* tokenbuf, int
 		if( ptokens->currentpos >= ptokens->size )
 		{
 			int32_t resize = ptokens->size * QS_TOKEN_RESIZE_QUANTITY;
-			if( -1 == ( tmpmunit = qs_create_munit( _ppool, sizeof( QS_TOKEN ) * ( resize ), MEMORY_TYPE_DEFAULT ) ) ){
+			if( -1 == ( tmpmunit = qs_create_memory_block( _ppool, sizeof( QS_TOKEN ) * ( resize ) ) ) ){
 				printf("realloc token memory error\n");
 				return -1;
 			}
@@ -463,7 +497,7 @@ int qs_addtoken( QS_MEMORY_POOL* _ppool, QS_TOKENS *ptokens, char* tokenbuf, int
 	ptoken = ( QS_TOKEN* )QS_GET_POINTER(_ppool,ptokens->token_munit)+ptokens->currentpos;
 	*(tokenbuf+((*tokensize)++)) = '\0';
 	if( type == ID_NUM ){
-		if( -1 == ( ptoken->buf_munit = qs_create_munit( _ppool, sizeof(char)*(*tokensize) + sizeof( int32_t ), MEMORY_TYPE_DEFAULT ) ) ){
+		if( -1 == ( ptoken->buf_munit = qs_create_memory_block( _ppool, sizeof(char)*(*tokensize) + sizeof( int32_t ) ) ) ){
 			printf("allocate token buf munit error.\n");
 			return -1;
 		}
@@ -473,7 +507,7 @@ int qs_addtoken( QS_MEMORY_POOL* _ppool, QS_TOKENS *ptokens, char* tokenbuf, int
 		(*(int32_t*)(QS_GET_POINTER(_ppool,ptoken->buf_munit)+qs_usize(_ppool,ptoken->buf_munit)-sizeof(int32_t))) = atoi(tokenbuf);
 	}
 	else{
-		if( -1 == ( ptoken->buf_munit = qs_create_munit( _ppool, sizeof(char)*(*tokensize), MEMORY_TYPE_DEFAULT ) ) ){
+		if( -1 == ( ptoken->buf_munit = qs_create_memory_block( _ppool, sizeof(char)*(*tokensize) ) ) ){
 			printf("allocate token buf munit error.\n");
 			return -1;
 		}
