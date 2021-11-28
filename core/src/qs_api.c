@@ -41,7 +41,7 @@ int api_qs_init(QS_SERVER_CONTEXT** ppcontext, int port)
 	context->update_time = 0;
 	QS_MEMORY_POOL* main_memory_pool = NULL;
 	int32_t maxconnection = 100;
-	if( qs_initialize_memory( &main_memory_pool, SIZE_MBYTE * 16, SIZE_MBYTE * 16, MEMORY_ALIGNMENT_SIZE_BIT_64, FIX_MUNIT_SIZE, 1, SIZE_KBYTE * 16 ) <= 0 ){
+	if( qs_initialize_memory( &main_memory_pool, SIZE_MBYTE * 24, SIZE_MBYTE * 24, MEMORY_ALIGNMENT_SIZE_BIT_64, FIX_MUNIT_SIZE, 1, SIZE_KBYTE * 16 ) <= 0 ){
 		free(context); context=NULL;
 		return -2;
 	}
