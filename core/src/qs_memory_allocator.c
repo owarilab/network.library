@@ -1283,7 +1283,7 @@ void qs_memory_info( QS_MEMORY_POOL* _ppool )
 	printf(  "total : %lu Byte\n", _ppool->size );
 	printf(  "use   : %lu Byte\n", _ppool->size - freeSize );
 	printf(  "free  : %lu Byte\n", freeSize );
-	printf(  "units : %lu\n", _ppool->unit_size );
+	printf(  "blocks : %lu\n", _ppool->unit_size );
 	printf(  "max size : %lu Byte\n", _ppool->max_size );
 	printf(  "memory top = %p\n", ( (uint8_t*)_ppool->memory ) );
 	printf(  "memory end = %p\n", ( (uint8_t*)_ppool->memory + _ppool->size ) );

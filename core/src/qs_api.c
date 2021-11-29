@@ -27,7 +27,116 @@
 
 #include "qs_api.h"
 
-int api_qs_init(QS_SERVER_CONTEXT** ppcontext, int port)
+int api_qs_memory_alloc(QS_MEMORY_CONTEXT* context, size_t alloc_size)
+{
+	context->memory = NULL;
+	QS_MEMORY_POOL* memory;
+	if( qs_initialize_memory( &memory, alloc_size, alloc_size, MEMORY_ALIGNMENT_SIZE_BIT_64, FIX_MUNIT_SIZE, 1, SIZE_KBYTE * 16 ) <= 0 ){
+		return -1;
+	}
+	context->memory = memory;
+	return 0;
+}
+int api_qs_memory_clean(QS_MEMORY_CONTEXT* context)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	qs_memory_clean(memory);
+	return 0;
+}
+void api_qs_memory_info(QS_MEMORY_CONTEXT* context)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	qs_memory_info(memory);
+}
+int api_qs_memory_free(QS_MEMORY_CONTEXT* context)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	qs_free(memory);
+	return 0;
+}
+int api_qs_array_create(QS_MEMORY_CONTEXT* context, QS_JSON_ELEMENT_ARRAY* array)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	array->memid_array = qs_create_array(memory,8,NUMERIC_BUFFER_SIZE);
+	if(array->memid_array==-1){
+		return -1;
+	}
+	array->memory = (void*)memory;
+	return 0;
+}
+int api_qs_array_push_integer(QS_JSON_ELEMENT_ARRAY* array,int32_t value)
+{
+	if(array->memid_array==-1){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)array->memory;
+	return qs_array_push_integer(memory,&array->memid_array,value);
+}
+int api_qs_array_push_string(QS_JSON_ELEMENT_ARRAY* array,const char* value)
+{
+	if(array->memid_array==-1){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)array->memory;
+	return qs_array_push_string(memory,&array->memid_array,value);
+}
+int api_qs_object_create(QS_MEMORY_CONTEXT* context, QS_JSON_ELEMENT_OBJECT* object)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	object->memid_object = qs_create_hash(memory, 32);
+	if (-1 == object->memid_object) {
+		return -1;
+	}
+	object->memory = (void*)memory;
+	return 0;
+}
+int api_qs_object_push_integer(QS_JSON_ELEMENT_OBJECT* object,const char* name,int32_t value)
+{
+	if(object->memid_object==-1){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)object->memory;
+	QS_HASH_ELEMENT* elm = qs_add_hash_integer(memory,object->memid_object,name,value);
+	if(NULL==elm){
+		return -1;
+	}
+	return 0;
+}
+int api_qs_object_push_string(QS_JSON_ELEMENT_OBJECT* object,const char* name,const char* value)
+{
+	if(object->memid_object==-1){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)object->memory;
+	QS_HASH_ELEMENT* elm = qs_add_hash_string(memory,object->memid_object,name,value);
+	if(NULL==elm){
+		return -1;
+	}
+	return 0;
+}
+int api_qs_object_push_array(QS_JSON_ELEMENT_OBJECT* object,const char* name,QS_JSON_ELEMENT_ARRAY* array)
+{
+	if(object->memid_object==-1){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)object->memory;
+	qs_add_hash_array(memory,object->memid_object,name,array->memid_array);
+	return 0;
+}
+char* api_qs_json_encode_object(QS_JSON_ELEMENT_OBJECT* object,size_t buffer_size)
+{
+	if(object->memid_object==-1){
+		return 0;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)object->memory;
+	int32_t memid_json = qs_json_encode_hash(memory, object->memid_object, buffer_size);
+	if (-1 == memid_json) {
+		return 0;
+	}
+	char* json = (char*)QS_GET_POINTER(memory, memid_json);
+	return json;
+}
+int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port)
 {
 	if( ( (*ppcontext) = ( QS_SERVER_CONTEXT * )malloc( sizeof( QS_SERVER_CONTEXT ) ) ) == NULL ){
 		return -1;

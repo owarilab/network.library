@@ -32,6 +32,8 @@ extern "C"{
 #ifndef _QS_API_H_
 #define _QS_API_H_
 
+#include "qs_array.h"
+#include "qs_hash.h"
 #include "qs_socket.h"
 #include "qs_protocol.h"
 #include "qs_variable.h"
@@ -39,6 +41,11 @@ extern "C"{
 
 #define QS_EVENT_PARAMETER void*
 typedef int (*QS_EVENT_FUNCTION)( QS_EVENT_PARAMETER params );
+
+typedef struct QS_MEMORY_CONTEXT
+{
+	void* memory;
+} QS_MEMORY_CONTEXT;
 
 typedef struct QS_SERVER_CONTEXT
 {
@@ -60,7 +67,32 @@ typedef struct QS_SERVER_SCRIPT_CONTEXT
 	void* memory;
 } QS_SERVER_SCRIPT_CONTEXT;
 
-int api_qs_init(QS_SERVER_CONTEXT** ppcontext, int port);
+typedef struct QS_JSON_ELEMENT_ARRAY
+{
+	int32_t memid_array;
+	void* memory;
+} QS_JSON_ELEMENT_ARRAY;
+
+typedef struct QS_JSON_ELEMENT_OBJECT
+{
+	int32_t memid_object;
+	void* memory;
+} QS_JSON_ELEMENT_OBJECT;
+
+int api_qs_memory_alloc(QS_MEMORY_CONTEXT* context, size_t alloc_size);
+int api_qs_memory_clean(QS_MEMORY_CONTEXT* context);
+void api_qs_memory_info(QS_MEMORY_CONTEXT* context);
+int api_qs_memory_free(QS_MEMORY_CONTEXT* context);
+int api_qs_array_create(QS_MEMORY_CONTEXT* context, QS_JSON_ELEMENT_ARRAY* array);
+int api_qs_array_push_integer(QS_JSON_ELEMENT_ARRAY* array,int32_t value);
+int api_qs_array_push_string(QS_JSON_ELEMENT_ARRAY* array,const char* value);
+int api_qs_object_create(QS_MEMORY_CONTEXT* context, QS_JSON_ELEMENT_OBJECT* object);
+int api_qs_object_push_integer(QS_JSON_ELEMENT_OBJECT* object,const char* name,int32_t value);
+int api_qs_object_push_string(QS_JSON_ELEMENT_OBJECT* object,const char* name,const char* value);
+int api_qs_object_push_array(QS_JSON_ELEMENT_OBJECT* object,const char* name,QS_JSON_ELEMENT_ARRAY* array);
+char* api_qs_json_encode_object(QS_JSON_ELEMENT_OBJECT* object,size_t buffer_size);
+
+int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port);
 void api_qs_set_on_connect_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_connect );
 void api_qs_set_on_packet_recv_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_recv );
 void api_qs_set_on_close_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_close );
