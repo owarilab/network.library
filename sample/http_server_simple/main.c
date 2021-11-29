@@ -50,6 +50,30 @@ int main( int argc, char *argv[], char *envp[] )
 	}
 	api_qs_script_free(&script);
 
+	// json sample
+	{
+		QS_MEMORY_CONTEXT memory;
+		QS_JSON_ELEMENT_ARRAY array;
+		QS_JSON_ELEMENT_ARRAY array2;
+		QS_JSON_ELEMENT_OBJECT object;
+		api_qs_memory_alloc(&memory,1024 * 8);
+		api_qs_array_create(&memory,&array);
+		api_qs_array_create(&memory,&array2);
+		api_qs_array_push_integer(&array,1001);
+		api_qs_array_push_integer(&array,1002);
+		api_qs_array_push_string(&array2,"aaaaaaaaa");
+		api_qs_array_push_string(&array2,"bbbbbbbbb");
+		api_qs_array_push_string(&array2,"cccccccccccc");
+		api_qs_object_create(&memory,&object);
+		api_qs_object_push_integer(&object,"id",111111123);
+		api_qs_object_push_string(&object,"name","hoge");
+		api_qs_object_push_array(&object,"nums",&array);
+		api_qs_object_push_array(&object,"strings",&array2);
+		printf("json test : %s\n" , api_qs_json_encode_object(&object,1024 * 1));
+		api_qs_memory_info(&memory);
+		api_qs_memory_free(&memory);
+	}
+
 	QS_SERVER_CONTEXT* context = 0;
 	if(0 > api_qs_server_init(&context,8080)){
 		return -1;
