@@ -103,7 +103,7 @@ char* api_qs_get_http_post_parameter(QS_EVENT_PARAMETER params, char* name);
 void api_qs_send_response(QS_EVENT_PARAMETER params, char* response);
 
 QS_SERVER_CONTEXT* api_qs_get_server_context(QS_EVENT_PARAMETER params);
-int api_qs_script_init(QS_SERVER_SCRIPT_CONTEXT* script_context,const char* file_path);
+int api_qs_script_init(QS_MEMORY_CONTEXT* memory_context, QS_SERVER_SCRIPT_CONTEXT* script_context,const char* file_path);
 int api_qs_script_run(QS_SERVER_SCRIPT_CONTEXT* script_context);
 char* api_qs_script_get_parameter(QS_SERVER_SCRIPT_CONTEXT* script_context, const char* name);
 int api_qs_script_free(QS_SERVER_SCRIPT_CONTEXT* script_context);

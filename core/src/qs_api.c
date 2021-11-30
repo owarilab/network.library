@@ -289,11 +289,34 @@ void api_qs_exec_websocket(QS_RECV_INFO *rinfo)
 		return;
 	}
 	if( psockparam->tmpmsglen == 0 ){
-		if(rinfo->recvlen==0){ // ping packet
+		if(_tmpmsglen==0){ // ping packet
 			return;
 		}
+		char* msgpbuf = (char*)qs_upointer(option->memory_pool, tinfo->recvmsg_munit);
+		msgpbuf[_tmpmsglen] = '\0';
+		int i;
 		ssize_t ret = 0;
-		if (-1 == (ret = qs_send_all(psockparam->acc, "test", 4, 0))) {}
+		QS_SERVER_CONNECTION_INFO *tmptinfo;
+		if( option->connection_munit != -1 ){
+			int32_t message_buffer_munit = qs_create_munit(temporary_memory,qs_strlen(msgpbuf) + SIZE_KBYTE*8,MEMORY_TYPE_DEFAULT);
+			if(-1==message_buffer_munit){
+				return;
+			}
+			void* buffer = QS_GET_POINTER(temporary_memory,message_buffer_munit);
+			size_t buffer_size = qs_usize(temporary_memory,message_buffer_munit);
+			ssize_t sendlen = qs_make_websocket_msg(buffer,buffer_size,false,msgpbuf,qs_strlen(msgpbuf));
+			if(sendlen==0){
+				return;
+			}
+			for( i = 0; i < option->maxconnection; i++ ){
+				tmptinfo = qs_offsetpointer( option->memory_pool, option->connection_munit, sizeof( QS_SERVER_CONNECTION_INFO ), i );
+				if( tmptinfo->sockparam.acc != -1 && tmptinfo->sockparam.phase == QS_HTTP_SOCK_PHASE_MSG_WEBSOCKET ){
+					if( -1 == ( ret = qs_send_all( tmptinfo->sockparam.acc, buffer, sendlen, 0 ) ) ){
+						qs_close_socket_common(option, tmptinfo, 0);
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -414,12 +437,9 @@ QS_SERVER_CONTEXT* api_qs_get_server_context(QS_EVENT_PARAMETER params)
 	QS_SERVER_CONTEXT* context = (QS_SERVER_CONTEXT*)option->application_data;
 	return context;
 }
-int api_qs_script_init(QS_SERVER_SCRIPT_CONTEXT* script_context,const char* file_path)
+int api_qs_script_init(QS_MEMORY_CONTEXT* memory_context, QS_SERVER_SCRIPT_CONTEXT* script_context,const char* file_path)
 {
-	QS_MEMORY_POOL * script_memory = NULL;
-	if( qs_initialize_memory( &script_memory, SIZE_MBYTE * 1, SIZE_MBYTE * 1, MEMORY_ALIGNMENT_SIZE_BIT_64, FIX_MUNIT_SIZE, 1, SIZE_KBYTE * 16 ) <= 0 ){
-		return -1;
-	}
+	QS_MEMORY_POOL * script_memory = (QS_MEMORY_POOL *)memory_context->memory;
 	if( -1 == ( script_context->memid_script = qs_init_script( script_memory, 256, 64, 256 ) ) ){
 		return -1;
 	}
@@ -453,10 +473,4 @@ char* api_qs_script_get_parameter(QS_SERVER_SCRIPT_CONTEXT* script_context, cons
 		return 0;
 	}
 	return (char*)QS_GET_POINTER(script_memory,memid_parameter);
-}
-int api_qs_script_free(QS_SERVER_SCRIPT_CONTEXT* script_context)
-{
-	QS_MEMORY_POOL * script_memory = ( QS_MEMORY_POOL* )(script_context->memory);
-	qs_free(script_memory);
-	return 0;
 }

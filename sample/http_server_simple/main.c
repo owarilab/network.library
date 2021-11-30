@@ -37,9 +37,10 @@ int main( int argc, char *argv[], char *envp[] )
 #ifdef __WINDOWS__
 	SetConsoleOutputCP(CP_UTF8);
 #endif
-
+	QS_MEMORY_CONTEXT memory;
 	QS_SERVER_SCRIPT_CONTEXT script;
-	if(-1==api_qs_script_init(&script, "./server.conf")){
+	api_qs_memory_alloc(&memory,1024 * 64);
+	if(-1==api_qs_script_init(&memory, &script, "./server.conf")){
 		return -1;
 	}
 	if(-1==api_qs_script_run(&script)){
@@ -48,7 +49,7 @@ int main( int argc, char *argv[], char *envp[] )
 	if(0!=api_qs_script_get_parameter(&script,"server_port")){
 		printf("config.server_port : %s\n" , api_qs_script_get_parameter(&script,"server_port"));
 	}
-	api_qs_script_free(&script);
+	api_qs_memory_free(&memory);
 
 	// json sample
 	{
