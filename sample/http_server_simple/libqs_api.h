@@ -43,6 +43,13 @@ typedef struct QS_MEMORY_CONTEXT
 	void* memory;
 } QS_MEMORY_CONTEXT;
 
+typedef struct QS_KVS_CONTEXT
+{
+	int32_t memid_kvs;
+	int32_t memid_kvs_memory;
+	void* memory;
+} QS_KVS_CONTEXT;
+
 typedef struct QS_SERVER_CONTEXT
 {
 	void* memory;
@@ -55,6 +62,13 @@ typedef struct QS_SERVER_CONTEXT
 	QS_EVENT_FUNCTION on_connect;
 	QS_EVENT_FUNCTION on_recv;
 	QS_EVENT_FUNCTION on_close;
+
+	void* router_memory;
+	int32_t memid_router;
+
+	void* kvs_memory;
+	int32_t memid_kvs_memory;
+	int32_t memid_kvs;
 } QS_SERVER_CONTEXT;
 
 typedef struct QS_SERVER_SCRIPT_CONTEXT
@@ -75,6 +89,7 @@ typedef struct QS_JSON_ELEMENT_OBJECT
 	void* memory;
 } QS_JSON_ELEMENT_OBJECT;
 
+int api_qs_init();
 int api_qs_memory_alloc(QS_MEMORY_CONTEXT* context, size_t alloc_size);
 int api_qs_memory_clean(QS_MEMORY_CONTEXT* context);
 void api_qs_memory_info(QS_MEMORY_CONTEXT* context);
@@ -89,6 +104,9 @@ int api_qs_object_push_array(QS_JSON_ELEMENT_OBJECT* object,const char* name,QS_
 char* api_qs_json_encode_object(QS_JSON_ELEMENT_OBJECT* object,size_t buffer_size);
 
 int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port);
+int api_qs_server_create_router(QS_SERVER_CONTEXT* context);
+int api_qs_server_create_kvs(QS_SERVER_CONTEXT* context);
+int api_qs_server_get_kvs(QS_SERVER_CONTEXT* context,QS_KVS_CONTEXT* kvs_context);
 void api_qs_set_on_connect_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_connect );
 void api_qs_set_on_packet_recv_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_recv );
 void api_qs_set_on_close_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_close );
@@ -98,15 +116,25 @@ void api_qs_free(QS_SERVER_CONTEXT* context);
 
 char* api_qs_get_http_method(QS_EVENT_PARAMETER params);
 char* api_qs_get_http_path(QS_EVENT_PARAMETER params);
-char* api_qs_get_http_get_parameter(QS_EVENT_PARAMETER params, char* name);
-char* api_qs_get_http_post_parameter(QS_EVENT_PARAMETER params, char* name);
-void api_qs_send_response(QS_EVENT_PARAMETER params, char* response);
+char* api_qs_get_http_get_parameter(QS_EVENT_PARAMETER params, const char* name);
+char* api_qs_get_http_post_parameter(QS_EVENT_PARAMETER params, const char* name);
+void api_qs_send_response(QS_EVENT_PARAMETER params, const char* response);
 
 QS_SERVER_CONTEXT* api_qs_get_server_context(QS_EVENT_PARAMETER params);
 int api_qs_script_init(QS_MEMORY_CONTEXT* memory_context, QS_SERVER_SCRIPT_CONTEXT* script_context,const char* file_path);
 int api_qs_script_run(QS_SERVER_SCRIPT_CONTEXT* script_context);
 char* api_qs_script_get_parameter(QS_SERVER_SCRIPT_CONTEXT* script_context, const char* name);
-int api_qs_script_free(QS_SERVER_SCRIPT_CONTEXT* script_context);
+
+int api_qs_kvs_create_b1mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context);
+int api_qs_kvs_set(QS_KVS_CONTEXT* kvs_context,const char* key, const char* value, int32_t life_time);
+char* api_qs_kvs_get(QS_KVS_CONTEXT* kvs_context,const char* key);
+int api_qs_kvs_delete(QS_KVS_CONTEXT* kvs_context,const char* key);
+int api_qs_kvs_keys(QS_JSON_ELEMENT_ARRAY* array, QS_KVS_CONTEXT* kvs_context);
+
+int api_qs_room_create(QS_SERVER_CONTEXT* context, const char* name, QS_MEMORY_CONTEXT* dest_memory, QS_JSON_ELEMENT_OBJECT* dest_object);
+int api_qs_room_list(QS_SERVER_CONTEXT* context, QS_MEMORY_CONTEXT* dest_memory, QS_JSON_ELEMENT_OBJECT* dest_object);
+int api_qs_room_join(QS_SERVER_CONTEXT* context, const char* room_id, const char* connection_id, QS_MEMORY_CONTEXT* dest_memory, QS_JSON_ELEMENT_OBJECT* dest_object);
+int api_qs_http_response_json(QS_EVENT_PARAMETER params, QS_JSON_ELEMENT_OBJECT* object, size_t buffer_size);
 
 #endif /*_QS_API_H_*/
 

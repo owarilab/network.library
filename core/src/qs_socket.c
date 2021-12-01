@@ -1657,7 +1657,7 @@ void qs_server_update(QS_SOCKET_OPTION *option)
 	if (option->mode != SOCKET_MODE_NONBLOCKING) {
 		return;
 	}
-	size_t buffer_size = sizeof(char) * (option->recvbuffer_size);
+	size_t buffer_size = (sizeof(char) * (option->recvbuffer_size)) - 1;
 	socklen_t srlen;
 	QS_SERVER_CONNECTION_INFO *child;
 	int i;

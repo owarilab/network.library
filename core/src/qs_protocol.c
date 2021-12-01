@@ -120,13 +120,17 @@ int qs_http_parser( QS_RECV_INFO *rinfo )
 	char headername[256];
 	char headerparam[2048];
 	method = 0;
-
 	QS_SERVER_CONNECTION_INFO * tinfo = (QS_SERVER_CONNECTION_INFO *)rinfo->tinfo;
 	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
 	char *target = (char*)qs_upointer(option->memory_pool, rinfo->recvbuf_munit);
-	target[rinfo->recvlen] = '\0';
 	QS_SOCKPARAM* psockparam = &tinfo->sockparam;
 	do{
+		if(rinfo->recvlen>=qs_usize(option->memory_pool, rinfo->recvbuf_munit)){
+			//printf("invalid size : %s\n", (char*)qs_upointer(option->memory_pool, rinfo->recvbuf_munit));
+			method = -1;
+			break;
+		}
+		target[rinfo->recvlen] = '\0';
 		target_pt = target;
 		target_pt = qs_read_line_delimiter( headername, sizeof(headername), target_pt, ' ' );
 		if( strcmp( headername, "GET" ) == 0 ){
