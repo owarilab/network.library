@@ -107,6 +107,30 @@ int api_qs_array_push_string(QS_JSON_ELEMENT_ARRAY* array,const char* value)
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)array->memory;
 	return qs_array_push_string(memory,&array->memid_array,value);
 }
+int api_qs_array_push_object(QS_JSON_ELEMENT_ARRAY* array, QS_JSON_ELEMENT_OBJECT* object)
+{
+	if(array->memid_array==-1){
+		return -1;
+	}
+	if(array->memory!=object->memory){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)array->memory;
+	int32_t memid_push = qs_array_push(memory,&array->memid_array,ELEMENT_HASH,object->memid_object);
+	return (memid_push!=-1) ? 0 : -1;
+}
+int api_qs_array_push_array(QS_JSON_ELEMENT_ARRAY* array, QS_JSON_ELEMENT_ARRAY* push_array)
+{
+	if(array->memid_array==-1){
+		return -1;
+	}
+	if(array->memory!=push_array->memory){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)array->memory;
+	int32_t memid_push = qs_array_push(memory,&array->memid_array,ELEMENT_ARRAY,push_array->memid_array);
+	return (memid_push!=-1) ? 0 : -1;
+}
 int api_qs_object_create(QS_MEMORY_CONTEXT* context, QS_JSON_ELEMENT_OBJECT* object)
 {
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
@@ -148,6 +172,15 @@ int api_qs_object_push_array(QS_JSON_ELEMENT_OBJECT* object,const char* name,QS_
 	}
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)object->memory;
 	qs_add_hash_array(memory,object->memid_object,name,array->memid_array);
+	return 0;
+}
+int api_qs_object_push_object(QS_JSON_ELEMENT_OBJECT* object,const char* name,QS_JSON_ELEMENT_OBJECT* push_object)
+{
+	if(object->memid_object==-1){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)object->memory;
+	qs_add_hash_hash(memory,object->memid_object,name,push_object->memid_object);
 	return 0;
 }
 char* api_qs_json_encode_object(QS_JSON_ELEMENT_OBJECT* object,size_t buffer_size)
