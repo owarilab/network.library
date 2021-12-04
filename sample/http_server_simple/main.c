@@ -26,6 +26,7 @@
  */
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include "libqs_api.h"
 
 int on_connect(QS_EVENT_PARAMETER params);
@@ -37,8 +38,20 @@ int main( int argc, char *argv[], char *envp[] )
 #ifdef __WINDOWS__
 	SetConsoleOutputCP(CP_UTF8);
 #endif
+	int server_port = 8080;
+	{
+		QS_MEMORY_CONTEXT memory;
+		api_qs_memory_alloc(&memory,1024 * 32);
+		QS_SERVER_SCRIPT_CONTEXT script;
+		if(-1==api_qs_script_read_file(&memory, &script, "./server.conf")){return -1;}
+		if(-1==api_qs_script_run(&script)){return -1;}
+		if(0!=api_qs_script_get_parameter(&script,"server_port")){
+			server_port = atoi(api_qs_script_get_parameter(&script,"server_port"));
+		}
+		api_qs_memory_free(&memory);
+	}
 	QS_SERVER_CONTEXT* context = 0;
-	if(0 > api_qs_server_init(&context,8080)){
+	if(0 > api_qs_server_init(&context,server_port)){
 		return -1;
 	}
 	if(-1==api_qs_server_create_router(context)){
