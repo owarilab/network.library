@@ -47,6 +47,15 @@ int main( int argc, char *argv[], char *envp[] )
 	if(-1==api_qs_server_create_kvs(context)){
 		return -1;
 	}
+	if(-1==api_qs_server_create_logger_access(context,"./access_log.txt")){
+		return -1;
+	}
+	if(-1==api_qs_server_create_logger_debug(context,"./debug_log.txt")){
+		return -1;
+	}
+	if(-1==api_qs_server_create_logger_error(context,"./error_log.txt")){
+		return -1;
+	}
 	api_qs_set_on_connect_event(context, on_connect );
 	api_qs_set_on_packet_recv_event(context, on_recv );
 	api_qs_set_on_close_event(context, on_close );
