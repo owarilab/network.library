@@ -46,6 +46,7 @@ int32_t qs_inittoken( QS_MEMORY_POOL* _ppool, int32_t allocsize, size_t read_buf
 	ptokens->currentpos = 0;
 	ptokens->workpos = 0;
 	ptokens->allocsize = allocsize;
+	ptokens->enable_newline = 0;
 	return tokens_munit;
 }
 
@@ -138,23 +139,6 @@ int qs_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr 
 			pstr+=2;
 			continue;
 		}
-//		if( *pstr == '\n' )
-//		{
-//			if( tokensize > 0 ){
-//				if( 0 == qs_addtoken(_ppool,ptokens,tokenbuf,&tokensize,token_type) ){
-//					printf("add token error.\n");
-//					break;
-//				}
-//				pstr++;
-//				continue;
-//			}
-//			pstr++;
-//		}
-//		else if( !isascii(*pstr) )
-//		{
-//			printf("invalid char : %c\n", (*pstr) );
-//			break;
-//		}
 		if (*pstr < 0) // ascii = 0 ~ 127
 		{
 			pstr++;
@@ -186,7 +170,6 @@ int qs_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr 
 			++pstr;
 			while(*pstr != '\"')
 			{
-				//if( *pstr == '\0' || *pstr == '\n' || *pstr == '\r' )
 				if( *pstr == '\0' )
 				{
 					//printf("syntax error : \"\n");
@@ -205,18 +188,6 @@ int qs_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr 
 						*(ptoken+(tokensize++)) = *(pstr++);
 					}
 				}
-				// multi byte
-				//else if( ( *pstr >= (char)(0x81) && *pstr <= (char)(0x9f) ) || ( *pstr >= (char)(0xe0) && *pstr <= (char)(0xfc) ) )
-				//{
-				//	int i;
-				//	for( i=0; i<2; i++ ){
-				//		if( *pstr == '\"' ){
-				//			printf( "%d %d\n",(uint8_t)(*(pstr-2)), (uint8_t)(*(pstr-1)) );
-				//			break;
-				//		}
-				//		*(ptoken+(tokensize++)) = *(pstr++);
-				//	}
-				//}
 				else {
 					*(ptoken+(tokensize++)) = *(pstr++);
 				}
@@ -244,25 +215,11 @@ int qs_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr 
 			token_type = ID_STR;
 			++pstr;
 			while(*pstr != '\''){
-				//if( *pstr == '\0' || *pstr == '\n' || *pstr == '\r' )
 				if( *pstr == '\0' ){
 					//printf("syntax error : \'\n");
 					return 1;
 				}
-//				// multi byte
-//				if( ( *pstr >= (char)(0x81) && *pstr <= (char)(0x9f) ) || ( *pstr >= (char)(0xe0) && *pstr <= (char)(0xfc) ) ){
-//					int i;
-//					for( i=0; i<2; i++ ){
-//						if( *pstr == '\'' ){
-//							//printf( "%d %d\n",(uint8_t)(*(pstr-2)), (uint8_t)(*(pstr-1)) );
-//							break;
-//						}
-//						*(ptoken+(tokensize++)) = *(pstr++);
-//					}
-//				}
-//				else {
-					*(ptoken+(tokensize++)) = *(pstr++);
-//				}
+				*(ptoken+(tokensize++)) = *(pstr++);
 				if( tokensize >= ptokens->read_buffer_size-8){
 					int32_t memid_new_buffer;
 					if(-1==(memid_new_buffer=qs_resize_token_buffer(_ppool,tokens_munit,tmpbuf_munit,tokensize))){
@@ -289,9 +246,18 @@ int qs_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr 
 					printf("add token error.\n");
 					break;
 				}
-				pstr++;
 			}
-			else{++pstr;}
+			if(ptokens->enable_newline==1)
+			{
+				if( *pstr == '\n' ){
+					tokenbuf[tokensize++] = '\n';
+					if( 0 == qs_addtoken(_ppool,ptokens,tokenbuf,&tokensize,ID_SYS_NEWLINE) ){
+						printf("add token error.\n");
+						break;
+					}
+				}
+			}
+			++pstr;
 		}
 		else {
 			if( tokensize == 0 ){
@@ -569,6 +535,7 @@ void qs_tokendump( QS_MEMORY_POOL* _ppool, int32_t tokens_munit )
 		,"float"
 		,"loop"
 		,"while"
+		,"newline"
 	};
 	QS_TOKENS *ptokens = (QS_TOKENS*)QS_GET_POINTER( _ppool, tokens_munit );
 	QS_TOKEN *token_list;

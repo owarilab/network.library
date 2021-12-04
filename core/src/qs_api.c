@@ -196,6 +196,50 @@ char* api_qs_json_encode_object(QS_JSON_ELEMENT_OBJECT* object,size_t buffer_siz
 	char* json = (char*)QS_GET_POINTER(memory, memid_json);
 	return json;
 }
+int api_qs_csv_read_file(QS_MEMORY_CONTEXT* context, QS_CSV_CONTEXT* csv, const char* csv_file_path)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	csv->memid_csv = qs_csv_file_load(memory,csv_file_path);
+	if(-1==csv->memid_csv){
+		return -1;
+	}
+	csv->memory = context->memory;
+	return 0; 
+}
+int api_qs_csv_parse(QS_MEMORY_CONTEXT* context, QS_CSV_CONTEXT* csv, const char * src_csv)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	csv->memid_csv = qs_csv_parse(memory,src_csv);
+	if(-1==csv->memid_csv){
+		return -1;
+	}
+	csv->memory = context->memory;
+	return 0; 
+}
+int32_t api_qs_csv_get_line_length(QS_CSV_CONTEXT* csv)
+{
+	if(-1==csv->memid_csv || csv->memory==NULL){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)csv->memory;
+	return qs_csv_get_line_length(memory,csv->memid_csv);
+}
+int32_t api_qs_csv_get_row_length(QS_CSV_CONTEXT* csv, int32_t line_pos)
+{
+	if(-1==csv->memid_csv || csv->memory==NULL){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)csv->memory;
+	return qs_csv_get_row_length(memory,csv->memid_csv,line_pos);
+}
+char* api_qs_csv_get_row(QS_CSV_CONTEXT* csv, int32_t line_pos, int32_t row_pos)
+{
+	if(-1==csv->memid_csv || csv->memory==NULL){
+		return NULL;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)csv->memory;
+	return qs_csv_get_row(memory,csv->memid_csv,line_pos,row_pos);
+}
 int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port)
 {
 	if( ( (*ppcontext) = ( QS_SERVER_CONTEXT * )malloc( sizeof( QS_SERVER_CONTEXT ) ) ) == NULL ){
@@ -315,14 +359,41 @@ void api_qs_set_on_close_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_
 {
 	context->on_close = on_close;
 }
+int api_qs_server_create_logger_access(QS_SERVER_CONTEXT* context,const char* log_file_path)
+{
+	QS_MEMORY_POOL* main_memory_pool = (QS_MEMORY_POOL*)context->memory;
+	QS_SOCKET_OPTION* server = (QS_SOCKET_OPTION*)QS_GET_POINTER(main_memory_pool, context->memid_server);
+	if( QS_SYSTEM_ERROR == qs_log_open(&server->log_access_file_info, log_file_path)){
+		return -1;
+	}
+	return 0;
+}
+int api_qs_server_create_logger_debug(QS_SERVER_CONTEXT* context,const char* log_file_path)
+{
+	QS_MEMORY_POOL* main_memory_pool = (QS_MEMORY_POOL*)context->memory;
+	QS_SOCKET_OPTION* server = (QS_SOCKET_OPTION*)QS_GET_POINTER(main_memory_pool, context->memid_server);
+	if( QS_SYSTEM_ERROR == qs_log_open(&server->log_debug_file_info, log_file_path)){
+		return -1;
+	}
+	return 0;
+}
+int api_qs_server_create_logger_error(QS_SERVER_CONTEXT* context,const char* log_file_path)
+{
+	QS_MEMORY_POOL* main_memory_pool = (QS_MEMORY_POOL*)context->memory;
+	QS_SOCKET_OPTION* server = (QS_SOCKET_OPTION*)QS_GET_POINTER(main_memory_pool, context->memid_server);
+	if( QS_SYSTEM_ERROR == qs_log_open(&server->log_error_file_info, log_file_path)){
+		return -1;
+	}
+	return 0;
+}
 void api_qs_update(QS_SERVER_CONTEXT* context)
 {
 	QS_MEMORY_POOL* main_memory_pool = (QS_MEMORY_POOL*)context->memory;
 	QS_SOCKET_OPTION* server = (QS_SOCKET_OPTION*)QS_GET_POINTER(main_memory_pool, context->memid_server);
 	context->current_time = time(NULL);
 	if (context->current_time - context->update_time > 60) {
-		if( QS_SYSTEM_ERROR == qs_log_rotate(&server->log_access_file_info, "./", "access", 0)){}
-		if( QS_SYSTEM_ERROR == qs_log_rotate(&server->log_error_file_info, "./", "error", 0)){}
+		//if( QS_SYSTEM_ERROR == qs_log_rotate(&server->log_access_file_info, "./", "access", 0)){}
+		//if( QS_SYSTEM_ERROR == qs_log_rotate(&server->log_error_file_info, "./", "error", 0)){}
 		if(-1 != context->memid_router){
 			QS_MEMORY_POOL* router_memory = (QS_MEMORY_POOL*)context->router_memory;
 			qs_update_packet_route(router_memory, context->memid_router);
@@ -636,7 +707,7 @@ QS_SERVER_CONTEXT* api_qs_get_server_context(QS_EVENT_PARAMETER params)
 	QS_SERVER_CONTEXT* context = (QS_SERVER_CONTEXT*)option->application_data;
 	return context;
 }
-int api_qs_script_init(QS_MEMORY_CONTEXT* memory_context, QS_SERVER_SCRIPT_CONTEXT* script_context,const char* file_path)
+int api_qs_script_read_file(QS_MEMORY_CONTEXT* memory_context, QS_SERVER_SCRIPT_CONTEXT* script_context,const char* file_path)
 {
 	QS_MEMORY_POOL * script_memory = (QS_MEMORY_POOL *)memory_context->memory;
 	if( -1 == ( script_context->memid_script = qs_init_script( script_memory, 256, 64, 256 ) ) ){
@@ -656,6 +727,25 @@ int api_qs_script_init(QS_MEMORY_CONTEXT* memory_context, QS_SERVER_SCRIPT_CONTE
 	qs_import_script( script_memory, &script_context->memid_script, (char*)file_path );
 	script_context->memory = (void*)script_memory;
 	return 0;
+}
+int api_qs_script_set_argv_object(QS_SERVER_SCRIPT_CONTEXT* script_context,const char* name, QS_JSON_ELEMENT_OBJECT* object)
+{
+	QS_MEMORY_POOL * script_memory = ( QS_MEMORY_POOL* )(script_context->memory);
+	QS_SCRIPT *script = (QS_SCRIPT *)QS_GET_POINTER( script_memory, script_context->memid_script );
+	qs_add_hash_value_kstring( script_memory, script->v_hash_munit, name, object->memid_object, ELEMENT_HASH );
+	return 0;
+}
+int api_qs_script_set_argv_string(QS_SERVER_SCRIPT_CONTEXT* script_context,const char* name, const char* value)
+{
+	QS_MEMORY_POOL * script_memory = ( QS_MEMORY_POOL* )(script_context->memory);
+	QS_SCRIPT *script = (QS_SCRIPT *)QS_GET_POINTER( script_memory, script_context->memid_script );
+	return (NULL == qs_add_hash_string( script_memory, script->v_hash_munit, name, value )) ? -1 : 0;
+}
+int api_qs_script_set_argv_integer(QS_SERVER_SCRIPT_CONTEXT* script_context,const char* name, int32_t value)
+{
+	QS_MEMORY_POOL * script_memory = ( QS_MEMORY_POOL* )(script_context->memory);
+	QS_SCRIPT *script = (QS_SCRIPT *)QS_GET_POINTER( script_memory, script_context->memid_script );
+	return (NULL == qs_add_hash_integer( script_memory, script->v_hash_munit, name, value )) ? -1 : 0;
 }
 int api_qs_script_run(QS_SERVER_SCRIPT_CONTEXT* script_context)
 {

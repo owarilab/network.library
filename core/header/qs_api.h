@@ -40,6 +40,7 @@ extern "C"{
 #include "qs_script.h"
 #include "qs_packet_route.h"
 #include "qs_random.h"
+#include "qs_csv.h"
 
 #define QS_EVENT_PARAMETER void*
 typedef int (*QS_EVENT_FUNCTION)( QS_EVENT_PARAMETER params );
@@ -95,6 +96,12 @@ typedef struct QS_JSON_ELEMENT_OBJECT
 	void* memory;
 } QS_JSON_ELEMENT_OBJECT;
 
+typedef struct QS_CSV_CONTEXT
+{
+	int32_t memid_csv;
+	void* memory;
+} QS_CSV_CONTEXT;
+
 // private api
 ssize_t api_qs_make_ws_message_common(QS_MEMORY_POOL * temporary_memory,char* connection_id,char* type,char* message,void* buffer,size_t buffer_size);
 
@@ -116,6 +123,12 @@ int api_qs_object_push_array(QS_JSON_ELEMENT_OBJECT* object,const char* name,QS_
 int api_qs_object_push_object(QS_JSON_ELEMENT_OBJECT* object,const char* name,QS_JSON_ELEMENT_OBJECT* push_object);
 char* api_qs_json_encode_object(QS_JSON_ELEMENT_OBJECT* object,size_t buffer_size);
 
+int api_qs_csv_read_file(QS_MEMORY_CONTEXT* context, QS_CSV_CONTEXT* csv, const char* csv_file_path);
+int api_qs_csv_parse(QS_MEMORY_CONTEXT* context, QS_CSV_CONTEXT* csv, const char * src_csv);
+int32_t api_qs_csv_get_line_length(QS_CSV_CONTEXT* csv);
+int32_t api_qs_csv_get_row_length(QS_CSV_CONTEXT* csv, int32_t line_pos);
+char* api_qs_csv_get_row(QS_CSV_CONTEXT* csv, int32_t line_pos, int32_t row_pos);
+
 int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port);
 int api_qs_server_create_router(QS_SERVER_CONTEXT* context);
 int api_qs_server_create_kvs(QS_SERVER_CONTEXT* context);
@@ -123,6 +136,9 @@ int api_qs_server_get_kvs(QS_SERVER_CONTEXT* context,QS_KVS_CONTEXT* kvs_context
 void api_qs_set_on_connect_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_connect );
 void api_qs_set_on_packet_recv_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_recv );
 void api_qs_set_on_close_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_close );
+int api_qs_server_create_logger_access(QS_SERVER_CONTEXT* context,const char* log_file_path);
+int api_qs_server_create_logger_debug(QS_SERVER_CONTEXT* context,const char* log_file_path);
+int api_qs_server_create_logger_error(QS_SERVER_CONTEXT* context,const char* log_file_path);
 void api_qs_update(QS_SERVER_CONTEXT* context);
 void api_qs_sleep(QS_SERVER_CONTEXT* context);
 void api_qs_free(QS_SERVER_CONTEXT* context);
@@ -140,7 +156,10 @@ char* api_qs_get_http_post_parameter(QS_EVENT_PARAMETER params, const char* name
 void api_qs_send_response(QS_EVENT_PARAMETER params, const char* response);
 
 QS_SERVER_CONTEXT* api_qs_get_server_context(QS_EVENT_PARAMETER params);
-int api_qs_script_init(QS_MEMORY_CONTEXT* memory_context, QS_SERVER_SCRIPT_CONTEXT* script_context,const char* file_path);
+int api_qs_script_read_file(QS_MEMORY_CONTEXT* memory_context, QS_SERVER_SCRIPT_CONTEXT* script_context,const char* file_path);
+int api_qs_script_set_argv_object(QS_SERVER_SCRIPT_CONTEXT* script_context,const char* name, QS_JSON_ELEMENT_OBJECT* object);
+int api_qs_script_set_argv_string(QS_SERVER_SCRIPT_CONTEXT* script_context,const char* name, const char* value);
+int api_qs_script_set_argv_integer(QS_SERVER_SCRIPT_CONTEXT* script_context,const char* name, int32_t value);
 int api_qs_script_run(QS_SERVER_SCRIPT_CONTEXT* script_context);
 char* api_qs_script_get_parameter(QS_SERVER_SCRIPT_CONTEXT* script_context, const char* name);
 

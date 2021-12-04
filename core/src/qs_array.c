@@ -180,25 +180,22 @@ int32_t qs_array_push( QS_MEMORY_POOL* _ppool, int32_t* pmunit, int id, int32_t 
 {
 	QS_ARRAY* parray;
 	QS_ARRAY_ELEMENT* elm;
-	int32_t freemunit = -1;
+	int32_t is_push = -1;
 	if( -1 == ( (*pmunit) = qs_resize_array( _ppool, (*pmunit) ) ) ){
 		printf("qs_resize_array error \n");
-		return freemunit;
+		return is_push;
 	}
 	parray = (QS_ARRAY*)QS_GET_POINTER( _ppool, (*pmunit) );
 	elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit );
 	if( parray->len >= parray->max_size ){
 		printf("[debug] parray->len >= parray->max_size\n");
-		return freemunit;
+		return is_push;
 	}
 	elm[parray->len].id = id;
-	if( munit != elm[parray->len].munit && elm[parray->len].munit > 0 )
-	{
-		freemunit = elm[parray->len].munit;
-	}
-	elm[parray->len].munit= munit;
+	elm[parray->len].munit = munit;
 	parray->len++;
-	return freemunit;
+	is_push = 1;
+	return is_push;
 }
 
 int32_t qs_array_push_integer( QS_MEMORY_POOL* _ppool, int32_t* pmunit, int32_t value )

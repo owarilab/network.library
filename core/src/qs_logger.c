@@ -27,7 +27,7 @@
 
 #include "qs_logger.h"
 
-int32_t qs_make_log_file_path(char* dest, size_t dest_size,char* base_path,char* file_name_prefix, time_t offset)
+int32_t qs_make_log_rotate_file_path(char* dest, size_t dest_size,char* base_path,char* file_name_prefix, time_t offset)
 {
 	char* path = dest;
 	size_t path_buffer_len = dest_size;
@@ -51,7 +51,7 @@ int32_t qs_log_rotate(QS_FILE_INFO* log_file_info,char* base_path,char* file_nam
 	char path_buffer[MAXPATHLEN];
 	memset(path_buffer,0,sizeof(path_buffer));
 	// base_path : "./" , file_name_prefix : "access" , offset : 0
-	qs_make_log_file_path(path_buffer, sizeof(path_buffer), base_path, file_name_prefix, offset);
+	qs_make_log_rotate_file_path(path_buffer, sizeof(path_buffer), base_path, file_name_prefix, offset);
 	if (strcmp(log_file_info->path, path_buffer)) {
 		qs_fclose(log_file_info);
 		if (QS_SYSTEM_ERROR == qs_fopen(path_buffer, "a", log_file_info)) {
@@ -59,6 +59,22 @@ int32_t qs_log_rotate(QS_FILE_INFO* log_file_info,char* base_path,char* file_nam
 		}
 	}
 	return QS_SYSTEM_OK;
+}
+
+int32_t qs_log_open(QS_FILE_INFO* log_file_info,const char* file_path)
+{
+	if (strcmp(log_file_info->path, file_path)) {
+		qs_fclose(log_file_info);
+		if (QS_SYSTEM_ERROR == qs_fopen((char*)file_path, "a", log_file_info)) {
+			return QS_SYSTEM_ERROR;
+		}
+	}
+	return QS_SYSTEM_OK;
+}
+
+int32_t qs_log_close(QS_FILE_INFO* log_file_info)
+{
+	return qs_fclose(log_file_info);
 }
 
 int32_t qs_http_access_log(QS_FILE_INFO* log_file_info,char* http_version, char* user_agent,char* client_ip,char* method,char* request,int32_t http_status_code)
