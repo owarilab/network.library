@@ -40,7 +40,7 @@ int main( int argc, char *argv[], char *envp[] )
 #ifdef __WINDOWS__
 	SetConsoleOutputCP(CP_UTF8);
 #endif
-	api_qs_memory_alloc(&g_temporary_memory,1024*1024);
+	api_qs_memory_alloc(&g_temporary_memory,1024*1024*4);
 	int server_port = 8080;
 	{
 		QS_SERVER_SCRIPT_CONTEXT script;
