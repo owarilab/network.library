@@ -66,7 +66,8 @@ typedef struct QS_SERVER_CONTEXT
 	time_t current_time;
 	time_t update_time;
 	QS_EVENT_FUNCTION on_connect;
-	QS_EVENT_FUNCTION on_recv;
+	QS_EVENT_FUNCTION on_http_event;
+	QS_EVENT_FUNCTION on_ws_event;
 	QS_EVENT_FUNCTION on_close;
 
 	void* router_memory;
@@ -129,7 +130,8 @@ int api_qs_server_create_router(QS_SERVER_CONTEXT* context);
 int api_qs_server_create_kvs(QS_SERVER_CONTEXT* context, int kvs_memory_type);
 int api_qs_server_get_kvs(QS_SERVER_CONTEXT* context,QS_KVS_CONTEXT* kvs_context);
 void api_qs_set_on_connect_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_connect );
-void api_qs_set_on_packet_recv_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_recv );
+void api_qs_set_on_http_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_http_event );
+void api_qs_set_on_websocket_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_ws_event );
 void api_qs_set_on_close_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_close );
 int api_qs_server_create_logger_access(QS_SERVER_CONTEXT* context,const char* log_file_path);
 int api_qs_server_create_logger_debug(QS_SERVER_CONTEXT* context,const char* log_file_path);
@@ -137,6 +139,10 @@ int api_qs_server_create_logger_error(QS_SERVER_CONTEXT* context,const char* log
 void api_qs_update(QS_SERVER_CONTEXT* context);
 void api_qs_sleep(QS_SERVER_CONTEXT* context);
 void api_qs_free(QS_SERVER_CONTEXT* context);
+
+char* api_qs_get_ws_message(QS_EVENT_PARAMETER params);
+int api_qs_send_ws_message(QS_EVENT_PARAMETER params,const char* message);
+int api_qs_send_ws_message_plane(QS_EVENT_PARAMETER params,const char* message);
 
 char* api_qs_get_http_method(QS_EVENT_PARAMETER params);
 char* api_qs_get_http_path(QS_EVENT_PARAMETER params);

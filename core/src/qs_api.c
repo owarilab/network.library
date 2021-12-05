@@ -251,7 +251,8 @@ int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_conn
 	QS_SERVER_CONTEXT* context = *ppcontext;
 	context->system_data = NULL;
 	context->on_connect = NULL;
-	context->on_recv = NULL;
+	context->on_http_event = NULL;
+	context->on_ws_event = NULL;
 	context->on_close = NULL;
 	context->current_time = time(NULL);
 	context->update_time = 0;
@@ -397,9 +398,13 @@ void api_qs_set_on_connect_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION o
 {
 	context->on_connect = on_connect;
 }
-void api_qs_set_on_packet_recv_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_recv )
+void api_qs_set_on_http_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_http_event )
 {
-	context->on_recv = on_recv;
+	context->on_http_event = on_http_event;
+}
+void api_qs_set_on_websocket_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_ws_event )
+{
+	context->on_ws_event = on_ws_event;
 }
 void api_qs_set_on_close_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_close )
 {
@@ -542,62 +547,14 @@ void api_qs_exec_websocket(QS_RECV_INFO *rinfo)
 		}
 		char* msgpbuf = (char*)qs_upointer(option->memory_pool, tinfo->recvmsg_munit);
 		msgpbuf[_tmpmsglen] = '\0';
-		if(-1!=context->memid_router)
-		{
-			int32_t message_buffer_munit = qs_create_munit(temporary_memory,qs_strlen(msgpbuf) + SIZE_KBYTE*8,MEMORY_TYPE_DEFAULT);
-			if(-1==message_buffer_munit){
-				return;
-			}
-			void* buffer = QS_GET_POINTER(temporary_memory,message_buffer_munit);
-			size_t buffer_size = qs_usize(temporary_memory,message_buffer_munit);
-			QS_MEMORY_POOL* router_memory = (QS_MEMORY_POOL*)context->router_memory;
-			char* connection_id = qs_get_packet_route_connection_id(router_memory, context->memid_router, tinfo->index);
-			ssize_t sendlen = api_qs_make_ws_message_common(temporary_memory, connection_id,"message",msgpbuf,buffer,buffer_size);
-			ssize_t ret = 0;
-			void* data = qs_get_packet_route_connection_chain(router_memory, context->memid_router, tinfo->index);
-			if (NULL != data) {
-				void* current = NULL;
-				QS_SERVER_CONNECTION_INFO *tmptinfo;
-				while (NULL != (current = qs_foreach_packet_route_connection_chain(router_memory, context->memid_router, tinfo->index, current))) {
-					QS_PACKET_ROUTE_NODE_CONNECTION* con = (QS_PACKET_ROUTE_NODE_CONNECTION*)current;
-					tmptinfo = qs_offsetpointer(option->memory_pool, option->connection_munit, sizeof(QS_SERVER_CONNECTION_INFO), con->connection_index);
-					if (tmptinfo->sockparam.acc != -1 && tmptinfo->sockparam.phase == QS_HTTP_SOCK_PHASE_MSG_WEBSOCKET) {
-						if (-1 == (ret = qs_send_all(tmptinfo->sockparam.acc, buffer, sendlen, 0))) {
-							qs_close_socket_common(option, tmptinfo, 0);
-						}
-					}
-				}
-			}
-			else {
-				if (-1 == (ret = qs_send_all(psockparam->acc, buffer, sendlen, 0))) {
 
-				}
-			}
-		} else {
-			// simple broadcast
-			int i;
-			ssize_t ret = 0;
-			QS_SERVER_CONNECTION_INFO *tmptinfo;
-			if( option->connection_munit != -1 ){
-				int32_t message_buffer_munit = qs_create_munit(temporary_memory,qs_strlen(msgpbuf) + SIZE_KBYTE*8,MEMORY_TYPE_DEFAULT);
-				if(-1==message_buffer_munit){
-					return;
-				}
-				void* buffer = QS_GET_POINTER(temporary_memory,message_buffer_munit);
-				size_t buffer_size = qs_usize(temporary_memory,message_buffer_munit);
-				ssize_t sendlen = qs_make_websocket_msg(buffer,buffer_size,false,msgpbuf,qs_strlen(msgpbuf));
-				if(sendlen==0){
-					return;
-				}
-				for( i = 0; i < option->maxconnection; i++ ){
-					tmptinfo = qs_offsetpointer( option->memory_pool, option->connection_munit, sizeof( QS_SERVER_CONNECTION_INFO ), i );
-					if( tmptinfo->sockparam.acc != -1 && tmptinfo->sockparam.phase == QS_HTTP_SOCK_PHASE_MSG_WEBSOCKET ){
-						if( -1 == ( ret = qs_send_all( tmptinfo->sockparam.acc, buffer, sendlen, 0 ) ) ){
-							qs_close_socket_common(option, tmptinfo, 0);
-						}
-					}
-				}
-			}
+		if(context->on_ws_event!=NULL){
+			context->system_data = (void*)(msgpbuf);
+			context->on_ws_event((void*)rinfo);
+		}
+		else
+		{
+			api_qs_send_ws_message_common(rinfo,msgpbuf,false);
 		}
 	}
 }
@@ -613,9 +570,9 @@ void api_qs_exec_http(QS_RECV_INFO *rinfo)
 	int32_t http_status_code = http_request_common(rinfo, &http_request, temporary_memory);
 	// API
 	if (http_status_code == 404) {
-		if(context->on_recv!=NULL){
+		if(context->on_http_event!=NULL){
 			context->system_data = (void*)(&http_request);
-			http_status_code = context->on_recv((void*)rinfo);
+			http_status_code = context->on_http_event((void*)rinfo);
 		}
 	}
 	if( http_status_code != 200 ){
@@ -686,7 +643,104 @@ int api_qs_core_on_close(QS_SERVER_CONNECTION_INFO* connection)
 	}
 	return 0;
 }
+char* api_qs_get_ws_message(QS_EVENT_PARAMETER params)
+{
+	QS_RECV_INFO *rinfo = (QS_RECV_INFO *)params;
+	QS_SERVER_CONNECTION_INFO * tinfo = (QS_SERVER_CONNECTION_INFO *)rinfo->tinfo;
+	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
+	QS_SERVER_CONTEXT* context = (QS_SERVER_CONTEXT*)option->application_data;
+	char* message = (char*)context->system_data;
+	return message;
+}
+int api_qs_send_ws_message(QS_EVENT_PARAMETER params,const char* message)
+{
+	QS_RECV_INFO *qs_recv_info = (QS_RECV_INFO *)params;
+	return api_qs_send_ws_message_common(qs_recv_info,message,false);
+}
+int api_qs_send_ws_message_plane(QS_EVENT_PARAMETER params,const char* message)
+{
+	QS_RECV_INFO *qs_recv_info = (QS_RECV_INFO *)params;
+	return api_qs_send_ws_message_common(qs_recv_info,message,true);
+}
+int api_qs_send_ws_message_common(QS_RECV_INFO *qs_recv_info,const char* message,int is_plane)
+{
+	QS_SERVER_CONNECTION_INFO * tinfo = (QS_SERVER_CONNECTION_INFO *)qs_recv_info->tinfo;
+	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
+	QS_SERVER_CONTEXT* context = (QS_SERVER_CONTEXT*)option->application_data;
+	QS_MEMORY_POOL * temporary_memory = ( QS_MEMORY_POOL* )QS_GET_POINTER( option->memory_pool, context->memid_temporary_memory );
+	QS_SOCKPARAM* psockparam = &tinfo->sockparam;
+	if(-1!=context->memid_router)
+	{
+		int32_t message_buffer_munit = qs_create_munit(temporary_memory,qs_strlen(message) + SIZE_KBYTE*8,MEMORY_TYPE_DEFAULT);
+		if(-1==message_buffer_munit){
+			return -1;
+		}
+		void* buffer = QS_GET_POINTER(temporary_memory,message_buffer_munit);
+		size_t buffer_size = qs_usize(temporary_memory,message_buffer_munit);
+		QS_MEMORY_POOL* router_memory = (QS_MEMORY_POOL*)context->router_memory;
+		char* connection_id = qs_get_packet_route_connection_id(router_memory, context->memid_router, tinfo->index);
+		ssize_t sendlen = 0;
+		if(is_plane){
+			sendlen = qs_make_websocket_msg((void*)buffer, buffer_size, false, message, qs_strlen(message));
+		} else{
+			sendlen = api_qs_make_ws_message_common(temporary_memory, connection_id,"message",(char*)message,buffer,buffer_size);
+		}
+		if(sendlen==0){
+			return -1;
+		}
+		ssize_t ret = 0;
+		void* data = qs_get_packet_route_connection_chain(router_memory, context->memid_router, tinfo->index);
+		if (NULL != data) {
+			void* current = NULL;
+			QS_SERVER_CONNECTION_INFO *tmptinfo;
+			while (NULL != (current = qs_foreach_packet_route_connection_chain(router_memory, context->memid_router, tinfo->index, current))) {
+				QS_PACKET_ROUTE_NODE_CONNECTION* con = (QS_PACKET_ROUTE_NODE_CONNECTION*)current;
+				tmptinfo = qs_offsetpointer(option->memory_pool, option->connection_munit, sizeof(QS_SERVER_CONNECTION_INFO), con->connection_index);
+				if (tmptinfo->sockparam.acc != -1 && tmptinfo->sockparam.phase == QS_HTTP_SOCK_PHASE_MSG_WEBSOCKET) {
+					if (-1 == (ret = qs_send_all(tmptinfo->sockparam.acc, buffer, sendlen, 0))) {
+						qs_close_socket_common(option, tmptinfo, 0);
+					}
+				}
+			}
+		}
+		else {
+			if (-1 == (ret = qs_send_all(psockparam->acc, buffer, sendlen, 0))) {
 
+			}
+		}
+	} else {
+		// simple broadcast
+		int i;
+		ssize_t ret = 0;
+		QS_SERVER_CONNECTION_INFO *tmptinfo;
+		if( option->connection_munit != -1 ){
+			int32_t message_buffer_munit = qs_create_munit(temporary_memory,qs_strlen(message) + SIZE_KBYTE*8,MEMORY_TYPE_DEFAULT);
+			if(-1==message_buffer_munit){
+				return -1;
+			}
+			void* buffer = QS_GET_POINTER(temporary_memory,message_buffer_munit);
+			size_t buffer_size = qs_usize(temporary_memory,message_buffer_munit);
+			ssize_t sendlen = 0;
+			if(is_plane){
+				sendlen = qs_make_websocket_msg((void*)buffer, buffer_size, false, message, qs_strlen(message));
+			} else{
+				sendlen = qs_make_websocket_msg(buffer,buffer_size,false,(char*)message,qs_strlen(message));
+			}
+			if(sendlen==0){
+				return -1;
+			}
+			for( i = 0; i < option->maxconnection; i++ ){
+				tmptinfo = qs_offsetpointer( option->memory_pool, option->connection_munit, sizeof( QS_SERVER_CONNECTION_INFO ), i );
+				if( tmptinfo->sockparam.acc != -1 && tmptinfo->sockparam.phase == QS_HTTP_SOCK_PHASE_MSG_WEBSOCKET ){
+					if( -1 == ( ret = qs_send_all( tmptinfo->sockparam.acc, buffer, sendlen, 0 ) ) ){
+						qs_close_socket_common(option, tmptinfo, 0);
+					}
+				}
+			}
+		}
+	}
+	return 0;
+}
 char* api_qs_get_http_method(void* params)
 {
 	QS_RECV_INFO *rinfo = (QS_RECV_INFO *)params;

@@ -30,7 +30,8 @@
 #include "libqs_api.h"
 
 int on_connect(QS_EVENT_PARAMETER params);
-int on_recv(QS_EVENT_PARAMETER params);
+int on_http_event(QS_EVENT_PARAMETER params);
+int on_ws_event(QS_EVENT_PARAMETER params);
 int on_close(QS_EVENT_PARAMETER params);
 
 QS_MEMORY_CONTEXT g_temporary_memory;
@@ -60,7 +61,8 @@ int main( int argc, char *argv[], char *envp[] )
 	if(-1==api_qs_server_create_logger_debug(context,"./debug_log.txt")){return -1;}
 	if(-1==api_qs_server_create_logger_error(context,"./error_log.txt")){return -1;}
 	api_qs_set_on_connect_event(context, on_connect );
-	api_qs_set_on_packet_recv_event(context, on_recv );
+	api_qs_set_on_http_event(context, on_http_event );
+	api_qs_set_on_websocket_event(context, on_ws_event );
 	api_qs_set_on_close_event(context, on_close );
 	for(;;){
 		api_qs_update(context);
@@ -76,7 +78,7 @@ int on_connect(QS_EVENT_PARAMETER params)
 	return 0;
 }
 
-int on_recv(QS_EVENT_PARAMETER params)
+int on_http_event(QS_EVENT_PARAMETER params)
 {
 	int http_status_code = 404;
 	QS_SERVER_CONTEXT* context = api_qs_get_server_context(params);
@@ -204,6 +206,14 @@ int on_recv(QS_EVENT_PARAMETER params)
 	}
 
 	return http_status_code;
+}
+
+int on_ws_event(QS_EVENT_PARAMETER params)
+{
+	char* message = api_qs_get_ws_message(params);
+	api_qs_send_ws_message(params,message);
+	//api_qs_send_ws_message_plane(params,message);
+	return 0;
 }
 
 int on_close(QS_EVENT_PARAMETER params)

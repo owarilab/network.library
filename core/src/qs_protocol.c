@@ -399,7 +399,10 @@ int qs_http_parse_header( QS_RECV_INFO *rinfo, int skip_head )
 				break;
 			}
 			target_pt = qs_read_line_delimiter_core( headername, sizeof(headername), target_pt, ':', ' ' );
-			target_pt = qs_read_line_delimiter_core( headerparam, sizeof(headerparam), target_pt, '\0', ' ' );
+			while(*target_pt==' '){
+				++target_pt;
+			}
+			target_pt = qs_read_line_delimiter( headerparam, sizeof(headerparam), target_pt, '\0' );
 			qs_add_hash_string( con_memory, psockparam->http_header_munit, headername, headerparam );
 			if( (*target_pt) == '\0' ){
 				break;
