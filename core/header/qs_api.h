@@ -42,6 +42,12 @@ extern "C"{
 #include "qs_random.h"
 #include "qs_csv.h"
 
+#define QS_KVS_MEMORY_TYPE_B1MB 0
+#define QS_KVS_MEMORY_TYPE_B128MB 1
+#define QS_KVS_MEMORY_TYPE_B256MB 2
+#define QS_KVS_MEMORY_TYPE_B512MB 3
+#define QS_KVS_MEMORY_TYPE_B1024MB 4
+
 #define QS_EVENT_PARAMETER void*
 typedef int (*QS_EVENT_FUNCTION)( QS_EVENT_PARAMETER params );
 
@@ -131,7 +137,7 @@ char* api_qs_csv_get_row(QS_CSV_CONTEXT* csv, int32_t line_pos, int32_t row_pos)
 
 int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port);
 int api_qs_server_create_router(QS_SERVER_CONTEXT* context);
-int api_qs_server_create_kvs(QS_SERVER_CONTEXT* context);
+int api_qs_server_create_kvs(QS_SERVER_CONTEXT* context, int kvs_memory_type);
 int api_qs_server_get_kvs(QS_SERVER_CONTEXT* context,QS_KVS_CONTEXT* kvs_context);
 void api_qs_set_on_connect_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_connect );
 void api_qs_set_on_packet_recv_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_recv );

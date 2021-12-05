@@ -70,8 +70,69 @@ int32_t qs_create_cache_B1MB( QS_MEMORY_POOL* memory)
 	size_t key_size = 64;
 	size_t hash_size = 128;
 	size_t cache_size = 700;
-	size_t page_allocate_size = SIZE_KBYTE*470;
-	int32_t cache_id = qs_create_cache(memory,cache_size*(key_size+20),cache_size,page_allocate_size,hash_size,key_size);
+	size_t chain_allocate_size = cache_size*(key_size+20);
+	size_t page_allocate_size = (qs_memory_available_size(memory) - (chain_allocate_size + SIZE_KBYTE * 8)) / 2;
+	int32_t cache_id = qs_create_cache(memory,chain_allocate_size,cache_size,page_allocate_size,hash_size,key_size);
+	if(-1==cache_id){
+		printf("qs_create_cache error\n");
+		return -1;
+	}
+	return cache_id;
+}
+
+int32_t qs_create_cache_B128MB( QS_MEMORY_POOL* memory)
+{
+	size_t key_size = 64;
+	size_t hash_size = 1000000;
+	size_t cache_size = 50000;
+	size_t chain_allocate_size = cache_size*(key_size+20);
+	size_t page_allocate_size = (qs_memory_available_size(memory) - (chain_allocate_size + SIZE_KBYTE * 8)) / 2;
+	int32_t cache_id = qs_create_cache(memory,chain_allocate_size,cache_size,page_allocate_size,hash_size,key_size);
+	if(-1==cache_id){
+		printf("qs_create_cache error\n");
+		return -1;
+	}
+	return cache_id;
+}
+
+int32_t qs_create_cache_B256MB( QS_MEMORY_POOL* memory)
+{
+	size_t key_size = 128;
+	size_t hash_size = 1500000;
+	size_t cache_size = 50000;
+	size_t chain_allocate_size = cache_size*(key_size+20);
+	size_t page_allocate_size = (qs_memory_available_size(memory) - (chain_allocate_size + SIZE_KBYTE * 8)) / 2;
+	int32_t cache_id = qs_create_cache(memory,chain_allocate_size,cache_size,page_allocate_size,hash_size,key_size);
+	if(-1==cache_id){
+		printf("qs_create_cache error\n");
+		return -1;
+	}
+	return cache_id;
+}
+
+int32_t qs_create_cache_B512MB( QS_MEMORY_POOL* memory)
+{
+	size_t key_size = 128;
+	size_t hash_size = 1500000;
+	size_t cache_size = 100000;
+	size_t chain_allocate_size = cache_size*(key_size+20);
+	size_t page_allocate_size = (qs_memory_available_size(memory) - (chain_allocate_size + SIZE_KBYTE * 8)) / 2;
+	int32_t cache_id = qs_create_cache(memory,chain_allocate_size,cache_size,page_allocate_size,hash_size,key_size);
+	if(-1==cache_id){
+		printf("qs_create_cache error\n");
+		return -1;
+	}
+	return cache_id;
+}
+
+int32_t qs_create_cache_B1GB( QS_MEMORY_POOL* memory)
+{
+	size_t key_size   = 256;
+	size_t hash_size  = 5000000;
+	size_t cache_size = 100000;
+	size_t chain_allocate_size = cache_size*(key_size+20);
+	size_t page_allocate_size = (qs_memory_available_size(memory) - (chain_allocate_size + SIZE_KBYTE * 8)) / 2;
+	int32_t cache_id = qs_create_cache(memory,chain_allocate_size,cache_size,page_allocate_size,hash_size,key_size);
 	if(-1==cache_id){
 		printf("qs_create_cache error\n");
 		return -1;
@@ -317,6 +378,7 @@ int32_t qs_cache_int(QS_CACHE* cache,char* key,int32_t value, int32_t life_time)
 	if(NULL==(elm=qs_add_hash_integer( cache_page.memory, cache_page.hash_id, key, value ))){
 		qs_swap_page(cache,&cache_page);
 		if(NULL==(elm=qs_add_hash_integer( cache_page.memory, cache_page.hash_id, key, value ))){
+			//printf("[qs_cache_int] qs_add_hash_integer error\n");
 			return QS_SYSTEM_ERROR;
 		}
 	}

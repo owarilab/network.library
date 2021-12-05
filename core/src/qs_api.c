@@ -318,19 +318,56 @@ int api_qs_server_create_router(QS_SERVER_CONTEXT* context)
 	}
 	return 0;
 }
-int api_qs_server_create_kvs(QS_SERVER_CONTEXT* context)
+int api_qs_server_create_kvs(QS_SERVER_CONTEXT* context, int kvs_memory_type)
 {
 	QS_MEMORY_POOL* kvs_memory_pool = NULL;
-	if( qs_initialize_memory( &kvs_memory_pool, SIZE_MBYTE * 2, SIZE_MBYTE * 2, MEMORY_ALIGNMENT_SIZE_BIT_64, FIX_MUNIT_SIZE, 1, SIZE_KBYTE * 16 ) <= 0 ){
+	size_t kvs_alloc_size = SIZE_MBYTE * 1;
+	switch(kvs_memory_type)
+	{
+		case QS_KVS_MEMORY_TYPE_B128MB:
+			kvs_alloc_size = SIZE_MBYTE * 128;
+			break;
+		case QS_KVS_MEMORY_TYPE_B256MB:
+			kvs_alloc_size = SIZE_MBYTE * 256;
+			break;
+		case QS_KVS_MEMORY_TYPE_B512MB:
+			kvs_alloc_size = SIZE_MBYTE * 512;
+			break;
+		case QS_KVS_MEMORY_TYPE_B1024MB:
+			kvs_alloc_size = SIZE_MBYTE * 1024;
+			break;
+		default:
+			kvs_alloc_size = SIZE_MBYTE * 1;
+			break;
+	}
+	if( qs_initialize_memory( &kvs_memory_pool, kvs_alloc_size + SIZE_KBYTE * 8, kvs_alloc_size + SIZE_KBYTE * 8, MEMORY_ALIGNMENT_SIZE_BIT_64, FIX_MUNIT_SIZE, 1, SIZE_KBYTE * 16 ) <= 0 ){
 		return -1;
 	}
 	context->kvs_memory = (void*)kvs_memory_pool;
-	context->memid_kvs_memory = qs_create_mini_memory(kvs_memory_pool, SIZE_MBYTE * 1);
+	context->memid_kvs_memory = qs_create_mini_memory(kvs_memory_pool, kvs_alloc_size);
 	if(-1==context->memid_kvs_memory){
 		return -1;
 	}
 	QS_MEMORY_POOL* cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(kvs_memory_pool,context->memid_kvs_memory);
-	context->memid_kvs = qs_create_cache_B1MB(cache_memory);
+	context->memid_kvs = -1;
+	switch(kvs_memory_type)
+	{
+		case QS_KVS_MEMORY_TYPE_B128MB:
+			context->memid_kvs = qs_create_cache_B128MB(cache_memory);
+			break;
+		case QS_KVS_MEMORY_TYPE_B256MB:
+			context->memid_kvs = qs_create_cache_B256MB(cache_memory);
+			break;
+		case QS_KVS_MEMORY_TYPE_B512MB:
+			context->memid_kvs = qs_create_cache_B512MB(cache_memory);
+			break;
+		case QS_KVS_MEMORY_TYPE_B1024MB:
+			context->memid_kvs = qs_create_cache_B1GB(cache_memory);
+			break;
+		default:
+			context->memid_kvs = qs_create_cache_B1MB(cache_memory);
+			break;
+	}
 	if(-1==context->memid_kvs){
 		return -1;
 	}
