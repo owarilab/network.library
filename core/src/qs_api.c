@@ -240,9 +240,12 @@ char* api_qs_csv_get_row(QS_CSV_CONTEXT* csv, int32_t line_pos, int32_t row_pos)
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)csv->memory;
 	return qs_csv_get_row(memory,csv->memid_csv,line_pos,row_pos);
 }
-int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port)
+int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_connection)
 {
 	if( ( (*ppcontext) = ( QS_SERVER_CONTEXT * )malloc( sizeof( QS_SERVER_CONTEXT ) ) ) == NULL ){
+		return -1;
+	}
+	if(max_connection<=0){
 		return -1;
 	}
 	QS_SERVER_CONTEXT* context = *ppcontext;
@@ -257,8 +260,14 @@ int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port)
 	context->kvs_memory = NULL;
 	context->memid_kvs = -1;
 	QS_MEMORY_POOL* main_memory_pool = NULL;
-	int32_t maxconnection = 100;
-	if( qs_initialize_memory( &main_memory_pool, SIZE_MBYTE * 24, SIZE_MBYTE * 24, MEMORY_ALIGNMENT_SIZE_BIT_64, FIX_MUNIT_SIZE, 1, SIZE_KBYTE * 16 ) <= 0 ){
+	//int32_t max_connection = 100;
+	//if( qs_initialize_memory( &main_memory_pool, SIZE_MBYTE * 24, SIZE_MBYTE * 24, MEMORY_ALIGNMENT_SIZE_BIT_64, FIX_MUNIT_SIZE, 1, SIZE_KBYTE * 16 ) <= 0 ){
+	//	free(context); context=NULL;
+	//	return -2;
+	//}
+	size_t alloc_size = (((SIZE_KBYTE * 240LLU) * (size_t)(max_connection)) + (SIZE_MBYTE * 8LLU) + (SIZE_KBYTE * 32LLU));
+	//printf("server alloc size : %zu\n",alloc_size);
+	if( qs_initialize_memory( &main_memory_pool, alloc_size, alloc_size, MEMORY_ALIGNMENT_SIZE_BIT_64, FIX_MUNIT_SIZE, 1, SIZE_KBYTE * 16 ) <= 0 ){
 		free(context); context=NULL;
 		return -2;
 	}
@@ -276,7 +285,7 @@ int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port)
 	char portnum[32];
 	memset( portnum, 0, sizeof( portnum ) );
 	snprintf( portnum, sizeof( portnum ) -1, "%d", port );
-	if (-1 == qs_initialize_socket_option(server, NULL, portnum, SOCKET_TYPE_SERVER_TCP, SOCKET_MODE_NONBLOCKING, PROTOCOL_PLAIN, maxconnection, main_memory_pool, NULL)) {
+	if (-1 == qs_initialize_socket_option(server, NULL, portnum, SOCKET_TYPE_SERVER_TCP, SOCKET_MODE_NONBLOCKING, PROTOCOL_PLAIN, max_connection, main_memory_pool, NULL)) {
 		free(context); context=NULL;
 		return -5;
 	}

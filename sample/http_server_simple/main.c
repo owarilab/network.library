@@ -52,7 +52,8 @@ int main( int argc, char *argv[], char *envp[] )
 		api_qs_memory_clean(&g_temporary_memory);
 	}
 	QS_SERVER_CONTEXT* context = 0;
-	if(0 > api_qs_server_init(&context,server_port)){return -1;}
+	int32_t max_connection = 100;
+	if(0 > api_qs_server_init(&context,server_port,max_connection)){return -1;}
 	if(-1==api_qs_server_create_router(context)){return -1;}
 	if(-1==api_qs_server_create_kvs(context,QS_KVS_MEMORY_TYPE_B1MB)){return -1;}
 	if(-1==api_qs_server_create_logger_access(context,"./access_log.txt")){return -1;}
