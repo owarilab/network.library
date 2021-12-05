@@ -93,15 +93,17 @@ int qs_http_protocol_filter(QS_RECV_INFO* rinfo)
 		}
 	}
 	else if( psockparam->phase == QS_HTTP_SOCK_PHASE_PARSE_HTTP_HEADER ){
-		qs_http_parse_header( rinfo );
+		qs_http_parse_header( rinfo, false );
 	}
 	if( psockparam->opcode == 2 ){
 		psockparam->opcode = 0;
 		psockparam->phase = QS_HTTP_SOCK_PHASE_MSG_HTTP;
 		psockparam->tmpmsglen = 0;
 		rinfo->recvlen = 0;
-		if( -1 != qs_get_hash( option->memory_pool, psockparam->http_header_munit, "CONTENT_LENGTH" ) ){
-			rinfo->recvlen = atoi( (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, psockparam->http_header_munit, "CONTENT_LENGTH" )) );
+		QS_MEMORY_POOL* con_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(option->memory_pool,tinfo->memid_connection_data_memory);
+		int32_t memid_len_hash = qs_get_hash( con_memory, psockparam->http_header_munit, "Content-Length" );
+		if( -1 != memid_len_hash ){
+			rinfo->recvlen = atoi( (char*)QS_GET_POINTER(con_memory,memid_len_hash) );
 		}
 		rinfo->recvbuf_munit = tinfo->recvmsg_munit;
 		return psockparam->phase;
@@ -124,6 +126,7 @@ int qs_http_parser( QS_RECV_INFO *rinfo )
 	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
 	char *target = (char*)qs_upointer(option->memory_pool, rinfo->recvbuf_munit);
 	QS_SOCKPARAM* psockparam = &tinfo->sockparam;
+	QS_MEMORY_POOL* con_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(option->memory_pool,tinfo->memid_connection_data_memory);
 	do{
 		if(rinfo->recvlen>=qs_usize(option->memory_pool, rinfo->recvbuf_munit)){
 			//printf("invalid size : %s\n", (char*)qs_upointer(option->memory_pool, rinfo->recvbuf_munit));
@@ -148,25 +151,11 @@ int qs_http_parser( QS_RECV_INFO *rinfo )
 			break;
 		}
 		psockparam->opcode = 0;
-		const char http_header_strings[][3][256] = HTTP_HEADER_STRINGS;
-		int i;
-		if( psockparam->http_header_munit == -1 )
-		{
-			if( -1 == ( psockparam->http_header_munit = qs_create_hash( option->memory_pool, 16 ) ) ){
-				break;
-			}
-			for( i = 0; i < sizeof(http_header_strings) / sizeof(http_header_strings[0]); i++ )
-			{
-				qs_add_hash_emptystring( option->memory_pool, psockparam->http_header_munit, (char*)(http_header_strings[i][1]), atoi((char*)(http_header_strings[i][2])) );
-			}
+		psockparam->http_header_munit = -1;
+		if( -1 == ( psockparam->http_header_munit = qs_create_hash( con_memory, 16 ) ) ){
+			break;
 		}
-		else{
-			for( i = 0; i < sizeof(http_header_strings) / sizeof(http_header_strings[0]); i++ )
-			{
-				qs_clear_hash_string( option->memory_pool, psockparam->http_header_munit, (char*)(http_header_strings[i][1]) );
-			}
-		}
-		qs_replace_hash_string( option->memory_pool, psockparam->http_header_munit, "HTTP_METHOD", headername );
+		qs_add_hash_string( con_memory, psockparam->http_header_munit, "HTTP_METHOD", headername );
 		target_pt = qs_read_line_delimiter( headerparam, sizeof(headerparam), target_pt, ' ' );
 		if( strcmp( headerparam, "/" ) != 0 )
 		{
@@ -178,7 +167,7 @@ int qs_http_parser( QS_RECV_INFO *rinfo )
 				//memset( params_buf, 0, sizeof(params_buf));
 				memcpy( params_buf, &headerparam[pos+1], params_buf_size );
 				headerparam[pos] = '\0';
-				qs_replace_hash_string( option->memory_pool, psockparam->http_header_munit, "GET_PARAMS", params_buf );
+				qs_add_hash_string( con_memory, psockparam->http_header_munit, "GET_PARAMS", params_buf );
 			}
 			else{
 				if( 0 < ( pos = qs_find_char( headerparam, strlen( headerparam ), '&' ) ) ){
@@ -201,78 +190,84 @@ int qs_http_parser( QS_RECV_INFO *rinfo )
 			method = -1;
 			break;
 		}
-		qs_replace_hash_string( option->memory_pool, psockparam->http_header_munit, "REQUEST", request_path );
+		qs_add_hash_string( con_memory, psockparam->http_header_munit, "REQUEST", request_path );
 		target_pt = qs_read_line_delimiter( headername, sizeof(headername), target_pt, '\0' );
-		qs_replace_hash_string( option->memory_pool, psockparam->http_header_munit, "HTTP_VERSION", headername );
-		qs_http_parse_header( rinfo );
+		qs_add_hash_string( con_memory, psockparam->http_header_munit, "HTTP_VERSION", headername );
+		qs_http_parse_header( rinfo, true);
 	}while( false );
 	return method;
 }
-int qs_http_parse_header( QS_RECV_INFO *rinfo )
+int qs_http_parse_header( QS_RECV_INFO *rinfo, int skip_head )
 {
+	int is_upload_enable = false;
 	char headername[256];
 	char headerparam[2048];
 	char* target_pt;
-	const char http_header_strings[][3][256] = HTTP_HEADER_STRINGS;
 
 	QS_SERVER_CONNECTION_INFO * tinfo = (QS_SERVER_CONNECTION_INFO *)rinfo->tinfo;
 	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
 	char *target = (char*)qs_upointer(option->memory_pool, rinfo->recvbuf_munit);
 	QS_SOCKPARAM* psockparam = &tinfo->sockparam;
 	int32_t recvmsg_munit = tinfo->recvmsg_munit;
+	QS_MEMORY_POOL* con_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(option->memory_pool,tinfo->memid_connection_data_memory);
 
 	do{
 		target_pt = target;
+		if(skip_head){
+			target_pt = qs_read_line_delimiter( headerparam, sizeof(headerparam), target_pt, '\0' );
+		}
 		for(;;){
-			if(psockparam->opcode==3){
-				if( -1 != qs_get_hash( option->memory_pool, psockparam->http_header_munit, "CONTENT_LENGTH" ) ){
-					int contentlen = atoi( (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, psockparam->http_header_munit, "CONTENT_LENGTH" )) );
-					size_t write_size = 0;
-					size_t current = 0;
-					while(current<rinfo->recvlen){
-						if(*(target_pt+current) == '-'){
-							char tmpkey[256];
-							memcpy(tmpkey,(target_pt+current),qs_strlen((char*)psockparam->header));
-							tmpkey[qs_strlen((char*)psockparam->header)] = '\0';
-							printf("is key ? : [%s][%s]\n",(char*)psockparam->header,tmpkey);
-							if(!strcmp(tmpkey,(char*)psockparam->header)){
-								write_size = current - 2 -2;
-								break;
+			if(is_upload_enable)
+			{
+				if(psockparam->opcode==3){
+					if( -1 != qs_get_hash( con_memory, psockparam->http_header_munit, "Content-Length" ) ){
+						int contentlen = atoi( (char*)QS_GET_POINTER(con_memory,qs_get_hash( con_memory, psockparam->http_header_munit, "Content-Length" )) );
+						size_t write_size = 0;
+						size_t current = 0;
+						while(current<rinfo->recvlen){
+							if(*(target_pt+current) == '-'){
+								char tmpkey[256];
+								memcpy(tmpkey,(target_pt+current),qs_strlen((char*)psockparam->header));
+								tmpkey[qs_strlen((char*)psockparam->header)] = '\0';
+								printf("is key ? : [%s][%s]\n",(char*)psockparam->header,tmpkey);
+								if(!strcmp(tmpkey,(char*)psockparam->header)){
+									write_size = current - 2 -2;
+									break;
+								}
 							}
+							write_size++;
+							current++;
 						}
-						write_size++;
-						current++;
+						//size_t write_size = rinfo->recvlen;
+						//printf("save to file : %d\n",(int)psockparam->header_size);
+						//if((psockparam->tmpmsglen+rinfo->recvlen)>(contentlen-psockparam->header_size)){
+						//	write_size = rinfo->recvlen - (psockparam->tmpmsglen+rinfo->recvlen-(contentlen-psockparam->header_size));
+						//}
+						printf("write_size : %d\n",(int)write_size);
+						if(write_size>0){
+							qs_fwrite_bin_a( "./out.data", target, write_size );
+						}
+						psockparam->tmpmsglen +=rinfo->recvlen;
+						if( psockparam->tmpmsglen >= contentlen ){
+							psockparam->opcode = 2;
+							printf("upload data size full\n");
+						}
 					}
-					//size_t write_size = rinfo->recvlen;
-					//printf("save to file : %d\n",(int)psockparam->header_size);
-					//if((psockparam->tmpmsglen+rinfo->recvlen)>(contentlen-psockparam->header_size)){
-					//	write_size = rinfo->recvlen - (psockparam->tmpmsglen+rinfo->recvlen-(contentlen-psockparam->header_size));
-					//}
-					printf("write_size : %d\n",(int)write_size);
-					if(write_size>0){
-						qs_fwrite_bin_a( "./out.data", target, write_size );
+					else{
+						// error
 					}
-					psockparam->tmpmsglen +=rinfo->recvlen;
-					if( psockparam->tmpmsglen >= contentlen ){
-						psockparam->opcode = 2;
-						printf("upload data size full\n");
-					}
+					break;
 				}
-				else{
-					// error
-				}
-				break;
 			}
 			if( *target_pt=='\n' || *target_pt=='\r' ){
 				psockparam->opcode = 1;
 				psockparam->tmpmsglen = 0;
 			}
 			if( psockparam->opcode == 1 ){
-
-				if(false)
+				if(is_upload_enable)
 				{
-					if(qs_get_hash(option->memory_pool, psockparam->http_header_munit, "CONTENT_TYPE") != -1){
-						char* contentType = (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash(option->memory_pool, psockparam->http_header_munit, "CONTENT_TYPE"));
+					if(qs_get_hash(con_memory, psockparam->http_header_munit, "Content-Type") != -1){
+						char* contentType = (char*)QS_GET_POINTER(con_memory,qs_get_hash(con_memory, psockparam->http_header_munit, "Content-Type"));
 						char* pt = contentType;
 						char param[256];
 						char formkey[256];
@@ -319,11 +314,11 @@ int qs_http_parse_header( QS_RECV_INFO *rinfo )
 								}
 								psockparam->opcode = 3;
 
-								if( -1 == qs_get_hash( option->memory_pool, psockparam->http_header_munit, "CONTENT_LENGTH" ) ){
+								if( -1 == qs_get_hash( con_memory, psockparam->http_header_munit, "Content-Length" ) ){
 									// error
 									break;
 								}
-								int contentlen = atoi( (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, psockparam->http_header_munit, "CONTENT_LENGTH" )) );
+								int contentlen = atoi( (char*)QS_GET_POINTER(con_memory,qs_get_hash( con_memory, psockparam->http_header_munit, "Content-Length" )) );
 								size_t write_size = 0;
 								size_t current = (ppt-target_pt);
 								while(current<rinfo->recvlen){
@@ -359,8 +354,8 @@ int qs_http_parse_header( QS_RECV_INFO *rinfo )
 					}
 				}
 
-				if( -1 != qs_get_hash( option->memory_pool, psockparam->http_header_munit, "CONTENT_LENGTH" ) ){
-					int contentlen = atoi( (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, psockparam->http_header_munit, "CONTENT_LENGTH" )) );
+				if( -1 != qs_get_hash( con_memory, psockparam->http_header_munit, "Content-Length" ) ){
+					int contentlen = atoi( (char*)QS_GET_POINTER(con_memory,qs_get_hash( con_memory, psockparam->http_header_munit, "Content-Length" )) );
 					if( contentlen > 0 )
 					{
 						char* msgbuf = ( (char*)QS_GET_POINTER(option->memory_pool,recvmsg_munit) ) + psockparam->tmpmsglen;
@@ -403,26 +398,15 @@ int qs_http_parse_header( QS_RECV_INFO *rinfo )
 				}
 				break;
 			}
-			target_pt = qs_read_line_delimiter( headername, sizeof(headername), target_pt, ' ' );
-			target_pt = qs_read_line_delimiter( headerparam, sizeof(headerparam), target_pt, '\0' );
-			int i;
-			int is_push = 0;
-			for( i = 0; i < sizeof(http_header_strings) / sizeof(http_header_strings[0]); i++ )
-			{
-				if( !strcmp( headername, http_header_strings[i][0] ) )
-				{
-					qs_replace_hash_string( option->memory_pool, psockparam->http_header_munit, (char*)(http_header_strings[i][1]), headerparam );
-					is_push = 1;
-				}
-			}
-			if( is_push == 0 ){
-				//printf("Not Support %s: %s\n",headername,headerparam);
-			}
+			target_pt = qs_read_line_delimiter_core( headername, sizeof(headername), target_pt, ':', ' ' );
+			target_pt = qs_read_line_delimiter_core( headerparam, sizeof(headerparam), target_pt, '\0', ' ' );
+			qs_add_hash_string( con_memory, psockparam->http_header_munit, headername, headerparam );
 			if( (*target_pt) == '\0' ){
 				break;
 			}
 		}
 	}while( false );
+	//qs_hash_dump(con_memory, psockparam->http_header_munit,0);
 	return 0;
 }
 
@@ -517,6 +501,9 @@ int32_t qs_http_parse_request_parameter(QS_MEMORY_POOL * memory,char *get_params
 {
 	int32_t memid_get_parameter_hash = -1;
 	do{
+		if(NULL==get_params){
+			break;
+		}
 		char* pparam = get_params;
 		char param_name[1024];
 		int32_t memid_value = qs_create_memory_block(memory,buffer_size);
@@ -547,20 +534,54 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 	http_request->http_status_code = 500;
 	QS_SERVER_CONNECTION_INFO * tinfo = (QS_SERVER_CONNECTION_INFO *)rinfo->tinfo;
 	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
+	QS_MEMORY_POOL* con_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(option->memory_pool,tinfo->memid_connection_data_memory);
 
 	int32_t memid_headers = tinfo->sockparam.http_header_munit;
 	//printf("headers\n");
 	//qs_hash_dump(option->memory_pool, memid_headers,0);
-
+	int32_t memid_dummy_string = qs_create_memory_block(con_memory,SIZE_BYTE * 16);
+	if( -1 == memid_dummy_string ){
+		return http_request->http_status_code;
+	}
+	char* dummy_string = (char*)QS_GET_POINTER(con_memory,memid_dummy_string);
+	memset(dummy_string,0,SIZE_BYTE * 16);
 	http_request->temporary_memory = temporary_memory;
-	http_request->method = (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, memid_headers, "HTTP_METHOD" ));
-	http_request->request = (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, memid_headers, "REQUEST" ));
-	http_request->get_params = (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, memid_headers, "GET_PARAMS" ));
-	http_request->content_type = (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, memid_headers, "CONTENT_TYPE" ));
-	http_request->cache_control = (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, memid_headers, "CACHE_CONTROL" ));
-	http_request->http_version = (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, memid_headers, "HTTP_VERSION" ));
-	http_request->user_agent = (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, memid_headers, "USER_AGENT" ));
-	//printf("method : %s , request : %s\n",http_request->method,http_request->request);
+	http_request->method = dummy_string;
+	http_request->request = dummy_string;
+	http_request->get_params = dummy_string;
+	http_request->content_type = dummy_string;
+	http_request->cache_control = dummy_string;
+	http_request->http_version = dummy_string;
+	http_request->user_agent = dummy_string;
+	int32_t memid_http_method = qs_get_hash(con_memory, memid_headers, "HTTP_METHOD");
+	int32_t memid_request = qs_get_hash( con_memory, memid_headers, "REQUEST" );
+	int32_t memid_get_params = qs_get_hash( con_memory, memid_headers, "GET_PARAMS" );
+	int32_t memid_content_type = qs_get_hash( con_memory, memid_headers, "Content-Type" );
+	int32_t memid_cache_control = qs_get_hash( con_memory, memid_headers, "Cache-Control" );
+	int32_t memid_http_version = qs_get_hash( con_memory, memid_headers, "HTTP_VERSION" );
+	int32_t memid_user_agent = qs_get_hash( con_memory, memid_headers, "User-Agent" );
+	if(-1!=memid_http_method){
+		http_request->method = (char*)QS_GET_POINTER(con_memory,memid_http_method);
+	}
+	if(-1!=memid_request){
+		http_request->request = (char*)QS_GET_POINTER(con_memory,memid_request);
+	}
+	if(-1!=memid_get_params){
+		http_request->get_params = (char*)QS_GET_POINTER(con_memory,memid_get_params);
+	}
+	if(-1!=memid_content_type){
+		http_request->content_type = (char*)QS_GET_POINTER(con_memory,memid_content_type);
+	}
+	if(-1!=memid_cache_control){
+		http_request->cache_control = (char*)QS_GET_POINTER(con_memory,memid_cache_control);
+	}
+	if(-1!=memid_http_version){
+		http_request->http_version = (char*)QS_GET_POINTER(con_memory,memid_http_version);
+	}
+	if(-1!=memid_user_agent){
+		http_request->user_agent = (char*)QS_GET_POINTER(con_memory,memid_user_agent);
+	}
+	// printf("method : %s , request : %s\n",http_request->method,http_request->request);
 
 	http_request->memid_get_parameter_hash = -1;
 	do{
@@ -638,7 +659,7 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 		else if( !strcmp(http_request->extension,"css"))
 		{
 			if( !strcmp(http_request->cache_control,"max-age=0") ){
-				char *modified_since = (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, memid_headers, "IF_MODIFIED_SINCE" ));
+				char *modified_since = (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, memid_headers, "If-Modified-Since" ));
 				if( strcmp("",modified_since)){
 					http_request->http_status_code = 304;
 					break;
@@ -651,7 +672,7 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 		else if( !strcmp(http_request->extension,"js"))
 		{
 			if( !strcmp(http_request->cache_control,"max-age=0") ){
-				char *modified_since = (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, memid_headers, "IF_MODIFIED_SINCE" ));
+				char *modified_since = (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, memid_headers, "If-Modified-Since" ));
 				if( strcmp("",modified_since)){
 					http_request->http_status_code = 304;
 					break;
@@ -664,7 +685,7 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 		else if (!strcmp(http_request->extension, "json"))
 		{
 			if (!strcmp(http_request->cache_control, "max-age=0")) {
-				char *modified_since = (char*)QS_GET_POINTER(option->memory_pool, qs_get_hash(option->memory_pool, memid_headers, "IF_MODIFIED_SINCE"));
+				char *modified_since = (char*)QS_GET_POINTER(option->memory_pool, qs_get_hash(option->memory_pool, memid_headers, "If-Modified-Since"));
 				if (strcmp("", modified_since)) {
 					http_request->http_status_code = 304;
 					break;
@@ -772,7 +793,7 @@ int qs_http_protocol_filter_with_websocket(QS_RECV_INFO *rinfo)
 			case QS_HTTP_SOCK_PHASE_MSG_HTTP:
 				break;
 		}
-		int ws_hand_shake = qs_send_handshake_param( rinfo->recvfrom, option, psockparam );
+		int ws_hand_shake = qs_send_handshake_param( rinfo->recvfrom, option, tinfo );
 		if( -1 == ws_hand_shake ){
 			qs_disconnect( psockparam );
 			return -1;
@@ -907,18 +928,6 @@ ssize_t qs_parse_websocket_binary( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psock
 			}
 		}
 		psockparam->tmpmsglen += ( cnt - psockparam->tmpmsglen );
-#ifdef __QS_DEBUG__
-		//		printf( "websocket protocol : fin[%d], rsv[%d], opcode[%d], mask[%d], payload[%llu],tmplen[%zd], pktsize[%zd], [%zd]\n"
-		//				, psockparam->fin
-		//				, psockparam->rsv
-		//				, psockparam->opcode
-		//				, psockparam->mask
-		//				, psockparam->payloadlen
-		//				, psockparam->tmpmsglen
-		//				, size
-		//				, qs_usize( option->memory_pool, basebuf_munit )
-		//				);
-#endif
 		if( psockparam->opcode == 8 ){
 			//printf("opecode : 8(close)\n");
 			//uint16_t close_code = msg[0] << 8 | msg[1];
@@ -973,7 +982,7 @@ ssize_t qs_make_websocket_msg( void* message_buffer, size_t message_buffer_size,
 		}
 		len = size + headersize;
 		if( message_buffer_size < len ){
-			printf( "[qs_send_websocket_msg]size over: %zd byte\n", len );
+			//printf( "[qs_send_websocket_msg]size over: %zd byte\n", len );
 			break;
 		}
 		memset( sendbin, 0, message_buffer_size );
@@ -1000,7 +1009,7 @@ ssize_t qs_make_websocket_msg( void* message_buffer, size_t message_buffer_size,
 	return len;
 }
 
-int qs_send_handshake_param(QS_SOCKET_ID socket, QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockparam )
+int qs_send_handshake_param(QS_SOCKET_ID socket, QS_SOCKET_OPTION *option, QS_SERVER_CONNECTION_INFO* connection )
 {
 	uint8_t sendbuffer[1024];
 	uint8_t* pbuffer;
@@ -1012,11 +1021,13 @@ int qs_send_handshake_param(QS_SOCKET_ID socket, QS_SOCKET_OPTION *option, QS_SO
 	uint8_t length = 0;
 	ssize_t sendlen = 0;
 	const char* ws_guid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-	if( qs_get_hash( option->memory_pool, psockparam->http_header_munit, "SEC_WEBSOCKET_KEY" ) ){
-		pwskey = (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, psockparam->http_header_munit, "SEC_WEBSOCKET_KEY" ));
+	QS_SOCKPARAM* psockparam = &connection->sockparam;
+	QS_MEMORY_POOL* con_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(option->memory_pool,connection->memid_connection_data_memory);
+	if( -1 != qs_get_hash( con_memory, psockparam->http_header_munit, "Sec-WebSocket-Key" ) ){
+		pwskey = (char*)QS_GET_POINTER(con_memory,qs_get_hash( con_memory, psockparam->http_header_munit, "Sec-WebSocket-Key" ));
 	}
-	if( qs_get_hash( option->memory_pool, psockparam->http_header_munit, "SEC_WEBSOCKET_PROTOCOL" ) ){
-		pprotocol = (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, psockparam->http_header_munit, "SEC_WEBSOCKET_PROTOCOL" ));
+	if( -1 != qs_get_hash( con_memory, psockparam->http_header_munit, "Sec-WebSocket-Protocol" ) ){
+		pprotocol = (char*)QS_GET_POINTER(con_memory,qs_get_hash( con_memory, psockparam->http_header_munit, "Sec-WebSocket-Protocol" ));
 	}
 	if( pwskey == NULL || pwskey[0] == '\0' )
 	{
@@ -1026,24 +1037,19 @@ int qs_send_handshake_param(QS_SOCKET_ID socket, QS_SOCKET_OPTION *option, QS_SO
 	memset( sendbuffer, 0 ,sizeof( sendbuffer ) );
 	pbuffer = sendbuffer;
 	length = strlen(pwskey) + strlen( ws_guid );
-	if( psockparam->wsockkey_munit < 0 || qs_usize( option->memory_pool, psockparam->wsockkey_munit ) <= length )
+	psockparam->wsockkey_munit = -1;
+	if( ( psockparam->wsockkey_munit = qs_create_munit( con_memory, sizeof( char ) * QS_ALIGNUP( length, 64 ), MEMORY_TYPE_DEFAULT ) ) == -1 )
 	{
-		if( psockparam->wsockkey_munit >= 0 ){
-			qs_free_memory_unit( option->memory_pool, &psockparam->wsockkey_munit );
-		}
-		if( ( psockparam->wsockkey_munit = qs_create_munit( option->memory_pool, sizeof( char ) * QS_ALIGNUP( length, 64 ), MEMORY_TYPE_DEFAULT ) ) == -1 )
-		{
-			printf( "[responseKey]size over: %d byte\n", length );
-			return qs_error("[responseKey]size over");
-		}
+		//printf( "[responseKey]size over: %d byte\n", length );
+		return qs_error("[responseKey]size over");
 	}
-	responseKey = (char*)qs_upointer( option->memory_pool, psockparam->wsockkey_munit );
-	memset( responseKey, 0, qs_usize( option->memory_pool, psockparam->wsockkey_munit ) );
+	responseKey = (char*)qs_upointer( con_memory, psockparam->wsockkey_munit );
+	memset( responseKey, 0, qs_usize( con_memory, psockparam->wsockkey_munit ) );
 	memcpy(responseKey, pwskey, length);
 	memcpy(&(responseKey[strlen(pwskey)]), ws_guid, strlen(ws_guid));
 	qs_sha1( shaHash, responseKey, length );
 	shaHash[20] = '\0';
-	qs_base64_encode(responseKey, qs_usize( option->memory_pool, psockparam->wsockkey_munit ) , shaHash, sizeof( shaHash )-1 );
+	qs_base64_encode(responseKey, qs_usize( con_memory, psockparam->wsockkey_munit ) , shaHash, sizeof( shaHash )-1 );
 	if( pprotocol == NULL || !strcmp( pprotocol, "" ) )
 	{
 		buffersize = qs_sprintf((char *)pbuffer,sizeof(sendbuffer),

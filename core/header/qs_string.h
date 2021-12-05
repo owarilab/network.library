@@ -47,6 +47,7 @@ int qs_itoa( int32_t value, char* target, size_t size );
 int32_t qs_find_char( char* target, size_t target_size, char delimiter_ch );
 char* qs_readline( char* buf, size_t buffer_size,char* target, char delimiter_ch );
 char* qs_read_line_delimiter( char* buf, size_t buffer_size,char* target, char delimiter_ch );
+char* qs_read_line_delimiter_core( char* buf, size_t buffer_size,char* target, char delimiter_ch, char skip_ch );
 char* qs_read_delimiter( char* buf, size_t buffer_size,char* target, char delimiter_ch );
 size_t qs_strlcat( char *dst, const char *src, size_t size );
 size_t qs_strlink( char *pmain, size_t mainsize, char *psub, size_t subsize, size_t max_size );

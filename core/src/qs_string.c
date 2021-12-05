@@ -104,6 +104,10 @@ char* qs_readline( char* buf, size_t buffer_size, char* target, char delimiter_c
 
 char* qs_read_line_delimiter( char* buf, size_t buffer_size,char* target, char delimiter_ch )
 {
+	return qs_read_line_delimiter_core(buf,buffer_size,target,delimiter_ch,0);
+}
+char* qs_read_line_delimiter_core( char* buf, size_t buffer_size,char* target, char delimiter_ch, char skip_ch )
+{
 	char *bufstart = buf;
 	if( buf == NULL || target == NULL ){
 		return target;
@@ -113,6 +117,11 @@ char* qs_read_line_delimiter( char* buf, size_t buffer_size,char* target, char d
 		if( buf - bufstart >= buffer_size -1 ){
 			printf("qs_read_line_delimiter : buffer size over\n");
 			break;
+		}
+		if(skip_ch!=0 && (*target) == skip_ch)
+		{
+			target++;
+			continue;
 		}
 		if( (*target) == delimiter_ch )
 		{

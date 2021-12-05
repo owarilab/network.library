@@ -633,6 +633,10 @@ int32_t qs_make_connection_info_core( QS_SOCKET_OPTION *option, QS_SERVER_CONNEC
 		return QS_SYSTEM_ERROR;
 	}
 	tinfo->user_information = -1;
+	if( -1== (tinfo->memid_connection_data_memory = qs_create_mini_memory(option->memory_pool, SIZE_KBYTE * 64)) ){
+		return QS_SYSTEM_ERROR;
+	}
+	tinfo->memid_connection_data = -1;
 	qs_init_socket_param( &tinfo->sockparam );
 	return QS_SYSTEM_OK;
 }
@@ -1345,6 +1349,9 @@ QS_SOCKET_ID qs_accept(QS_SOCKET_OPTION *option)
 						child->sockparam.type = SOCK_TYPE_NORMAL_TCP;
 					}
 					qs_set_block(child->id, 0);
+					QS_MEMORY_POOL* con_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(option->memory_pool,child->memid_connection_data_memory);
+					qs_memory_clean(con_memory);
+					child->memid_connection_data = -1;
 					//qs_initialize_connection_info(option, child);
 					if (option->connection_start_callback != NULL) {
 						option->connection_start_callback((void*)child);
@@ -1379,6 +1386,9 @@ QS_SOCKET_ID qs_accept(QS_SOCKET_OPTION *option)
 					child->sockparam.type = SOCK_TYPE_NORMAL_TCP;
 				}
 				qs_set_block(child->id, 0);
+				QS_MEMORY_POOL* con_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(option->memory_pool,child->memid_connection_data_memory);
+				qs_memory_clean(con_memory);
+				child->memid_connection_data = -1;
 				//qs_initialize_connection_info(option, child);
 				if (option->connection_start_callback != NULL) {
 					option->connection_start_callback((void*)child);

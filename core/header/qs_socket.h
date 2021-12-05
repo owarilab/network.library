@@ -147,6 +147,8 @@ typedef struct QS_SERVER_CONNECTION_INFO
 	int32_t recvinfo_munit; // QS_RECV_INFO
 	int32_t recvmsg_munit; // char[]
 	int32_t user_information;
+	int32_t memid_connection_data_memory;
+	int32_t memid_connection_data;
 	void* qs_socket_option;
 	QS_SOCKPARAM sockparam;
 } QS_SERVER_CONNECTION_INFO;

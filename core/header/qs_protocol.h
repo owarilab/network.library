@@ -25,23 +25,6 @@ extern "C"{
 #define HTTP_NOT_FOUND "HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n"
 #define HTTP_OK "HTTP/1.1 200 OK\r\n"
 
-#define HTTP_HEADER_STRINGS { \
-	{"GET_PARAMS","GET_PARAMS","2048"}, \
-	{"REQUEST","REQUEST","2048"}, \
-	{"HTTP_VERSION","HTTP_VERSION","32"}, \
-	{"HTTP_METHOD","HTTP_METHOD","32"}, \
-	{"Sec-WebSocket-Key:","SEC_WEBSOCKET_KEY","256"}, \
-	{"Host:","HOST","512"}, \
-	{"User-Agent:","USER_AGENT","512"}, \
-	{"Sec-WebSocket-Protocol:","SEC_WEBSOCKET_PROTOCOL","128"}, \
-	{"Content-Length:","CONTENT_LENGTH","64"}, \
-	{"Content-Type:","CONTENT_TYPE","256"}, \
-	{"Connection:","CONNECTION","64"}, \
-	{"Cache-Control:","CACHE_CONTROL","256"}, \
-	{"Referer:","REFERER","2048"}, \
-	{"If-Modified-Since:","IF_MODIFIED_SINCE","64"}, \
-}; \
-
 // HTTP PROTOCOL PHASE
 #define QS_HTTP_SOCK_PHASE_RECV_CONTINUE 0
 #define QS_HTTP_SOCK_PHASE_PARSE_HTTP_HEADER 1
@@ -79,7 +62,7 @@ ssize_t qs_make_protocol_buffer(uint8_t* bin, uint8_t* payload,ssize_t payload_s
 
 int qs_http_protocol_filter(QS_RECV_INFO* rinfo);
 int qs_http_parser( QS_RECV_INFO *rinfo );
-int qs_http_parse_header( QS_RECV_INFO *rinfo );
+int qs_http_parse_header( QS_RECV_INFO *rinfo, int skip_head );
 size_t qs_http_add_response_common(char* dest, size_t dest_size, int http_response_code, char* content_type, size_t content_length);
 size_t qs_http_add_cache_control(char* dest, size_t dest_size, size_t start, int max_age, QS_FILE_INFO* info);
 size_t qs_http_document_path(char* dest, size_t dest_size,char* document_root, char* default_file, char* path);
@@ -90,7 +73,7 @@ int32_t http_json_response_common(QS_SERVER_CONNECTION_INFO * connection, QS_SOC
 int qs_http_protocol_filter_with_websocket(QS_RECV_INFO *rinfo);
 ssize_t qs_parse_websocket_binary( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockparam, uint8_t* u8buf, size_t size, uint32_t basebuf_munit );
 ssize_t qs_make_websocket_msg( void* message_buffer, size_t message_buffer_size,int is_binary, const char* msg, ssize_t size );
-int qs_send_handshake_param(QS_SOCKET_ID socket, QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockparam );
+int qs_send_handshake_param(QS_SOCKET_ID socket, QS_SOCKET_OPTION *option, QS_SERVER_CONNECTION_INFO* connection );
 
 #endif /*_QS_PROTOCOL_H_*/
 
