@@ -1079,7 +1079,7 @@ int qs_send_handshake_param(QS_SOCKET_ID socket, QS_SOCKET_OPTION *option, QS_SE
 				,"Connection: "
 				,"Upgrade"
 				,responseKey
-				,pprotocol
+				,"chat"//,pprotocol
 				);
 	}
 	if( option->user_send_function != NULL ){

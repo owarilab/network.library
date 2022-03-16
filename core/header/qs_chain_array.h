@@ -46,6 +46,7 @@ void qs_dump_chain_array(QS_MEMORY_POOL* memory,int32_t chain_id);
 int qs_show_chain_info(QS_MEMORY_POOL* memory,int32_t chain_id,void* chain, int debug);
 int32_t qs_get_chain_start(QS_MEMORY_POOL* memory,int32_t chain_id);
 int32_t qs_get_chain_length(QS_MEMORY_POOL* memory,int32_t chain_id);
+int32_t qs_get_chain_size(QS_MEMORY_POOL* memory,int32_t chain_id);
 #endif /*_QS_CHAIN_ARRAY_H_*/
 
 #ifdef __cplusplus

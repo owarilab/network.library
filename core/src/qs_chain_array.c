@@ -263,3 +263,10 @@ int32_t qs_get_chain_length(QS_MEMORY_POOL* memory,int32_t chain_id)
 	}
 	return print_length;
 }
+
+int32_t qs_get_chain_size(QS_MEMORY_POOL* memory,int32_t chain_id)
+{
+	uint8_t* chain_root = (uint8_t*)QS_GET_POINTER(memory,chain_id);
+	int32_t chain_size = *(((int32_t*)chain_root)+2);
+	return chain_size;
+}

@@ -383,7 +383,7 @@ int qs_initialize_socket_option(
 	if (-1 == (option->memid_accept_wait_pool = qs_create_chain_array(memory_pool, option->maxconnection, sizeof(int32_t)))) {
 		return -1;
 	}
-	for (i = 0; i < option->maxconnection; i++) {
+	for (i = 0; i < qs_get_chain_size(memory_pool,option->memid_accept_wait_pool); i++) {
 		wait_id = (int32_t*)qs_get_chain_i(memory_pool, option->memid_accept_wait_pool, i);
 		*wait_id = -1;
 	}

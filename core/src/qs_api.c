@@ -316,13 +316,16 @@ int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_conn
 int api_qs_server_create_router(QS_SERVER_CONTEXT* context)
 {
 	QS_MEMORY_POOL* router_memory_pool = NULL;
-	if( qs_initialize_memory( &router_memory_pool, SIZE_MBYTE * 16, SIZE_MBYTE * 16, MEMORY_ALIGNMENT_SIZE_BIT_64, FIX_MUNIT_SIZE, 1, SIZE_KBYTE * 16 ) <= 0 ){
+	size_t route_save_data_size = QS_PACKET_ROUTE_DATA_SIZE_DEFAULT;
+	size_t max_route_chain = QS_PACKET_ROUTE_ROUTE_SIZE_DEFAULT;
+	size_t alloc_size = QS_PACKET_ROUTE_ALLOC_SIZE_DEFAULT + (max_route_chain * route_save_data_size);
+	if( qs_initialize_memory( &router_memory_pool, alloc_size, alloc_size, MEMORY_ALIGNMENT_SIZE_BIT_64, FIX_MUNIT_SIZE, 1, SIZE_KBYTE * 16 ) <= 0 ){
 		return -1;
 	}
 	context->router_memory = (void*)router_memory_pool;
 	QS_MEMORY_POOL* server_memory_pool = (QS_MEMORY_POOL*)context->memory;
 	QS_SOCKET_OPTION* server = (QS_SOCKET_OPTION*)QS_GET_POINTER(server_memory_pool, context->memid_server);
-	context->memid_router = qs_init_packet_route(router_memory_pool, server->maxconnection, QS_PACKET_ROUTE_ROUTE_SIZE_DEFAULT, QS_PACKET_ROUTE_KEY_SIZE_DEFAULT, SIZE_KBYTE*2);
+	context->memid_router = qs_init_packet_route(router_memory_pool, server->maxconnection, max_route_chain, QS_PACKET_ROUTE_KEY_SIZE_DEFAULT, route_save_data_size);
 	if(-1==context->memid_router){
 		return -1;
 	}
@@ -568,10 +571,125 @@ void api_qs_exec_http(QS_RECV_INFO *rinfo)
 	qs_memory_clean( temporary_memory );
 	QS_HTTP_REQUEST_COMMON http_request;
 	int32_t http_status_code = http_request_common(rinfo, &http_request, temporary_memory);
+	context->system_data = (void*)(&http_request);
+
 	// API
+	{
+		QS_EVENT_PARAMETER params = (void*)rinfo;
+		QS_MEMORY_CONTEXT memory;
+		QS_JSON_ELEMENT_OBJECT object;
+		memory.memory = (void*)temporary_memory;
+
+		// curl -X POST http://localhost:8080/api/v1/mem/set -d 'k=memk1&v=memvalue1'
+		if(!strcmp(api_qs_get_http_method(params),"POST")){
+			if(!strcmp(api_qs_get_http_path(params),"/api/v1/mem/set")){
+				char* key = api_qs_get_http_post_parameter(params,"k");
+				char* value = api_qs_get_http_post_parameter(params,"v");
+				if(key!=0&&value!=0){
+					QS_KVS_CONTEXT kvs;
+					if(-1!=api_qs_server_get_kvs(context,&kvs)){
+						int result = api_qs_kvs_set(&kvs,key,value,0);
+						api_qs_object_create(&memory,&object);
+						api_qs_object_push_string(&object,"k",key);
+						api_qs_object_push_string(&object,"v",value);
+						api_qs_object_push_integer(&object,"result",result);
+						http_status_code = api_qs_http_response_json(params,&object,1024 * 1024);
+					}
+				}
+			}
+		}
+
+		// curl -X POST http://localhost:8080/api/v1/mem/get -d 'k=memk1'
+		if(!strcmp(api_qs_get_http_method(params),"POST")){
+			if(!strcmp(api_qs_get_http_path(params),"/api/v1/mem/get")){
+				char* key = api_qs_get_http_post_parameter(params,"k");
+				if(key!=0){
+					QS_KVS_CONTEXT kvs;
+					if(-1!=api_qs_server_get_kvs(context,&kvs)){
+						char* value = api_qs_kvs_get(&kvs,key);
+						api_qs_object_create(&memory,&object);
+						api_qs_object_push_string(&object,"k",key);
+						if(value==0){
+							api_qs_object_push_string(&object,"v","");
+						}else{
+							api_qs_object_push_string(&object,"v",value);
+						}
+						http_status_code = api_qs_http_response_json(params,&object,1024 * 1024);
+					}
+				}
+			}
+		}
+
+		// curl -X POST http://localhost:8080/api/v1/mem/delete -d 'k=memk1'
+		if(!strcmp(api_qs_get_http_method(params),"POST")){
+			if(!strcmp(api_qs_get_http_path(params),"/api/v1/mem/delete")){
+				char* key = api_qs_get_http_post_parameter(params,"k");
+				if(key!=0){
+					QS_KVS_CONTEXT kvs;
+					if(-1!=api_qs_server_get_kvs(context,&kvs)){
+						api_qs_kvs_delete(&kvs,key);
+						api_qs_object_create(&memory,&object);
+						api_qs_object_push_string(&object,"k",key);
+						http_status_code = api_qs_http_response_json(params,&object,1024*64);
+					}
+				}
+			}
+		}
+
+		// curl -X POST http://localhost:8080/api/v1/mem/keys
+		if(!strcmp(api_qs_get_http_method(params),"POST")){
+			if(!strcmp(api_qs_get_http_path(params),"/api/v1/mem/keys")){
+				QS_KVS_CONTEXT kvs;
+				QS_JSON_ELEMENT_ARRAY array;
+				if(-1!=api_qs_server_get_kvs(context,&kvs)){
+					api_qs_object_create(&memory,&object);
+					api_qs_array_create(&memory,&array);
+					int32_t key_length = api_qs_kvs_keys(&array,&kvs);
+					api_qs_object_push_integer(&object,"len",key_length);
+					api_qs_object_push_array(&object,"keys",&array);
+					http_status_code = api_qs_http_response_json(params,&object,1024*64);
+				}
+			}
+		}
+
+		// curl -X POST http://localhost:8080/api/v1/room/create -d 'name=testroom1'
+		if(!strcmp(api_qs_get_http_method(params),"POST")){
+			if(!strcmp(api_qs_get_http_path(params),"/api/v1/room/create")){
+				char* room_name = api_qs_get_http_post_parameter(params,"name");
+				if(room_name!=0){
+					if(0==api_qs_room_create(context,room_name,&memory,&object)){
+						http_status_code = api_qs_http_response_json(params,&object,1024*8);
+					}
+				}
+			}
+		}
+
+		// curl -X POST http://localhost:8080/api/v1/room/list
+		if(!strcmp(api_qs_get_http_method(params),"POST")){
+			if(!strcmp(api_qs_get_http_path(params),"/api/v1/room/list")){
+				if(0==api_qs_room_list(context,&memory,&object)){
+					http_status_code = api_qs_http_response_json(params,&object,1024*8);
+				}
+			}
+		}
+
+		// curl -X POST http://localhost:8080/api/v1/room/join -d 'room_id=WTeiylPnFIDeyPOnTnBU&connection_id=klV7RRk1vgpshZfdzzPjcC4PM7sDBCd8'
+		if(!strcmp(api_qs_get_http_method(params),"POST")){
+			if(!strcmp(api_qs_get_http_path(params),"/api/v1/room/join")){
+				char* room_id = api_qs_get_http_post_parameter(params,"room_id");
+				char* connection_id = api_qs_get_http_post_parameter(params,"connection_id");
+				if(room_id!=0&&connection_id!=0){
+					if(0==api_qs_room_join(context,room_id,connection_id,&memory,&object)){
+						http_status_code = api_qs_http_response_json(params,&object,1024*8);
+					} else{
+						http_status_code = 404;
+					}
+				}
+			}
+		}
+	}
 	if (http_status_code == 404) {
 		if(context->on_http_event!=NULL){
-			context->system_data = (void*)(&http_request);
 			http_status_code = context->on_http_event((void*)rinfo);
 		}
 	}

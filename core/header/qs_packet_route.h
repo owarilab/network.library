@@ -39,8 +39,10 @@ extern "C"{
 #include "qs_variable.h"
 #include "qs_random.h"
 
+#define QS_PACKET_ROUTE_ALLOC_SIZE_DEFAULT SIZE_MBYTE * 16
 #define QS_PACKET_ROUTE_KEY_SIZE_DEFAULT 20
 #define QS_PACKET_ROUTE_ROUTE_SIZE_DEFAULT 1000
+#define QS_PACKET_ROUTE_DATA_SIZE_DEFAULT SIZE_KBYTE*2
 
 typedef struct QS_PACKET_ROUTE_NODE
 {

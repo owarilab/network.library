@@ -60,7 +60,7 @@ int32_t qs_init_packet_route(QS_MEMORY_POOL* memory,size_t max_connection,size_t
 	if(-1==(packet_route->node_chain_array=qs_create_chain_array(memory,max_route_chain,QS_ALIGNUP( sizeof( QS_PACKET_ROUTE_NODE ), memory->alignment )))){
 		return -1;
 	}
-	for(i=0;i<max_route_chain;i++){
+	for(i=0;i<qs_get_chain_size(memory,packet_route->node_chain_array);i++){
 		QS_PACKET_ROUTE_NODE* route_node = (QS_PACKET_ROUTE_NODE*)qs_get_chain_i(memory,packet_route->node_chain_array,i);
 		if(data_size>0){
 			route_node->data_memory_id = qs_create_mini_memory(memory,data_size + SIZE_BYTE * 256);
