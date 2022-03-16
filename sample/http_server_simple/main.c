@@ -81,7 +81,7 @@ int on_connect(QS_EVENT_PARAMETER params)
 int on_http_event(QS_EVENT_PARAMETER params)
 {
 	int http_status_code = 404;
-	QS_SERVER_CONTEXT* context = api_qs_get_server_context(params);
+	//QS_SERVER_CONTEXT* context = api_qs_get_server_context(params);
 	api_qs_memory_clean(&g_temporary_memory);
 	QS_JSON_ELEMENT_OBJECT object;
 
@@ -97,110 +97,6 @@ int on_http_event(QS_EVENT_PARAMETER params)
 				api_qs_object_push_string(&object,"v2",v2);
 				api_qs_object_push_string(&object,"v3",v3);
 				http_status_code = api_qs_http_response_json(params,&object,1024*8);
-			}
-		}
-	}
-
-	// curl -X POST http://localhost:8080/api/v1/mem/set -d 'k=memk1&v=memvalue1'
-	if(!strcmp(api_qs_get_http_method(params),"POST")){
-		if(!strcmp(api_qs_get_http_path(params),"/api/v1/mem/set")){
-			char* key = api_qs_get_http_post_parameter(params,"k");
-			char* value = api_qs_get_http_post_parameter(params,"v");
-			if(key!=0&&value!=0){
-				QS_KVS_CONTEXT kvs;
-				api_qs_server_get_kvs(context,&kvs);
-				int result = api_qs_kvs_set(&kvs,key,value,0);
-				api_qs_object_create(&g_temporary_memory,&object);
-				api_qs_object_push_string(&object,"k",key);
-				api_qs_object_push_string(&object,"v",value);
-				api_qs_object_push_integer(&object,"result",result);
-				http_status_code = api_qs_http_response_json(params,&object,1024 * 1024);
-			}
-		}
-	}
-
-	// curl -X POST http://localhost:8080/api/v1/mem/get -d 'k=memk1'
-	if(!strcmp(api_qs_get_http_method(params),"POST")){
-		if(!strcmp(api_qs_get_http_path(params),"/api/v1/mem/get")){
-			char* key = api_qs_get_http_post_parameter(params,"k");
-			if(key!=0){
-				QS_KVS_CONTEXT kvs;
-				api_qs_server_get_kvs(context,&kvs);
-				char* value = api_qs_kvs_get(&kvs,key);
-				api_qs_object_create(&g_temporary_memory,&object);
-				api_qs_object_push_string(&object,"k",key);
-				if(value==0){
-					api_qs_object_push_string(&object,"v","");
-				}else{
-					api_qs_object_push_string(&object,"v",value);
-				}
-				http_status_code = api_qs_http_response_json(params,&object,1024 * 1024);
-			}
-		}
-	}
-
-	// curl -X POST http://localhost:8080/api/v1/mem/delete -d 'k=memk1'
-	if(!strcmp(api_qs_get_http_method(params),"POST")){
-		if(!strcmp(api_qs_get_http_path(params),"/api/v1/mem/delete")){
-			char* key = api_qs_get_http_post_parameter(params,"k");
-			if(key!=0){
-				QS_KVS_CONTEXT kvs;
-				api_qs_server_get_kvs(context,&kvs);
-				api_qs_kvs_delete(&kvs,key);
-				api_qs_object_create(&g_temporary_memory,&object);
-				api_qs_object_push_string(&object,"k",key);
-				http_status_code = api_qs_http_response_json(params,&object,1024*64);
-			}
-		}
-	}
-
-	// curl -X POST http://localhost:8080/api/v1/mem/keys
-	if(!strcmp(api_qs_get_http_method(params),"POST")){
-		if(!strcmp(api_qs_get_http_path(params),"/api/v1/mem/keys")){
-			QS_KVS_CONTEXT kvs;
-			QS_JSON_ELEMENT_ARRAY array;
-			api_qs_server_get_kvs(context,&kvs);
-			api_qs_object_create(&g_temporary_memory,&object);
-			api_qs_array_create(&g_temporary_memory,&array);
-			int32_t key_length = api_qs_kvs_keys(&array,&kvs);
-			api_qs_object_push_integer(&object,"len",key_length);
-			api_qs_object_push_array(&object,"keys",&array);
-			http_status_code = api_qs_http_response_json(params,&object,1024*64);
-		}
-	}
-
-	// curl -X POST http://localhost:8080/api/v1/room/create -d 'name=testroom1'
-	if(!strcmp(api_qs_get_http_method(params),"POST")){
-		if(!strcmp(api_qs_get_http_path(params),"/api/v1/room/create")){
-			char* room_name = api_qs_get_http_post_parameter(params,"name");
-			if(room_name!=0){
-				if(0==api_qs_room_create(context,room_name,&g_temporary_memory,&object)){
-					http_status_code = api_qs_http_response_json(params,&object,1024*8);
-				}
-			}
-		}
-	}
-
-	// curl -X POST http://localhost:8080/api/v1/room/list
-	if(!strcmp(api_qs_get_http_method(params),"POST")){
-		if(!strcmp(api_qs_get_http_path(params),"/api/v1/room/list")){
-			if(0==api_qs_room_list(context,&g_temporary_memory,&object)){
-				http_status_code = api_qs_http_response_json(params,&object,1024*8);
-			}
-		}
-	}
-
-	// curl -X POST http://localhost:8080/api/v1/room/join -d 'room_id=WTeiylPnFIDeyPOnTnBU&connection_id=klV7RRk1vgpshZfdzzPjcC4PM7sDBCd8'
-	if(!strcmp(api_qs_get_http_method(params),"POST")){
-		if(!strcmp(api_qs_get_http_path(params),"/api/v1/room/join")){
-			char* room_id = api_qs_get_http_post_parameter(params,"room_id");
-			char* connection_id = api_qs_get_http_post_parameter(params,"connection_id");
-			if(room_id!=0&&connection_id!=0){
-				if(0==api_qs_room_join(context,room_id,connection_id,&g_temporary_memory,&object)){
-					http_status_code = api_qs_http_response_json(params,&object,1024*8);
-				} else{
-					http_status_code = 404;
-				}
 			}
 		}
 	}
