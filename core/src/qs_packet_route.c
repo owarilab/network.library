@@ -239,9 +239,6 @@ int32_t qs_add_packet_route_connection(QS_MEMORY_POOL* memory,int32_t packet_rou
 	if(-1 != con->data_memory_id){
 		QS_MEMORY_POOL* con_data_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(memory,con->data_memory_id);
 		qs_safe_memory_clean(con_data_memory);
-		if(-1 == qs_create_fixmunit(con_data_memory, 0, route_node->con_data_size)){
-			return -1;
-		}
 	}
 	con->connection_index = connection_index;
 	con->id = ++route_node->auto_id_counter;
