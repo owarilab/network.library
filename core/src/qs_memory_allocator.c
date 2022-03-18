@@ -596,9 +596,21 @@ int32_t qs_resize_copy_mini_memory(QS_MEMORY_POOL* _dest_ppool, QS_MEMORY_POOL* 
 
 void qs_memory_clean( QS_MEMORY_POOL* _ppool )
 {
+	qs_memory_clean_core( _ppool, 0 );
+}
+
+void qs_safe_memory_clean( QS_MEMORY_POOL* _ppool )
+{
+	qs_memory_clean_core( _ppool, 1 );
+}
+
+void qs_memory_clean_core( QS_MEMORY_POOL* _ppool, int safe_clean )
+{
 	QS_MEMORY_UNIT* unit;
 	int i;
-	//memset( _ppool->memory, 0, _ppool->size );
+	if(safe_clean){
+		memset( _ppool->memory, 0, _ppool->size );
+	}
 	_ppool->top				= 0;
 	_ppool->end				= _ppool->size;
 	_ppool->bottom			= _ppool->size;

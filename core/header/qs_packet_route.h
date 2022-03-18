@@ -39,6 +39,7 @@ extern "C"{
 #include "qs_variable.h"
 #include "qs_random.h"
 
+#define QS_PACKET_ROUTE_ID_BUFFER_SIZE 33
 #define QS_PACKET_ROUTE_ALLOC_SIZE_DEFAULT SIZE_MBYTE * 16
 #define QS_PACKET_ROUTE_KEY_SIZE_DEFAULT 20
 #define QS_PACKET_ROUTE_ROUTE_SIZE_DEFAULT 1000
@@ -57,19 +58,21 @@ typedef struct QS_PACKET_ROUTE_NODE
 	int32_t capacity;
 	int32_t application_data_id;
 	int32_t data_memory_id;
+	size_t con_data_size;
 } QS_PACKET_ROUTE_NODE;
 
 typedef struct QS_PACKET_ROUTE_NODE_CONNECTION
 {
 	int32_t connection_index;
 	int64_t id;
+	int32_t data_memory_id;
 } QS_PACKET_ROUTE_NODE_CONNECTION;
 
 typedef struct QS_PACKET_ROUTE_OFFSET
 {
 	int32_t route_chain_offset;
 	int32_t route_node_chain_offset;
-	char id[33];
+	char id[QS_PACKET_ROUTE_ID_BUFFER_SIZE];
 } QS_PACKET_ROUTE_OFFSET;
 
 typedef struct QS_PACKET_ROUTE{
@@ -84,7 +87,7 @@ typedef struct QS_PACKET_ROUTE{
 } QS_PACKET_ROUTE;
 
 int32_t qs_init_packet_route(QS_MEMORY_POOL* memory,size_t max_connection,size_t max_route_chain,size_t key_size,size_t data_size);
-int32_t qs_create_packet_route(QS_MEMORY_POOL* memory,int32_t packet_route_id,char* route_name, int32_t route_capacity, int32_t life_time);
+int32_t qs_create_packet_route(QS_MEMORY_POOL* memory,int32_t packet_route_id,char* route_name, int32_t route_capacity, int32_t life_time,size_t con_data_size);
 int32_t qs_get_packet_route(QS_MEMORY_POOL* memory,int32_t packet_route_id,char* route_name);
 int32_t qs_clean_packet_route(QS_MEMORY_POOL* memory,int32_t packet_route_id);
 int32_t qs_set_packet_route_owner(QS_MEMORY_POOL* memory,int32_t packet_route_id,char* route_name, int64_t owner_id);

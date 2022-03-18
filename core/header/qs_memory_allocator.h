@@ -131,6 +131,7 @@ extern "C"{
 	mem+=8;
 
 #define FIX_MUNIT_SIZE 4
+#define QS_FIX_MEMORY_SIZE ( QS_ALIGNUP( sizeof( QS_MEMORY_UNIT ), MEMORY_ALIGNMENT_SIZE_BIT_64 ) * FIX_MUNIT_SIZE ) + 8
 
 # define QS_MEMORY_ERROR_CODE_RESIZE -1000
 
@@ -192,6 +193,8 @@ int32_t qs_create_clone_mini_memory( QS_MEMORY_POOL* _ppool, QS_MEMORY_POOL* _mi
 int32_t qs_copy_mini_memory( QS_MEMORY_POOL* _dest_ppool, QS_MEMORY_POOL* _src_ppool );
 int32_t qs_resize_copy_mini_memory(QS_MEMORY_POOL* _dest_ppool, QS_MEMORY_POOL* _src_ppool);
 void qs_memory_clean( QS_MEMORY_POOL* _ppool );
+void qs_safe_memory_clean( QS_MEMORY_POOL* _ppool );
+void qs_memory_clean_core( QS_MEMORY_POOL* _ppool, int safe_clean );
 size_t qs_mgetsize( QS_MEMORY_POOL* _ppool, size_t size );
 uint32_t qs_free_memory_unit( QS_MEMORY_POOL* _ppool, int32_t *munit_id );
 int32_t qs_create_fixmunit( QS_MEMORY_POOL* _ppool, int32_t id, size_t size );

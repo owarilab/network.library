@@ -822,6 +822,7 @@ int api_qs_send_ws_message_common(QS_RECV_INFO *qs_recv_info,const char* message
 			}
 		}
 		else {
+			// send echo
 			if (-1 == (ret = qs_send_all(psockparam->acc, buffer, sendlen, 0))) {
 
 			}
@@ -1069,7 +1070,7 @@ int api_qs_room_create(QS_SERVER_CONTEXT* context, const char* name, QS_MEMORY_C
 		int32_t route_capacity = 10;
 		int32_t life_time = 60 * 5; // 5 minutes
 		qs_uniqid_r32(id,sizeof(id)-1);
-		int32_t route_offset = qs_create_packet_route(router_memory, context->memid_router, id, route_capacity, life_time);
+		int32_t route_offset = qs_create_packet_route(router_memory, context->memid_router, id, route_capacity, life_time, 0);
 		if(-1 == route_offset){
 			break;
 		}

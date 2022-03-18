@@ -63,7 +63,7 @@ int32_t qs_init_packet_route(QS_MEMORY_POOL* memory,size_t max_connection,size_t
 	for(i=0;i<qs_get_chain_size(memory,packet_route->node_chain_array);i++){
 		QS_PACKET_ROUTE_NODE* route_node = (QS_PACKET_ROUTE_NODE*)qs_get_chain_i(memory,packet_route->node_chain_array,i);
 		if(data_size>0){
-			route_node->data_memory_id = qs_create_mini_memory(memory,data_size + SIZE_BYTE * 256);
+			route_node->data_memory_id = qs_create_mini_memory(memory,data_size + QS_FIX_MEMORY_SIZE);
 			if(-1 == route_node->data_memory_id){
 				return -1;
 			}
@@ -74,7 +74,7 @@ int32_t qs_init_packet_route(QS_MEMORY_POOL* memory,size_t max_connection,size_t
 	return packet_route_id;
 }
 
-int32_t qs_create_packet_route(QS_MEMORY_POOL* memory,int32_t packet_route_id,char* route_name, int32_t route_capacity, int32_t life_time)
+int32_t qs_create_packet_route(QS_MEMORY_POOL* memory,int32_t packet_route_id,char* route_name, int32_t route_capacity, int32_t life_time,size_t con_data_size)
 {
 	QS_PACKET_ROUTE* packet_route = (QS_PACKET_ROUTE*)QS_GET_POINTER(memory,packet_route_id);
 	int32_t route_offset = qs_add_chain_i(memory,packet_route->node_chain_array);
@@ -92,14 +92,38 @@ int32_t qs_create_packet_route(QS_MEMORY_POOL* memory,int32_t packet_route_id,ch
 	}
 	
 	if(route_node->status==0){
+		int i;
 		if(-1==(route_node->connection_chain_array = qs_create_chain_array(memory,route_capacity,sizeof(QS_PACKET_ROUTE_NODE_CONNECTION)))){
 			return -1;
+		}
+		for(i=0;i<qs_get_chain_size(memory,route_node->connection_chain_array);i++){
+			QS_PACKET_ROUTE_NODE_CONNECTION* con = (QS_PACKET_ROUTE_NODE_CONNECTION*)qs_get_chain_i(memory,route_node->connection_chain_array,i);
+			con->data_memory_id = -1;
+			if(con_data_size>0)
+			{
+				con->data_memory_id = qs_create_mini_memory(memory,con_data_size + QS_FIX_MEMORY_SIZE);
+				if(-1 == con->data_memory_id){
+					printf("con memory allocate error\n");
+					return -1;
+				}
+				QS_MEMORY_POOL* con_data_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(memory,con->data_memory_id);
+				qs_safe_memory_clean(con_data_memory);
+			}
 		}
 		route_node->route_name_id = qs_create_munit(packet_route->memory,packet_route->key_size,MEMORY_TYPE_DEFAULT);
 		if(route_node->route_name_id==-1){
 			return -1;
 		}
 		route_node->status=1;
+	}else{
+		int i;
+		for(i=0;i<qs_get_chain_size(memory,route_node->connection_chain_array);i++){
+			QS_PACKET_ROUTE_NODE_CONNECTION* con = (QS_PACKET_ROUTE_NODE_CONNECTION*)qs_get_chain_i(memory,route_node->connection_chain_array,i);
+			if(-1 != con->data_memory_id){
+				QS_MEMORY_POOL* con_data_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(memory,con->data_memory_id);
+				qs_safe_memory_clean(con_data_memory);
+			}
+		}
 	}
 	
 	QS_CACHE* cache = (QS_CACHE*)QS_GET_POINTER(packet_route->memory,packet_route->cache_id);
@@ -112,6 +136,7 @@ int32_t qs_create_packet_route(QS_MEMORY_POOL* memory,int32_t packet_route_id,ch
 	route_node->owner_id = 0;
 	route_node->auto_id_counter = 0;
 	route_node->capacity = route_capacity;
+	route_node->con_data_size = con_data_size;
 	route_node->application_data_id = -1;
 	if(-1!=route_node->data_memory_id)
 	{
@@ -211,6 +236,13 @@ int32_t qs_add_packet_route_connection(QS_MEMORY_POOL* memory,int32_t packet_rou
 		return -1;
 	}
 	QS_PACKET_ROUTE_NODE_CONNECTION* con = (QS_PACKET_ROUTE_NODE_CONNECTION*)qs_get_chain_i(memory,route_node->connection_chain_array,connection_chain);
+	if(-1 != con->data_memory_id){
+		QS_MEMORY_POOL* con_data_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(memory,con->data_memory_id);
+		qs_safe_memory_clean(con_data_memory);
+		if(-1 == qs_create_fixmunit(con_data_memory, 0, route_node->con_data_size)){
+			return -1;
+		}
+	}
 	con->connection_index = connection_index;
 	con->id = ++route_node->auto_id_counter;
 	QS_PACKET_ROUTE_OFFSET* offsets = (QS_PACKET_ROUTE_OFFSET*)QS_GET_POINTER(memory,packet_route->connection_node_offsets_id);
