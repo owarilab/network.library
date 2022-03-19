@@ -76,6 +76,9 @@ extern "C"{
 #define QS_PUNIT_USIZE( _ppool, munit_id ) (*(uint64_t*)((((uint8_t*)_ppool->memory+_ppool->end)-(_ppool->memory_unit_size_one*(munit_id+1)))+sizeof(uint64_t)))
 #define QS_PINT32( _ppool, munit_id ) (int32_t*)(QS_GET_POINTER(_ppool,munit_id)+QS_PUNIT_USIZE(_ppool,munit_id)-sizeof(int32_t))
 #define QS_INT32( _ppool, munit_id ) (*(int32_t*)(QS_GET_POINTER(_ppool,munit_id)+QS_PUNIT_USIZE(_ppool,munit_id)-sizeof(int32_t)))
+#define QS_PINT64( _ppool, munit_id ) (int64_t*)(QS_GET_POINTER(_ppool,munit_id)+QS_PUNIT_USIZE(_ppool,munit_id)-sizeof(int64_t))
+#define QS_INT64( _ppool, munit_id ) (*(int64_t*)(QS_GET_POINTER(_ppool,munit_id)+QS_PUNIT_USIZE(_ppool,munit_id)-sizeof(int64_t)))
+
 
 #define BYTE_SWAP_BIT16( v ) (v >> 8) | ( (v & 0xff) << 8 )
 #define BYTE_SWAP_BIT32( v ) (v >> 24) | ( (v & 0x000000ff) << 24 ) | ( (v & 0x0000ff00) << 8 ) | ( (v & 0x00ff0000) >> 8 )

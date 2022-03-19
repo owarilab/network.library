@@ -145,12 +145,12 @@ int32_t qs_json_encode_parser_hash( QS_MEMORY_POOL* _ppool, int32_t buf_munit, i
 		qs_add_json_element( _ppool, buf_munit, "{", 1, 0 );
 		for( j = 0; j < hash->hash_size; j++ )
 		{
-			if( hashchild[j].hash_munit > 0 )
+			if( -1 != hashchild[j].hash_munit )
 			{
 				hashelement = (struct QS_HASH_ELEMENT*)QS_GET_POINTER( _ppool, hashchild[j].hash_munit );
 				for( i = 0; i < hashchild[j].hash_size; i++ )
 				{
-					if( hashelement[i].hashname_munit > 0 )
+					if(  -1 != hashelement[i].hashname_munit )
 					{
 						if( hashelement[i].id==ELEMENT_HASH){
 							if( cnt > 0 ){ 
@@ -217,7 +217,7 @@ int32_t qs_json_encode_parser_array( QS_MEMORY_POOL* _ppool, int32_t buf_munit, 
 	int i;
 	do{
 		qs_add_json_element( _ppool, buf_munit, "[", 1, 0 );
-		if( a_munit > 1 ){
+		if( -1 != a_munit ){
 			parray = (QS_ARRAY*)QS_GET_POINTER( _ppool, a_munit );
 			elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit );
 			for( i = 0; i < parray->len; i++ )
