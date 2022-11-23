@@ -199,7 +199,7 @@ void qs_memory_clean( QS_MEMORY_POOL* _ppool );
 void qs_safe_memory_clean( QS_MEMORY_POOL* _ppool );
 void qs_memory_clean_core( QS_MEMORY_POOL* _ppool, int safe_clean );
 size_t qs_mgetsize( QS_MEMORY_POOL* _ppool, size_t size );
-uint32_t qs_free_memory_unit( QS_MEMORY_POOL* _ppool, int32_t *munit_id );
+uint32_t qs_free_memory_unit( QS_MEMORY_POOL* _ppool, int32_t* munit_id );
 int32_t qs_create_fixmunit( QS_MEMORY_POOL* _ppool, int32_t id, size_t size );
 QS_MEMORY_UNIT* qs_get_fixmunit( QS_MEMORY_POOL* _ppool, int32_t id );
 int32_t qs_create_munit( QS_MEMORY_POOL* _ppool, size_t size, uint8_t type );

@@ -124,6 +124,8 @@ extern "C"{
 #define SIZE_MBYTE ( SIZE_KBYTE * 1024 )	// 1MB
 #define SIZE_GBYTE ( SIZE_MBYTE * 1024 )	// 1GB
 
+//#define NUMERIC_CAST int64_t
+//#define NUMERIC_BUFFER_SIZE (24+sizeof(NUMERIC_CAST))
 #define NUMERIC_BUFFER_SIZE (20+sizeof(int32_t))
 
 #define QS_MAX_FILE_DESCRIPTOR 1024

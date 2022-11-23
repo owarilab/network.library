@@ -82,7 +82,8 @@ int32_t qs_create_ranking( QS_MEMORY_POOL* _ppool, size_t size, int32_t key_size
 void qs_push_integer( QS_MEMORY_POOL* _ppool, int32_t munit,int32_t value )
 {
 	qs_itoa( value, (char*)QS_GET_POINTER(_ppool,munit), qs_usize(_ppool,munit) );
-	(*(int32_t*)(QS_GET_POINTER(_ppool,munit)+qs_usize(_ppool,munit)-sizeof(int32_t))) = value;
+	int32_t* pv = QS_PINT32(_ppool,munit);
+	*pv = value;
 }
 
 int32_t qs_entry_ranking( QS_MEMORY_POOL* _ppool, int32_t ranking_munit, char* id)
@@ -160,14 +161,12 @@ int32_t qs_set_ranking_value( QS_MEMORY_POOL* _ppool, int32_t ranking_munit, cha
 				break;
 			}
 			if( i == parray->max_size-1 && index == -1 ){
-				//int32_t h1 = qs_get_hash(_ppool,(elm+i)->munit,"value");
-				//int32_t v1 = (*(int32_t*)(QS_GET_POINTER(_ppool,h1)+QS_PUNIT_USIZE(_ppool,h1)-sizeof(int32_t)));
 				return QS_SYSTEM_ERROR;
 			}
 		}
 	}
 	else{
-		index = (*(int32_t*)(QS_GET_POINTER(index_memory,index_munit)+QS_PUNIT_USIZE(index_memory,index_munit)-sizeof(int32_t)));
+		index = QS_INT32(index_memory,index_munit);
 		qs_push_integer( _ppool, qs_get_hash(_ppool,(elm+index)->munit,"value"),value );
 		if(ranking->low_value < value){
 			ranking->low_value = value;
@@ -212,9 +211,9 @@ int32_t qs_add_ranking_value( QS_MEMORY_POOL* _ppool, int32_t ranking_munit, cha
 		}
 	}
 	else{
-		index = (*(int32_t*)(QS_GET_POINTER(index_memory,index_munit)+QS_PUNIT_USIZE(index_memory,index_munit)-sizeof(int32_t)));
+		index = QS_INT32(index_memory,index_munit);
 		int32_t h1 = qs_get_hash(_ppool,(elm+index)->munit,"value");
-		int32_t v1 = (*(int32_t*)(QS_GET_POINTER(_ppool,h1)+QS_PUNIT_USIZE(_ppool,h1)-sizeof(int32_t)));
+		int32_t v1 = QS_INT32(_ppool,h1);
 		int32_t v = v1 + value;
 		qs_push_integer( _ppool, qs_get_hash(_ppool,(elm+index)->munit,"value"), v );
 		if(ranking->low_value < v){
@@ -240,7 +239,7 @@ int32_t qs_ranking_sort_all( QS_MEMORY_POOL* _ppool, int32_t ranking_munit )
 	for( i = 0; i < parray->max_size; i++ )
 	{
 		int32_t target_hash_munit = qs_get_hash_fix_ihash(_ppool,(elm+i)->munit,"value",hashkey_value);
-		int32_t target_rank_value = (*(int32_t*)(QS_GET_POINTER(_ppool,target_hash_munit)+QS_PUNIT_USIZE(_ppool,target_hash_munit)-sizeof(int32_t)));
+		int32_t target_rank_value = QS_INT32(_ppool,target_hash_munit);
 		(sort_buffer+i)->munit = (elm+i)->munit;
 		(sort_buffer+i)->value = target_rank_value;
 		(sort_buffer+i)->ranking = 0;

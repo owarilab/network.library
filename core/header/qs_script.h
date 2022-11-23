@@ -81,8 +81,8 @@ typedef struct QS_FUNCTION_RETURN
 
 // token_analyzer ->  pase_code -> execute
 int32_t qs_init_script( QS_MEMORY_POOL* _ppool, size_t valiablehash_size, size_t functionhash_size, int32_t init_token_size );
-void qs_import_script( QS_MEMORY_POOL* _ppool, int32_t *p_unitid, char* filename );
-void qs_input_script( QS_MEMORY_POOL* _ppool, int32_t *p_unitid, char* pstr );
+void qs_import_script( QS_MEMORY_POOL* _ppool, int32_t* p_unitid, char* filename );
+void qs_input_script( QS_MEMORY_POOL* _ppool, int32_t* p_unitid, char* pstr );
 
 // parse code
 int qs_parse_code( QS_MEMORY_POOL* _ppool, QS_SCRIPT* pscript );
@@ -102,7 +102,7 @@ int qs_parse_addsub( QS_MEMORY_POOL* _ppool, QS_SCRIPT* pscript, QS_NODE* node, 
 int qs_parse_muldiv( QS_MEMORY_POOL* _ppool, QS_SCRIPT* pscript, QS_NODE* node, QS_TOKEN* pt, int index );
 
 // execute
-void qs_exec( QS_MEMORY_POOL* _ppool, int32_t *p_unitid );
+void qs_exec( QS_MEMORY_POOL* _ppool, int32_t* p_unitid );
 int32_t qs_exec_core( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* node );
 int32_t qs_exec_function( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* node );
 int32_t qs_exec_array_set( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* node );

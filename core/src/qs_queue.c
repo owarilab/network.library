@@ -27,7 +27,7 @@
 
 #include "qs_queue.h"
 
-void qs_create_message_queue( QS_MEMORY_POOL* _ppool, int32_t *q_munit, size_t qlen, size_t size )
+void qs_create_message_queue( QS_MEMORY_POOL* _ppool, int32_t* q_munit, size_t qlen, size_t size )
 {
 	int i;
 #ifdef __WINDOWS__
@@ -78,7 +78,7 @@ void qs_create_message_queue( QS_MEMORY_POOL* _ppool, int32_t *q_munit, size_t q
 			(*q_munit) = -1;
 			break;
 		}
-		mqlist = (int32_t *)qs_upointer( _ppool, pmq->queuemunit );
+		mqlist = (int32_t*)qs_upointer( _ppool, pmq->queuemunit );
 		//memset( mqlist, -1, sizeof( int32_t ) * pmq->queuelen );
 		for( i = 0; i < pmq->queuelen; i++ )
 		{
@@ -119,7 +119,7 @@ int qs_enqueue( QS_MEMORY_POOL* _ppool, int32_t q_munit, const char* pbuf, size_
 			printf( "queuemunit is not allocate : %d\n", pmq->queuemunit );
 			break;
 		}
-		mqlist = (int32_t *)qs_upointer( _ppool, pmq->queuemunit );
+		mqlist = (int32_t*)qs_upointer( _ppool, pmq->queuemunit );
 		if( mqlist[pmq->tail] < 0 ){
 			printf( "mqlist[pmq->tail] is not allocate : %d\n", pmq->tail );
 			break;
@@ -198,7 +198,7 @@ int32_t qs_dequeue( QS_MEMORY_POOL* _ppool, int32_t q_munit )
 			printf( "queuemunit is not allocate : %d\n", pmq->queuemunit );
 			break;
 		}
-		mqlist = (int32_t *)qs_upointer( _ppool, pmq->queuemunit );
+		mqlist = (int32_t*)qs_upointer( _ppool, pmq->queuemunit );
 		int32_t target = pmq->top - pmq->status;
 		if( target < 0 ){
 			target = pmq->queuelen-1;

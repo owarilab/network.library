@@ -669,7 +669,7 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 				}
 			}
 			http_request->http_status_code = 200;
-			response_len = qs_http_add_response_common(response_buffer,response_buffer_size,http_request->http_status_code,"text/css",http_request->file_info.size);
+			response_len = qs_http_add_response_common(response_buffer,response_buffer_size,http_request->http_status_code,"text/css; charset=UTF-8",http_request->file_info.size);
 			response_len = qs_http_add_cache_control(response_buffer, response_buffer_size, response_len, 30, &http_request->file_info);
 		}
 		else if( !strcmp(http_request->extension,"js"))
@@ -682,7 +682,7 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 				}
 			}
 			http_request->http_status_code = 200;
-			response_len = qs_http_add_response_common(response_buffer,response_buffer_size,http_request->http_status_code,"text/javascript",http_request->file_info.size);
+			response_len = qs_http_add_response_common(response_buffer,response_buffer_size,http_request->http_status_code,"text/javascript; charset=UTF-8",http_request->file_info.size);
 			response_len = qs_http_add_cache_control(response_buffer, response_buffer_size, response_len, 30, &http_request->file_info);
 		}
 		else if (!strcmp(http_request->extension, "json"))
@@ -695,7 +695,7 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 				}
 			}
 			http_request->http_status_code = 200;
-			response_len = qs_http_add_response_common(response_buffer, response_buffer_size, http_request->http_status_code, "application/json", http_request->file_info.size);
+			response_len = qs_http_add_response_common(response_buffer, response_buffer_size, http_request->http_status_code, "application/json; charset=UTF-8", http_request->file_info.size);
 			response_len = qs_http_add_cache_control(response_buffer, response_buffer_size, response_len, 30, &http_request->file_info);
 		}
 		else if( !strcmp(http_request->extension,"ico"))

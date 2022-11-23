@@ -470,7 +470,8 @@ int qs_addtoken( QS_MEMORY_POOL* _ppool, QS_TOKENS *ptokens, char* tokenbuf, int
 		pbuf = (char*)QS_GET_POINTER(_ppool,ptoken->buf_munit);
 		ptoken->size = (*tokensize);
 		memcpy(pbuf,tokenbuf,(*tokensize));
-		(*(int32_t*)(QS_GET_POINTER(_ppool,ptoken->buf_munit)+qs_usize(_ppool,ptoken->buf_munit)-sizeof(int32_t))) = atoi(tokenbuf);
+		int32_t* pv = QS_PINT32(_ppool,ptoken->buf_munit);
+		*pv = atoi(tokenbuf);
 	}
 	else{
 		if( -1 == ( ptoken->buf_munit = qs_create_memory_block( _ppool, sizeof(char)*(*tokensize) ) ) ){

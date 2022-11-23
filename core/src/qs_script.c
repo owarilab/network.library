@@ -65,7 +65,7 @@ int32_t qs_init_script( QS_MEMORY_POOL* _ppool, size_t valiablehash_size, size_t
 	return munit;
 }
 
-void qs_import_script( QS_MEMORY_POOL* _ppool, int32_t *p_unitid, char* filename )
+void qs_import_script( QS_MEMORY_POOL* _ppool, int32_t* p_unitid, char* filename )
 {
 	FILE* file;
 	int fsize = 0;
@@ -188,7 +188,7 @@ void qs_import_script( QS_MEMORY_POOL* _ppool, int32_t *p_unitid, char* filename
 #endif
 }
 
-void qs_input_script( QS_MEMORY_POOL* _ppool, int32_t *p_unitid, char* pstr )
+void qs_input_script( QS_MEMORY_POOL* _ppool, int32_t* p_unitid, char* pstr )
 {
 	QS_SCRIPT *pscript;
 #ifdef __QS_DEBUG__
@@ -1255,7 +1255,7 @@ int qs_parse_while( QS_MEMORY_POOL* _ppool, QS_SCRIPT* pscript, QS_NODE* node, i
 	return index;
 }
 
-void qs_exec( QS_MEMORY_POOL* _ppool, int32_t *p_unitid )
+void qs_exec( QS_MEMORY_POOL* _ppool, int32_t* p_unitid )
 {
 	QS_SCRIPT *pscript;
 	QS_NODE *rootnode;
@@ -1917,14 +1917,14 @@ int32_t qs_exec_expr( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* node,
 				qs_array_push( _ppool, &workingmunit, tmpid, tmphashmunit );
 			}
 			else{
-				int32_t *pi;
+				int32_t* pi;
 				csize = NUMERIC_BUFFER_SIZE;
 				tmpid = ELEMENT_LITERAL_NUM;
 				if( 0 >= ( tmpmunit = qs_create_munit( _ppool, csize, MEMORY_TYPE_DEFAULT ) ) ){
 					return QS_SYSTEM_ERROR;
 				}
 				pbuf = (char*)QS_GET_POINTER( _ppool, tmpmunit );
-				pi = (int32_t*)(QS_GET_POINTER( _ppool, tmpmunit )+QS_PUNIT_USIZE(_ppool,tmpmunit)-sizeof(int32_t));
+				pi = QS_PINT32(_ppool, tmpmunit);
 				pbuf[0] = '0';
 				pbuf[1] = '\0';
 				*pi = 0;
@@ -2000,14 +2000,14 @@ int32_t qs_exec_expr( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* node,
 					qs_array_push( _ppool, &workingmunit, tmpid, tmphashmunit );
 				}
 				else{
-					int32_t *pi;
+					int32_t* pi;
 					csize = NUMERIC_BUFFER_SIZE;
 					tmpid = ELEMENT_LITERAL_NUM;
 					if( 0 >= ( tmpmunit = qs_create_munit( _ppool, csize, MEMORY_TYPE_DEFAULT ) ) ){
 						return QS_SYSTEM_ERROR;
 					}
 					pbuf = (char*)QS_GET_POINTER( _ppool, tmpmunit );
-					pi = (int32_t*)(QS_GET_POINTER( _ppool, tmpmunit )+QS_PUNIT_USIZE(_ppool,tmpmunit)-sizeof(int32_t));
+					pi = QS_PINT32(_ppool, tmpmunit);
 					pbuf[0] = '0';
 					pbuf[1] = '\0';
 					*pi = 0;
@@ -2055,9 +2055,9 @@ int32_t qs_exec_expr( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* node,
 				else{
 					QS_ARRAY_ELEMENT* pelm;
 					pelm = qs_array_pop( _ppool, workingmunit );
-					tmpv1 = (*(int32_t*)( QS_GET_POINTER( _ppool, pelm->munit ) + QS_PUNIT_USIZE( _ppool, pelm->munit ) - sizeof( int32_t) ) );
+					tmpv1 = QS_INT32(_ppool, pelm->munit);
 					pelm = qs_array_pop( _ppool, workingmunit );
-					tmpv2 = (*(int32_t*)( QS_GET_POINTER( _ppool, pelm->munit ) + QS_PUNIT_USIZE( _ppool, pelm->munit ) - sizeof( int32_t) ) );
+					tmpv2 = QS_INT32(_ppool, pelm->munit);
 					if( !strcmp( opbuf, "+" ) )
 					{
 						tmpv1 = tmpv2+tmpv1;
@@ -2269,7 +2269,8 @@ int32_t qs_exec_expr( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* node,
 				}
 				pbuf = (char*)QS_GET_POINTER( _ppool, tmpmunit );
 				memcpy( pbuf, (char*)QS_GET_POINTER(_ppool,resultelm->munit), QS_PUNIT_USIZE( _ppool, resultelm->munit ) );
-				(*(int32_t*)(QS_GET_POINTER(_ppool,tmpmunit)+QS_PUNIT_USIZE(_ppool,tmpmunit)-sizeof(int32_t))) = (*(int32_t*)(QS_GET_POINTER(_ppool,resultelm->munit)+QS_PUNIT_USIZE(_ppool,resultelm->munit)-sizeof(int32_t)));
+				int32_t* pv = QS_PINT32(_ppool,tmpmunit);
+				*pv = QS_INT32(_ppool,resultelm->munit);
 				resultmunit = qs_create_return(_ppool, pscript, tmpmunit, resultelm->id );
 			}
 			else if( resultelm->id == ELEMENT_ARRAY ){
@@ -2347,7 +2348,8 @@ int32_t qs_exec_if( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* node )
 					printf("exec if error2. \n");
 					break;
 				}
-				if( 1 == (*(int32_t*)( QS_GET_POINTER( _ppool, pfret->munit ) + QS_PUNIT_USIZE( _ppool, pfret->munit ) - sizeof( int32_t) ) ) )
+				int32_t rv = QS_INT32(_ppool, pfret->munit);
+				if( 1 == rv )
 				//if( !strcmp( (char*)QS_GET_POINTER( _ppool, pfret->munit ), "1" ) )
 				{
 					is_success = 1;
@@ -2410,7 +2412,8 @@ int32_t qs_exec_while( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* node
 				exec_expr_munit = qs_exec_expr( _ppool, pscript, cnode, while_ret_munit );
 				if( exec_expr_munit > 0 ){
 					pfret = (QS_FUNCTION_RETURN*)QS_GET_POINTER( _ppool, exec_expr_munit );
-					if( 1 == (*(int32_t*)( QS_GET_POINTER( _ppool, pfret->munit ) + QS_PUNIT_USIZE( _ppool, pfret->munit ) - sizeof( int32_t) ) ) ) {
+					int32_t rv = QS_INT32(_ppool, pfret->munit);
+					if( 1 == rv ) {
 						for( j = 0; j < blocknode->pos; j++ ){
 							cblocknode = (QS_NODE*)QS_GET_POINTER( _ppool, blockworkelemlist[j].element_munit );
 							qs_exec_core( _ppool, pscript, cblocknode );
@@ -2576,7 +2579,8 @@ void* qs_script_system_function_count( QS_MEMORY_POOL* _ppool, void* args )
 				}
 				char* pbuf = (char*)QS_GET_POINTER(_ppool,len_munit);
 				qs_itoa( len, pbuf, QS_PUNIT_USIZE(_ppool,len_munit) );
-				(*(int32_t*)(QS_GET_POINTER(_ppool,len_munit)+QS_PUNIT_USIZE(_ppool,len_munit)-sizeof(int32_t))) = len;
+				int32_t* pv = QS_PINT32(_ppool,len_munit);
+				*pv = len;
 				pret->munit = len_munit;
 				pret->id = ELEMENT_LITERAL_NUM;
 			}
@@ -2610,11 +2614,13 @@ void* qs_script_system_function_file_exist( QS_MEMORY_POOL* _ppool, void* args )
 					char* pbuf = (char*)QS_GET_POINTER(_ppool,len_munit);
 					if( 0 != qs_fget_info( (char*)QS_GET_POINTER( _ppool, elm[0].munit ), &info ) ){
 						qs_itoa( 0, pbuf, QS_PUNIT_USIZE(_ppool,len_munit) );
-						(*(int32_t*)(QS_GET_POINTER(_ppool,len_munit)+QS_PUNIT_USIZE(_ppool,len_munit)-sizeof(int32_t))) = 0;
+						int32_t* pv = QS_PINT32(_ppool,len_munit);
+						*pv = 0;
 					}
 					else{
 						qs_itoa( 1, pbuf, QS_PUNIT_USIZE(_ppool,len_munit) );
-						(*(int32_t*)(QS_GET_POINTER(_ppool,len_munit)+QS_PUNIT_USIZE(_ppool,len_munit)-sizeof(int32_t))) = 1;
+						int32_t* pv = QS_PINT32(_ppool,len_munit);
+						*pv = 1;
 					}
 					pret->munit = len_munit;
 					pret->id = ELEMENT_LITERAL_NUM;
@@ -2650,11 +2656,13 @@ void* qs_script_system_function_file_size( QS_MEMORY_POOL* _ppool, void* args )
 					char* pbuf = (char*)QS_GET_POINTER(_ppool,len_munit);
 					if( 0 != qs_fget_info( (char*)QS_GET_POINTER( _ppool, elm[0].munit ), &info ) ){
 						qs_itoa( 0, pbuf, QS_PUNIT_USIZE(_ppool,len_munit) );
-						(*(int32_t*)(QS_GET_POINTER(_ppool,len_munit)+QS_PUNIT_USIZE(_ppool,len_munit)-sizeof(int32_t))) = 0;
+						int32_t* pv = QS_PINT32(_ppool,len_munit);
+						*pv = 0;
 					}
 					else{
 						qs_itoa( (int32_t)info.size, pbuf, QS_PUNIT_USIZE(_ppool,len_munit) );
-						(*(int32_t*)(QS_GET_POINTER(_ppool,len_munit)+QS_PUNIT_USIZE(_ppool,len_munit)-sizeof(int32_t))) = (int32_t)info.size;
+						int32_t* pv = QS_PINT32(_ppool,len_munit);
+						*pv = (int32_t)info.size;
 					}
 					pret->munit = len_munit;
 					pret->id = ELEMENT_LITERAL_NUM;

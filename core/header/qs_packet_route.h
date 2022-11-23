@@ -103,6 +103,7 @@ char* qs_get_packet_route_connection_id(QS_MEMORY_POOL* memory,int32_t packet_ro
 int32_t qs_find_packet_route_connection_id(QS_MEMORY_POOL* memory,int32_t packet_route_id,char* connection_id);
 QS_PACKET_ROUTE_NODE* qs_get_packet_route_connection_join_node(QS_MEMORY_POOL* memory,int32_t packet_route_id,int32_t connection_index);
 int32_t qs_remove_packet_route_connection(QS_MEMORY_POOL* memory,int32_t packet_route_id,int32_t connection_index);
+int32_t qs_change_packet_route_owner(QS_MEMORY_POOL* memory,int32_t packet_route_id,int32_t connection_index);
 int32_t qs_remove_packet_route(QS_MEMORY_POOL* memory,int32_t packet_route_id,int32_t route_offset);
 int32_t qs_remove_packet_route_core(QS_MEMORY_POOL* memory,int32_t packet_route_id,QS_PACKET_ROUTE_NODE* route_node);
 int32_t qs_update_packet_route(QS_MEMORY_POOL* memory, int32_t packet_route_id);

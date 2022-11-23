@@ -338,6 +338,39 @@ QS_PACKET_ROUTE_NODE* qs_get_packet_route_connection_join_node(QS_MEMORY_POOL* m
 	return route_node;
 }
 
+int32_t qs_change_packet_route_owner(QS_MEMORY_POOL* memory,int32_t packet_route_id,int32_t connection_index)
+{
+	QS_PACKET_ROUTE* packet_route = (QS_PACKET_ROUTE*)QS_GET_POINTER(memory,packet_route_id);
+	QS_PACKET_ROUTE_OFFSET* offsets = (QS_PACKET_ROUTE_OFFSET*)QS_GET_POINTER(memory,packet_route->connection_node_offsets_id);
+	int32_t route_offset = offsets[connection_index].route_chain_offset;
+	int32_t connection_chain = offsets[connection_index].route_node_chain_offset;
+	QS_PACKET_ROUTE_NODE* route_node = (QS_PACKET_ROUTE_NODE*)qs_get_chain_i(memory,packet_route->node_chain_array,route_offset);
+	QS_PACKET_ROUTE_NODE_CONNECTION* con = (QS_PACKET_ROUTE_NODE_CONNECTION*)qs_get_chain_i(memory,route_node->connection_chain_array,connection_chain);
+	if (con->connection_index != connection_index) {
+		printf("invalid index %d, %d\n",con->connection_index,connection_index);
+		return -1;
+	}
+
+	// change owner
+	if(route_node->owner_id==connection_index){
+		//printf("change owner : %ld\n",route_node->owner_id);
+		route_node->owner_id=0;
+
+		void* current = NULL;
+		current=qs_get_chain(memory,route_node->connection_chain_array,current);
+		while(NULL!=current){
+			QS_PACKET_ROUTE_NODE_CONNECTION* con = (QS_PACKET_ROUTE_NODE_CONNECTION*)current;
+			if(-1 != con->connection_index && con->connection_index != connection_index ){
+				route_node->owner_id = con->connection_index;
+				break;
+			}
+			current=qs_get_chain(memory,route_node->connection_chain_array,current);
+		}
+	}
+
+	return 0;
+}
+
 int32_t qs_remove_packet_route_connection(QS_MEMORY_POOL* memory,int32_t packet_route_id,int32_t connection_index)
 {
 	QS_PACKET_ROUTE* packet_route = (QS_PACKET_ROUTE*)QS_GET_POINTER(memory,packet_route_id);
@@ -508,12 +541,22 @@ int32_t qs_get_route_info(QS_MEMORY_POOL* memory, int32_t packet_route_id, QS_ME
 		char* route_data = (char*)QS_FIXPOINTER(data_memory,0);
 		qs_add_hash_string(dest_memory,memid_temp_info_hash,"data",route_data);
 	}
+
+	char empty_id[8];
+	memset(empty_id,0,sizeof(empty_id));
+	char* owner_id = empty_id;
+	if(route_node->owner_id!=0)
+	{
+		QS_PACKET_ROUTE_OFFSET* offsets = (QS_PACKET_ROUTE_OFFSET*)QS_GET_POINTER(memory,packet_route->connection_node_offsets_id);
+		owner_id = offsets[route_node->owner_id].id;
+	}
+
 	qs_add_hash_string(dest_memory,memid_temp_info_hash,"id",id);
 	qs_add_hash_integer(dest_memory,memid_temp_info_hash,"max",route_node->capacity);
 	qs_add_hash_integer(dest_memory,memid_temp_info_hash,"connection",connection_length);
 	qs_add_hash_integer(dest_memory,memid_temp_info_hash,"created",route_node->create_time);
 	qs_add_hash_integer(dest_memory,memid_temp_info_hash,"updated",route_node->update_time);
-	qs_add_hash_integer(dest_memory,memid_temp_info_hash,"owner_id",route_node->owner_id);
+	qs_add_hash_string(dest_memory,memid_temp_info_hash,"owner_id",owner_id);
 	//printf("%s : %d , capacity = %d, created = %ld\n",id,route_offset,route_node->capacity,route_node->create_time);
 	return memid_temp_info_hash;
 }

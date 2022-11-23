@@ -665,7 +665,8 @@ void api_qs_exec_http(QS_RECV_INFO *rinfo)
 		}
 
 		// curl -X POST http://localhost:8080/api/v1/room/list
-		if(!strcmp(api_qs_get_http_method(params),"POST")){
+		// curl -X GET http://localhost:8080/api/v1/room/list
+		if(!strcmp(api_qs_get_http_method(params),"POST")||!strcmp(api_qs_get_http_method(params),"GET")){
 			if(!strcmp(api_qs_get_http_path(params),"/api/v1/room/list")){
 				if(0==api_qs_room_list(context,&memory,&object)){
 					http_status_code = api_qs_http_response_json(params,&object,1024*8);
@@ -735,15 +736,35 @@ int api_qs_core_on_close(QS_SERVER_CONNECTION_INFO* connection)
 				QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)connection->qs_socket_option;
 				QS_MEMORY_POOL * temporary_memory = ( QS_MEMORY_POOL* )QS_GET_POINTER( option->memory_pool, context->memid_temporary_memory );
 				qs_memory_clean( temporary_memory );
-				int32_t message_buffer_munit = qs_create_munit(temporary_memory, SIZE_KBYTE * 8, MEMORY_TYPE_DEFAULT);
+				int32_t message_buffer_munit = qs_create_munit(temporary_memory, SIZE_KBYTE * 32, MEMORY_TYPE_DEFAULT);
 				void* buffer = QS_GET_POINTER(temporary_memory, message_buffer_munit);
 				size_t buffer_size = qs_usize(temporary_memory, message_buffer_munit);
 				char* connection_id = qs_get_packet_route_connection_id(router_memory, context->memid_router, connection->index);
-				ssize_t sendlen = api_qs_make_ws_message_common(temporary_memory, connection_id,"leave","leave",buffer,buffer_size);
+				int32_t route_offset = qs_get_packet_route_connection_offset(router_memory, context->memid_router, connection->index);
+
+				// change owner
+				qs_change_packet_route_owner(router_memory, context->memid_router, connection->index);
+				qs_remove_packet_route_connection(router_memory, context->memid_router, connection->index);
+
+				char* json = NULL;
+				{
+					int32_t memid_temp_info_hash = qs_get_route_info(router_memory,context->memid_router,temporary_memory,route_offset);
+					if(-1==memid_temp_info_hash){
+						return -1;
+					}
+
+					int32_t memid_response_body = qs_json_encode_hash(temporary_memory, memid_temp_info_hash, SIZE_KBYTE * 8);
+					if (-1 == memid_response_body) {
+						return -1;
+					}
+					json = (char*)QS_GET_POINTER(temporary_memory, memid_response_body);	
+				}
+
+				ssize_t sendlen = api_qs_make_ws_message_common(temporary_memory, connection_id,"leave",json,buffer,buffer_size);
 				void* current = NULL;
 				ssize_t ret = 0;
 				QS_SERVER_CONNECTION_INFO *tmptinfo;
-				while (NULL != (current = qs_foreach_packet_route_connection_chain(router_memory, context->memid_router, connection->index, current))) {
+				while (NULL != (current = qs_system_foreach_packet_route_connection_chain(router_memory, context->memid_router, route_offset, current))) {
 					QS_PACKET_ROUTE_NODE_CONNECTION* con = (QS_PACKET_ROUTE_NODE_CONNECTION*)current;
 					if(con->connection_index==connection->index){
 						continue;
@@ -756,7 +777,6 @@ int api_qs_core_on_close(QS_SERVER_CONNECTION_INFO* connection)
 					}
 				}
 			}while(false);
-			qs_remove_packet_route_connection(router_memory, context->memid_router, connection->index);
 		}
 	}
 	return 0;
@@ -1149,6 +1169,13 @@ int api_qs_room_join(QS_SERVER_CONTEXT* context, const char* room_id, const char
 		if(-1==connection_offset){
 			//printf("qs_add_packet_route_connection error\n");
 			break;
+		}
+		// set owner
+		if (0==qs_get_packet_route_owner(router_memory, context->memid_router, (char*)room_id)) {
+			if (-1==qs_set_packet_route_owner(router_memory, context->memid_router, (char*)room_id,connection_index)) {
+				//printf("qs_set_packet_route_owner error\n");
+				break;
+			}
 		}
 		dest_object->memid_object = qs_get_route_info(router_memory, context->memid_router,dest_temporary_memory,route_offset);
 		if(-1 == dest_object->memid_object){

@@ -78,7 +78,7 @@ int32_t qs_resize_chain_array(QS_MEMORY_POOL* memory,int32_t chain_id)
 void* qs_add_chain(QS_MEMORY_POOL* memory,int32_t chain_id)
 {
 	uint8_t* chain_root = (uint8_t*)QS_GET_POINTER(memory,chain_id);
-	int32_t *ptail = (((int32_t*)chain_root)+1);
+	int32_t* ptail = (((int32_t*)chain_root)+1);
 	int32_t data_size = *(((int32_t*)chain_root)+3);
 	int32_t block_size = *(((int32_t*)chain_root)+4);
 	int32_t header_size = *(((int32_t*)chain_root)+5);
@@ -95,7 +95,7 @@ void* qs_add_chain(QS_MEMORY_POOL* memory,int32_t chain_id)
 int32_t qs_add_chain_i(QS_MEMORY_POOL* memory,int32_t chain_id)
 {
 	uint8_t* chain_root = (uint8_t*)QS_GET_POINTER(memory,chain_id);
-	int32_t *ptail = (((int32_t*)chain_root)+1);
+	int32_t* ptail = (((int32_t*)chain_root)+1);
 	int32_t data_size = *(((int32_t*)chain_root)+3);
 	int32_t block_size = *(((int32_t*)chain_root)+4);
 	int32_t header_size = *(((int32_t*)chain_root)+5);

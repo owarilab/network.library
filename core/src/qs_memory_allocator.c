@@ -715,7 +715,7 @@ uint32_t qs_initialize_memory_unit( QS_MEMORY_UNIT * unit )
 	return 0;
 }
 
-uint32_t qs_free_memory_unit( QS_MEMORY_POOL* _ppool, int32_t *munit_id )
+uint32_t qs_free_memory_unit( QS_MEMORY_POOL* _ppool, int32_t* munit_id )
 {
 	QS_MEMORY_UNIT *unit;
 	if( *munit_id < _ppool->fix_unit_size ){

@@ -211,7 +211,8 @@ int32_t qs_array_push_integer( QS_MEMORY_POOL* _ppool, int32_t* pmunit, int32_t 
 	elm[parray->len].id = ELEMENT_LITERAL_NUM;
 	elm[parray->len].munit = elm[parray->len].buf_munit;
 	qs_itoa( value, (char*)QS_GET_POINTER(_ppool,elm[parray->len].munit), qs_usize(_ppool,elm[parray->len].munit) );
-	(*(int32_t*)(QS_GET_POINTER(_ppool,elm[parray->len].munit)+qs_usize(_ppool,elm[parray->len].munit)-sizeof(int32_t))) = value;
+	int32_t* pv = QS_PINT32(_ppool,elm[parray->len].munit);
+	*pv = value;
 	parray->len++;
 	return QS_SYSTEM_OK;
 }

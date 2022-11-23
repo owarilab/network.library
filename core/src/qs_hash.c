@@ -297,7 +297,8 @@ QS_HASH_ELEMENT* qs_add_hash_integer( QS_MEMORY_POOL* _ppool, int32_t h_munit, c
 	}
 	size_t data_size = qs_usize(_ppool,datamunit);
 	qs_itoa( value, (char*)QS_GET_POINTER(_ppool,datamunit), data_size );
-	(*(int32_t*)(QS_GET_POINTER(_ppool,datamunit)+data_size-sizeof(int32_t))) = value;
+	int32_t* pv = QS_PINT32(_ppool,datamunit);
+	*pv = value;
 	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, namemunit, datamunit, ELEMENT_LITERAL_NUM );
 	if( NULL==is_push){
 		printf("[qs_add_hash_integer] is_push is NULL\n");
@@ -313,7 +314,8 @@ void qs_add_hash_integer_kint( QS_MEMORY_POOL* _ppool, int32_t h_munit, int32_t 
 	}
 	size_t data_size = qs_usize(_ppool,datamunit);
 	qs_itoa( value, (char*)QS_GET_POINTER(_ppool,datamunit), data_size );
-	(*(int32_t*)(QS_GET_POINTER(_ppool,datamunit)+data_size-sizeof(int32_t))) = value;
+	int32_t* pv = QS_PINT32(_ppool,datamunit);
+	*pv = value;
 	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, name_munit, datamunit, ELEMENT_LITERAL_NUM );
 	if( NULL==is_push){
 		printf("[qs_add_hash_integer_kint] is_push is NULL\n");
