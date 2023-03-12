@@ -77,35 +77,10 @@ int32_t qs_log_close(QS_FILE_INFO* log_file_info)
 	return qs_fclose(log_file_info);
 }
 
-int32_t qs_http_access_log(QS_FILE_INFO* log_file_info,char* http_version, char* user_agent,char* client_ip,char* method,char* request,int32_t http_status_code)
+int32_t qs_log_output(QS_FILE_INFO* log_file_info,char* log)
 {
-	char log_buffer[SIZE_KBYTE*4];
-	size_t log_buffer_size = sizeof(log_buffer);
-	char status_code_buffer[20];
-	qs_itoa( http_status_code, status_code_buffer, sizeof(status_code_buffer) );
-	char date_buffer[128];
-	struct tm t;
-	time_t nowtime = time(NULL);
-	qs_localtime(&t, &nowtime);
-	strftime( date_buffer, sizeof(date_buffer), "%Y-%m-%d %H:%M:%S", &t);
-	size_t log_len = 0;
-	log_len = qs_strlink( log_buffer, log_len, client_ip, qs_strlen(client_ip), log_buffer_size );
-	log_len = qs_strlink( log_buffer, log_len, " ", 1, log_buffer_size );
-	log_len = qs_strlink( log_buffer, log_len, method, qs_strlen(method), log_buffer_size );
-	log_len = qs_strlink( log_buffer, log_len, " ", 1, log_buffer_size );
-	log_len = qs_strlink( log_buffer, log_len, http_version, qs_strlen(http_version), log_buffer_size );
-	log_len = qs_strlink( log_buffer, log_len, " ", 1, log_buffer_size );
-	log_len = qs_strlink( log_buffer, log_len, request, qs_strlen(request), log_buffer_size );
-	log_len = qs_strlink( log_buffer, log_len, " ", 1, log_buffer_size );
-	log_len = qs_strlink( log_buffer, log_len, status_code_buffer, qs_strlen(status_code_buffer), log_buffer_size );
-	log_len = qs_strlink( log_buffer, log_len, " [", 2, log_buffer_size );
-	log_len = qs_strlink( log_buffer, log_len, date_buffer, qs_strlen(date_buffer), log_buffer_size );
-	log_len = qs_strlink( log_buffer, log_len, "] ", 2, log_buffer_size );
-	log_len = qs_strlink( log_buffer, log_len, user_agent, qs_strlen(user_agent), log_buffer_size );
-	log_buffer[log_len++] = '\n';
-	log_buffer[log_len] = '\0';
 	if(log_file_info->f!=NULL){
-		qs_fwrite2(log_file_info,log_buffer,qs_strlen(log_buffer));
+		qs_fwrite2(log_file_info,log,qs_strlen(log));
 		fflush(log_file_info->f);
 	}
 	return QS_SYSTEM_OK;

@@ -43,19 +43,14 @@ int32_t qs_create_array( QS_MEMORY_POOL* _ppool, size_t allocsize, size_t buffer
 	}
 	parray->buffer_size = buffer_size;
 	parray->len = 0;
-	if( -1 == ( parray->munit = qs_create_memory_block( _ppool, sizeof( QS_ARRAY_ELEMENT ) * allocsize ) ) ){
+	if( -1 == ( parray->memid = qs_create_memory_block( _ppool, sizeof( QS_ARRAY_ELEMENT ) * allocsize ) ) ){
 		qs_free_memory_unit( _ppool, &tmpmunit );
 		return -1;
 	}
-	elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit );
+	elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid );
 	for( i = 0; i < allocsize; i++ ){
 		(elm+i)->id = 0;
 		(elm+i)->munit = -1;//qs_create_memory_block( _ppool, sizeof( char ) * parray->buffer_size );
-		if( buffer_size > 0 ){
-			if( -1 == ( (elm+i)->buf_munit = qs_create_memory_block( _ppool, sizeof( char ) * parray->buffer_size ) ) ){
-				return -1;
-			}
-		}
 	}
 	return tmpmunit;
 }
@@ -76,11 +71,11 @@ int32_t qs_create_array_buffer( QS_MEMORY_POOL* _ppool, size_t allocsize, size_t
 	}
 	parray->buffer_size = buffer_size;
 	parray->len = 0;
-	if( -1 == ( parray->munit = qs_create_memory_block( _ppool, sizeof( QS_ARRAY_ELEMENT ) * allocsize ) ) ){
+	if( -1 == ( parray->memid = qs_create_memory_block( _ppool, sizeof( QS_ARRAY_ELEMENT ) * allocsize ) ) ){
 		qs_free_memory_unit( _ppool, &tmpmunit );
 		return -1;
 	}
-	elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit );
+	elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid );
 	for( i = 0; i < allocsize; i++ ){
 		(elm+i)->id = ELEMENT_LITERAL_STR;
 		if( -1 == ( (elm+i)->munit = qs_create_memory_block( _ppool, sizeof( char ) * parray->buffer_size ) ) ){
@@ -104,7 +99,7 @@ int32_t qs_reset_array( QS_MEMORY_POOL* _ppool, int32_t munit )
 	parray = (QS_ARRAY*)QS_GET_POINTER( _ppool, munit );
 	parray->max_size = parray->max_size;
 	parray->len = 0;
-	elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit );
+	elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid );
 	for( i = 0; i < parray->len; i++ ){
 		(elm+i)->id = 0;
 		//(*(char*)QS_GET_POINTER(_ppool,(elm+i)->munit)) = '\0';
@@ -134,46 +129,20 @@ int32_t qs_resize_array( QS_MEMORY_POOL* _ppool, int32_t munit )
 			}
 			memcpy( 
 				  ( QS_ARRAY_ELEMENT* )QS_GET_POINTER( _ppool, tmpmunit )
-				, ( QS_ARRAY_ELEMENT* )QS_GET_POINTER( _ppool, parray->munit )
+				, ( QS_ARRAY_ELEMENT* )QS_GET_POINTER( _ppool, parray->memid )
 				, sizeof( QS_ARRAY_ELEMENT )*parray->max_size
 			);
-			qs_free_memory_unit( _ppool, &parray->munit );
-			parray->munit = tmpmunit;
-			elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit );
+			qs_free_memory_unit( _ppool, &parray->memid );
+			parray->memid = tmpmunit;
+			elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid );
 			for( i = parray->max_size; i < parray->max_size + allocsize; i++ ){
 				(elm+i)->id = 0;
 				(elm+i)->munit = -1;
-				if( parray->buffer_size > 0 ){
-					if( -1 == ( (elm+i)->buf_munit = qs_create_memory_block( _ppool, sizeof( char ) * parray->buffer_size ) ) ){
-						printf("qs_resize_array init error.\n");
-						munit = -1;
-						return munit;
-					}
-				}
-				//(elm+1)->tmp_munit = -1;//qs_create_memory_block( _ppool, sizeof( char ) * parray->buffer_size );
 			}
 			parray->max_size += allocsize;
 		}
 	}
 	return munit;
-}
-
-int32_t qs_next_push_munit( QS_MEMORY_POOL* _ppool, int32_t munit )
-{
-	QS_ARRAY* parray;
-	QS_ARRAY_ELEMENT* elm;
-	int32_t tmpmunit = -1;
-	if( -1 == ( munit = qs_resize_array( _ppool, munit ) ) ){
-		return tmpmunit;
-	}
-	parray = (QS_ARRAY*)QS_GET_POINTER( _ppool, munit );
-	elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit );
-	if( parray->len >= parray->max_size ){
-		printf("[debug] parray->len >= parray->max_size\n");
-		return tmpmunit;
-	}
-	tmpmunit = elm[parray->len].munit;
-	return tmpmunit;
 }
 
 int32_t qs_array_push( QS_MEMORY_POOL* _ppool, int32_t* pmunit, int id, int32_t munit )
@@ -186,7 +155,7 @@ int32_t qs_array_push( QS_MEMORY_POOL* _ppool, int32_t* pmunit, int id, int32_t 
 		return is_push;
 	}
 	parray = (QS_ARRAY*)QS_GET_POINTER( _ppool, (*pmunit) );
-	elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit );
+	elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid );
 	if( parray->len >= parray->max_size ){
 		printf("[debug] parray->len >= parray->max_size\n");
 		return is_push;
@@ -204,12 +173,26 @@ int32_t qs_array_push_integer( QS_MEMORY_POOL* _ppool, int32_t* pmunit, int32_t 
 	QS_ARRAY_ELEMENT* elm;
 	(*pmunit) = qs_resize_array( _ppool, (*pmunit) );
 	parray = (QS_ARRAY*)QS_GET_POINTER( _ppool, (*pmunit) );
-	elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit );
+	elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid );
 	if( parray->len >= parray->max_size ){
 		return QS_SYSTEM_ERROR;
 	}
 	elm[parray->len].id = ELEMENT_LITERAL_NUM;
+
+	if( elm[parray->len].buf_munit == -1 ){
+		if( -1 == ( elm[parray->len].buf_munit = qs_create_memory_block( _ppool, NUMERIC_BUFFER_SIZE ) ) ){
+			return QS_SYSTEM_ERROR;
+		}
+	}
+	else{
+		if( qs_usize(_ppool,elm[parray->len].buf_munit) < NUMERIC_BUFFER_SIZE ){
+			if( -1 == ( elm[parray->len].buf_munit = qs_create_memory_block( _ppool, NUMERIC_BUFFER_SIZE ) ) ){
+				return QS_SYSTEM_ERROR;
+			}
+		}
+	}
 	elm[parray->len].munit = elm[parray->len].buf_munit;
+
 	qs_itoa( value, (char*)QS_GET_POINTER(_ppool,elm[parray->len].munit), qs_usize(_ppool,elm[parray->len].munit) );
 	int32_t* pv = QS_PINT32(_ppool,elm[parray->len].munit);
 	*pv = value;
@@ -223,7 +206,7 @@ int32_t qs_array_push_string( QS_MEMORY_POOL* _ppool, int32_t* pmunit, const cha
 	QS_ARRAY_ELEMENT* elm;
 	(*pmunit) = qs_resize_array( _ppool, (*pmunit) );
 	parray = (QS_ARRAY*)QS_GET_POINTER( _ppool, (*pmunit) );
-	elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit );
+	elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid );
 	if( parray->len >= parray->max_size ){
 		return QS_SYSTEM_ERROR;
 	}
@@ -252,7 +235,7 @@ int32_t qs_array_push_empty_string( QS_MEMORY_POOL* _ppool, int32_t* pmunit, siz
 	QS_ARRAY_ELEMENT* elm;
 	(*pmunit) = qs_resize_array( _ppool, (*pmunit) );
 	parray = (QS_ARRAY*)QS_GET_POINTER( _ppool, (*pmunit) );
-	elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit );
+	elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid );
 	if( parray->len >= parray->max_size ){
 		return QS_SYSTEM_ERROR;
 	}
@@ -285,7 +268,7 @@ QS_ARRAY_ELEMENT* qs_array_pop( QS_MEMORY_POOL* _ppool, int32_t arraymunit )
 	if( parray == NULL || parray->len <= 0 ){
 		return retelm;
 	}
-	retelm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit )+( parray->len-1 );
+	retelm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid )+( parray->len-1 );
 	parray->len--;
 	return retelm;
 }
@@ -300,7 +283,7 @@ QS_ARRAY_ELEMENT* qs_array_get( QS_MEMORY_POOL* _ppool, int32_t arraymunit, int 
 	if( parray == NULL || parray->len <= index ){
 		return retelm;
 	}
-	retelm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit )+( index );
+	retelm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid )+( index );
 	return retelm;
 }
 
@@ -314,7 +297,7 @@ QS_ARRAY_ELEMENT* qs_array_foreach( QS_MEMORY_POOL* _ppool, int32_t array_munit,
 	if( parray == NULL || parray->len <= (*psize) ){
 		return retelm;
 	}
-	retelm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit )+( *psize );
+	retelm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid )+( *psize );
 	*psize = *psize + 1;
 	return retelm;
 }

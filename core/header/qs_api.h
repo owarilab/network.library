@@ -32,15 +32,8 @@ extern "C"{
 #ifndef _QS_API_H_
 #define _QS_API_H_
 
-#include "qs_array.h"
-#include "qs_hash.h"
-#include "qs_socket.h"
-#include "qs_protocol.h"
-#include "qs_variable.h"
-#include "qs_script.h"
-#include "qs_packet_route.h"
-#include "qs_random.h"
-#include "qs_csv.h"
+#include <sys/types.h>
+#include <inttypes.h>
 
 #define QS_KVS_MEMORY_TYPE_B1MB 0
 #define QS_KVS_MEMORY_TYPE_B128MB 1
@@ -109,10 +102,6 @@ typedef struct QS_CSV_CONTEXT
 	void* memory;
 } QS_CSV_CONTEXT;
 
-// private api
-ssize_t api_qs_make_ws_message_common(QS_MEMORY_POOL * temporary_memory,char* connection_id,char* type,char* message,void* buffer,size_t buffer_size);
-
-// public api
 int api_qs_init();
 int api_qs_memory_alloc(QS_MEMORY_CONTEXT* context, size_t alloc_size);
 int api_qs_memory_clean(QS_MEMORY_CONTEXT* context);
@@ -150,17 +139,10 @@ int api_qs_server_create_logger_error(QS_SERVER_CONTEXT* context,const char* log
 void api_qs_update(QS_SERVER_CONTEXT* context);
 void api_qs_sleep(QS_SERVER_CONTEXT* context);
 void api_qs_free(QS_SERVER_CONTEXT* context);
-void api_qs_on_recv( void* params );
-void api_qs_exec_http(QS_RECV_INFO *rinfo);
-void api_qs_exec_websocket(QS_RECV_INFO *rinfo);
-int api_qs_core_on_connect(QS_SERVER_CONNECTION_INFO* connection);
-void* api_qs_core_on_recv( void* args );
-int api_qs_core_on_close(QS_SERVER_CONNECTION_INFO* connection);
 
 char* api_qs_get_ws_message(QS_EVENT_PARAMETER params);
 int api_qs_send_ws_message(QS_EVENT_PARAMETER params,const char* message);
 int api_qs_send_ws_message_plane(QS_EVENT_PARAMETER params,const char* message);
-int api_qs_send_ws_message_common(QS_RECV_INFO *qs_recv_info,const char* message,int is_plane);
 
 char* api_qs_get_http_method(QS_EVENT_PARAMETER params);
 char* api_qs_get_http_path(QS_EVENT_PARAMETER params);

@@ -219,7 +219,7 @@ int32_t qs_json_encode_parser_array( QS_MEMORY_POOL* _ppool, int32_t buf_munit, 
 		qs_add_json_element( _ppool, buf_munit, "[", 1, 0 );
 		if( -1 != a_munit ){
 			parray = (QS_ARRAY*)QS_GET_POINTER( _ppool, a_munit );
-			elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit );
+			elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid );
 			for( i = 0; i < parray->len; i++ )
 			{
 				if( (elm+i)->id == ELEMENT_LITERAL_NUM ){

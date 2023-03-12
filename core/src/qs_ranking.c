@@ -55,7 +55,7 @@ int32_t qs_create_ranking( QS_MEMORY_POOL* _ppool, size_t size, int32_t key_size
 	}
 	ranking->tail_ranking = 0;
 	QS_ARRAY* parray = (QS_ARRAY*)QS_GET_POINTER(_ppool,ranking->ranking_user_munit );
-	QS_ARRAY_ELEMENT* elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit );
+	QS_ARRAY_ELEMENT* elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid );
 	int i;
 	int32_t user_munit = -1;
 	for( i = 0; i < parray->max_size; i++ )
@@ -94,7 +94,7 @@ int32_t qs_entry_ranking( QS_MEMORY_POOL* _ppool, int32_t ranking_munit, char* i
 	int32_t index = -1;
 	int i;
 	QS_ARRAY* parray = (QS_ARRAY*)QS_GET_POINTER(_ppool,ranking->ranking_user_munit );
-	QS_ARRAY_ELEMENT* elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit );
+	QS_ARRAY_ELEMENT* elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid );
 	if( -1 == ( index_munit = qs_get_hash(index_memory,ranking->ranking_index_munit,id) ) ){
 		char* pbuf;
 		if(ranking->tail_ranking >= parray->max_size ){
@@ -137,7 +137,7 @@ int32_t qs_set_ranking_value( QS_MEMORY_POOL* _ppool, int32_t ranking_munit, cha
 	int32_t index = -1;
 	int i;
 	QS_ARRAY* parray = (QS_ARRAY*)QS_GET_POINTER(_ppool,ranking->ranking_user_munit );
-	QS_ARRAY_ELEMENT* elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit );
+	QS_ARRAY_ELEMENT* elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid );
 	if( -1 == ( index_munit = qs_get_hash(index_memory,ranking->ranking_index_munit,id) ) ){
 		if(ranking->need_entry==1){
 			//printf("not entry : %s\n",id);
@@ -183,7 +183,7 @@ int32_t qs_add_ranking_value( QS_MEMORY_POOL* _ppool, int32_t ranking_munit, cha
 	int32_t index = -1;
 	int i;
 	QS_ARRAY* parray = (QS_ARRAY*)QS_GET_POINTER(_ppool,ranking->ranking_user_munit );
-	QS_ARRAY_ELEMENT* elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit );
+	QS_ARRAY_ELEMENT* elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid );
 	if( -1 == ( index_munit = qs_get_hash(index_memory,ranking->ranking_index_munit,id) ) ){
 		if(ranking->need_entry==1){
 			return -1;
@@ -229,7 +229,7 @@ int32_t qs_ranking_sort_all( QS_MEMORY_POOL* _ppool, int32_t ranking_munit )
 	QS_RANKING* ranking = (QS_RANKING*)QS_GET_POINTER(_ppool,ranking_munit);
 	QS_MEMORY_POOL* index_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(_ppool,ranking->ranking_index_memory_id);
 	QS_ARRAY* parray = (QS_ARRAY*)QS_GET_POINTER(_ppool,ranking->ranking_user_munit );
-	QS_ARRAY_ELEMENT* elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit );
+	QS_ARRAY_ELEMENT* elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid );
 	int32_t tmph;
 	size_t hash_size = RANKING_USER_HASH_SIZE;
 	uint32_t hashkey_value = qs_ihash( "value", hash_size );
@@ -288,9 +288,9 @@ int32_t qs_get_ranking( QS_MEMORY_POOL* _ppool, int32_t ranking_munit, int32_t o
 	}
 	int32_t ranking_temp_munit = qs_create_array( dest_memory, length, 0 );
 	QS_ARRAY* parray = (QS_ARRAY*)QS_GET_POINTER(_ppool,ranking->ranking_user_munit );
-	QS_ARRAY_ELEMENT* elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit );
+	QS_ARRAY_ELEMENT* elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid );
 	QS_ARRAY* temp_parray = (QS_ARRAY*)QS_GET_POINTER(dest_memory,ranking_temp_munit );
-	QS_ARRAY_ELEMENT* temp_elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( dest_memory, temp_parray->munit );
+	QS_ARRAY_ELEMENT* temp_elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( dest_memory, temp_parray->memid );
 	int i;
 	int temp_offset = 0;
 	int32_t user_munit = -1;

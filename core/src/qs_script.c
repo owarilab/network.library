@@ -1518,7 +1518,7 @@ int32_t qs_exec_function( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* n
 			{
 				parray = (QS_ARRAY*)QS_GET_POINTER( _ppool, argsmunit );
 				if( parray != NULL ){
-					elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit );
+					elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid );
 				}
 			}
 			if( parray != NULL && elm != NULL )
@@ -1593,7 +1593,7 @@ int32_t qs_exec_array_set( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* 
 					printf("invalid array access\n");
 				}
 				else{
-					QS_ARRAY_ELEMENT* retelm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit )+( array_index );
+					QS_ARRAY_ELEMENT* retelm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid )+( array_index );
 					tmp_node.id =  retelm->id;
 					tmp_node.element_munit = retelm->munit;
 					if(i==right_node->pos-1){
@@ -1857,7 +1857,7 @@ int32_t qs_exec_array_get( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* 
 						printf("invalid array access\n");
 					}
 					else{
-						QS_ARRAY_ELEMENT* retelm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit )+( array_index );
+						QS_ARRAY_ELEMENT* retelm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid )+( array_index );
 						tmp_node.id =  retelm->id;
 						tmp_node.element_munit = retelm->munit;
 					}
@@ -2515,7 +2515,7 @@ void* qs_script_system_function_echo( QS_MEMORY_POOL* _ppool, void* args )
 	pret->munit	= -1;
 	if( parray != NULL )
 	{
-		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->munit );
+		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->memid );
 		if( elm != NULL )
 		{
 			if( parray->len > 0 )
@@ -2555,7 +2555,7 @@ void* qs_script_system_function_count( QS_MEMORY_POOL* _ppool, void* args )
 	pret->refid = retmunit;
 	if( parray != NULL )
 	{
-		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->munit );
+		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->memid );
 		if( elm != NULL )
 		{
 			if( parray->len > 0 )
@@ -2602,7 +2602,7 @@ void* qs_script_system_function_file_exist( QS_MEMORY_POOL* _ppool, void* args )
 	pret->refid = retmunit;
 	if( parray != NULL )
 	{
-		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->munit );
+		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->memid );
 		if( elm != NULL )
 		{
 			if( parray->len > 0 )
@@ -2644,7 +2644,7 @@ void* qs_script_system_function_file_size( QS_MEMORY_POOL* _ppool, void* args )
 	pret->refid = retmunit;
 	if( parray != NULL )
 	{
-		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->munit );
+		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->memid );
 		if( elm != NULL )
 		{
 			if( parray->len > 0 )
@@ -2686,7 +2686,7 @@ void* qs_script_system_function_file_extension( QS_MEMORY_POOL* _ppool, void* ar
 	pret->refid = retmunit;
 	if( parray != NULL )
 	{
-		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->munit );
+		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->memid );
 		if( elm != NULL )
 		{
 			if( parray->len > 0 )
@@ -2722,7 +2722,7 @@ void* qs_script_system_function_file_get( QS_MEMORY_POOL* _ppool, void* args )
 	pret->refid = retmunit;
 	if( parray != NULL )
 	{
-		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->munit );
+		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->memid );
 		if( elm != NULL )
 		{
 			if( parray->len > 0 )
@@ -2771,7 +2771,7 @@ void* qs_script_system_function_file_put( QS_MEMORY_POOL* _ppool, void* args )
 	pret->refid = retmunit;
 	if( parray != NULL )
 	{
-		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->munit );
+		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->memid );
 		if( elm != NULL )
 		{
 			if( parray->len > 1 )
@@ -2809,7 +2809,7 @@ void* qs_script_system_function_file_add( QS_MEMORY_POOL* _ppool, void* args )
 	pret->refid = retmunit;
 	if( parray != NULL )
 	{
-		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->munit );
+		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->memid );
 		if( elm != NULL )
 		{
 			if( parray->len > 1 )
@@ -2847,7 +2847,7 @@ void* qs_script_system_function_json_encode( QS_MEMORY_POOL* _ppool, void* args 
 	pret->refid = retmunit;
 	if( parray != NULL )
 	{
-		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->munit );
+		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->memid );
 		if( elm != NULL )
 		{
 			if( parray->len > 0 )
@@ -2884,7 +2884,7 @@ void* qs_script_system_function_json_decode( QS_MEMORY_POOL* _ppool, void* args 
 	pret->refid = retmunit;
 	if( parray != NULL )
 	{
-		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->munit );
+		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->memid );
 		if( elm != NULL )
 		{
 			if( parray->len > 0 )

@@ -36,13 +36,14 @@
 // echo 'net.core.somaxconn=1024' > /etc/sysctl.conf
 // echo 'net.ipv4.tcp_max_syn_backlog=1024' > /etc/sysctl.conf
 #define QS_SOMAXCONN 1024
+#define QS_MAXCONNECTION 100
 // SOMAXCONN
 
 QS_SOCKET_OPTION* qs_create_tcp_server(char* hostname, char* portnum)
 {
 	QS_MEMORY_POOL* memory_pool = NULL;
 	QS_SOCKET_OPTION *option;
-	size_t maxconnection = 1000;
+	size_t maxconnection = QS_MAXCONNECTION;
 	if (qs_initialize_memory(&memory_pool, SIZE_MBYTE * 128, SIZE_MBYTE * 128, MEMORY_ALIGNMENT_SIZE_BIT_64, FIX_MUNIT_SIZE, 1, SIZE_KBYTE * 16) <= 0) {
 		return NULL;
 	}
@@ -61,7 +62,7 @@ QS_SOCKET_OPTION* qs_create_tcp_server_plane(char* hostname, char* portnum)
 {
 	QS_MEMORY_POOL* memory_pool = NULL;
 	QS_SOCKET_OPTION *option;
-	size_t maxconnection = 1000;
+	size_t maxconnection = QS_MAXCONNECTION;
 	if (qs_initialize_memory(&memory_pool, SIZE_MBYTE * 128, SIZE_MBYTE * 128, MEMORY_ALIGNMENT_SIZE_BIT_64, FIX_MUNIT_SIZE, 1, SIZE_KBYTE * 16) <= 0) {
 		return NULL;
 	}
@@ -216,7 +217,7 @@ ssize_t qs_send_message_multicast(uint32_t payload_type, char* payload, size_t p
 	int i;
 	char* pbuf;
 	parray = (QS_ARRAY*)QS_GET_POINTER( array_memory, array_munit );
-	elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( array_memory, parray->munit );
+	elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( array_memory, parray->memid );
 	for( i = 0; i < parray->len; i++ )
 	{
 		pbuf = (char*)QS_GET_POINTER(array_memory,(elm+i)->munit);
@@ -253,7 +254,7 @@ ssize_t qs_send_message_multiothercast(uint32_t payload_type, char* payload, siz
 	int i;
 	char* pbuf;
 	parray = (QS_ARRAY*)QS_GET_POINTER( array_memory, array_munit );
-	elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( array_memory, parray->munit );
+	elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( array_memory, parray->memid );
 	for( i = 0; i < parray->len; i++ )
 	{
 		pbuf = (char*)QS_GET_POINTER(array_memory,(elm+i)->munit);
@@ -869,10 +870,12 @@ void qs_set_sock_option( QS_SOCKET_OPTION *option )
 		perror("getsockopt");
 	}
 #else
-//	int cork = 0;
-//	(void) setsockopt( option->sockid, IPPROTO_TCP, TCP_CORK, &cork, sizeof(cork) );
-	int no_delay = 1;
-	(void) setsockopt( option->sockid, IPPROTO_TCP, TCP_NODELAY, &no_delay, sizeof(no_delay) );
+	if(option->socket_type==SOCKET_TYPE_SERVER_TCP){
+//		int cork = 0;
+//		(void) setsockopt( option->sockid, IPPROTO_TCP, TCP_CORK, &cork, sizeof(cork) );
+		int no_delay = 1;
+		(void) setsockopt( option->sockid, IPPROTO_TCP, TCP_NODELAY, &no_delay, sizeof(no_delay) );
+	}
 	(void) setsockopt( option->sockid, SOL_SOCKET, SO_RCVBUF, &option->recvbuffer_size, sizeof( option->recvbuffer_size ) );
 	(void) setsockopt( option->sockid, SOL_SOCKET, SO_SNDBUF, &option->sendbuffer_size, sizeof( option->sendbuffer_size ) );
 	len = sizeof(option->recvbuffer_size);
@@ -884,24 +887,28 @@ void qs_set_sock_option( QS_SOCKET_OPTION *option )
 		perror("getsockopt");
 	}
 #endif
-//#ifdef __LINUX__
-//	int flag = 0;
-//	(void) setsockopt( option->sockid, IPPROTO_TCP, TCP_CORK, (const void*)flag, sizeof(int) );
-//	int flag2 = 1;
-//	(void) setsockopt( option->sockid, IPPROTO_TCP, TCP_NODELAY, (const void*)flag2, sizeof(int) );
-//#endif
 
-//#ifdef __WINDOWS__
-//	struct linger l;
-//	l.l_onoff=0;
-//	l.l_linger=0;
-//	(void) setsockopt( option->sockid, SOL_SOCKET, SO_LINGER, (const char*)&l, sizeof( l ) );
-//#endif;
+if(option->socket_type==SOCKET_TYPE_SERVER_TCP){
+#ifdef __LINUX__
+	//	int flag = 0;
+	//	(void) setsockopt( option->sockid, IPPROTO_TCP, TCP_CORK, (const void*)flag, sizeof(int) );
+	//	int flag2 = 1;
+	//	(void) setsockopt( option->sockid, IPPROTO_TCP, TCP_NODELAY, (const void*)flag2, sizeof(int) );
+#endif
 
-//#ifdef __QS_DEBUG__
+#ifdef __WINDOWS__
+	//	struct linger l;
+	//	l.l_onoff=0;
+	//	l.l_linger=0;
+	//	(void) setsockopt( option->sockid, SOL_SOCKET, SO_LINGER, (const char*)&l, sizeof( l ) );
+#endif
+}
+
+#ifdef __QS_DEBUG__
 //	printf( "default:SO_RCVBUF=%zd\n", option->recvbuffer_size );
 //	printf( "default:SO_SNDBUF=%zd\n", option->sendbuffer_size );
-//#endif
+#endif
+
 }
 
 int qs_set_block(QS_SOCKET_ID fd, int flag )
@@ -1670,14 +1677,14 @@ void qs_server_update(QS_SOCKET_OPTION *option)
 	size_t buffer_size = (sizeof(char) * (option->recvbuffer_size)) - 1;
 	socklen_t srlen;
 	QS_SERVER_CONNECTION_INFO *child;
-	int i;
-	for (i = 0; i < option->maxconnection; i++) {
-		if (-1 == qs_accept(option)) {
-			break;
-		}
-	}
 	if (option->socket_type == SOCKET_TYPE_SERVER_TCP)
 	{
+		int i;
+		for (i = 0; i < option->maxconnection; i++) {
+			if (-1 == qs_accept(option)) {
+				break;
+			}
+		}
 		time_t temp_time = time(NULL);
 		QS_SERVER_CONNECTION_INFO* current = (QS_SERVER_CONNECTION_INFO*)qs_offsetpointer(option->memory_pool, option->connection_munit, sizeof(QS_SERVER_CONNECTION_INFO), 0);
 		for (i = 0; i < option->maxconnection; i++)

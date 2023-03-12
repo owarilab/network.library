@@ -556,6 +556,7 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 	http_request->cache_control = dummy_string;
 	http_request->http_version = dummy_string;
 	http_request->user_agent = dummy_string;
+	http_request->from_ip = tinfo->hbuf;
 	int32_t memid_http_method = qs_get_hash(con_memory, memid_headers, "HTTP_METHOD");
 	int32_t memid_request = qs_get_hash( con_memory, memid_headers, "REQUEST" );
 	int32_t memid_get_params = qs_get_hash( con_memory, memid_headers, "GET_PARAMS" );
@@ -772,6 +773,116 @@ int32_t http_json_response_common(QS_SERVER_CONNECTION_INFO * connection, QS_SOC
 	response_buffer[response_len] = '\0';
 	qs_send(option, &connection->sockparam, response_buffer, response_len, 0);
 	return http_status_code;
+}
+
+int32_t qs_http_access_log(QS_FILE_INFO* log_file_info,QS_HTTP_REQUEST_COMMON* http_request,int32_t http_status_code)
+{
+	char log_buffer[SIZE_KBYTE*4];
+	size_t log_buffer_size = sizeof(log_buffer);
+	char status_code_buffer[20];
+	qs_itoa( http_status_code, status_code_buffer, sizeof(status_code_buffer) );
+	char date_buffer[128];
+	struct tm t;
+	time_t nowtime = time(NULL);
+	qs_localtime(&t, &nowtime);
+	strftime( date_buffer, sizeof(date_buffer), "%Y-%m-%d %H:%M:%S", &t);
+	size_t log_len = 0;
+	log_len = qs_strlink( log_buffer, log_len, http_request->from_ip, qs_strlen(http_request->from_ip), log_buffer_size );
+	log_len = qs_strlink( log_buffer, log_len, " ", 1, log_buffer_size );
+	log_len = qs_strlink( log_buffer, log_len, http_request->method, qs_strlen(http_request->method), log_buffer_size );
+	log_len = qs_strlink( log_buffer, log_len, " ", 1, log_buffer_size );
+	log_len = qs_strlink( log_buffer, log_len, http_request->http_version, qs_strlen(http_request->http_version), log_buffer_size );
+	log_len = qs_strlink( log_buffer, log_len, " ", 1, log_buffer_size );
+	log_len = qs_strlink( log_buffer, log_len, http_request->request, qs_strlen(http_request->request), log_buffer_size );
+	log_len = qs_strlink( log_buffer, log_len, " ", 1, log_buffer_size );
+	log_len = qs_strlink( log_buffer, log_len, status_code_buffer, qs_strlen(status_code_buffer), log_buffer_size );
+	log_len = qs_strlink( log_buffer, log_len, " [", 2, log_buffer_size );
+	log_len = qs_strlink( log_buffer, log_len, date_buffer, qs_strlen(date_buffer), log_buffer_size );
+	log_len = qs_strlink( log_buffer, log_len, "] ", 2, log_buffer_size );
+	log_len = qs_strlink( log_buffer, log_len, http_request->user_agent, qs_strlen(http_request->user_agent), log_buffer_size );
+	log_buffer[log_len++] = '\n';
+	log_buffer[log_len] = '\0';
+	return qs_log_output(log_file_info,log_buffer);
+}
+
+int32_t qs_http_client_init(QS_MEMORY_POOL * memory, size_t http_request_buffer_size)
+{
+	int32_t memid_http_client = qs_create_memory_block(memory,sizeof(QS_HTTP_CLIENT));
+	if( -1 == memid_http_client ){
+		return -1;
+	}
+	QS_HTTP_CLIENT* client = (QS_HTTP_CLIENT*)QS_GET_POINTER(memory,memid_http_client);
+
+	client->memory = memory;
+
+	client->memid_http_header_name_array = qs_create_array(client->memory,8,NUMERIC_BUFFER_SIZE);
+	if(-1 == client->memid_http_header_name_array){
+		return -1;
+	}
+
+	client->memid_http_header_hash = qs_create_hash(client->memory,8);
+	if(-1 == client->memid_http_header_hash){
+		return -1;
+	}
+
+	client->buffer_size = http_request_buffer_size;
+	client->memid_http_request_string = qs_create_memory_block(client->memory,client->buffer_size);
+	if( -1 == client->memid_http_request_string ){
+		return -1;
+	}
+	char* http_request_string = (char*)QS_GET_POINTER(client->memory,client->memid_http_request_string);
+	memset(http_request_string,0,http_request_buffer_size);
+
+	client->temp_buffer_size = SIZE_KBYTE * 64;
+	client->memid_temp_string = qs_create_memory_block(client->memory,client->temp_buffer_size);
+	if( -1 == client->memid_temp_string ){
+		return -1;
+	}
+	char* temp_string = (char*)QS_GET_POINTER(client->memory,client->memid_temp_string);
+	memset(temp_string,0,client->temp_buffer_size);
+
+	return memid_http_client;
+}
+
+QS_HTTP_CLIENT* qs_http_client_get(QS_MEMORY_POOL * memory, int32_t memid_http_client)
+{
+	QS_HTTP_CLIENT* client = (QS_HTTP_CLIENT*)QS_GET_POINTER(memory,memid_http_client);
+	return client;
+}
+
+/*
+ * example
+ * ===============================================
+ * GET /hoge/huga HTTP/1.1
+ * Host: hoge.example.com
+ * User-Agent: xxxxxxxxxx
+ * ...
+ * 
+ * body
+ * ===============================================
+ */
+int32_t qs_http_make_request_v1_1(QS_HTTP_CLIENT* client, const char* method,const char* host, const char* path, int32_t content_length)
+{
+	char* http_request_string = (char*)QS_GET_POINTER(client->memory,client->memid_http_request_string);
+	char* temp_string = (char*)QS_GET_POINTER(client->memory,client->memid_temp_string);
+	memset(temp_string,0,client->temp_buffer_size);
+
+	snprintf(temp_string, client->temp_buffer_size, "%s %s HTTP/1.1\n", method, path);
+
+	client->buffer_pos = qs_strlink( http_request_string, client->buffer_pos, temp_string, qs_strlen(temp_string), client->buffer_size );
+
+	memset(temp_string,0,client->temp_buffer_size);
+	snprintf(temp_string, client->temp_buffer_size, "Host: %s\n", host);
+	client->buffer_pos = qs_strlink( http_request_string, client->buffer_pos, temp_string, qs_strlen(temp_string), client->buffer_size );
+
+	memset(temp_string,0,client->temp_buffer_size);
+	snprintf(temp_string, client->temp_buffer_size, "User-Agent: qs_http_client_v1\n");
+	client->buffer_pos = qs_strlink( http_request_string, client->buffer_pos, temp_string, qs_strlen(temp_string), client->buffer_size );
+
+	memset(temp_string,0,client->temp_buffer_size);
+	snprintf(temp_string, client->temp_buffer_size, "Content-Length: %d\n", content_length);
+	client->buffer_pos = qs_strlink( http_request_string, client->buffer_pos, temp_string, qs_strlen(temp_string), client->buffer_size );
+	return QS_SYSTEM_OK;
 }
 
 int qs_http_protocol_filter_with_websocket(QS_RECV_INFO *rinfo)
@@ -1010,6 +1121,27 @@ ssize_t qs_make_websocket_msg( void* message_buffer, size_t message_buffer_size,
 		memcpy( cptr, msg, size );
 	}while( false );
 	return len;
+}
+
+ssize_t qs_make_ws_message_simple(QS_MEMORY_POOL * temporary_memory,char* connection_id,char* type,char* message,void* buffer,size_t buffer_size)
+{
+	int32_t memid_temp_data = qs_create_hash(temporary_memory, 32);
+	if (-1 == memid_temp_data) {
+		return 0;
+	}
+	qs_add_hash_string(temporary_memory, memid_temp_data, "id", connection_id);
+	qs_add_hash_string(temporary_memory, memid_temp_data, "type", type);
+	qs_add_hash_string(temporary_memory, memid_temp_data, "message", message);
+	int32_t memid_temp_data_json = qs_json_encode_hash(temporary_memory, memid_temp_data, SIZE_KBYTE * 4);
+	if (-1 == memid_temp_data_json) {
+		printf("qs_json_encode_hash error\n");
+		return 0;
+	}
+	char* json = (char*)QS_GET_POINTER(temporary_memory, memid_temp_data_json);
+	size_t json_len = qs_strlen(json);
+
+	// send message
+	 return qs_make_websocket_msg((void*)buffer, buffer_size, false, json, json_len);
 }
 
 int qs_send_handshake_param(QS_SOCKET_ID socket, QS_SOCKET_OPTION *option, QS_SERVER_CONNECTION_INFO* connection )

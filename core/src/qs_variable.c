@@ -453,10 +453,10 @@ void qs_array_dump( QS_MEMORY_POOL* _ppool, int32_t munit, int index )
 	}
 	//if(1){for( k=0;k<index;k++ ){ printf("  ");}}
 	parray = (QS_ARRAY*)QS_GET_POINTER( _ppool, munit );
-	if( -1 == parray->munit){
+	if( -1 == parray->memid){
 		return;
 	}
-	elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit );
+	elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid );
 	printf("[\n");
 	for( i = 0; i < parray->len; i++ )
 	{
@@ -631,7 +631,7 @@ int32_t qs_opendir( QS_MEMORY_POOL* _ppool, const char* path )
 				QS_ARRAY_ELEMENT* elm;
 				int i;
 				parray = (QS_ARRAY*)QS_GET_POINTER( _ppool, tmp_array );
-				elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->munit );
+				elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid );
 				for( i = 0; i < parray->len; i++ ){
 					qs_array_push(_ppool,&path_array_munit,ELEMENT_LITERAL_STR,(elm+i)->munit);
 				}

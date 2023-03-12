@@ -27,26 +27,25 @@
 
 #include "qs_api.h"
 
-ssize_t api_qs_make_ws_message_common(QS_MEMORY_POOL * temporary_memory,char* connection_id,char* type,char* message,void* buffer,size_t buffer_size)
-{
-	int32_t memid_temp_data = qs_create_hash(temporary_memory, 32);
-	if (-1 == memid_temp_data) {
-		return 0;
-	}
-	qs_add_hash_string(temporary_memory, memid_temp_data, "id", connection_id);
-	qs_add_hash_string(temporary_memory, memid_temp_data, "type", type);
-	qs_add_hash_string(temporary_memory, memid_temp_data, "message", message);
-	int32_t memid_temp_data_json = qs_json_encode_hash(temporary_memory, memid_temp_data, SIZE_KBYTE * 4);
-	if (-1 == memid_temp_data_json) {
-		printf("qs_json_encode_hash error\n");
-		return 0;
-	}
-	char* json = (char*)QS_GET_POINTER(temporary_memory, memid_temp_data_json);
-	size_t json_len = qs_strlen(json);
+//---------------------------------------------------
+#include "qs_array.h"
+#include "qs_hash.h"
+#include "qs_socket.h"
+#include "qs_protocol.h"
+#include "qs_variable.h"
+#include "qs_script.h"
+#include "qs_packet_route.h"
+#include "qs_random.h"
+#include "qs_csv.h"
 
-	// send message
-	 return qs_make_websocket_msg((void*)buffer, buffer_size, false, json, json_len);
-}
+void api_qs_on_recv( void* params );
+void api_qs_exec_http(QS_RECV_INFO *rinfo);
+void api_qs_exec_websocket(QS_RECV_INFO *rinfo);
+int api_qs_core_on_connect(QS_SERVER_CONNECTION_INFO* connection);
+void* api_qs_core_on_recv( void* args );
+int api_qs_core_on_close(QS_SERVER_CONNECTION_INFO* connection);
+int api_qs_send_ws_message_common(QS_RECV_INFO *qs_recv_info,const char* message,int is_plane);
+//---------------------------------------------------
 
 int api_qs_init()
 {
@@ -705,7 +704,7 @@ void api_qs_exec_http(QS_RECV_INFO *rinfo)
 			qs_send( option, &tinfo->sockparam, HTTP_INTERNAL_SERVER_ERROR, qs_strlen( HTTP_INTERNAL_SERVER_ERROR ), 0 );
 		}
 	}
-	qs_http_access_log(&option->log_access_file_info, http_request.http_version,http_request.user_agent,tinfo->hbuf, http_request.method, http_request.request, http_status_code);
+	qs_http_access_log(&option->log_access_file_info, &http_request, http_status_code);
 	qs_disconnect(&tinfo->sockparam);
 }
 int api_qs_core_on_connect(QS_SERVER_CONNECTION_INFO* connection)
@@ -760,7 +759,7 @@ int api_qs_core_on_close(QS_SERVER_CONNECTION_INFO* connection)
 					json = (char*)QS_GET_POINTER(temporary_memory, memid_response_body);	
 				}
 
-				ssize_t sendlen = api_qs_make_ws_message_common(temporary_memory, connection_id,"leave",json,buffer,buffer_size);
+				ssize_t sendlen = qs_make_ws_message_simple(temporary_memory, connection_id,"leave",json,buffer,buffer_size);
 				void* current = NULL;
 				ssize_t ret = 0;
 				QS_SERVER_CONNECTION_INFO *tmptinfo;
@@ -821,7 +820,7 @@ int api_qs_send_ws_message_common(QS_RECV_INFO *qs_recv_info,const char* message
 		if(is_plane){
 			sendlen = qs_make_websocket_msg((void*)buffer, buffer_size, false, message, qs_strlen(message));
 		} else{
-			sendlen = api_qs_make_ws_message_common(temporary_memory, connection_id,"message",(char*)message,buffer,buffer_size);
+			sendlen = qs_make_ws_message_simple(temporary_memory, connection_id,"message",(char*)message,buffer,buffer_size);
 		}
 		if(sendlen==0){
 			return -1;
@@ -1189,7 +1188,7 @@ int api_qs_room_join(QS_SERVER_CONTEXT* context, const char* room_id, const char
 			void* buffer = QS_GET_POINTER(temporary_memory, message_buffer_munit);
 			size_t buffer_size = qs_usize(temporary_memory, message_buffer_munit);
 			char* connection_id = qs_get_packet_route_connection_id(router_memory, context->memid_router, connection_index);
-			ssize_t sendlen = api_qs_make_ws_message_common(temporary_memory, connection_id,"join","join",buffer,buffer_size);
+			ssize_t sendlen = qs_make_ws_message_simple(temporary_memory, connection_id,"join","join",buffer,buffer_size);
 			void* current = NULL;
 			ssize_t ret = 0;
 			QS_SERVER_CONNECTION_INFO *tmptinfo;

@@ -7,6 +7,7 @@ extern "C"{
 
 #include "qs_core.h"
 #include "qs_memory_allocator.h"
+#include "qs_logger.h"
 #include "qs_socket.h"
 #include "qs_variable.h"
 
@@ -51,8 +52,21 @@ typedef struct QS_HTTP_REQUEST_COMMON
 	char *user_agent;
 	char *request_path;
 	char *extension;
+	char *from_ip;
 	QS_FILE_INFO file_info;
 } QS_HTTP_REQUEST_COMMON;
+
+typedef struct QS_HTTP_CLIENT
+{
+	QS_MEMORY_POOL* memory;
+	int32_t memid_http_request_string;
+	int32_t memid_http_header_name_array;
+	int32_t memid_http_header_hash;
+	size_t buffer_size;
+	size_t buffer_pos;
+	int32_t memid_temp_string;
+	size_t temp_buffer_size;
+} QS_HTTP_CLIENT;
 
 ssize_t qs_get_protocol_buffer_size(ssize_t payload_size);
 uint8_t qs_get_protocol_header_size_byte(ssize_t payload_size);
@@ -70,9 +84,16 @@ int32_t qs_http_parse_request_parameter(QS_MEMORY_POOL * memory,char *get_params
 int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_request, QS_MEMORY_POOL* temporary_memory);
 int32_t http_json_response_common(QS_SERVER_CONNECTION_INFO * connection, QS_SOCKET_OPTION* option,QS_MEMORY_POOL* temporary_memory,int32_t memid_response_hash, size_t json_buffer_size);
 
+int32_t qs_http_access_log(QS_FILE_INFO* log_file_info,QS_HTTP_REQUEST_COMMON* http_request,int32_t http_status_code);
+
+int32_t qs_http_client_init(QS_MEMORY_POOL * memory, size_t http_request_buffer_size);
+QS_HTTP_CLIENT* qs_http_client_get(QS_MEMORY_POOL * memory, int32_t memid_http_client);
+int32_t qs_http_make_request_v1_1(QS_HTTP_CLIENT* client, const char* method,const char* host, const char* path, int32_t content_length);
+
 int qs_http_protocol_filter_with_websocket(QS_RECV_INFO *rinfo);
 ssize_t qs_parse_websocket_binary( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockparam, uint8_t* u8buf, size_t size, uint32_t basebuf_munit );
 ssize_t qs_make_websocket_msg( void* message_buffer, size_t message_buffer_size,int is_binary, const char* msg, ssize_t size );
+ssize_t qs_make_ws_message_simple(QS_MEMORY_POOL * temporary_memory,char* connection_id,char* type,char* message,void* buffer,size_t buffer_size);
 int qs_send_handshake_param(QS_SOCKET_ID socket, QS_SOCKET_OPTION *option, QS_SERVER_CONNECTION_INFO* connection );
 
 #endif /*_QS_PROTOCOL_H_*/
