@@ -49,8 +49,8 @@ typedef struct QS_HASH
 typedef struct QS_HASH_ELEMENT
 {
 	int32_t id;
-	int32_t hashname_munit;
-	int32_t elm_munit;
+	int32_t memid_hash_name;
+	int32_t memid_hash_element_data;
 	time_t create_time;
 	int32_t life_time;
 } QS_HASH_ELEMENT;
@@ -68,35 +68,35 @@ typedef struct QS_HASH_FOREACH
 #define QS_HASH_ELEMENT_RESIZE_QUANTITY 4
 #define QS_HASH_ELEMENT_ARRAY_SIZE 8
 
-int32_t qs_create_hash( QS_MEMORY_POOL* _ppool, size_t hlen );
-QS_HASH_ELEMENT* qs_add_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, int32_t name_munit, int32_t data_munit, int32_t id );
-int32_t qs_make_hash_name( QS_MEMORY_POOL* _ppool, int32_t h_munit,const char* name);
-void qs_add_hash_hash(QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, int32_t hash_id);
-void qs_add_hash_array(QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, int32_t array_id);
-void qs_add_hash_array_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, const char* value );
-void qs_add_hash_array_empty_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, size_t size );
-QS_HASH_ELEMENT* qs_add_hash_binary( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, uint8_t* binary, size_t size );
-void qs_add_hash_value( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, const char* value, int32_t id );
-QS_HASH_ELEMENT* qs_add_hash_integer( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, int32_t value );
-void qs_add_hash_integer_kint( QS_MEMORY_POOL* _ppool, int32_t h_munit, int32_t name_munit, int32_t value );
-QS_HASH_ELEMENT* qs_add_hash_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, const char* value );
-void qs_add_hash_value_kstring( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, int32_t data_munit, int32_t id );
-void qs_add_hash_emptystring( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, size_t string_size );
-int32_t qs_move_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname_from, const char* hashname_to );
-int32_t qs_remove_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname );
-char* qs_get_hash_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname );
-int32_t* qs_get_hash_integer( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname );
-int32_t qs_get_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname );
-int32_t qs_get_hash_fix_ihash( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname, uint32_t hashkey );
-QS_HASH_ELEMENT* qs_get_hash_core( QS_MEMORY_POOL* _ppool, struct QS_HASH *hash, QS_HASH *hashchild, const char* hashname, uint32_t hashkey );
-void qs_clear_hash_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name );
-int32_t qs_replace_hash_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, const char* value );
-int32_t qs_get_hash_name( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname );
-int32_t qs_get_hash_id( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname );
-QS_HASH_ELEMENT* qs_get_hash_element( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname );
-int32_t qs_hash_length( QS_MEMORY_POOL* _ppool, int32_t h_munit );
-int32_t qs_init_hash_foreach( QS_MEMORY_POOL* _ppool, int32_t h_munit, QS_HASH_FOREACH* hf );
-QS_HASH_ELEMENT* qs_hash_foreach( QS_MEMORY_POOL* _ppool, QS_HASH_FOREACH* hf );
+int32_t qs_create_hash( QS_MEMORY_POOL* memory, size_t hash_size );
+QS_HASH_ELEMENT* qs_add_hash( QS_MEMORY_POOL* memory, int32_t memid_hash, int32_t memid_name_string, int32_t memid_data, int32_t id );
+int32_t qs_make_hash_name( QS_MEMORY_POOL* memory, int32_t memid_hash,const char* name);
+void qs_add_hash_hash(QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, int32_t memid_target_hash);
+void qs_add_hash_array(QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, int32_t memid_target_array);
+void qs_add_hash_array_string( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, const char* value );
+void qs_add_hash_array_empty_string( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, size_t size );
+QS_HASH_ELEMENT* qs_add_hash_binary( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, uint8_t* binary, size_t size );
+void qs_add_hash_value( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, const char* value, int32_t id );
+QS_HASH_ELEMENT* qs_add_hash_integer( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, int32_t value );
+void qs_add_hash_integer_kint( QS_MEMORY_POOL* memory, int32_t memid_hash, int32_t memid_name_string, int32_t value );
+QS_HASH_ELEMENT* qs_add_hash_string( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, const char* value );
+void qs_add_hash_value_kstring( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, int32_t memid_data, int32_t id );
+void qs_add_hash_emptystring( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, size_t string_size );
+int32_t qs_move_hash( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name_from, const char* hash_name_to );
+int32_t qs_remove_hash( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name );
+char* qs_get_hash_string( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name );
+int32_t* qs_get_hash_integer( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name );
+int32_t qs_get_hash( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name );
+int32_t qs_get_hash_fix_ihash( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name, uint32_t hashkey );
+QS_HASH_ELEMENT* qs_get_hash_core( QS_MEMORY_POOL* memory, struct QS_HASH *hash, QS_HASH *hashchild, const char* hash_name, uint32_t hashkey );
+void qs_clear_hash_string( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name );
+int32_t qs_replace_hash_string( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, const char* value );
+int32_t qs_get_hash_name( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name );
+int32_t qs_get_hash_id( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name );
+QS_HASH_ELEMENT* qs_get_hash_element( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name );
+int32_t qs_hash_length( QS_MEMORY_POOL* memory, int32_t memid_hash );
+int32_t qs_init_hash_foreach( QS_MEMORY_POOL* memory, int32_t memid_hash, QS_HASH_FOREACH* hf );
+QS_HASH_ELEMENT* qs_hash_foreach( QS_MEMORY_POOL* memory, QS_HASH_FOREACH* hf );
 
 #endif /*_QS_HASH_H_*/
 

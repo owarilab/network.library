@@ -83,7 +83,7 @@ int api_qs_memory_free(QS_MEMORY_CONTEXT* context)
 int api_qs_array_create(QS_MEMORY_CONTEXT* context, QS_JSON_ELEMENT_ARRAY* array)
 {
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
-	array->memid_array = qs_create_array(memory,8,NUMERIC_BUFFER_SIZE);
+	array->memid_array = qs_create_array(memory,QS_ARRAY_SIZE_DEFAULT);
 	if(array->memid_array==-1){
 		return -1;
 	}
@@ -276,7 +276,7 @@ int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_conn
 		free(context); context=NULL;
 		return -3;
 	}
-	int32_t server_munit = qs_create_munit(main_memory_pool, sizeof(QS_SOCKET_OPTION), MEMORY_TYPE_DEFAULT);
+	int32_t server_munit = qs_create_memory_block(main_memory_pool, sizeof(QS_SOCKET_OPTION));
 	if (server_munit == -1) {
 		free(context); context=NULL;
 		return -4;
@@ -300,7 +300,7 @@ int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_conn
 		return -6;
 	}
 	context->memid_server = server_munit;
-	int32_t memid_scheduler = qs_create_munit(main_memory_pool, sizeof(SYSTEM_UPDATE_SCHEDULER), MEMORY_TYPE_DEFAULT);
+	int32_t memid_scheduler = qs_create_memory_block(main_memory_pool, sizeof(SYSTEM_UPDATE_SCHEDULER));
 	if (memid_scheduler == -1) {
 		free(context); context=NULL;
 		return -7;
@@ -735,7 +735,7 @@ int api_qs_core_on_close(QS_SERVER_CONNECTION_INFO* connection)
 				QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)connection->qs_socket_option;
 				QS_MEMORY_POOL * temporary_memory = ( QS_MEMORY_POOL* )QS_GET_POINTER( option->memory_pool, context->memid_temporary_memory );
 				qs_memory_clean( temporary_memory );
-				int32_t message_buffer_munit = qs_create_munit(temporary_memory, SIZE_KBYTE * 32, MEMORY_TYPE_DEFAULT);
+				int32_t message_buffer_munit = qs_create_memory_block(temporary_memory, SIZE_KBYTE * 32);
 				void* buffer = QS_GET_POINTER(temporary_memory, message_buffer_munit);
 				size_t buffer_size = qs_usize(temporary_memory, message_buffer_munit);
 				char* connection_id = qs_get_packet_route_connection_id(router_memory, context->memid_router, connection->index);
@@ -808,7 +808,7 @@ int api_qs_send_ws_message_common(QS_RECV_INFO *qs_recv_info,const char* message
 	QS_SOCKPARAM* psockparam = &tinfo->sockparam;
 	if(-1!=context->memid_router)
 	{
-		int32_t message_buffer_munit = qs_create_munit(temporary_memory,qs_strlen(message) + SIZE_KBYTE*8,MEMORY_TYPE_DEFAULT);
+		int32_t message_buffer_munit = qs_create_memory_block(temporary_memory,qs_strlen(message) + SIZE_KBYTE*8);
 		if(-1==message_buffer_munit){
 			return -1;
 		}
@@ -852,7 +852,7 @@ int api_qs_send_ws_message_common(QS_RECV_INFO *qs_recv_info,const char* message
 		ssize_t ret = 0;
 		QS_SERVER_CONNECTION_INFO *tmptinfo;
 		if( option->connection_munit != -1 ){
-			int32_t message_buffer_munit = qs_create_munit(temporary_memory,qs_strlen(message) + SIZE_KBYTE*8,MEMORY_TYPE_DEFAULT);
+			int32_t message_buffer_munit = qs_create_memory_block(temporary_memory,qs_strlen(message) + SIZE_KBYTE*8);
 			if(-1==message_buffer_munit){
 				return -1;
 			}
@@ -1060,11 +1060,11 @@ int api_qs_kvs_keys(QS_JSON_ELEMENT_ARRAY* array, QS_KVS_CONTEXT* kvs_context)
 	QS_HASH_ELEMENT* he;
 	qs_init_hash_foreach( cache_page.memory, cache_page.hash_id, &hf );
 	while( NULL != ( he = qs_hash_foreach( cache_page.memory, &hf ) ) ){
-		api_qs_array_push_string(array,(char*)QS_GET_POINTER(cache_page.memory,he->hashname_munit));
+		api_qs_array_push_string(array,(char*)QS_GET_POINTER(cache_page.memory,he->memid_hash_name));
 		//printf(
 		//	"%s=%s\n",
-		//	(char*)QS_GET_POINTER(cache_page.memory,he->hashname_munit),
-		//	(char*)QS_GET_POINTER(cache_page.memory,he->elm_munit)
+		//	(char*)QS_GET_POINTER(cache_page.memory,he->memid_hash_name),
+		//	(char*)QS_GET_POINTER(cache_page.memory,he->memid_hash_element_data)
 		//);
 		key_length++;
 	}
@@ -1184,7 +1184,7 @@ int api_qs_room_join(QS_SERVER_CONTEXT* context, const char* room_id, const char
 		dest_object->memory = dest_temporary_memory;
 		// join message
 		{
-			int32_t message_buffer_munit = qs_create_munit(temporary_memory, SIZE_KBYTE * 8, MEMORY_TYPE_DEFAULT);
+			int32_t message_buffer_munit = qs_create_memory_block(temporary_memory, SIZE_KBYTE * 8);
 			void* buffer = QS_GET_POINTER(temporary_memory, message_buffer_munit);
 			size_t buffer_size = qs_usize(temporary_memory, message_buffer_munit);
 			char* connection_id = qs_get_packet_route_connection_id(router_memory, context->memid_router, connection_index);

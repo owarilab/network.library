@@ -31,7 +31,7 @@ int32_t qs_createrootnode( QS_MEMORY_POOL* _ppool )
 {
 	int32_t rootnode_munit = -1;
 	QS_NODE *rootnode = NULL;
-	if( -1 == ( rootnode_munit = qs_create_munit( _ppool, sizeof( QS_NODE ), MEMORY_TYPE_DEFAULT ) ) ){
+	if( -1 == ( rootnode_munit = qs_create_memory_block( _ppool, sizeof( QS_NODE ) ) ) ){
 		return rootnode_munit;
 	}
 	rootnode = (QS_NODE*)QS_GET_POINTER( _ppool, rootnode_munit );
@@ -49,7 +49,7 @@ int32_t qs_addnodeelement( QS_MEMORY_POOL* _ppool, QS_NODE* node )
 {
 	int32_t element_munit;
 	QS_NODE* childnode;
-	if( -1 == ( element_munit = qs_create_munit( _ppool, sizeof( QS_NODE ), MEMORY_TYPE_DEFAULT ) ) ){
+	if( -1 == ( element_munit = qs_create_memory_block( _ppool, sizeof( QS_NODE ) ) ) ){
 		return element_munit;
 	}
 	childnode = (QS_NODE*)QS_GET_POINTER( _ppool, element_munit );
@@ -71,7 +71,7 @@ int32_t qs_addelement( QS_MEMORY_POOL* _ppool, QS_NODE* node, int id, int32_t da
 	QS_NODE* workelemlist = NULL;
 	size_t i;
 	if( node->element_munit == -1 ){
-		if( -1 == ( node->element_munit = qs_create_munit( _ppool, sizeof( QS_NODE ) * allocsize, MEMORY_TYPE_DEFAULT ) ) ){
+		if( -1 == ( node->element_munit = qs_create_memory_block( _ppool, sizeof( QS_NODE ) * allocsize ) ) ){
 			return -1;
 		}
 		node->elmsize = allocsize;
@@ -86,7 +86,7 @@ int32_t qs_addelement( QS_MEMORY_POOL* _ppool, QS_NODE* node, int id, int32_t da
 		if( node->pos >= node->elmsize ){
 			size_t resize_size = node->elmsize * QS_NODE_RESIZE_QUANTITY;
 			tmplist1 = ( QS_NODE* )QS_GET_POINTER( _ppool, node->element_munit );
-			if( -1 == ( tmpmunit = qs_create_munit( _ppool, sizeof( QS_NODE ) * ( resize_size ), MEMORY_TYPE_DEFAULT ) ) ){
+			if( -1 == ( tmpmunit = qs_create_memory_block( _ppool, sizeof( QS_NODE ) * ( resize_size ) ) ) ){
 				return -1;
 			}
 			tmplist2 = ( QS_NODE* )QS_GET_POINTER( _ppool, tmpmunit );
@@ -97,7 +97,7 @@ int32_t qs_addelement( QS_MEMORY_POOL* _ppool, QS_NODE* node, int id, int32_t da
 				workelemlist[i].exec_tmp_munit = -1;
 				workelemlist[i].exec_tmp_id    = -1;
 			}
-			qs_free_memory_unit( _ppool, &node->element_munit );
+			qs_free_memory_block( _ppool, &node->element_munit );
 			node->element_munit = tmpmunit;
 			node->elmsize = resize_size;
 		}

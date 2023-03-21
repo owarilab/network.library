@@ -114,7 +114,7 @@ int qs_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr 
 			char *new_tokenbuf = (char*)qs_upointer( _ppool, memid_new_buffer );
 			tokenbuf = new_tokenbuf;
 			ptoken = tokenbuf;
-			qs_free_memory_unit(_ppool,&tmpbuf_munit);
+			qs_free_memory_block(_ppool,&tmpbuf_munit);
 			tmpbuf_munit = memid_new_buffer;
 		}
 		// "//"
@@ -199,7 +199,7 @@ int qs_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr 
 					char *new_tokenbuf = (char*)qs_upointer( _ppool, memid_new_buffer );
 					tokenbuf = new_tokenbuf;
 					ptoken = tokenbuf;
-					qs_free_memory_unit(_ppool,&tmpbuf_munit);
+					qs_free_memory_block(_ppool,&tmpbuf_munit);
 					tmpbuf_munit = memid_new_buffer;
 				}
 			}
@@ -228,7 +228,7 @@ int qs_token_analyzer( QS_MEMORY_POOL* _ppool, int32_t tokens_munit, char* pstr 
 					char *new_tokenbuf = (char*)qs_upointer( _ppool, memid_new_buffer );
 					tokenbuf = new_tokenbuf;
 					ptoken = tokenbuf;
-					qs_free_memory_unit(_ppool,&tmpbuf_munit);
+					qs_free_memory_block(_ppool,&tmpbuf_munit);
 					tmpbuf_munit = memid_new_buffer;
 				}
 			}
@@ -455,7 +455,7 @@ int qs_addtoken( QS_MEMORY_POOL* _ppool, QS_TOKENS *ptokens, char* tokenbuf, int
 				, (QS_TOKEN*)QS_GET_POINTER(_ppool,ptokens->token_munit)
 				, sizeof( QS_TOKEN )*ptokens->size
 			);
-			qs_free_memory_unit( _ppool, &ptokens->token_munit );
+			qs_free_memory_block( _ppool, &ptokens->token_munit );
 			ptokens->token_munit = tmpmunit;
 			ptokens->size = resize;
 		}
@@ -463,7 +463,7 @@ int qs_addtoken( QS_MEMORY_POOL* _ppool, QS_TOKENS *ptokens, char* tokenbuf, int
 	ptoken = ( QS_TOKEN* )QS_GET_POINTER(_ppool,ptokens->token_munit)+ptokens->currentpos;
 	*(tokenbuf+((*tokensize)++)) = '\0';
 	if( type == ID_NUM ){
-		if( -1 == ( ptoken->buf_munit = qs_create_memory_block( _ppool, sizeof(char)*(*tokensize) + sizeof( int32_t ) ) ) ){
+		if( -1 == ( ptoken->buf_munit = qs_create_memory_block( _ppool, sizeof(char)*(*tokensize) + sizeof( NUMERIC_CAST ) ) ) ){
 			printf("allocate token buf munit error.\n");
 			return -1;
 		}

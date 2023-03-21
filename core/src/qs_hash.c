@@ -27,32 +27,32 @@
 
 #include "qs_hash.h"
 
-int32_t qs_create_hash( QS_MEMORY_POOL* _ppool, size_t hlen )
+int32_t qs_create_hash( QS_MEMORY_POOL* memory, size_t hash_size )
 {
-	int32_t h_munit = -1;
-	if( hlen <= 0 ){
+	int32_t memid_hash = -1;
+	if( hash_size <= 0 ){
 		return -1;
 	}
-	if( -1 == (h_munit = qs_create_memory_block( _ppool, sizeof( struct QS_HASH ) )) ){
+	if( -1 == (memid_hash = qs_create_memory_block( memory, sizeof( struct QS_HASH ) )) ){
 		return -1;
 	}
-	QS_HASH *hash = (struct QS_HASH *)QS_GET_POINTER( _ppool, h_munit );
-	hash->hash_size = hlen;
-	hash->hash_munit = qs_create_memory_block( _ppool, sizeof( struct QS_HASH ) * hlen );
+	QS_HASH *hash = (struct QS_HASH *)QS_GET_POINTER( memory, memid_hash );
+	hash->hash_size = hash_size;
+	hash->hash_munit = qs_create_memory_block( memory, sizeof( struct QS_HASH ) * hash->hash_size );
 	if( -1 == hash->hash_munit ){
 		return -1;
 	}
-	QS_HASH *hashchild = (struct QS_HASH *)QS_GET_POINTER( _ppool, hash->hash_munit );
+	QS_HASH *hash_child = (struct QS_HASH *)QS_GET_POINTER( memory, hash->hash_munit );
 	uint32_t i;
-	for( i = 0; i < hlen; i++ )
+	for( i = 0; i < hash->hash_size; i++ )
 	{
-		hashchild[i].hash_size	= 0;
-		hashchild[i].hash_munit	= -1;
+		hash_child[i].hash_size	= 0;
+		hash_child[i].hash_munit	= -1;
 	}
-	return h_munit;
+	return memid_hash;
 }
 
-QS_HASH_ELEMENT* qs_add_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, int32_t name_munit, int32_t data_munit, int32_t id )
+QS_HASH_ELEMENT* qs_add_hash( QS_MEMORY_POOL* memory, int32_t memid_hash, int32_t memid_name_string, int32_t memid_data, int32_t id )
 {
 	struct QS_HASH *hash;
 	struct QS_HASH *hashchild;
@@ -60,41 +60,41 @@ QS_HASH_ELEMENT* qs_add_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, int32_t n
 	uint32_t hashkey;
 	uint32_t i;
 	QS_HASH_ELEMENT* is_push = NULL;
-	if( -1 == h_munit ){
+	if( -1 == memid_hash ){
 		return is_push;
 	}
-	char* hash_name = (char*)QS_GET_POINTER( _ppool, name_munit );
-	hash = (struct QS_HASH *)QS_GET_POINTER( _ppool, h_munit );
-	hashkey = qs_ihash( (char*)QS_GET_POINTER( _ppool, name_munit ), hash->hash_size );
-	hashchild = (struct QS_HASH *)QS_GET_POINTER( _ppool, hash->hash_munit );
+	char* hash_name = (char*)QS_GET_POINTER( memory, memid_name_string );
+	hash = (struct QS_HASH *)QS_GET_POINTER( memory, memid_hash );
+	hashkey = qs_ihash( (char*)QS_GET_POINTER( memory, memid_name_string ), hash->hash_size );
+	hashchild = (struct QS_HASH *)QS_GET_POINTER( memory, hash->hash_munit );
 	if( -1 == hashchild[hashkey].hash_munit )
 	{
-		if( -1 == (hashchild[hashkey].hash_munit = qs_create_memory_block( _ppool, sizeof( struct QS_HASH_ELEMENT ) * QS_HASH_ELEMENT_SIZE ))){
+		if( -1 == (hashchild[hashkey].hash_munit = qs_create_memory_block( memory, sizeof( struct QS_HASH_ELEMENT ) * QS_HASH_ELEMENT_SIZE ))){
 			return is_push;
 		}
 		hashchild[hashkey].hash_size = QS_HASH_ELEMENT_SIZE;
-		hashelement = (struct QS_HASH_ELEMENT*)QS_GET_POINTER( _ppool, hashchild[hashkey].hash_munit );
+		hashelement = (struct QS_HASH_ELEMENT*)QS_GET_POINTER( memory, hashchild[hashkey].hash_munit );
 		for( i = 0; i < hashchild[hashkey].hash_size; ++i )
 		{
-			hashelement[i].hashname_munit = -1;
-			hashelement[i].elm_munit = -1;
+			hashelement[i].memid_hash_name = -1;
+			hashelement[i].memid_hash_element_data = -1;
 			hashelement[i].id = -1;
 			hashelement[i].create_time = 0;
 			hashelement[i].life_time = 0;
 		}
 	} else {
-		hashelement = (struct QS_HASH_ELEMENT*)QS_GET_POINTER( _ppool, hashchild[hashkey].hash_munit );
+		hashelement = (struct QS_HASH_ELEMENT*)QS_GET_POINTER( memory, hashchild[hashkey].hash_munit );
 	}
 	for( i = 0; i < hashchild[hashkey].hash_size; ++i )
 	{
-		if( -1 != hashelement[i].hashname_munit )
+		if( -1 != hashelement[i].memid_hash_name )
 		{
-			if( !strcmp( (char*)QS_GET_POINTER( _ppool, hashelement[i].hashname_munit ), hash_name ) )
+			if( !strcmp( (char*)QS_GET_POINTER( memory, hashelement[i].memid_hash_name ), hash_name ) )
 			{
-				if( hashelement[i].elm_munit != data_munit ){
-					qs_free_memory_unit( _ppool, &hashelement[i].elm_munit );
+				if( hashelement[i].memid_hash_element_data != memid_data ){
+					qs_free_memory_block( memory, &hashelement[i].memid_hash_element_data );
 				}
-				hashelement[i].elm_munit = data_munit;
+				hashelement[i].memid_hash_element_data = memid_data;
 				hashelement[i].id = id;
 				//hashelement[i].create_time = time(NULL);
 				is_push = &hashelement[i];
@@ -102,8 +102,8 @@ QS_HASH_ELEMENT* qs_add_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, int32_t n
 			}
 		}
 		else{
-			hashelement[i].hashname_munit = name_munit;
-			hashelement[i].elm_munit = data_munit;
+			hashelement[i].memid_hash_name = memid_name_string;
+			hashelement[i].memid_hash_element_data = memid_data;
 			hashelement[i].id = id;
 			//hashelement[i].create_time = time(NULL);
 			is_push = &hashelement[i];
@@ -114,29 +114,29 @@ QS_HASH_ELEMENT* qs_add_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, int32_t n
 		int32_t resize_munit = -1;
 		size_t resize = hashchild[hashkey].hash_size * QS_HASH_ELEMENT_RESIZE_QUANTITY;
 		//printf("resize hash : %d -> %d\n",(int)(hashchild[hashkey].hash_size),(int)(resize));
-		if( -1 == (resize_munit = qs_create_memory_block( _ppool, sizeof( struct QS_HASH_ELEMENT ) * resize ))){
+		if( -1 == (resize_munit = qs_create_memory_block( memory, sizeof( struct QS_HASH_ELEMENT ) * resize ))){
 			return is_push;
 		}
-		hashelement = (struct QS_HASH_ELEMENT*)QS_GET_POINTER( _ppool, resize_munit );
-		QS_HASH_ELEMENT *oldhashelement = (struct QS_HASH_ELEMENT*)QS_GET_POINTER( _ppool, hashchild[hashkey].hash_munit );
+		hashelement = (struct QS_HASH_ELEMENT*)QS_GET_POINTER( memory, resize_munit );
+		QS_HASH_ELEMENT *oldhashelement = (struct QS_HASH_ELEMENT*)QS_GET_POINTER( memory, hashchild[hashkey].hash_munit );
 		for( i = 0; i < resize; ++i ){
 			if( i < hashchild[hashkey].hash_size ){
-				hashelement[i].hashname_munit = oldhashelement[i].hashname_munit;
-				hashelement[i].elm_munit = oldhashelement[i].elm_munit;
+				hashelement[i].memid_hash_name = oldhashelement[i].memid_hash_name;
+				hashelement[i].memid_hash_element_data = oldhashelement[i].memid_hash_element_data;
 				hashelement[i].id = oldhashelement[i].id;
 				hashelement[i].create_time = oldhashelement[i].create_time;
 				hashelement[i].life_time = oldhashelement[i].life_time;
 			} else {
-				hashelement[i].hashname_munit = -1;
-				hashelement[i].elm_munit = -1;
+				hashelement[i].memid_hash_name = -1;
+				hashelement[i].memid_hash_element_data = -1;
 				hashelement[i].id = -1;
 				hashelement[i].create_time = 0;
 				hashelement[i].life_time = 0;
 			}
 		}
 		
-		hashelement[hashchild[hashkey].hash_size].hashname_munit = name_munit;
-		hashelement[hashchild[hashkey].hash_size].elm_munit = data_munit;
+		hashelement[hashchild[hashkey].hash_size].memid_hash_name = memid_name_string;
+		hashelement[hashchild[hashkey].hash_size].memid_hash_element_data = memid_data;
 		hashelement[hashchild[hashkey].hash_size].id = id;
 		//hashelement[hashchild[hashkey].hash_size].create_time = time(NULL);
 		is_push = &hashelement[hashchild[hashkey].hash_size];
@@ -147,276 +147,276 @@ QS_HASH_ELEMENT* qs_add_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, int32_t n
 	return is_push;
 }
 
-int32_t qs_make_hash_name( QS_MEMORY_POOL* _ppool, int32_t h_munit,const char* name)
+int32_t qs_make_hash_name( QS_MEMORY_POOL* memory, int32_t memid_hash,const char* name)
 {
-	int32_t name_munit = qs_get_hash_name( _ppool, h_munit, name );
-	if( name_munit == -1 ){
-		if( -1 == (name_munit = qs_create_memory_block( _ppool, strlen( name )+1 ))){
+	int32_t memid_name_string = qs_get_hash_name( memory, memid_hash, name );
+	if( memid_name_string == -1 ){
+		if( -1 == (memid_name_string = qs_create_memory_block( memory, strlen( name )+1 ))){
 			return -1;
 		}
-		char* pbuf = (char*)QS_GET_POINTER( _ppool, name_munit );
-		qs_strcopy( pbuf, name, qs_usize( _ppool, name_munit ) );
+		char* pbuf = (char*)QS_GET_POINTER( memory, memid_name_string );
+		qs_strcopy( pbuf, name, qs_usize( memory, memid_name_string ) );
 	}
-	return name_munit;
+	return memid_name_string;
 }
 
-void qs_add_hash_hash(QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, int32_t hash_id)
+void qs_add_hash_hash(QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, int32_t memid_target_hash)
 {
-	int32_t namemunit = qs_make_hash_name(_ppool, h_munit, name);
-	if (namemunit == -1) {
+	int32_t memid_name = qs_make_hash_name(memory, memid_hash, name);
+	if (memid_name == -1) {
 		return;
 	}
-	int32_t hash_munit = qs_get_hash(_ppool, h_munit, name);
+	int32_t hash_munit = qs_get_hash(memory, memid_hash, name);
 	if (hash_munit != -1) {
 		printf("hash exist\n");
 	}
-	QS_HASH_ELEMENT* is_push = qs_add_hash(_ppool, h_munit, namemunit, hash_id, ELEMENT_HASH);
+	QS_HASH_ELEMENT* is_push = qs_add_hash(memory, memid_hash, memid_name, memid_target_hash, ELEMENT_HASH);
 	if (NULL == is_push) {
 		printf("[qs_add_hash_hash] is_push is NULL\n");
 	}
 }
 
-void qs_add_hash_value( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, const char* value, int32_t id )
+void qs_add_hash_value( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, const char* value, int32_t id )
 {
 	char* pbuf;
-	int32_t datamunit;
-	int32_t namemunit = qs_make_hash_name( _ppool, h_munit, name );
-	if( namemunit == -1 ){
+	int32_t memid_data;
+	int32_t memid_name = qs_make_hash_name( memory, memid_hash, name );
+	if( memid_name == -1 ){
 		return;
 	}
-	if( -1 == (datamunit = qs_create_memory_block( _ppool, strlen( value )+1 ))){
+	if( -1 == (memid_data = qs_create_memory_block( memory, strlen( value )+1 ))){
 		return;
 	}
-	pbuf = (char*)QS_GET_POINTER( _ppool, datamunit );
-	memcpy( pbuf, value, qs_usize( _ppool, datamunit ) );
-	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, namemunit, datamunit, id );
+	pbuf = (char*)QS_GET_POINTER( memory, memid_data );
+	memcpy( pbuf, value, qs_usize( memory, memid_data ) );
+	QS_HASH_ELEMENT* is_push = qs_add_hash( memory, memid_hash, memid_name, memid_data, id );
 	if( NULL==is_push){
 		printf("[qs_add_hash_value] is_push is NULL\n");
 	}
 }
 
-void qs_add_hash_array(QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, int32_t array_id)
+void qs_add_hash_array(QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, int32_t memid_target_array)
 {
-	int32_t namemunit = qs_make_hash_name(_ppool, h_munit, name);
-	if (namemunit == -1) {
+	int32_t memid_name = qs_make_hash_name(memory, memid_hash, name);
+	if (memid_name == -1) {
 		return;
 	}
-	int32_t array_munit = qs_get_hash(_ppool, h_munit, name);
+	int32_t array_munit = qs_get_hash(memory, memid_hash, name);
 	if (array_munit != -1) {
 		printf("array exist\n");
 	}
-	QS_HASH_ELEMENT* is_push = qs_add_hash(_ppool, h_munit, namemunit, array_id, ELEMENT_ARRAY);
+	QS_HASH_ELEMENT* is_push = qs_add_hash(memory, memid_hash, memid_name, memid_target_array, ELEMENT_ARRAY);
 	if (NULL == is_push) {
 		printf("[qs_add_hash_array] is_push is NULL\n");
 	}
 }
 
-void qs_add_hash_array_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, const char* value )
+void qs_add_hash_array_string( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, const char* value )
 {
-	int32_t namemunit = qs_make_hash_name( _ppool, h_munit, name );
-	if( namemunit == -1 ){
+	int32_t memid_name = qs_make_hash_name( memory, memid_hash, name );
+	if( memid_name == -1 ){
 		return;
 	}
-	int32_t array_munit = qs_get_hash( _ppool, h_munit, name );
+	int32_t array_munit = qs_get_hash( memory, memid_hash, name );
 	if( array_munit == -1 ){
-		array_munit = qs_create_array( _ppool, QS_HASH_ELEMENT_ARRAY_SIZE, 0 );
+		array_munit = qs_create_array( memory, QS_HASH_ELEMENT_ARRAY_SIZE );
 		if( -1 == array_munit ){
 			return;
 		}
 	}
-	if( QS_SYSTEM_ERROR == qs_array_push_string( _ppool, &array_munit, value ) ){
+	if( QS_SYSTEM_ERROR == qs_array_push_string( memory, &array_munit, value ) ){
 		return;
 	}
-	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, namemunit, array_munit, ELEMENT_ARRAY );
+	QS_HASH_ELEMENT* is_push = qs_add_hash( memory, memid_hash, memid_name, array_munit, ELEMENT_ARRAY );
 	if( NULL==is_push){
 		printf("[qs_add_hash_array_string] is_push is NULL\n");
 	}
 }
 
-void qs_add_hash_array_empty_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, size_t size )
+void qs_add_hash_array_empty_string( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, size_t size )
 {
-	int32_t namemunit = qs_make_hash_name( _ppool, h_munit, name );
-	if( namemunit == -1 ){
+	int32_t memid_name = qs_make_hash_name( memory, memid_hash, name );
+	if( memid_name == -1 ){
 		return;
 	}
-	int32_t array_munit = qs_get_hash( _ppool, h_munit, name );
+	int32_t array_munit = qs_get_hash( memory, memid_hash, name );
 	if( array_munit == -1 ){
-		array_munit = qs_create_array( _ppool, QS_HASH_ELEMENT_ARRAY_SIZE, 0 );
+		array_munit = qs_create_array( memory, QS_HASH_ELEMENT_ARRAY_SIZE );
 		if( -1 == array_munit ){
 			return;
 		}
 	}
-	if( QS_SYSTEM_ERROR == qs_array_push_empty_string( _ppool, &array_munit, size ) ){
+	if( QS_SYSTEM_ERROR == qs_array_push_empty_string( memory, &array_munit, size ) ){
 		return;
 	}
-	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, namemunit, array_munit, ELEMENT_ARRAY );
+	QS_HASH_ELEMENT* is_push = qs_add_hash( memory, memid_hash, memid_name, array_munit, ELEMENT_ARRAY );
 	if( NULL==is_push){
 		printf("[qs_add_hash_array_empty_string] is_push is NULL\n");
 	}
 }
 
-QS_HASH_ELEMENT* qs_add_hash_binary( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, uint8_t* binary, size_t size )
+QS_HASH_ELEMENT* qs_add_hash_binary( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, uint8_t* binary, size_t size )
 {
 	uint8_t* bin;
-	int32_t namemunit = qs_make_hash_name( _ppool, h_munit, name );
-	if( namemunit == -1 ){
+	int32_t memid_name = qs_make_hash_name( memory, memid_hash, name );
+	if( memid_name == -1 ){
 		return NULL;
 	}
-	int32_t datamunit = qs_get_hash( _ppool, h_munit, name );
-	if( datamunit == -1 ){
-		if( -1 == ( datamunit = qs_create_memory_block( _ppool, size ) ) ){
+	int32_t memid_data = qs_get_hash( memory, memid_hash, name );
+	if( memid_data == -1 ){
+		if( -1 == ( memid_data = qs_create_memory_block( memory, size ) ) ){
 			return NULL;
 		}
 	}
 	else{
-		if( qs_usize(_ppool,datamunit) < size ){
-			if( -1 == ( datamunit = qs_create_memory_block( _ppool, size ) ) ){
+		if( qs_usize(memory,memid_data) < size ){
+			if( -1 == ( memid_data = qs_create_memory_block( memory, size ) ) ){
 				return NULL;
 			}
 		}
 	}
-	bin = (uint8_t*)QS_GET_POINTER( _ppool, datamunit );
+	bin = (uint8_t*)QS_GET_POINTER( memory, memid_data );
 	memcpy( bin, binary, size );
-	QS_MEMORY_UNIT* punit = qs_get_munit( _ppool, datamunit );
+	QS_MEMORY_UNIT* punit = qs_get_memory_block( memory, memid_data );
 	punit->top = size;
-	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, namemunit, datamunit, ELEMENT_LITERAL_BIN );
+	QS_HASH_ELEMENT* is_push = qs_add_hash( memory, memid_hash, memid_name, memid_data, ELEMENT_LITERAL_BIN );
 	return is_push;
 }
 
-QS_HASH_ELEMENT* qs_add_hash_integer( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, int32_t value )
+QS_HASH_ELEMENT* qs_add_hash_integer( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, int32_t value )
 {
-	int32_t namemunit = qs_make_hash_name( _ppool, h_munit, name );
-	if( namemunit == -1 ){
+	int32_t memid_name = qs_make_hash_name( memory, memid_hash, name );
+	if( memid_name == -1 ){
 		return NULL;
 	}
-	int32_t datamunit = qs_get_hash( _ppool, h_munit, name );
-	if( datamunit == -1 ){
-		if( -1 == ( datamunit = qs_create_memory_block( _ppool, NUMERIC_BUFFER_SIZE ) ) ){
+	int32_t memid_data = qs_get_hash( memory, memid_hash, name );
+	if( memid_data == -1 ){
+		if( -1 == ( memid_data = qs_create_memory_block( memory, NUMERIC_BUFFER_SIZE ) ) ){
 			return NULL;
 		}
 	}
-	size_t data_size = qs_usize(_ppool,datamunit);
-	qs_itoa( value, (char*)QS_GET_POINTER(_ppool,datamunit), data_size );
-	int32_t* pv = QS_PINT32(_ppool,datamunit);
+	size_t data_size = qs_usize(memory,memid_data);
+	qs_itoa( value, (char*)QS_GET_POINTER(memory,memid_data), data_size );
+	int32_t* pv = QS_PINT32(memory,memid_data);
 	*pv = value;
-	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, namemunit, datamunit, ELEMENT_LITERAL_NUM );
+	QS_HASH_ELEMENT* is_push = qs_add_hash( memory, memid_hash, memid_name, memid_data, ELEMENT_LITERAL_NUM );
 	if( NULL==is_push){
 		printf("[qs_add_hash_integer] is_push is NULL\n");
 	}
 	return is_push;
 }
 
-void qs_add_hash_integer_kint( QS_MEMORY_POOL* _ppool, int32_t h_munit, int32_t name_munit, int32_t value )
+void qs_add_hash_integer_kint( QS_MEMORY_POOL* memory, int32_t memid_hash, int32_t memid_name_string, int32_t value )
 {
-	int32_t datamunit;
-	if( -1 == ( datamunit = qs_create_memory_block( _ppool, NUMERIC_BUFFER_SIZE ) ) ){
+	int32_t memid_data;
+	if( -1 == ( memid_data = qs_create_memory_block( memory, NUMERIC_BUFFER_SIZE ) ) ){
 		return;
 	}
-	size_t data_size = qs_usize(_ppool,datamunit);
-	qs_itoa( value, (char*)QS_GET_POINTER(_ppool,datamunit), data_size );
-	int32_t* pv = QS_PINT32(_ppool,datamunit);
+	size_t data_size = qs_usize(memory,memid_data);
+	qs_itoa( value, (char*)QS_GET_POINTER(memory,memid_data), data_size );
+	int32_t* pv = QS_PINT32(memory,memid_data);
 	*pv = value;
-	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, name_munit, datamunit, ELEMENT_LITERAL_NUM );
+	QS_HASH_ELEMENT* is_push = qs_add_hash( memory, memid_hash, memid_name_string, memid_data, ELEMENT_LITERAL_NUM );
 	if( NULL==is_push){
 		printf("[qs_add_hash_integer_kint] is_push is NULL\n");
 	}
 }
 
-QS_HASH_ELEMENT* qs_add_hash_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, const char* value )
+QS_HASH_ELEMENT* qs_add_hash_string( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, const char* value )
 {
 	char* pbuf;
-	int32_t namemunit = qs_make_hash_name( _ppool, h_munit, name );
-	if( namemunit == -1 ){
+	int32_t memid_name = qs_make_hash_name( memory, memid_hash, name );
+	if( memid_name == -1 ){
 		return NULL;
 	}
-	int32_t datamunit = qs_get_hash( _ppool, h_munit, name );
+	int32_t memid_data = qs_get_hash( memory, memid_hash, name );
 	size_t data_size = 0;
-	if( datamunit == -1 ){
-		if( -1 == ( datamunit = qs_create_memory_block( _ppool, strlen( value )+1 ) ) ){
+	if( memid_data == -1 ){
+		if( -1 == ( memid_data = qs_create_memory_block( memory, strlen( value )+1 ) ) ){
 			return NULL;
 		}
-		data_size = qs_usize( _ppool, datamunit );
+		data_size = qs_usize( memory, memid_data );
 	}
 	else{
 		size_t size = strlen( value )+1;
-		data_size = qs_usize( _ppool, datamunit );
+		data_size = qs_usize( memory, memid_data );
 		if( data_size < size ){
-			if( -1 == ( datamunit = qs_create_memory_block( _ppool, strlen( value )+1 ) ) ){
+			if( -1 == ( memid_data = qs_create_memory_block( memory, strlen( value )+1 ) ) ){
 				return NULL;
 			}
 		}
-		data_size = qs_usize( _ppool, datamunit );
+		data_size = qs_usize( memory, memid_data );
 	}
-	pbuf = (char*)QS_GET_POINTER( _ppool, datamunit );
+	pbuf = (char*)QS_GET_POINTER( memory, memid_data );
 	memcpy( pbuf, value, data_size );
-	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, namemunit, datamunit, ELEMENT_LITERAL_STR );
+	QS_HASH_ELEMENT* is_push = qs_add_hash( memory, memid_hash, memid_name, memid_data, ELEMENT_LITERAL_STR );
 	if( NULL==is_push){
 		printf("[qs_add_hash_string] is_push is NULL\n");
 	}
 	return is_push;
 }
 
-void qs_add_hash_emptystring( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, size_t string_size )
+void qs_add_hash_emptystring( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, size_t string_size )
 {
 	char* pbuf;
-	int32_t datamunit;
-	int32_t namemunit = qs_make_hash_name( _ppool, h_munit, name );
-	if( namemunit == -1 ){
+	int32_t memid_data;
+	int32_t memid_name = qs_make_hash_name( memory, memid_hash, name );
+	if( memid_name == -1 ){
 		return;
 	}
-	if( -1 == ( datamunit = qs_create_memory_block( _ppool, string_size ) ) ){
+	if( -1 == ( memid_data = qs_create_memory_block( memory, string_size ) ) ){
 		return;
 	}
-	pbuf = (char*)QS_GET_POINTER( _ppool, datamunit );
-	//memset( pbuf, 0, qs_usize( _ppool, datamunit ) );
+	pbuf = (char*)QS_GET_POINTER( memory, memid_data );
+	//memset( pbuf, 0, qs_usize( memory, memid_data ) );
 	pbuf[0] = '\0';
-	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, namemunit, datamunit, ELEMENT_LITERAL_STR );
+	QS_HASH_ELEMENT* is_push = qs_add_hash( memory, memid_hash, memid_name, memid_data, ELEMENT_LITERAL_STR );
 	if( NULL==is_push){
 		printf("[qs_add_hash_emptystring] is_push is NULL\n");
 	}
 }
 
-void qs_add_hash_value_kstring( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, int32_t data_munit, int32_t id )
+void qs_add_hash_value_kstring( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, int32_t memid_data, int32_t id )
 {
-	int32_t namemunit = qs_make_hash_name( _ppool, h_munit, name );
-	if( namemunit == -1 ){
+	int32_t memid_name = qs_make_hash_name( memory, memid_hash, name );
+	if( memid_name == -1 ){
 		return;
 	}
-	QS_HASH_ELEMENT* is_push = qs_add_hash( _ppool, h_munit, namemunit, data_munit, id );
+	QS_HASH_ELEMENT* is_push = qs_add_hash( memory, memid_hash, memid_name, memid_data, id );
 	if( NULL==is_push){
 		printf("[qs_add_hash_value_kstring] is_push is NULL\n");
 	}
 }
 
-int32_t qs_move_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname_from, const char* hashname_to )
+int32_t qs_move_hash( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name_from, const char* hash_name_to )
 {
-	if( h_munit == -1 ){
+	if( memid_hash == -1 ){
 		return -1;
 	}
-	struct QS_HASH *hash = (struct QS_HASH *)QS_GET_POINTER( _ppool, h_munit );
-	struct QS_HASH *hashchild = (struct QS_HASH *)QS_GET_POINTER( _ppool, hash->hash_munit );
-	uint32_t hashkey = qs_ihash( hashname_from, hash->hash_size );
+	struct QS_HASH *hash = (struct QS_HASH *)QS_GET_POINTER( memory, memid_hash );
+	struct QS_HASH *hashchild = (struct QS_HASH *)QS_GET_POINTER( memory, hash->hash_munit );
+	uint32_t hashkey = qs_ihash( hash_name_from, hash->hash_size );
 	int32_t retmunit = -1;
 	if( -1 == hashchild[hashkey].hash_munit ){
 		return retmunit;
 	}
-	if( qs_strlen(hashname_from) != qs_strlen(hashname_to) ){
+	if( qs_strlen(hash_name_from) != qs_strlen(hash_name_to) ){
 		return retmunit;
 	}
-	QS_HASH_ELEMENT *hashelement = (struct QS_HASH_ELEMENT*)QS_GET_POINTER( _ppool, hashchild[hashkey].hash_munit );
+	QS_HASH_ELEMENT *hashelement = (struct QS_HASH_ELEMENT*)QS_GET_POINTER( memory, hashchild[hashkey].hash_munit );
 	uint32_t i;
 	for( i = 0; i < hashchild[hashkey].hash_size; i++ )
 	{
-		if( hashelement[i].hashname_munit >= 0 )
+		if( hashelement[i].memid_hash_name >= 0 )
 		{
-			char* tmpname = (char*)QS_GET_POINTER( _ppool, hashelement[i].hashname_munit );
-			if( !strcmp( tmpname, hashname_from ) )
+			char* tmpname = (char*)QS_GET_POINTER( memory, hashelement[i].memid_hash_name );
+			if( !strcmp( tmpname, hash_name_from ) )
 			{
-				memcpy(tmpname,hashname_to,qs_strlen(hashname_to));
-				QS_HASH_ELEMENT* elm = qs_add_hash( _ppool, h_munit, hashelement[i].hashname_munit, hashelement[i].elm_munit, hashelement[i].id );
+				memcpy(tmpname,hash_name_to,qs_strlen(hash_name_to));
+				QS_HASH_ELEMENT* elm = qs_add_hash( memory, memid_hash, hashelement[i].memid_hash_name, hashelement[i].memid_hash_element_data, hashelement[i].id );
 				if( elm != &hashelement[i] ){
-					hashelement[i].hashname_munit = -1;
-					hashelement[i].elm_munit = -1;
+					hashelement[i].memid_hash_name = -1;
+					hashelement[i].memid_hash_element_data = -1;
 					hashelement[i].id = -1;
 					hashelement[i].create_time = 0;
 					hashelement[i].life_time = 0;
@@ -428,22 +428,22 @@ int32_t qs_move_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashn
 	return retmunit;
 }
 
-int32_t qs_remove_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname )
+int32_t qs_remove_hash( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name )
 {
-	struct QS_HASH *hash = (struct QS_HASH *)QS_GET_POINTER( _ppool, h_munit );
-	struct QS_HASH *hashchild = (struct QS_HASH *)QS_GET_POINTER( _ppool, hash->hash_munit );
-	uint32_t hashkey = qs_ihash( hashname, hash->hash_size );
-	QS_HASH_ELEMENT *hashelement = (struct QS_HASH_ELEMENT*)QS_GET_POINTER( _ppool, hashchild[hashkey].hash_munit );
+	struct QS_HASH *hash = (struct QS_HASH *)QS_GET_POINTER( memory, memid_hash );
+	struct QS_HASH *hashchild = (struct QS_HASH *)QS_GET_POINTER( memory, hash->hash_munit );
+	uint32_t hashkey = qs_ihash( hash_name, hash->hash_size );
+	QS_HASH_ELEMENT *hashelement = (struct QS_HASH_ELEMENT*)QS_GET_POINTER( memory, hashchild[hashkey].hash_munit );
 	uint32_t i;
 	for( i = 0; i < hashchild[hashkey].hash_size; i++ )
 	{
-		if( hashelement[i].hashname_munit >= 0 )
+		if( hashelement[i].memid_hash_name >= 0 )
 		{
-			if( !strcmp( (char*)QS_GET_POINTER( _ppool, hashelement[i].hashname_munit ), hashname ) )
+			if( !strcmp( (char*)QS_GET_POINTER( memory, hashelement[i].memid_hash_name ), hash_name ) )
 			{
 				hashelement[i].id = -1;
-				hashelement[i].hashname_munit = -1;
-				hashelement[i].elm_munit = -1;
+				hashelement[i].memid_hash_name = -1;
+				hashelement[i].memid_hash_element_data = -1;
 				hashelement[i].create_time = 0;
 				hashelement[i].life_time = 0;
 				break;
@@ -453,79 +453,79 @@ int32_t qs_remove_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* has
 	return QS_SYSTEM_OK;
 }
 
-char* qs_get_hash_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname )
+char* qs_get_hash_string( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name )
 {
-	if( h_munit == -1 ){
+	if( memid_hash == -1 ){
 		return NULL;
 	}
-	struct QS_HASH *hash = (struct QS_HASH *)QS_GET_POINTER( _ppool, h_munit );
-	struct QS_HASH *hashchild = (struct QS_HASH *)QS_GET_POINTER( _ppool, hash->hash_munit );
-	uint32_t hashkey = qs_ihash( hashname, hash->hash_size );
-	QS_HASH_ELEMENT* elm = qs_get_hash_core( _ppool, hash, hashchild, hashname, hashkey );
+	struct QS_HASH *hash = (struct QS_HASH *)QS_GET_POINTER( memory, memid_hash );
+	struct QS_HASH *hashchild = (struct QS_HASH *)QS_GET_POINTER( memory, hash->hash_munit );
+	uint32_t hashkey = qs_ihash( hash_name, hash->hash_size );
+	QS_HASH_ELEMENT* elm = qs_get_hash_core( memory, hash, hashchild, hash_name, hashkey );
 	if(elm==NULL){
 		return NULL;
 	}
 	if(elm->id != ELEMENT_LITERAL_STR){
 		return NULL;
 	}
-	return (char*)QS_GET_POINTER(_ppool,elm->elm_munit);
+	return (char*)QS_GET_POINTER(memory,elm->memid_hash_element_data);
 }
 
-int32_t* qs_get_hash_integer( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname )
+int32_t* qs_get_hash_integer( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name )
 {
-	if( h_munit == -1 ){
+	if( memid_hash == -1 ){
 		return NULL;
 	}
-	struct QS_HASH *hash = (struct QS_HASH *)QS_GET_POINTER( _ppool, h_munit );
-	struct QS_HASH *hashchild = (struct QS_HASH *)QS_GET_POINTER( _ppool, hash->hash_munit );
-	uint32_t hashkey = qs_ihash( hashname, hash->hash_size );
-	QS_HASH_ELEMENT* elm = qs_get_hash_core( _ppool, hash, hashchild, hashname, hashkey );
+	struct QS_HASH *hash = (struct QS_HASH *)QS_GET_POINTER( memory, memid_hash );
+	struct QS_HASH *hashchild = (struct QS_HASH *)QS_GET_POINTER( memory, hash->hash_munit );
+	uint32_t hashkey = qs_ihash( hash_name, hash->hash_size );
+	QS_HASH_ELEMENT* elm = qs_get_hash_core( memory, hash, hashchild, hash_name, hashkey );
 	if(elm==NULL){
 		return NULL;
 	}
 	if(elm->id != ELEMENT_LITERAL_NUM){
 		return NULL;
 	}
-	return QS_PINT32(_ppool,elm->elm_munit);
+	return QS_PINT32(memory,elm->memid_hash_element_data);
 }
 
-int32_t qs_get_hash( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname )
+int32_t qs_get_hash( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name )
 {
-	if( h_munit == -1 ){
+	if( memid_hash == -1 ){
 		return -1;
 	}
-	struct QS_HASH *hash = (struct QS_HASH *)QS_GET_POINTER( _ppool, h_munit );
-	struct QS_HASH *hashchild = (struct QS_HASH *)QS_GET_POINTER( _ppool, hash->hash_munit );
-	uint32_t hashkey = qs_ihash( hashname, hash->hash_size );
-	QS_HASH_ELEMENT* elm = qs_get_hash_core( _ppool, hash, hashchild, hashname, hashkey );
+	struct QS_HASH *hash = (struct QS_HASH *)QS_GET_POINTER( memory, memid_hash );
+	struct QS_HASH *hashchild = (struct QS_HASH *)QS_GET_POINTER( memory, hash->hash_munit );
+	uint32_t hashkey = qs_ihash( hash_name, hash->hash_size );
+	QS_HASH_ELEMENT* elm = qs_get_hash_core( memory, hash, hashchild, hash_name, hashkey );
 	if(elm==NULL){
 		return -1;
 	}
-	return elm->elm_munit;
+	return elm->memid_hash_element_data;
 }
 
-int32_t qs_get_hash_fix_ihash( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname, uint32_t hashkey )
+int32_t qs_get_hash_fix_ihash( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name, uint32_t hashkey )
 {
-	if( h_munit == -1 ){
+	if( memid_hash == -1 ){
 		return -1;
 	}
-	struct QS_HASH *hash = (struct QS_HASH *)QS_GET_POINTER( _ppool, h_munit );
-	struct QS_HASH *hashchild = (struct QS_HASH *)QS_GET_POINTER( _ppool, hash->hash_munit );
+	struct QS_HASH *hash = (struct QS_HASH *)QS_GET_POINTER( memory, memid_hash );
+	struct QS_HASH *hashchild = (struct QS_HASH *)QS_GET_POINTER( memory, hash->hash_munit );
 	int32_t retmunit = -1;
 	if( -1 == hashchild[hashkey].hash_munit )
 	{
-		//printf( "hash element is not found : %s\n", hashname );
+		//printf( "hash element is not found : %s\n", hash_name );
 		return retmunit;
 	}
-	QS_HASH_ELEMENT *hashelement = (struct QS_HASH_ELEMENT*)QS_GET_POINTER( _ppool, hashchild[hashkey].hash_munit );
+	QS_HASH_ELEMENT *hashelement = (struct QS_HASH_ELEMENT*)QS_GET_POINTER( memory, hashchild[hashkey].hash_munit );
 	uint32_t i;
 	for( i = 0; i < hashchild[hashkey].hash_size; i++ )
 	{
-		if( hashelement[i].hashname_munit >= 0 )
+		if( hashelement[i].memid_hash_name >= 0 )
 		{
-			if( !strcmp( (char*)QS_GET_POINTER( _ppool, hashelement[i].hashname_munit ), hashname ) )
+			if( !strcmp( (char*)QS_GET_POINTER( memory, hashelement[i].memid_hash_name ), hash_name ) )
 			{
-				retmunit = hashelement[i].elm_munit;
+				retmunit = hashelement[i].memid_hash_element_data;
 				break;
 			}
 		}
@@ -533,21 +533,21 @@ int32_t qs_get_hash_fix_ihash( QS_MEMORY_POOL* _ppool, int32_t h_munit, const ch
 	return retmunit;
 }
 
-QS_HASH_ELEMENT* qs_get_hash_core( QS_MEMORY_POOL* _ppool, struct QS_HASH *hash, QS_HASH *hashchild, const char* hashname, uint32_t hashkey )
+QS_HASH_ELEMENT* qs_get_hash_core( QS_MEMORY_POOL* memory, struct QS_HASH *hash, QS_HASH *hashchild, const char* hash_name, uint32_t hashkey )
 {
 	QS_HASH_ELEMENT* ret = NULL;
 	if( -1 == hashchild[hashkey].hash_munit )
 	{
-		//printf( "hash element is not found : %s\n", hashname );
+		//printf( "hash element is not found : %s\n", hash_name );
 		return NULL;
 	}
-	QS_HASH_ELEMENT *hashelement = (struct QS_HASH_ELEMENT*)QS_GET_POINTER( _ppool, hashchild[hashkey].hash_munit );
+	QS_HASH_ELEMENT *hashelement = (struct QS_HASH_ELEMENT*)QS_GET_POINTER( memory, hashchild[hashkey].hash_munit );
 	uint32_t i;
 	for( i = 0; i < hashchild[hashkey].hash_size; i++ )
 	{
-		if( hashelement[i].hashname_munit >= 0 )
+		if( hashelement[i].memid_hash_name >= 0 )
 		{
-			if( !strcmp( (char*)QS_GET_POINTER( _ppool, hashelement[i].hashname_munit ), hashname ) )
+			if( !strcmp( (char*)QS_GET_POINTER( memory, hashelement[i].memid_hash_name ), hash_name ) )
 			{
 				ret = &hashelement[i];
 				break;
@@ -557,46 +557,46 @@ QS_HASH_ELEMENT* qs_get_hash_core( QS_MEMORY_POOL* _ppool, struct QS_HASH *hash,
 	return ret;
 }
 
-void qs_clear_hash_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name )
+void qs_clear_hash_string( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name )
 {
-	int32_t data_munit = qs_get_hash( _ppool, h_munit, name );
-	if( data_munit >= 0 ){
-		//memset( (char*)QS_GET_POINTER(_ppool,data_munit), 0, QS_PUNIT_USIZE(_ppool,data_munit) );
-		*((char*)QS_GET_POINTER(_ppool,data_munit)) = '\0';
+	int32_t memid_data = qs_get_hash( memory, memid_hash, name );
+	if( memid_data >= 0 ){
+		//memset( (char*)QS_GET_POINTER(memory,memid_data), 0, QS_PUNIT_USIZE(memory,memid_data) );
+		*((char*)QS_GET_POINTER(memory,memid_data)) = '\0';
 	}
 }
 
-int32_t qs_replace_hash_string( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* name, const char* value )
+int32_t qs_replace_hash_string( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, const char* value )
 {
-	int32_t data_munit = qs_get_hash( _ppool, h_munit, name );
-	if( data_munit >= 0 ){
-		memcpy( (char*)QS_GET_POINTER(_ppool,data_munit), value, QS_PUNIT_USIZE(_ppool,data_munit) );
-		*( ((char*)QS_GET_POINTER(_ppool,data_munit))+QS_PUNIT_USIZE(_ppool,data_munit)-1 ) = '\0';
+	int32_t memid_data = qs_get_hash( memory, memid_hash, name );
+	if( memid_data >= 0 ){
+		memcpy( (char*)QS_GET_POINTER(memory,memid_data), value, QS_PUNIT_USIZE(memory,memid_data) );
+		*( ((char*)QS_GET_POINTER(memory,memid_data))+QS_PUNIT_USIZE(memory,memid_data)-1 ) = '\0';
 	}
-	return data_munit;
+	return memid_data;
 }
 
-int32_t qs_get_hash_name( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname )
+int32_t qs_get_hash_name( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name )
 {
 	int32_t retmunit = -1;
 	QS_HASH *hash;
 	QS_HASH *hashchild;
 	uint32_t hashkey;
-	hash = (QS_HASH *)QS_GET_POINTER( _ppool, h_munit );
+	hash = (QS_HASH *)QS_GET_POINTER( memory, memid_hash );
 	if( hash->hash_size == 0 ){
 		return retmunit;
 	}
-	hashkey = qs_ihash( hashname, hash->hash_size );
-	hashchild = (QS_HASH *)QS_GET_POINTER( _ppool, hash->hash_munit );
+	hashkey = qs_ihash( hash_name, hash->hash_size );
+	hashchild = (QS_HASH *)QS_GET_POINTER( memory, hash->hash_munit );
 	if( -1 == hashchild[hashkey].hash_munit ){
 		return retmunit;
 	}
-	QS_HASH_ELEMENT *hashelement = (QS_HASH_ELEMENT*)QS_GET_POINTER( _ppool, hashchild[hashkey].hash_munit );
+	QS_HASH_ELEMENT *hashelement = (QS_HASH_ELEMENT*)QS_GET_POINTER( memory, hashchild[hashkey].hash_munit );
 	uint32_t i;
 	for( i = 0; i < hashchild[hashkey].hash_size; ++i ){
-		if( hashelement[i].hashname_munit != -1 ){
-			if( !strcmp( (char*)QS_GET_POINTER( _ppool, hashelement[i].hashname_munit ), hashname ) ){
-				retmunit = hashelement[i].hashname_munit;
+		if( hashelement[i].memid_hash_name != -1 ){
+			if( !strcmp( (char*)QS_GET_POINTER( memory, hashelement[i].memid_hash_name ), hash_name ) ){
+				retmunit = hashelement[i].memid_hash_name;
 				break;
 			}
 		}
@@ -604,26 +604,26 @@ int32_t qs_get_hash_name( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* h
 	return retmunit;
 }
 
-int32_t qs_get_hash_id( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname )
+int32_t qs_get_hash_id( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name )
 {
 	int32_t retid = -1;
 	QS_HASH *hash;
 	QS_HASH *hashchild;
 	uint32_t hashkey;
-	hash = (QS_HASH *)QS_GET_POINTER( _ppool, h_munit );
-	hashkey = qs_ihash( hashname, hash->hash_size );
-	hashchild = (QS_HASH *)QS_GET_POINTER( _ppool, hash->hash_munit );
+	hash = (QS_HASH *)QS_GET_POINTER( memory, memid_hash );
+	hashkey = qs_ihash( hash_name, hash->hash_size );
+	hashchild = (QS_HASH *)QS_GET_POINTER( memory, hash->hash_munit );
 	if( -1 == hashchild[hashkey].hash_munit )
 	{
 		return retid;
 	}
-	QS_HASH_ELEMENT *hashelement = (QS_HASH_ELEMENT*)QS_GET_POINTER( _ppool, hashchild[hashkey].hash_munit );
+	QS_HASH_ELEMENT *hashelement = (QS_HASH_ELEMENT*)QS_GET_POINTER( memory, hashchild[hashkey].hash_munit );
 	uint32_t i;
 	for( i = 0; i < hashchild[hashkey].hash_size; i++ )
 	{
-		if( hashelement[i].hashname_munit >= 0 )
+		if( hashelement[i].memid_hash_name >= 0 )
 		{
-			if( !strcmp( (char*)QS_GET_POINTER( _ppool, hashelement[i].hashname_munit ), hashname ) )
+			if( !strcmp( (char*)QS_GET_POINTER( memory, hashelement[i].memid_hash_name ), hash_name ) )
 			{
 				retid = hashelement[i].id;
 				break;
@@ -633,26 +633,26 @@ int32_t qs_get_hash_id( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* has
 	return retid;
 }
 
-QS_HASH_ELEMENT* qs_get_hash_element( QS_MEMORY_POOL* _ppool, int32_t h_munit, const char* hashname )
+QS_HASH_ELEMENT* qs_get_hash_element( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name )
 {
 	QS_HASH_ELEMENT* ret = NULL;
 	QS_HASH *hash;
 	QS_HASH *hashchild;
 	uint32_t hashkey;
-	hash = (QS_HASH *)QS_GET_POINTER( _ppool, h_munit );
-	hashkey = qs_ihash( hashname, hash->hash_size );
-	hashchild = (QS_HASH *)QS_GET_POINTER( _ppool, hash->hash_munit );
+	hash = (QS_HASH *)QS_GET_POINTER( memory, memid_hash );
+	hashkey = qs_ihash( hash_name, hash->hash_size );
+	hashchild = (QS_HASH *)QS_GET_POINTER( memory, hash->hash_munit );
 	if( -1 == hashchild[hashkey].hash_munit )
 	{
 		return ret;
 	}
-	QS_HASH_ELEMENT *hashelement = (QS_HASH_ELEMENT*)QS_GET_POINTER( _ppool, hashchild[hashkey].hash_munit );
+	QS_HASH_ELEMENT *hashelement = (QS_HASH_ELEMENT*)QS_GET_POINTER( memory, hashchild[hashkey].hash_munit );
 	uint32_t i;
 	for( i = 0; i < hashchild[hashkey].hash_size; i++ )
 	{
-		if( hashelement[i].hashname_munit >= 0 )
+		if( hashelement[i].memid_hash_name >= 0 )
 		{
-			if( !strcmp( (char*)QS_GET_POINTER( _ppool, hashelement[i].hashname_munit ), hashname ) )
+			if( !strcmp( (char*)QS_GET_POINTER( memory, hashelement[i].memid_hash_name ), hash_name ) )
 			{
 				ret = &hashelement[i];
 				break;
@@ -662,23 +662,23 @@ QS_HASH_ELEMENT* qs_get_hash_element( QS_MEMORY_POOL* _ppool, int32_t h_munit, c
 	return ret;
 }
 
-int32_t qs_hash_length( QS_MEMORY_POOL* _ppool, int32_t h_munit )
+int32_t qs_hash_length( QS_MEMORY_POOL* memory, int32_t memid_hash )
 {
 	int32_t length = 0;
 	struct QS_HASH *hash;
 	struct QS_HASH *hashchild;
 	struct QS_HASH_ELEMENT *hashelement;
 	uint32_t i,j;
-	hash = (struct QS_HASH *)QS_GET_POINTER( _ppool, h_munit );
-	hashchild = (struct QS_HASH *)QS_GET_POINTER( _ppool, hash->hash_munit );
+	hash = (struct QS_HASH *)QS_GET_POINTER( memory, memid_hash );
+	hashchild = (struct QS_HASH *)QS_GET_POINTER( memory, hash->hash_munit );
 	for( j = 0; j < hash->hash_size; j++ )
 	{
 		if( hashchild[j].hash_munit >= 0 )
 		{
-			hashelement = (struct QS_HASH_ELEMENT*)QS_GET_POINTER( _ppool, hashchild[j].hash_munit );
+			hashelement = (struct QS_HASH_ELEMENT*)QS_GET_POINTER( memory, hashchild[j].hash_munit );
 			for( i = 0; i < hashchild[j].hash_size; i++ )
 			{
-				if( hashelement[i].hashname_munit >= 0 )
+				if( hashelement[i].memid_hash_name >= 0 )
 				{
 					++length;
 				}
@@ -689,18 +689,18 @@ int32_t qs_hash_length( QS_MEMORY_POOL* _ppool, int32_t h_munit )
 }
 
 
-int32_t qs_init_hash_foreach( QS_MEMORY_POOL* _ppool, int32_t h_munit, QS_HASH_FOREACH* hf )
+int32_t qs_init_hash_foreach( QS_MEMORY_POOL* memory, int32_t memid_hash, QS_HASH_FOREACH* hf )
 {
 	hf->p1 = 0;
 	hf->p2 = 0;
-	hf->root = (QS_HASH*)QS_GET_POINTER( _ppool, h_munit );
-	hf->child = (QS_HASH*)QS_GET_POINTER( _ppool, hf->root->hash_munit );
+	hf->root = (QS_HASH*)QS_GET_POINTER( memory, memid_hash );
+	hf->child = (QS_HASH*)QS_GET_POINTER( memory, hf->root->hash_munit );
 	hf->he = NULL;
 	return QS_SYSTEM_OK;
 }
 
 
-QS_HASH_ELEMENT* qs_hash_foreach( QS_MEMORY_POOL* _ppool, QS_HASH_FOREACH* hf )
+QS_HASH_ELEMENT* qs_hash_foreach( QS_MEMORY_POOL* memory, QS_HASH_FOREACH* hf )
 {
 	QS_HASH_ELEMENT* ret = NULL;
 	do{
@@ -713,7 +713,7 @@ QS_HASH_ELEMENT* qs_hash_foreach( QS_MEMORY_POOL* _ppool, QS_HASH_FOREACH* hf )
 				++hf->p1;
 				continue;
 			}
-			hf->he = (QS_HASH_ELEMENT*)QS_GET_POINTER( _ppool, hf->child[hf->p1]. hash_munit );
+			hf->he = (QS_HASH_ELEMENT*)QS_GET_POINTER( memory, hf->child[hf->p1]. hash_munit );
 		}
 		if( hf->p2 >= hf->child[hf->p1].hash_size ){
 			hf->he = NULL;
@@ -721,7 +721,7 @@ QS_HASH_ELEMENT* qs_hash_foreach( QS_MEMORY_POOL* _ppool, QS_HASH_FOREACH* hf )
 			++hf->p1;
 			continue;
 		}
-		if( hf->he[hf->p2].hashname_munit == -1 ){
+		if( hf->he[hf->p2].memid_hash_name == -1 ){
 			++hf->p2;
 			continue;
 		}

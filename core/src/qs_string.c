@@ -27,7 +27,7 @@
 
 #include "qs_string.h"
 
-int qs_itoa( int32_t value, char* target, size_t size )
+int qs_ltoa( int64_t value, char* target, size_t size )
 {
 	int error_code = 0;
 	int isminus = false;
@@ -64,6 +64,12 @@ int qs_itoa( int32_t value, char* target, size_t size )
 		}while( index < len/2 );
 	}
 	return error_code;
+}
+
+int qs_itoa( int32_t value, char* target, size_t size )
+{
+	int64_t v64 = value;
+	return qs_ltoa( v64, target, size );
 }
 
 int32_t qs_find_char( char* target, size_t target_size, char delimiter_ch )

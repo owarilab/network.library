@@ -35,7 +35,7 @@ extern "C"{
 #include "qs_core.h"
 
 void qs_base64_encode(char* dest, uint16_t destlength, const void* src, uint16_t length);
-void qs_base64_decode( char* dest, uint16_t destlength, const void* src, uint16_t length );
+void qs_base64_decode(char* dest, uint16_t destlength, const void* src, uint16_t length);
 
 #endif /*_QS_BASE64_H_*/
 

@@ -101,10 +101,10 @@ extern "C"{
 	_snprintf_s(s, n, _TRUNCATE, format, __VA_ARGS__)
 # define qs_sprintf(s, n, format, ...) \
 	sprintf_s(s, n, format, __VA_ARGS__)
-#else
+#else //  !__WINDOWS__
 # define qs_sprintf(s, n, format, ...) \
 	sprintf(s, format, __VA_ARGS__)
-#endif
+#endif // ifdef __WINDOWS__
 
 #ifndef TRUE
 	#define TRUE 1

@@ -42,7 +42,7 @@ void qs_create_message_queue( QS_MEMORY_POOL* _ppool, int32_t* q_munit, size_t q
 	if( qlen <= 0 ){
 		return;
 	}
-	(*q_munit) = qs_create_munit( _ppool, sizeof( QS_MSGQUEUE ), MEMORY_TYPE_DEFAULT );
+	(*q_munit) = qs_create_memory_block( _ppool, sizeof( QS_MSGQUEUE ) );
 	if( -1 == (*q_munit) ){
 		return;
 	}
@@ -53,7 +53,7 @@ void qs_create_message_queue( QS_MEMORY_POOL* _ppool, int32_t* q_munit, size_t q
 		pmq->status		= 0;
 		pmq->queuelen	= qlen;
 #ifdef __WINDOWS__
-		if( 0 >= ( pmq->mqlock_munit = qs_create_munit( _ppool, sizeof( HANDLE ), MEMORY_TYPE_DEFAULT ) ) ){
+		if( 0 >= ( pmq->mqlock_munit = qs_create_memory_block( _ppool, sizeof( HANDLE ) ) ) ){
 			printf("alloc error\n");
 			(*q_munit) = -1;
 			break;
@@ -61,7 +61,7 @@ void qs_create_message_queue( QS_MEMORY_POOL* _ppool, int32_t* q_munit, size_t q
 		pmutex = (HANDLE *)qs_upointer( _ppool, pmq->mqlock_munit );
 		*pmutex = CreateMutex( NULL, false , NULL );
 #else
-		if( -1 == ( pmq->mqlock_munit = qs_create_munit( _ppool, sizeof( pthread_mutex_t ), MEMORY_TYPE_DEFAULT ) ) ){
+		if( -1 == ( pmq->mqlock_munit = qs_create_memory_block( _ppool, sizeof( pthread_mutex_t ) ) ) ){
 			printf("alloc error\n");
 			(*q_munit) = -1;
 			break;
@@ -73,7 +73,7 @@ void qs_create_message_queue( QS_MEMORY_POOL* _ppool, int32_t* q_munit, size_t q
 			break;
 		}
 #endif
-		if( -1 == ( pmq->queuemunit = qs_create_munit( _ppool, sizeof( int32_t ) * pmq->queuelen, MEMORY_TYPE_DEFAULT ) ) ){
+		if( -1 == ( pmq->queuemunit = qs_create_memory_block( _ppool, sizeof( int32_t ) * pmq->queuelen ) ) ){
 			printf("create mu array error\n");
 			(*q_munit) = -1;
 			break;
@@ -82,13 +82,13 @@ void qs_create_message_queue( QS_MEMORY_POOL* _ppool, int32_t* q_munit, size_t q
 		//memset( mqlist, -1, sizeof( int32_t ) * pmq->queuelen );
 		for( i = 0; i < pmq->queuelen; i++ )
 		{
-			if( -1 == ( mqlist[i] = qs_create_munit( _ppool, sizeof( QS_MSG_INFO ), MEMORY_TYPE_DEFAULT ) ) ){
+			if( -1 == ( mqlist[i] = qs_create_memory_block( _ppool, sizeof( QS_MSG_INFO ) ) ) ){
 				printf("create msg info error\n");
 				(*q_munit) = -1;
 				continue;
 			}
 			pminf = (QS_MSG_INFO *)qs_upointer( _ppool, mqlist[i] );
-			if( -1 == ( pminf->msgmunit = qs_create_munit( _ppool, sizeof( char ) * size, MEMORY_TYPE_DEFAULT ) ) ){
+			if( -1 == ( pminf->msgmunit = qs_create_memory_block( _ppool, sizeof( char ) * size ) ) ){
 				printf("create msg queue buf error\n");
 				(*q_munit) = -1;
 				continue;

@@ -57,12 +57,12 @@ typedef struct QS_ARRAY
 
 typedef struct QS_ARRAY_ELEMENT
 {
-	int32_t munit;
-	int32_t buf_munit;
+	int32_t memid_array_element_data;
+	int32_t memid_numeric_buffer;
 	int32_t id;
 } QS_ARRAY_ELEMENT;
 
-int32_t qs_create_array( QS_MEMORY_POOL* _ppool, size_t allocsize, size_t buffer_size );
+int32_t qs_create_array( QS_MEMORY_POOL* _ppool, size_t allocsize );
 int32_t qs_create_array_buffer( QS_MEMORY_POOL* _ppool, size_t allocsize, size_t buffer_size );
 int32_t qs_reset_array( QS_MEMORY_POOL* _ppool, int32_t munit );
 int32_t qs_resize_array( QS_MEMORY_POOL* _ppool, int32_t munit );

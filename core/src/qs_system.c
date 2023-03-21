@@ -85,7 +85,7 @@ int32_t qs_get_current_directory( QS_MEMORY_POOL* _ppool )
 {
 	int32_t munit = -1;
 	do{
-		int32_t muPathBuffer = qs_create_munit( _ppool, MAXPATHLEN, MEMORY_TYPE_DEFAULT );
+		int32_t muPathBuffer = qs_create_memory_block( _ppool, MAXPATHLEN );
 		char* pbuf = (char*)qs_upointer( _ppool,muPathBuffer );
 		if( pbuf == NULL ){
 			printf( "[qs_get_current_directory]qs_upointer error\n" );
@@ -99,13 +99,13 @@ int32_t qs_get_current_directory( QS_MEMORY_POOL* _ppool )
 		}
 		size_t length = qs_strlen( pbuf );
 		size_t msize = qs_mgetsize( _ppool, length + 1 );
-		munit = qs_create_munit( _ppool, msize, MEMORY_TYPE_DEFAULT );
+		munit = qs_create_memory_block( _ppool, msize );
 		if( munit < 0 ){
-			printf( "[qs_get_current_directory]qs_create_munit error = %d\n", munit );
+			printf( "[qs_get_current_directory]qs_create_memory_block error = %d\n", munit );
 			break;
 		}
 		qs_strcopy( (char *)qs_upointer(_ppool,munit), pbuf, qs_usize(_ppool,munit) );
-		qs_free_memory_unit( _ppool, &muPathBuffer );
+		qs_free_memory_block( _ppool, &muPathBuffer );
 #ifdef __QS_DEBUG__
 //		syslog( LOG_USER|LOG_NOTICE, "daemon:cwd=%s\n", (char *)qs_upointer(_ppool,munit) );
 //		printf(  "daemon:cwd=%s\n", (char *)qs_upointer(_ppool,munit) );

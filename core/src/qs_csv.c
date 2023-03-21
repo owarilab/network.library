@@ -122,7 +122,7 @@ int32_t qs_csv_get_row_length(QS_MEMORY_POOL* memory, int32_t memid_csv, int32_t
 	if(NULL==elm){
 		return -1;
 	}
-	return qs_array_length(memory,elm->munit);
+	return qs_array_length(memory,elm->memid_array_element_data);
 }
 char* qs_csv_get_row(QS_MEMORY_POOL* memory, int32_t memid_csv, int32_t line_pos, int32_t row_pos)
 {
@@ -134,9 +134,9 @@ char* qs_csv_get_row(QS_MEMORY_POOL* memory, int32_t memid_csv, int32_t line_pos
 	if(NULL==elm){
 		return NULL;
 	}
-	QS_ARRAY_ELEMENT* row_elm = qs_array_get(memory,elm->munit,row_pos);
+	QS_ARRAY_ELEMENT* row_elm = qs_array_get(memory,elm->memid_array_element_data,row_pos);
 	if(NULL==row_elm){
 		return NULL;
 	}
-	return (char*)QS_GET_POINTER(memory,row_elm->munit);
+	return (char*)QS_GET_POINTER(memory,row_elm->memid_array_element_data);
 }

@@ -31,7 +31,7 @@ int32_t qs_init_script( QS_MEMORY_POOL* _ppool, size_t valiablehash_size, size_t
 {
 	QS_SCRIPT *pscript;
 	int32_t munit = -1;
-	if( -1 == (munit = qs_create_munit( _ppool, sizeof( QS_SCRIPT ), MEMORY_TYPE_DEFAULT )) ){
+	if( -1 == (munit = qs_create_memory_block( _ppool, sizeof( QS_SCRIPT ) )) ){
 #ifdef __QS_DEBUG__
 		printf("qs_init_script error.\n");
 #endif
@@ -53,13 +53,13 @@ int32_t qs_init_script( QS_MEMORY_POOL* _ppool, size_t valiablehash_size, size_t
 	if( -1 == ( pscript->f_hash_munit = qs_create_hash( _ppool, functionhash_size ) ) ){
 		return -1;
 	}
-	if( -1 == ( pscript->s_hash_munit = qs_create_array( _ppool, 128, NUMERIC_BUFFER_SIZE ) ) ){
+	if( -1 == ( pscript->s_hash_munit = qs_create_array( _ppool, 128 ) ) ){
 		return -1;
 	}
-	if( -1 == ( pscript->return_munit = qs_create_munit( _ppool, sizeof( QS_FUNCTION_RETURN ), MEMORY_TYPE_DEFAULT ) ) ){
+	if( -1 == ( pscript->return_munit = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) ) ) ){
 		return -1;
 	}
-	if( -1 == ( pscript->int_cache_munit = qs_create_munit( _ppool, sizeof(int32_t) * 32, MEMORY_TYPE_DEFAULT ) ) ){
+	if( -1 == ( pscript->int_cache_munit = qs_create_memory_block( _ppool, sizeof(int32_t) * 32 ) ) ){
 		return -1;
 	}
 	return munit;
@@ -119,7 +119,7 @@ void qs_import_script( QS_MEMORY_POOL* _ppool, int32_t* p_unitid, char* filename
 #ifdef __QS_DEBUG__
 //	printf("filse size of %s : %dbytes\n", filename, fsize );
 #endif
-	pscript->textbuf_munit = qs_create_munit( _ppool, sizeof( char ) * ( fsize+1 ), MEMORY_TYPE_DEFAULT );
+	pscript->textbuf_munit = qs_create_memory_block( _ppool, sizeof( char ) * ( fsize+1 ) );
 	pstr = (char*)QS_GET_POINTER( _ppool, pscript->textbuf_munit );
 	if( pstr == NULL )
 	{
@@ -378,7 +378,7 @@ int qs_parse_array( QS_MEMORY_POOL* _ppool, QS_SCRIPT* pscript, QS_NODE* node, Q
 		{
 			childmunit = qs_addnodeelement( _ppool, node );
 			childnode = (QS_NODE*)QS_GET_POINTER( _ppool, childmunit );
-			if( 0 >= (tmpmunit = qs_create_munit( _ppool, 8, MEMORY_TYPE_DEFAULT ))){
+			if( 0 >= (tmpmunit = qs_create_memory_block( _ppool, 8 ))){
 				printf("alloc error\n");
 				return index;
 			}
@@ -1173,7 +1173,7 @@ int qs_parse_if( QS_MEMORY_POOL* _ppool, QS_SCRIPT* pscript, QS_NODE* node, int 
 			index++;
 			if( token_list[index].type == ID_SYS_IF && token_list[index-1].type == ID_SYS_ELSE )
 			{
-				if( 0 >= ( tmpmunit = qs_create_munit( _ppool, 8, MEMORY_TYPE_DEFAULT ) ) ){
+				if( 0 >= ( tmpmunit = qs_create_memory_block( _ppool, 8 ) ) ){
 					index = -1;
 					break;
 				}
@@ -1332,7 +1332,7 @@ int32_t qs_exec_core( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* node 
 							memcpy( (char*)(QS_GET_POINTER(_ppool,myhash)), value,vsize );
 						}
 						else{
-							if( 0 >= ( myhash = qs_create_munit( _ppool, vsize, MEMORY_TYPE_DEFAULT ) ) ){
+							if( 0 >= ( myhash = qs_create_memory_block( _ppool, vsize ) ) ){
 								break;
 							}
 							memcpy( (char*)(QS_GET_POINTER(_ppool,myhash)), value,vsize );
@@ -1537,7 +1537,7 @@ int32_t qs_exec_function( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* n
 								_ppool
 								, pscript->v_hash_munit
 								, (char*)QS_GET_POINTER( _ppool, argelmlist[0].element_munit )
-								, (char*)QS_GET_POINTER( _ppool, elm[i-1].munit )
+								, (char*)QS_GET_POINTER( _ppool, elm[i-1].memid_array_element_data )
 								, elm[i-1].id
 							);
 						}
@@ -1595,7 +1595,7 @@ int32_t qs_exec_array_set( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* 
 				else{
 					QS_ARRAY_ELEMENT* retelm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid )+( array_index );
 					tmp_node.id =  retelm->id;
-					tmp_node.element_munit = retelm->munit;
+					tmp_node.element_munit = retelm->memid_array_element_data;
 					if(i==right_node->pos-1){
 						QS_NODE* left_node = (QS_NODE*)QS_GET_POINTER( _ppool, rootlist[2].element_munit );
 						int32_t exec_expr_munit = qs_exec_expr( _ppool, pscript, left_node, pscript->int_cache_munit );
@@ -1604,9 +1604,9 @@ int32_t qs_exec_array_set( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* 
 							if( -1 != pfret->munit ){
 								if(pfret->id==ELEMENT_LITERAL_NUM&&retelm->id==ELEMENT_LITERAL_NUM){
 									memcpy(
-										(uint8_t*)QS_GET_POINTER(_ppool,retelm->munit),
+										(uint8_t*)QS_GET_POINTER(_ppool,retelm->memid_array_element_data),
 										(uint8_t*)QS_GET_POINTER(_ppool,pfret->munit),
-										QS_PUNIT_USIZE(_ppool,retelm->munit)
+										QS_PUNIT_USIZE(_ppool,retelm->memid_array_element_data)
 									);
 								}
 								else{
@@ -1753,7 +1753,7 @@ int32_t qs_exec_array_create( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NOD
 		}
 	}
 	else{
-		if( -1 == ( argsmunit = qs_create_array( _ppool, 8, NUMERIC_BUFFER_SIZE ) ) ){
+		if( -1 == ( argsmunit = qs_create_array( _ppool, QS_ARRAY_SIZE_DEFAULT ) ) ){
 			printf("empty?\n");
 		}
 	}
@@ -1859,7 +1859,7 @@ int32_t qs_exec_array_get( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* 
 					else{
 						QS_ARRAY_ELEMENT* retelm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid )+( array_index );
 						tmp_node.id =  retelm->id;
-						tmp_node.element_munit = retelm->munit;
+						tmp_node.element_munit = retelm->memid_array_element_data;
 					}
 				}
 				else{
@@ -1920,7 +1920,7 @@ int32_t qs_exec_expr( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* node,
 				int32_t* pi;
 				csize = NUMERIC_BUFFER_SIZE;
 				tmpid = ELEMENT_LITERAL_NUM;
-				if( 0 >= ( tmpmunit = qs_create_munit( _ppool, csize, MEMORY_TYPE_DEFAULT ) ) ){
+				if( 0 >= ( tmpmunit = qs_create_memory_block( _ppool, csize ) ) ){
 					return QS_SYSTEM_ERROR;
 				}
 				pbuf = (char*)QS_GET_POINTER( _ppool, tmpmunit );
@@ -2003,7 +2003,7 @@ int32_t qs_exec_expr( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* node,
 					int32_t* pi;
 					csize = NUMERIC_BUFFER_SIZE;
 					tmpid = ELEMENT_LITERAL_NUM;
-					if( 0 >= ( tmpmunit = qs_create_munit( _ppool, csize, MEMORY_TYPE_DEFAULT ) ) ){
+					if( 0 >= ( tmpmunit = qs_create_memory_block( _ppool, csize ) ) ){
 						return QS_SYSTEM_ERROR;
 					}
 					pbuf = (char*)QS_GET_POINTER( _ppool, tmpmunit );
@@ -2036,7 +2036,7 @@ int32_t qs_exec_expr( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* node,
 					{
 						QS_ARRAY_ELEMENT* pelm;
 						pelm = qs_array_pop( _ppool, workingmunit );
-						pbuf = (char*)QS_GET_POINTER( _ppool, pelm->munit );
+						pbuf = (char*)QS_GET_POINTER( _ppool, pelm->memid_array_element_data );
 						tmpv1 = atoi( pbuf );
 						tmpv1 = -tmpv1;
 					}
@@ -2044,7 +2044,7 @@ int32_t qs_exec_expr( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* node,
 					{
 						QS_ARRAY_ELEMENT* pelm;
 						pelm = qs_array_pop( _ppool, workingmunit );
-						pbuf = (char*)QS_GET_POINTER( _ppool, pelm->munit );
+						pbuf = (char*)QS_GET_POINTER( _ppool, pelm->memid_array_element_data );
 						tmpv1 = atoi( pbuf );
 					}
 					else{
@@ -2055,9 +2055,9 @@ int32_t qs_exec_expr( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* node,
 				else{
 					QS_ARRAY_ELEMENT* pelm;
 					pelm = qs_array_pop( _ppool, workingmunit );
-					tmpv1 = QS_INT32(_ppool, pelm->munit);
+					tmpv1 = QS_INT32(_ppool, pelm->memid_array_element_data);
 					pelm = qs_array_pop( _ppool, workingmunit );
-					tmpv2 = QS_INT32(_ppool, pelm->munit);
+					tmpv2 = QS_INT32(_ppool, pelm->memid_array_element_data);
 					if( !strcmp( opbuf, "+" ) )
 					{
 						tmpv1 = tmpv2+tmpv1;
@@ -2136,12 +2136,12 @@ int32_t qs_exec_expr( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* node,
 					{
 						if( pelm2 == NULL )
 						{
-							tmpmunit = qs_create_munit( _ppool, QS_PUNIT_USIZE( _ppool, pelm1->munit ) + 5, MEMORY_TYPE_DEFAULT );
+							tmpmunit = qs_create_memory_block( _ppool, QS_PUNIT_USIZE( _ppool, pelm1->memid_array_element_data ) + 5 );
 							if( tmpmunit < 0 ){
 								return QS_SYSTEM_ERROR;
 							}
 							pbuf = (char*)QS_GET_POINTER( _ppool, tmpmunit );
-							snprintf( pbuf, QS_PUNIT_USIZE( _ppool, tmpmunit ), "%s%s", (char*)QS_GET_POINTER( _ppool, pelm1->munit ), "NULL" );
+							snprintf( pbuf, QS_PUNIT_USIZE( _ppool, tmpmunit ), "%s%s", (char*)QS_GET_POINTER( _ppool, pelm1->memid_array_element_data ), "NULL" );
 							qs_array_push( _ppool, &workingmunit, ELEMENT_LITERAL_STR, tmpmunit );
 						}
 						else{
@@ -2149,50 +2149,50 @@ int32_t qs_exec_expr( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* node,
 							{
 								size_t s1, s2;
 								if( pelm2->id == ELEMENT_LITERAL_BIN ){
-									s1=QS_PUNIT_USIZE( _ppool, pelm2->munit );
+									s1=QS_PUNIT_USIZE( _ppool, pelm2->memid_array_element_data );
 								}
 								else{
-									s1=qs_strlen( (char*)QS_GET_POINTER( _ppool, pelm2->munit ) );
+									s1=qs_strlen( (char*)QS_GET_POINTER( _ppool, pelm2->memid_array_element_data ) );
 								}
 								if( pelm1->id == ELEMENT_LITERAL_BIN ){
-									s2=QS_PUNIT_USIZE( _ppool, pelm1->munit );
+									s2=QS_PUNIT_USIZE( _ppool, pelm1->memid_array_element_data );
 								}
 								else{
-									s2=qs_strlen( (char*)QS_GET_POINTER( _ppool, pelm1->munit ) );
+									s2=qs_strlen( (char*)QS_GET_POINTER( _ppool, pelm1->memid_array_element_data ) );
 								}
-								tmpmunit = qs_create_munit( _ppool, s1 + s2, MEMORY_TYPE_DEFAULT );
+								tmpmunit = qs_create_memory_block( _ppool, s1 + s2 );
 								if( tmpmunit < 0 ){
 									return QS_SYSTEM_ERROR;
 								}
 								pbuf = (char*)QS_GET_POINTER( _ppool, tmpmunit );
 								if( pelm2->id == ELEMENT_LITERAL_BIN ){
-									memcpy( pbuf, (char*)QS_GET_POINTER( _ppool, pelm2->munit ), QS_PUNIT_USIZE( _ppool, pelm2->munit ) );
-									pbuf+=QS_PUNIT_USIZE( _ppool, pelm2->munit );
+									memcpy( pbuf, (char*)QS_GET_POINTER( _ppool, pelm2->memid_array_element_data ), QS_PUNIT_USIZE( _ppool, pelm2->memid_array_element_data ) );
+									pbuf+=QS_PUNIT_USIZE( _ppool, pelm2->memid_array_element_data );
 								}
 								else{
-									memcpy( pbuf, (char*)QS_GET_POINTER( _ppool, pelm2->munit ), qs_strlen( (char*)QS_GET_POINTER( _ppool, pelm2->munit ) ) );
-									pbuf+=qs_strlen( (char*)QS_GET_POINTER( _ppool, pelm2->munit ) );
+									memcpy( pbuf, (char*)QS_GET_POINTER( _ppool, pelm2->memid_array_element_data ), qs_strlen( (char*)QS_GET_POINTER( _ppool, pelm2->memid_array_element_data ) ) );
+									pbuf+=qs_strlen( (char*)QS_GET_POINTER( _ppool, pelm2->memid_array_element_data ) );
 								}
 								if( pelm1->id == ELEMENT_LITERAL_BIN ){
-									memcpy( pbuf, (char*)QS_GET_POINTER( _ppool, pelm1->munit ), QS_PUNIT_USIZE( _ppool, pelm1->munit ) );
-									pbuf+=QS_PUNIT_USIZE( _ppool, pelm1->munit );
+									memcpy( pbuf, (char*)QS_GET_POINTER( _ppool, pelm1->memid_array_element_data ), QS_PUNIT_USIZE( _ppool, pelm1->memid_array_element_data ) );
+									pbuf+=QS_PUNIT_USIZE( _ppool, pelm1->memid_array_element_data );
 								}
 								else{
-									memcpy( pbuf, (char*)QS_GET_POINTER( _ppool, pelm1->munit ), qs_strlen( (char*)QS_GET_POINTER( _ppool, pelm1->munit ) ) );
-									pbuf+=qs_strlen( (char*)QS_GET_POINTER( _ppool, pelm1->munit ) );
+									memcpy( pbuf, (char*)QS_GET_POINTER( _ppool, pelm1->memid_array_element_data ), qs_strlen( (char*)QS_GET_POINTER( _ppool, pelm1->memid_array_element_data ) ) );
+									pbuf+=qs_strlen( (char*)QS_GET_POINTER( _ppool, pelm1->memid_array_element_data ) );
 								}
 								*pbuf='\0';
 							}
 							else{
-								tmpmunit = qs_create_munit( _ppool, QS_PUNIT_USIZE( _ppool, pelm1->munit ) + QS_PUNIT_USIZE( _ppool, pelm2->munit ), MEMORY_TYPE_DEFAULT );
+								tmpmunit = qs_create_memory_block( _ppool, QS_PUNIT_USIZE( _ppool, pelm1->memid_array_element_data ) + QS_PUNIT_USIZE( _ppool, pelm2->memid_array_element_data ) );
 								if( tmpmunit < 0 ){
 									return QS_SYSTEM_ERROR;
 								}
 								pbuf = (char*)QS_GET_POINTER( _ppool, tmpmunit );
-								size_t elm1_len = qs_strlen((char*)QS_GET_POINTER( _ppool, pelm1->munit ));
-								size_t elm2_len = qs_strlen((char*)QS_GET_POINTER( _ppool, pelm2->munit ));
-								qs_strcopy( pbuf, (char*)QS_GET_POINTER( _ppool, pelm2->munit ), QS_PUNIT_USIZE( _ppool, tmpmunit ) );
-								qs_strcopy( pbuf+elm2_len, (char*)QS_GET_POINTER( _ppool, pelm1->munit ), QS_PUNIT_USIZE( _ppool, tmpmunit ) );
+								size_t elm1_len = qs_strlen((char*)QS_GET_POINTER( _ppool, pelm1->memid_array_element_data ));
+								size_t elm2_len = qs_strlen((char*)QS_GET_POINTER( _ppool, pelm2->memid_array_element_data ));
+								qs_strcopy( pbuf, (char*)QS_GET_POINTER( _ppool, pelm2->memid_array_element_data ), QS_PUNIT_USIZE( _ppool, tmpmunit ) );
+								qs_strcopy( pbuf+elm2_len, (char*)QS_GET_POINTER( _ppool, pelm1->memid_array_element_data ), QS_PUNIT_USIZE( _ppool, tmpmunit ) );
 								*( pbuf+elm2_len+elm1_len ) = '\0';
 							}
 							qs_array_push( _ppool, &workingmunit, ELEMENT_LITERAL_STR, tmpmunit );
@@ -2204,7 +2204,7 @@ int32_t qs_exec_expr( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* node,
 							tmpv1 = 0;
 						}
 						else{
-							tmpv1 = !strcmp( (char*)QS_GET_POINTER( _ppool, pelm2->munit ), (char*)QS_GET_POINTER( _ppool, pelm1->munit ) );
+							tmpv1 = !strcmp( (char*)QS_GET_POINTER( _ppool, pelm2->memid_array_element_data ), (char*)QS_GET_POINTER( _ppool, pelm1->memid_array_element_data ) );
 						}
 						qs_array_push_integer( _ppool, &workingmunit, tmpv1 );
 					}
@@ -2214,7 +2214,7 @@ int32_t qs_exec_expr( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* node,
 							tmpv1 = 1;
 						}
 						else{
-							tmpv1 = strcmp( (char*)QS_GET_POINTER( _ppool, pelm2->munit ), (char*)QS_GET_POINTER( _ppool, pelm1->munit ) ) ? 0 : 1;
+							tmpv1 = strcmp( (char*)QS_GET_POINTER( _ppool, pelm2->memid_array_element_data ), (char*)QS_GET_POINTER( _ppool, pelm1->memid_array_element_data ) ) ? 0 : 1;
 						}
 						qs_array_push_integer( _ppool, &workingmunit, tmpv1 );
 					}else{
@@ -2233,7 +2233,7 @@ int32_t qs_exec_expr( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* node,
 				}
 				else{
 					QS_ARRAY_ELEMENT* pelm = qs_array_pop( _ppool, workingmunit );
-					pbuf = (char*)QS_GET_POINTER( _ppool, pelm->munit );
+					pbuf = (char*)QS_GET_POINTER( _ppool, pelm->memid_array_element_data );
 					tmpv1 = atoi( pbuf );
 					tmpv1 = -tmpv1;
 				}
@@ -2251,43 +2251,43 @@ int32_t qs_exec_expr( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* node,
 			{
 				if( 0 < result_cache_munit )
 				{
-					if( QS_PUNIT_USIZE(_ppool,result_cache_munit) >= QS_PUNIT_USIZE(_ppool,resultelm->munit) ){
+					if( QS_PUNIT_USIZE(_ppool,result_cache_munit) >= QS_PUNIT_USIZE(_ppool,resultelm->memid_array_element_data) ){
 						tmpmunit = result_cache_munit;
 					}
 					else{
-						tmpmunit = qs_create_munit( _ppool, QS_PUNIT_USIZE( _ppool, resultelm->munit ), MEMORY_TYPE_DEFAULT );
+						tmpmunit = qs_create_memory_block( _ppool, QS_PUNIT_USIZE( _ppool, resultelm->memid_array_element_data ) );
 						if( tmpmunit <= 0 ){
 							return QS_SYSTEM_ERROR;
 						}
 					}
 				}
 				else{
-					tmpmunit = qs_create_munit( _ppool, QS_PUNIT_USIZE( _ppool, resultelm->munit ), MEMORY_TYPE_DEFAULT );
+					tmpmunit = qs_create_memory_block( _ppool, QS_PUNIT_USIZE( _ppool, resultelm->memid_array_element_data ) );
 					if( tmpmunit <= 0 ){
 						return QS_SYSTEM_ERROR;
 					}
 				}
 				pbuf = (char*)QS_GET_POINTER( _ppool, tmpmunit );
-				memcpy( pbuf, (char*)QS_GET_POINTER(_ppool,resultelm->munit), QS_PUNIT_USIZE( _ppool, resultelm->munit ) );
+				memcpy( pbuf, (char*)QS_GET_POINTER(_ppool,resultelm->memid_array_element_data), QS_PUNIT_USIZE( _ppool, resultelm->memid_array_element_data ) );
 				int32_t* pv = QS_PINT32(_ppool,tmpmunit);
-				*pv = QS_INT32(_ppool,resultelm->munit);
+				*pv = QS_INT32(_ppool,resultelm->memid_array_element_data);
 				resultmunit = qs_create_return(_ppool, pscript, tmpmunit, resultelm->id );
 			}
 			else if( resultelm->id == ELEMENT_ARRAY ){
-				resultmunit = qs_create_return(_ppool, pscript, resultelm->munit, resultelm->id );
+				resultmunit = qs_create_return(_ppool, pscript, resultelm->memid_array_element_data, resultelm->id );
 			}
 			else if( resultelm->id == ELEMENT_HASH ){
-				resultmunit = qs_create_return(_ppool, pscript, resultelm->munit, resultelm->id );
+				resultmunit = qs_create_return(_ppool, pscript, resultelm->memid_array_element_data, resultelm->id );
 			}
 			else{
-				if( resultelm->munit > 0 )
+				if( resultelm->memid_array_element_data > 0 )
 				{
-					tmpmunit = qs_create_munit( _ppool, QS_PUNIT_USIZE( _ppool, resultelm->munit ), MEMORY_TYPE_DEFAULT );
+					tmpmunit = qs_create_memory_block( _ppool, QS_PUNIT_USIZE( _ppool, resultelm->memid_array_element_data ) );
 					if( tmpmunit <= 0 ){
 						return QS_SYSTEM_ERROR;
 					}
 					pbuf = (char*)QS_GET_POINTER( _ppool, tmpmunit );
-					memcpy( pbuf, (char*)QS_GET_POINTER(_ppool,resultelm->munit), QS_PUNIT_USIZE( _ppool, tmpmunit ) );
+					memcpy( pbuf, (char*)QS_GET_POINTER(_ppool,resultelm->memid_array_element_data), QS_PUNIT_USIZE( _ppool, tmpmunit ) );
 					resultmunit = qs_create_return(_ppool, pscript, tmpmunit, resultelm->id );
 				}
 			}
@@ -2393,7 +2393,7 @@ int32_t qs_exec_while( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* node
 	QS_NODE* blockworkelemlist;
 	int j;
 	QS_NODE* cblocknode;
-	int32_t while_ret_munit = qs_create_munit( _ppool, NUMERIC_BUFFER_SIZE, MEMORY_TYPE_DEFAULT );
+	int32_t while_ret_munit = qs_create_memory_block( _ppool, NUMERIC_BUFFER_SIZE );
 	workelemlist = ( QS_NODE* )QS_GET_POINTER( _ppool, node->element_munit );
 	do{
 		if( workelemlist[0].id == ELEMENT_WHILE ){
@@ -2459,10 +2459,10 @@ int qs_add_system_function( QS_MEMORY_POOL* _ppool, int32_t munit, char* functio
 			printf("name munit found error : %d\n", namemunit);
 			break;
 		}
-		namemunit = qs_create_munit( _ppool, strlen( functionname )+1, MEMORY_TYPE_DEFAULT );
+		namemunit = qs_create_memory_block( _ppool, strlen( functionname )+1 );
 		pbuf = (char*)QS_GET_POINTER( _ppool, namemunit );
 		qs_strcopy( pbuf, functionname, QS_PUNIT_USIZE( _ppool, namemunit ) );
-		datamunit = qs_create_munit( _ppool, sizeof( QS_FUNCTION_INFO ), MEMORY_TYPE_DEFAULT );
+		datamunit = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_INFO ) );
 		pfuncinfo = (QS_FUNCTION_INFO*)QS_GET_POINTER( _ppool, datamunit );
 		pfuncinfo->type = QS_FUNCTION_TYPE_SYSTEM;
 		pfuncinfo->func = func;
@@ -2489,10 +2489,10 @@ int qs_add_user_function( QS_MEMORY_POOL* _ppool, int32_t munit, char* functionn
 			printf("name munit found error : %d\n", namemunit);
 			break;
 		}
-		namemunit = qs_create_munit( _ppool, strlen( functionname )+1, MEMORY_TYPE_DEFAULT );
+		namemunit = qs_create_memory_block( _ppool, strlen( functionname )+1 );
 		pbuf = (char*)QS_GET_POINTER( _ppool, namemunit );
 		qs_strcopy( pbuf, functionname, QS_PUNIT_USIZE( _ppool, namemunit ) );
-		datamunit = qs_create_munit( _ppool, sizeof( QS_FUNCTION_INFO ), MEMORY_TYPE_DEFAULT );
+		datamunit = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_INFO ) );
 		pfuncinfo = (QS_FUNCTION_INFO*)QS_GET_POINTER( _ppool, datamunit );
 		pfuncinfo->type = QS_FUNCTION_TYPE_USER;
 		pfuncinfo->func = NULL;
@@ -2509,7 +2509,7 @@ void* qs_script_system_function_echo( QS_MEMORY_POOL* _ppool, void* args )
 	QS_ARRAY_ELEMENT* elm;
 	QS_FUNCTION_RETURN* pret;
 	int32_t retmunit = -1;
-	retmunit = qs_create_munit( _ppool, sizeof( QS_FUNCTION_RETURN ), MEMORY_TYPE_DEFAULT );
+	retmunit = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
 	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, retmunit );
 	pret->id	= 0;
 	pret->munit	= -1;
@@ -2522,19 +2522,19 @@ void* qs_script_system_function_echo( QS_MEMORY_POOL* _ppool, void* args )
 			{
 				if( elm[0].id == ELEMENT_LITERAL_STR )
 				{
-					printf( "%s", (char*)qs_upointer( _ppool, elm[0].munit ) );
+					printf( "%s", (char*)qs_upointer( _ppool, elm[0].memid_array_element_data ) );
 				}
 				else if( elm[0].id == ELEMENT_LITERAL_NUM )
 				{
-					printf( "%s", (char*)qs_upointer( _ppool, elm[0].munit ) );
+					printf( "%s", (char*)qs_upointer( _ppool, elm[0].memid_array_element_data ) );
 				}
 				else if( elm[0].id == ELEMENT_ARRAY )
 				{
-					qs_array_dump( _ppool, elm[0].munit, 0 );
+					qs_array_dump( _ppool, elm[0].memid_array_element_data, 0 );
 				}
 				else if( elm[0].id == ELEMENT_HASH )
 				{
-					qs_hash_dump( _ppool, elm[0].munit, 0 );
+					qs_hash_dump( _ppool, elm[0].memid_array_element_data, 0 );
 				}
 			}
 		}
@@ -2548,7 +2548,7 @@ void* qs_script_system_function_count( QS_MEMORY_POOL* _ppool, void* args )
 	QS_ARRAY_ELEMENT* elm;
 	QS_FUNCTION_RETURN* pret;
 	int32_t retmunit = -1;
-	retmunit = qs_create_munit( _ppool, sizeof( QS_FUNCTION_RETURN ), MEMORY_TYPE_DEFAULT );
+	retmunit = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
 	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, retmunit );
 	pret->id	= 0;
 	pret->munit	= -1;
@@ -2560,22 +2560,22 @@ void* qs_script_system_function_count( QS_MEMORY_POOL* _ppool, void* args )
 		{
 			if( parray->len > 0 )
 			{
-				int32_t len_munit = qs_create_munit( _ppool, NUMERIC_BUFFER_SIZE, MEMORY_TYPE_DEFAULT );
+				int32_t len_munit = qs_create_memory_block( _ppool, NUMERIC_BUFFER_SIZE );
 				int32_t len = 0;
 				if( len_munit <= 0 ){
 					return pret;
 				}
 				if( elm[0].id == ELEMENT_LITERAL_STR )
 				{
-					len = qs_strlen( (char*)QS_GET_POINTER(_ppool,elm[0].munit) );
+					len = qs_strlen( (char*)QS_GET_POINTER(_ppool,elm[0].memid_array_element_data) );
 				}
 				else if( elm[0].id == ELEMENT_ARRAY )
 				{
-					len = qs_array_length( _ppool, elm[0].munit );
+					len = qs_array_length( _ppool, elm[0].memid_array_element_data );
 				}
 				else if( elm[0].id == ELEMENT_HASH )
 				{
-					len = qs_hash_length( _ppool, elm[0].munit );
+					len = qs_hash_length( _ppool, elm[0].memid_array_element_data );
 				}
 				char* pbuf = (char*)QS_GET_POINTER(_ppool,len_munit);
 				qs_itoa( len, pbuf, QS_PUNIT_USIZE(_ppool,len_munit) );
@@ -2595,7 +2595,7 @@ void* qs_script_system_function_file_exist( QS_MEMORY_POOL* _ppool, void* args )
 	QS_ARRAY_ELEMENT* elm;
 	QS_FUNCTION_RETURN* pret;
 	int32_t retmunit = -1;
-	retmunit = qs_create_munit( _ppool, sizeof( QS_FUNCTION_RETURN ), MEMORY_TYPE_DEFAULT );
+	retmunit = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
 	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, retmunit );
 	pret->id	= 0;
 	pret->munit	= -1;
@@ -2610,9 +2610,9 @@ void* qs_script_system_function_file_exist( QS_MEMORY_POOL* _ppool, void* args )
 				if( elm[0].id == ELEMENT_LITERAL_STR )
 				{
 					QS_FILE_INFO info;
-					int32_t len_munit = qs_create_munit( _ppool, NUMERIC_BUFFER_SIZE, MEMORY_TYPE_DEFAULT );
+					int32_t len_munit = qs_create_memory_block( _ppool, NUMERIC_BUFFER_SIZE );
 					char* pbuf = (char*)QS_GET_POINTER(_ppool,len_munit);
-					if( 0 != qs_fget_info( (char*)QS_GET_POINTER( _ppool, elm[0].munit ), &info ) ){
+					if( 0 != qs_fget_info( (char*)QS_GET_POINTER( _ppool, elm[0].memid_array_element_data ), &info ) ){
 						qs_itoa( 0, pbuf, QS_PUNIT_USIZE(_ppool,len_munit) );
 						int32_t* pv = QS_PINT32(_ppool,len_munit);
 						*pv = 0;
@@ -2637,7 +2637,7 @@ void* qs_script_system_function_file_size( QS_MEMORY_POOL* _ppool, void* args )
 	QS_ARRAY_ELEMENT* elm;
 	QS_FUNCTION_RETURN* pret;
 	int32_t retmunit = -1;
-	retmunit = qs_create_munit( _ppool, sizeof( QS_FUNCTION_RETURN ), MEMORY_TYPE_DEFAULT );
+	retmunit = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
 	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, retmunit );
 	pret->id	= 0;
 	pret->munit	= -1;
@@ -2652,9 +2652,9 @@ void* qs_script_system_function_file_size( QS_MEMORY_POOL* _ppool, void* args )
 				if( elm[0].id == ELEMENT_LITERAL_STR )
 				{
 					QS_FILE_INFO info;
-					int32_t len_munit = qs_create_munit( _ppool, NUMERIC_BUFFER_SIZE, MEMORY_TYPE_DEFAULT );
+					int32_t len_munit = qs_create_memory_block( _ppool, NUMERIC_BUFFER_SIZE );
 					char* pbuf = (char*)QS_GET_POINTER(_ppool,len_munit);
-					if( 0 != qs_fget_info( (char*)QS_GET_POINTER( _ppool, elm[0].munit ), &info ) ){
+					if( 0 != qs_fget_info( (char*)QS_GET_POINTER( _ppool, elm[0].memid_array_element_data ), &info ) ){
 						qs_itoa( 0, pbuf, QS_PUNIT_USIZE(_ppool,len_munit) );
 						int32_t* pv = QS_PINT32(_ppool,len_munit);
 						*pv = 0;
@@ -2679,7 +2679,7 @@ void* qs_script_system_function_file_extension( QS_MEMORY_POOL* _ppool, void* ar
 	QS_ARRAY_ELEMENT* elm;
 	QS_FUNCTION_RETURN* pret;
 	int32_t retmunit = -1;
-	retmunit = qs_create_munit( _ppool, sizeof( QS_FUNCTION_RETURN ), MEMORY_TYPE_DEFAULT );
+	retmunit = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
 	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, retmunit );
 	pret->id	= 0;
 	pret->munit	= -1;
@@ -2693,11 +2693,11 @@ void* qs_script_system_function_file_extension( QS_MEMORY_POOL* _ppool, void* ar
 			{
 				if( elm[0].id == ELEMENT_LITERAL_STR )
 				{
-					int32_t string_munit = qs_create_munit( _ppool, 32, MEMORY_TYPE_DEFAULT );
+					int32_t string_munit = qs_create_memory_block( _ppool, 32 );
 					if( string_munit <= 0 ){
 						return pret;
 					}
-					if( QS_SYSTEM_OK != qs_get_extension( (char*)QS_GET_POINTER( _ppool, string_munit ), 32, (char*)QS_GET_POINTER( _ppool, elm[0].munit ) ) ){
+					if( QS_SYSTEM_OK != qs_get_extension( (char*)QS_GET_POINTER( _ppool, string_munit ), 32, (char*)QS_GET_POINTER( _ppool, elm[0].memid_array_element_data ) ) ){
 						
 					}
 					pret->munit = string_munit;
@@ -2715,7 +2715,7 @@ void* qs_script_system_function_file_get( QS_MEMORY_POOL* _ppool, void* args )
 	QS_ARRAY_ELEMENT* elm;
 	QS_FUNCTION_RETURN* pret;
 	int32_t retmunit = -1;
-	retmunit = qs_create_munit( _ppool, sizeof( QS_FUNCTION_RETURN ), MEMORY_TYPE_DEFAULT );
+	retmunit = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
 	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, retmunit );
 	pret->id	= 0;
 	pret->munit	= -1;
@@ -2730,24 +2730,24 @@ void* qs_script_system_function_file_get( QS_MEMORY_POOL* _ppool, void* args )
 				if( elm[0].id == ELEMENT_LITERAL_STR )
 				{
 					QS_FILE_INFO info;
-					if( 0 != qs_fget_info( (char*)QS_GET_POINTER( _ppool, elm[0].munit ), &info ) ){
+					if( 0 != qs_fget_info( (char*)QS_GET_POINTER( _ppool, elm[0].memid_array_element_data ), &info ) ){
 						return pret;
 					}
-					if( parray->len > 1 && elm[1].id == ELEMENT_LITERAL_STR && !strcmp("b",(char*)QS_GET_POINTER( _ppool, elm[1].munit )) ){
-						int32_t string_munit = qs_create_munit( _ppool, info.size, MEMORY_TYPE_DEFAULT );
+					if( parray->len > 1 && elm[1].id == ELEMENT_LITERAL_STR && !strcmp("b",(char*)QS_GET_POINTER( _ppool, elm[1].memid_array_element_data )) ){
+						int32_t string_munit = qs_create_memory_block( _ppool, info.size );
 						if( string_munit <= 0 ){
 							return pret;
 						}
-						qs_fread_bin( (char*)QS_GET_POINTER( _ppool, elm[0].munit ), (char*)QS_GET_POINTER(_ppool,string_munit), QS_PUNIT_USIZE(_ppool,string_munit) );
+						qs_fread_bin( (char*)QS_GET_POINTER( _ppool, elm[0].memid_array_element_data ), (char*)QS_GET_POINTER(_ppool,string_munit), QS_PUNIT_USIZE(_ppool,string_munit) );
 						pret->munit = string_munit;
 						pret->id = ELEMENT_LITERAL_BIN;
 					}
 					else{
-						int32_t string_munit = qs_create_munit( _ppool, info.size+1, MEMORY_TYPE_DEFAULT );
+						int32_t string_munit = qs_create_memory_block( _ppool, info.size+1 );
 						if( string_munit <= 0 ){
 							return pret;
 						}
-						qs_fread( (char*)QS_GET_POINTER( _ppool, elm[0].munit ), (char*)QS_GET_POINTER(_ppool,string_munit), QS_PUNIT_USIZE(_ppool,string_munit) );
+						qs_fread( (char*)QS_GET_POINTER( _ppool, elm[0].memid_array_element_data ), (char*)QS_GET_POINTER(_ppool,string_munit), QS_PUNIT_USIZE(_ppool,string_munit) );
 						pret->munit = string_munit;
 						pret->id = ELEMENT_LITERAL_STR;
 					}
@@ -2764,7 +2764,7 @@ void* qs_script_system_function_file_put( QS_MEMORY_POOL* _ppool, void* args )
 	QS_ARRAY_ELEMENT* elm;
 	QS_FUNCTION_RETURN* pret;
 	int32_t retmunit = -1;
-	retmunit = qs_create_munit( _ppool, sizeof( QS_FUNCTION_RETURN ), MEMORY_TYPE_DEFAULT );
+	retmunit = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
 	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, retmunit );
 	pret->id	= 0;
 	pret->munit	= -1;
@@ -2778,8 +2778,8 @@ void* qs_script_system_function_file_put( QS_MEMORY_POOL* _ppool, void* args )
 			{
 				if( elm[0].id == ELEMENT_LITERAL_STR && elm[1].id == ELEMENT_LITERAL_STR )
 				{
-					int32_t string_munit = qs_create_munit( _ppool, 8, MEMORY_TYPE_DEFAULT );
-					if( 0 != qs_fwrite( (char*)QS_GET_POINTER( _ppool, elm[0].munit ), (char*)QS_GET_POINTER( _ppool, elm[1].munit ), QS_PUNIT_USIZE(_ppool,elm[1].munit) ) )
+					int32_t string_munit = qs_create_memory_block( _ppool, 8 );
+					if( 0 != qs_fwrite( (char*)QS_GET_POINTER( _ppool, elm[0].memid_array_element_data ), (char*)QS_GET_POINTER( _ppool, elm[1].memid_array_element_data ), QS_PUNIT_USIZE(_ppool,elm[1].memid_array_element_data) ) )
 					{
 						*((char*)QS_GET_POINTER(_ppool,string_munit)) = '0';
 					}
@@ -2802,7 +2802,7 @@ void* qs_script_system_function_file_add( QS_MEMORY_POOL* _ppool, void* args )
 	QS_ARRAY_ELEMENT* elm;
 	QS_FUNCTION_RETURN* pret;
 	int32_t retmunit = -1;
-	retmunit = qs_create_munit( _ppool, sizeof( QS_FUNCTION_RETURN ), MEMORY_TYPE_DEFAULT );
+	retmunit = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
 	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, retmunit );
 	pret->id	= 0;
 	pret->munit	= -1;
@@ -2816,8 +2816,8 @@ void* qs_script_system_function_file_add( QS_MEMORY_POOL* _ppool, void* args )
 			{
 				if( elm[0].id == ELEMENT_LITERAL_STR && elm[1].id == ELEMENT_LITERAL_STR )
 				{
-					int32_t string_munit = qs_create_munit( _ppool, 8, MEMORY_TYPE_DEFAULT );
-					if( 0 != qs_fwrite_a( (char*)QS_GET_POINTER( _ppool, elm[0].munit ), (char*)QS_GET_POINTER( _ppool, elm[1].munit ), QS_PUNIT_USIZE(_ppool,elm[1].munit) ) )
+					int32_t string_munit = qs_create_memory_block( _ppool, 8 );
+					if( 0 != qs_fwrite_a( (char*)QS_GET_POINTER( _ppool, elm[0].memid_array_element_data ), (char*)QS_GET_POINTER( _ppool, elm[1].memid_array_element_data ), QS_PUNIT_USIZE(_ppool,elm[1].memid_array_element_data) ) )
 					{
 						*((char*)QS_GET_POINTER(_ppool,string_munit)) = '0';
 					}
@@ -2840,7 +2840,7 @@ void* qs_script_system_function_json_encode( QS_MEMORY_POOL* _ppool, void* args 
 	QS_ARRAY_ELEMENT* elm;
 	QS_FUNCTION_RETURN* pret;
 	int32_t retmunit = -1;
-	retmunit = qs_create_munit( _ppool, sizeof( QS_FUNCTION_RETURN ), MEMORY_TYPE_DEFAULT );
+	retmunit = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
 	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, retmunit );
 	pret->id	= 0;
 	pret->munit	= -1;
@@ -2854,7 +2854,7 @@ void* qs_script_system_function_json_encode( QS_MEMORY_POOL* _ppool, void* args 
 			{
 				if( elm[0].id == ELEMENT_HASH || elm[0].id == ELEMENT_ARRAY )
 				{
-					int32_t r_munit = qs_make_json_root( _ppool, elm[0].munit, elm[0].id );
+					int32_t r_munit = qs_make_json_root( _ppool, elm[0].memid_array_element_data, elm[0].id );
 					if( r_munit == -1 ){
 						return pret;
 					}
@@ -2877,7 +2877,7 @@ void* qs_script_system_function_json_decode( QS_MEMORY_POOL* _ppool, void* args 
 	QS_ARRAY_ELEMENT* elm;
 	QS_FUNCTION_RETURN* pret;
 	int32_t retmunit = -1;
-	retmunit = qs_create_munit( _ppool, sizeof( QS_FUNCTION_RETURN ), MEMORY_TYPE_DEFAULT );
+	retmunit = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
 	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, retmunit );
 	pret->id	= 0;
 	pret->munit	= -1;
@@ -2891,7 +2891,7 @@ void* qs_script_system_function_json_decode( QS_MEMORY_POOL* _ppool, void* args 
 			{
 				if( elm[0].id == ELEMENT_LITERAL_STR )
 				{
-					int32_t rootnode_munit = qs_json_decode( _ppool, (char*)QS_GET_POINTER( _ppool, elm[0].munit ) );
+					int32_t rootnode_munit = qs_json_decode( _ppool, (char*)QS_GET_POINTER( _ppool, elm[0].memid_array_element_data ) );
 					QS_NODE *rootnode = (QS_NODE*)QS_GET_POINTER( _ppool, rootnode_munit );
 					QS_NODE* workelemlist = ( QS_NODE* )QS_GET_POINTER( _ppool, rootnode->element_munit );
 					pret->munit = workelemlist[0].element_munit;
@@ -2907,12 +2907,12 @@ void* qs_script_system_function_gmtime( QS_MEMORY_POOL* _ppool, void* args )
 {
 	QS_FUNCTION_RETURN* pret;
 	int32_t retmunit = -1;
-	retmunit = qs_create_munit( _ppool, sizeof( QS_FUNCTION_RETURN ), MEMORY_TYPE_DEFAULT );
+	retmunit = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
 	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, retmunit );
 	pret->id	= 0;
 	pret->munit	= -1;
 	pret->refid = retmunit;
-	int32_t string_munit = qs_create_munit( _ppool, 256, MEMORY_TYPE_DEFAULT );
+	int32_t string_munit = qs_create_memory_block( _ppool, 256 );
 	if( string_munit <= 0 ){
 		printf( "string_munit error\n" );
 		return pret;
@@ -2935,7 +2935,7 @@ int32_t qs_init_http_script( QS_MEMORY_POOL* _ppool, const char* script_file, co
 		QS_SCRIPT *pscript = (QS_SCRIPT *)QS_GET_POINTER( _ppool, script_munit );
 		QS_FILE_INFO info;
 		if( 0 == qs_fget_info( (char*)ini_json_file, &info ) ){
-			int32_t json_string_munit = qs_create_munit( _ppool, sizeof( char )*info.size+1, MEMORY_TYPE_DEFAULT );
+			int32_t json_string_munit = qs_create_memory_block( _ppool, sizeof( char )*info.size+1 );
 			if( 0 == qs_fread( (char*)ini_json_file, (char*)QS_GET_POINTER(_ppool,json_string_munit), QS_PUNIT_USIZE(_ppool,json_string_munit) ) ){
 				int32_t root_munit = qs_json_decode( _ppool, (char*)QS_GET_POINTER(_ppool,json_string_munit) );
 				QS_NODE* rootnode = (QS_NODE*)QS_GET_POINTER(_ppool,root_munit);

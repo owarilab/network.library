@@ -815,7 +815,7 @@ int32_t qs_http_client_init(QS_MEMORY_POOL * memory, size_t http_request_buffer_
 
 	client->memory = memory;
 
-	client->memid_http_header_name_array = qs_create_array(client->memory,8,NUMERIC_BUFFER_SIZE);
+	client->memid_http_header_name_array = qs_create_array(client->memory,QS_ARRAY_SIZE_DEFAULT);
 	if(-1 == client->memid_http_header_name_array){
 		return -1;
 	}
@@ -1173,7 +1173,7 @@ int qs_send_handshake_param(QS_SOCKET_ID socket, QS_SOCKET_OPTION *option, QS_SE
 	pbuffer = sendbuffer;
 	length = strlen(pwskey) + strlen( ws_guid );
 	psockparam->wsockkey_munit = -1;
-	if( ( psockparam->wsockkey_munit = qs_create_munit( con_memory, sizeof( char ) * QS_ALIGNUP( length, 64 ), MEMORY_TYPE_DEFAULT ) ) == -1 )
+	if( ( psockparam->wsockkey_munit = qs_create_memory_block( con_memory, sizeof( char ) * QS_ALIGNUP( length, 64 ) ) ) == -1 )
 	{
 		//printf( "[responseKey]size over: %d byte\n", length );
 		return qs_error("[responseKey]size over");

@@ -142,7 +142,7 @@ int32_t qs_create_cache_B1GB( QS_MEMORY_POOL* memory)
 
 int32_t qs_create_cache( QS_MEMORY_POOL* memory,size_t chain_allocate_size,size_t max_cache_size,size_t page_allocate_size,size_t page_hash_size,size_t max_key_size)
 {
-	int32_t cache_id = qs_create_munit(memory,sizeof(QS_CACHE),MEMORY_TYPE_DEFAULT);
+	int32_t cache_id = qs_create_memory_block(memory,sizeof(QS_CACHE));
 	if(cache_id==-1){
 		return -1;
 	}
@@ -215,8 +215,8 @@ int32_t qs_create_storage_cache( const char* store_name, QS_MEMORY_POOL** pp_mem
 	}
 	QS_MEMORY_POOL* memory = *pp_memory;
 	int32_t cache_id = -1;
-	if(memory->memory_buf_munit == -1){
-		cache_id = qs_create_munit(memory,sizeof(QS_CACHE),MEMORY_TYPE_DEFAULT);
+	if(memory->memid_save_data == -1){
+		cache_id = qs_create_memory_block(memory,sizeof(QS_CACHE));
 		if(cache_id==-1){
 			printf("create cache error\n");
 			return -1;
@@ -269,17 +269,17 @@ int32_t qs_create_storage_cache( const char* store_name, QS_MEMORY_POOL** pp_mem
 				return -1;
 			}
 		}
-		memory->memory_buf_munit = cache_id;
+		memory->memid_save_data = cache_id;
 		qs_sync_mmap_memory(memory);
 	} else{
-		cache_id = memory->memory_buf_munit;
+		cache_id = memory->memid_save_data;
 		QS_CACHE* cache = (QS_CACHE*)QS_GET_POINTER(memory,cache_id);
 		cache->memory = memory;
 		QS_MEMORY_POOL* page1 = (QS_MEMORY_POOL*)QS_GET_POINTER(cache->memory,cache->memory_page1);
-		page1->memory = ( void* )QS_GET_POINTER( memory, page1->memory_buf_munit );
+		page1->memory = ( void* )QS_GET_POINTER( memory, page1->memid_save_data );
 		if(cache->is_swap==1){
 			QS_MEMORY_POOL* page2 = (QS_MEMORY_POOL*)QS_GET_POINTER(cache->memory,cache->memory_page2);
-			page2->memory = ( void* )QS_GET_POINTER( memory, page2->memory_buf_munit );
+			page2->memory = ( void* )QS_GET_POINTER( memory, page2->memid_save_data );
 		}
 	}
 	return cache_id;
@@ -328,18 +328,18 @@ void qs_swap_page(QS_CACHE* cache,QS_CACHE_PAGE* page)
 		QS_HASH_ELEMENT* elm = qs_get_hash_element(current_page,current_hash_id,key);
 		if(elm!=NULL){
 			if(elm->id==ELEMENT_LITERAL_NUM){
-				int32_t value = QS_INT32(current_page, elm->elm_munit);
+				int32_t value = QS_INT32(current_page, elm->memid_hash_element_data);
 				if(NULL==qs_add_hash_integer( backup_page, backup_hash_id, key, value )){
 					// error
 				}
-				//printf("ELEMENT_LITERAL_NUM k = %s, h = %d, id = %d, value = %d\n",key,elm->elm_munit,elm->id,value);
+				//printf("ELEMENT_LITERAL_NUM k = %s, h = %d, id = %d, value = %d\n",key,elm->memid_hash_element_data,elm->id,value);
 			} else if( elm->id==ELEMENT_LITERAL_STR ){
-				char* value = (char*)QS_GET_POINTER(current_page, elm->elm_munit);
+				char* value = (char*)QS_GET_POINTER(current_page, elm->memid_hash_element_data);
 				if(NULL==qs_add_hash_string( backup_page, backup_hash_id, key, value )){
 					// error
 				}
 			} else {
-				printf("other hash k = %s, h = %d, id = %d\n",key,elm->elm_munit,elm->id);
+				printf("other hash k = %s, h = %d, id = %d\n",key,elm->memid_hash_element_data,elm->id);
 			}
 		}
 		if(qs_memory_available_size(backup_page) < backup_page->size / 4){
@@ -463,21 +463,21 @@ void qs_array_dump( QS_MEMORY_POOL* _ppool, int32_t munit, int index )
 		if( (elm+i)->id == ELEMENT_LITERAL_NUM ){
 			if( i > 0 ){ printf(",\n"); }
 			for( k=0;k<index+1;k++ ){ printf("  "); }
-			printf("%s",(char*)QS_GET_POINTER(_ppool,(elm+i)->munit));
+			printf("%s",(char*)QS_GET_POINTER(_ppool,(elm+i)->memid_array_element_data));
 		}
 		if( (elm+i)->id == ELEMENT_LITERAL_STR ){
 			if( i > 0 ){ printf(",\n"); }
 			for( k=0;k<index+1;k++ ){ printf("  "); }
-			printf("\"%s\"",(char*)QS_GET_POINTER(_ppool,(elm+i)->munit));
+			printf("\"%s\"",(char*)QS_GET_POINTER(_ppool,(elm+i)->memid_array_element_data));
 		}
 		else if( (elm+i)->id == ELEMENT_ARRAY ){
 			if( i > 0 ){ printf(",\n"); }
 			for( k=0;k<index+1;k++ ){ printf("  ");}
-			qs_array_dump( _ppool, (elm+i)->munit, index+1 );
+			qs_array_dump( _ppool, (elm+i)->memid_array_element_data, index+1 );
 		}
 		else if( (elm+i)->id==ELEMENT_HASH){
 			if( i > 0 ){ printf(",\n"); }
-			qs_hash_dump( _ppool, (elm+i)->munit, index+1 );
+			qs_hash_dump( _ppool, (elm+i)->memid_array_element_data, index+1 );
 		}
 	}
 	printf("\n");
@@ -503,24 +503,24 @@ void qs_hash_dump( QS_MEMORY_POOL* _ppool, int32_t h_munit, int index )
 			hashelement = (struct QS_HASH_ELEMENT*)QS_GET_POINTER( _ppool, hashchild[j].hash_munit );
 			for( i = 0; i < hashchild[j].hash_size; i++ )
 			{
-				if( hashelement[i].hashname_munit >= 0 )
+				if( hashelement[i].memid_hash_name >= 0 )
 				{
 					if( hashelement[i].id==ELEMENT_HASH){
 						if( cnt > 0 ){ printf(",\n"); }
 						for( k=0;k<index+1;k++ ){ printf("  "); }
 						printf( "\"%s\":"
-								, (char*)QS_GET_POINTER( _ppool, hashelement[i].hashname_munit )
+								, (char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_name )
 							  );
-						qs_hash_dump( _ppool, hashelement[i].elm_munit, index+1 );
+						qs_hash_dump( _ppool, hashelement[i].memid_hash_element_data, index+1 );
 						cnt++;
 					}
 					else if( hashelement[i].id==ELEMENT_ARRAY){
 						if( cnt > 0 ){ printf(",\n"); }
 						for( k=0;k<index+1;k++ ){ printf("  "); }
 						printf( "\"%s\":"
-								, (char*)QS_GET_POINTER( _ppool, hashelement[i].hashname_munit )
+								, (char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_name )
 							  );
-						qs_array_dump( _ppool, hashelement[i].elm_munit, index+1 );
+						qs_array_dump( _ppool, hashelement[i].memid_hash_element_data, index+1 );
 						cnt++;
 					}
 					else{
@@ -528,15 +528,15 @@ void qs_hash_dump( QS_MEMORY_POOL* _ppool, int32_t h_munit, int index )
 						for( k=0;k<index+1;k++ ){ printf("  "); }
 						if( hashelement[i].id == ELEMENT_LITERAL_STR ){
 							printf( "\"%s\":\"%s\""
-									, (char*)QS_GET_POINTER( _ppool, hashelement[i].hashname_munit )
-									, (char*)QS_GET_POINTER( _ppool, hashelement[i].elm_munit )
+									, (char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_name )
+									, (char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_element_data )
 								  );
 							cnt++;
 						}
 						else if( hashelement[i].id == ELEMENT_LITERAL_NUM ){
 							printf( "\"%s\":%s"
-									, (char*)QS_GET_POINTER( _ppool, hashelement[i].hashname_munit )
-									, (char*)QS_GET_POINTER( _ppool, hashelement[i].elm_munit )
+									, (char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_name )
+									, (char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_element_data )
 								  );
 							cnt++;
 						}
@@ -581,7 +581,7 @@ int32_t qs_opendir( QS_MEMORY_POOL* _ppool, const char* path )
 	}
 	dent = readdir(dir);
 #endif
-	int32_t path_array_munit = qs_create_array( _ppool, 128, 0 );
+	int32_t path_array_munit = qs_create_array( _ppool, 128 );
 	do{
 #ifdef __WINDOWS__
 		if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
@@ -633,7 +633,7 @@ int32_t qs_opendir( QS_MEMORY_POOL* _ppool, const char* path )
 				parray = (QS_ARRAY*)QS_GET_POINTER( _ppool, tmp_array );
 				elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid );
 				for( i = 0; i < parray->len; i++ ){
-					qs_array_push(_ppool,&path_array_munit,ELEMENT_LITERAL_STR,(elm+i)->munit);
+					qs_array_push(_ppool,&path_array_munit,ELEMENT_LITERAL_STR,(elm+i)->memid_array_element_data);
 				}
 			}
 		}

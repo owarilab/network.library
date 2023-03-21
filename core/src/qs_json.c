@@ -150,16 +150,16 @@ int32_t qs_json_encode_parser_hash( QS_MEMORY_POOL* _ppool, int32_t buf_munit, i
 				hashelement = (struct QS_HASH_ELEMENT*)QS_GET_POINTER( _ppool, hashchild[j].hash_munit );
 				for( i = 0; i < hashchild[j].hash_size; i++ )
 				{
-					if(  -1 != hashelement[i].hashname_munit )
+					if(  -1 != hashelement[i].memid_hash_name )
 					{
 						if( hashelement[i].id==ELEMENT_HASH){
 							if( cnt > 0 ){ 
 								qs_add_json_element( _ppool, buf_munit, ",", 1, 0);
 							}
 							qs_add_json_element( _ppool, buf_munit, "\"", 1, 0);
-							qs_add_json_element( _ppool, buf_munit, (char*)QS_GET_POINTER( _ppool, hashelement[i].hashname_munit ), qs_strlen((char*)QS_GET_POINTER( _ppool, hashelement[i].hashname_munit )), 1 );
+							qs_add_json_element( _ppool, buf_munit, (char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_name ), qs_strlen((char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_name )), 1 );
 							qs_add_json_element( _ppool, buf_munit, "\":", 2, 0);
-							qs_json_encode_parser_hash( _ppool, buf_munit, hashelement[i].elm_munit );
+							qs_json_encode_parser_hash( _ppool, buf_munit, hashelement[i].memid_hash_element_data );
 							cnt++;
 						}
 						else if( hashelement[i].id==ELEMENT_ARRAY){
@@ -167,9 +167,9 @@ int32_t qs_json_encode_parser_hash( QS_MEMORY_POOL* _ppool, int32_t buf_munit, i
 								qs_add_json_element( _ppool, buf_munit, ",", 1, 0);
 							}
 							qs_add_json_element( _ppool, buf_munit, "\"", 1, 0);
-							qs_add_json_element( _ppool, buf_munit, (char*)QS_GET_POINTER( _ppool, hashelement[i].hashname_munit ), qs_strlen((char*)QS_GET_POINTER( _ppool, hashelement[i].hashname_munit )), 1 );
+							qs_add_json_element( _ppool, buf_munit, (char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_name ), qs_strlen((char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_name )), 1 );
 							qs_add_json_element( _ppool, buf_munit, "\":", 2, 0);
-							qs_json_encode_parser_array( _ppool, buf_munit, hashelement[i].elm_munit );
+							qs_json_encode_parser_array( _ppool, buf_munit, hashelement[i].memid_hash_element_data );
 							cnt++;
 						}
 						else{
@@ -178,23 +178,23 @@ int32_t qs_json_encode_parser_hash( QS_MEMORY_POOL* _ppool, int32_t buf_munit, i
 							}
 							if( hashelement[i].id == ELEMENT_LITERAL_STR ){
 								qs_add_json_element( _ppool, buf_munit, "\"", 1, 0);
-								qs_add_json_element( _ppool, buf_munit, (char*)QS_GET_POINTER( _ppool, hashelement[i].hashname_munit ), qs_strlen((char*)QS_GET_POINTER( _ppool, hashelement[i].hashname_munit )), 1 );
+								qs_add_json_element( _ppool, buf_munit, (char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_name ), qs_strlen((char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_name )), 1 );
 								qs_add_json_element( _ppool, buf_munit, "\":", 2, 0);
 								qs_add_json_element( _ppool, buf_munit, "\"", 1, 0);
-								qs_add_json_element( _ppool, buf_munit, (char*)QS_GET_POINTER( _ppool, hashelement[i].elm_munit ), qs_strlen((char*)QS_GET_POINTER( _ppool, hashelement[i].elm_munit )), 1 );
+								qs_add_json_element( _ppool, buf_munit, (char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_element_data ), qs_strlen((char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_element_data )), 1 );
 								qs_add_json_element( _ppool, buf_munit, "\"", 1, 0);
 								cnt++;
 							}
 							else if( hashelement[i].id == ELEMENT_LITERAL_NUM ){
 								qs_add_json_element( _ppool, buf_munit, "\"", 1, 0);
-								qs_add_json_element( _ppool, buf_munit, (char*)QS_GET_POINTER( _ppool, hashelement[i].hashname_munit ), qs_strlen((char*)QS_GET_POINTER( _ppool, hashelement[i].hashname_munit )), 1 );
+								qs_add_json_element( _ppool, buf_munit, (char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_name ), qs_strlen((char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_name )), 1 );
 								qs_add_json_element( _ppool, buf_munit, "\":", 2, 0);
-								qs_add_json_element( _ppool, buf_munit, (char*)QS_GET_POINTER( _ppool, hashelement[i].elm_munit ), qs_strlen((char*)QS_GET_POINTER( _ppool, hashelement[i].elm_munit )), 1 );
+								qs_add_json_element( _ppool, buf_munit, (char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_element_data ), qs_strlen((char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_element_data )), 1 );
 								cnt++;
 							}
 							else{
 								qs_add_json_element( _ppool, buf_munit, "\"", 1, 0);
-								qs_add_json_element( _ppool, buf_munit, (char*)QS_GET_POINTER( _ppool, hashelement[i].hashname_munit ), qs_strlen((char*)QS_GET_POINTER( _ppool, hashelement[i].hashname_munit )), 1 );
+								qs_add_json_element( _ppool, buf_munit, (char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_name ), qs_strlen((char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_name )), 1 );
 								qs_add_json_element( _ppool, buf_munit, "\":", 2, 0);
 								qs_add_json_element( _ppool, buf_munit, "\"", 1, 0);
 								qs_add_json_element( _ppool, buf_munit, "NULL", 4, 0 );
@@ -226,27 +226,27 @@ int32_t qs_json_encode_parser_array( QS_MEMORY_POOL* _ppool, int32_t buf_munit, 
 					if( i > 0 ){ 
 						qs_add_json_element( _ppool, buf_munit, ",", 1, 0);
 					}
-					qs_add_json_element( _ppool, buf_munit, (char*)QS_GET_POINTER( _ppool, (elm+i)->munit ), qs_strlen((char*)QS_GET_POINTER( _ppool, (elm+i)->munit)), 1 );
+					qs_add_json_element( _ppool, buf_munit, (char*)QS_GET_POINTER( _ppool, (elm+i)->memid_array_element_data ), qs_strlen((char*)QS_GET_POINTER( _ppool, (elm+i)->memid_array_element_data)), 1 );
 				}
 				if( (elm+i)->id == ELEMENT_LITERAL_STR ){
 					if( i > 0 ){ 
 						qs_add_json_element( _ppool, buf_munit, ",", 1, 0);
 					}
 					qs_add_json_element( _ppool, buf_munit, "\"", 1, 0);
-					qs_add_json_element( _ppool, buf_munit, (char*)QS_GET_POINTER( _ppool, (elm+i)->munit ), qs_strlen((char*)QS_GET_POINTER( _ppool, (elm+i)->munit)), 1 );
+					qs_add_json_element( _ppool, buf_munit, (char*)QS_GET_POINTER( _ppool, (elm+i)->memid_array_element_data ), qs_strlen((char*)QS_GET_POINTER( _ppool, (elm+i)->memid_array_element_data)), 1 );
 					qs_add_json_element( _ppool, buf_munit, "\"", 1, 0);
 				}
 				else if( (elm+i)->id == ELEMENT_ARRAY ){
 					if( i > 0 ){ 
 						qs_add_json_element( _ppool, buf_munit, ",", 1, 0);
 					}
-					qs_json_encode_parser_array( _ppool, buf_munit, (elm+i)->munit);
+					qs_json_encode_parser_array( _ppool, buf_munit, (elm+i)->memid_array_element_data);
 				}
 				else if( (elm+i)->id==ELEMENT_HASH){
 					if( i > 0 ){ 
 						qs_add_json_element( _ppool, buf_munit, ",", 1, 0);
 					}
-					qs_json_encode_parser_hash( _ppool, buf_munit, (elm+i)->munit);
+					qs_json_encode_parser_hash( _ppool, buf_munit, (elm+i)->memid_array_element_data);
 				}
 			}
 		}
@@ -269,7 +269,7 @@ int qs_add_json_element( QS_MEMORY_POOL* _ppool, int32_t buf_munit, char* src, s
 		if( src_size == 0 ){
 			return 0;
 		}
-		QS_MEMORY_UNIT* punit = qs_get_munit( _ppool, buf_munit );
+		QS_MEMORY_UNIT* punit = qs_get_memory_block( _ppool, buf_munit );
 		uint32_t buf_size = punit->size - (punit->top - punit->p)-1;
 		if( src_size > buf_size ){
 			//printf("buffer out of range %d: %d\n", (int)( src_size + ( punit->top - punit->p ) ), (int)( punit->size ) );
@@ -572,7 +572,7 @@ int32_t qs_json_decode_parser_array( QS_MEMORY_POOL* _ppool, QS_NODE* node, QS_T
 			if( *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos].buf_munit)) == ']' ){
 				finish = 1;
 				if(working_munit==-1){
-					working_munit = qs_create_array( _ppool, 8, NUMERIC_BUFFER_SIZE );
+					working_munit = qs_create_array( _ppool, QS_ARRAY_SIZE_DEFAULT );
 				}
 				break;
 			}
