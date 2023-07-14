@@ -83,20 +83,34 @@ int on_http_event(QS_EVENT_PARAMETER params)
 	int http_status_code = 404;
 	//QS_SERVER_CONTEXT* context = api_qs_get_server_context(params);
 	api_qs_memory_clean(&g_temporary_memory);
-	QS_JSON_ELEMENT_OBJECT object;
-
-	// curl -X GET "http://localhost:8080/api/get_test?v1=v-1&v2=v-2&v3=v-3"
-	if(!strcmp(api_qs_get_http_method(params),"GET")){
-		if(!strcmp(api_qs_get_http_path(params),"/api/get_test")){
-			char* v1 = api_qs_get_http_get_parameter(params,"v1");
-			char* v2 = api_qs_get_http_get_parameter(params,"v2");
-			char* v3 = api_qs_get_http_get_parameter(params,"v3");
-			if(v1!=0&&v2!=0&&v3!=0){
-				api_qs_object_create(&g_temporary_memory,&object);
-				api_qs_object_push_string(&object,"v1",v1);
-				api_qs_object_push_string(&object,"v2",v2);
-				api_qs_object_push_string(&object,"v3",v3);
-				http_status_code = api_qs_http_response_json(params,&object,1024*8);
+	// curl -X POST  -H "Content-Type: application/json" -d '{"arr1":[{"id":1,"value":"arr1_v1"},{"id":2,"value":"arr1_v2"}],"arr2":[{"id":1,"value":"arr2_v1"},{"id":2,"value":"arr2_v2"}]}' "http://localhost:4444/api/json_test"
+	if(!strcmp(api_qs_get_http_method(params),"POST")){
+		if(!strcmp(api_qs_get_http_path(params),"/api/json_test")){
+			printf("body : %s\n",api_qs_get_http_post_body(params));
+			QS_JSON_ELEMENT_OBJECT object;
+			api_qs_json_decode_object(&g_temporary_memory,&object,api_qs_get_http_post_body(params));
+			QS_JSON_ELEMENT_ARRAY arr1;
+			QS_JSON_ELEMENT_ARRAY arr2;
+			api_qs_object_get_array(&object,"arr1",&arr1);
+			api_qs_object_get_array(&object,"arr2",&arr2);
+			printf("arr1 length : %d\n",api_qs_array_get_length(&arr1));
+			printf("arr2 length : %d\n",api_qs_array_get_length(&arr2));
+			int i;
+			printf("<<<show arr1\n");
+			for(i=0;i<api_qs_array_get_length(&arr1);i++){
+				QS_JSON_ELEMENT_OBJECT tmpobj;
+				api_qs_array_get_object(&arr1,i,&tmpobj);
+				int32_t* id = api_qs_object_get_integer(&tmpobj,"id");
+				printf("id : %d\n",*id);
+				printf("value : %s\n",api_qs_object_get_string(&tmpobj,"value"));
+			}
+			printf("<<<show arr2\n");
+			for(i=0;i<api_qs_array_get_length(&arr2);i++){
+				QS_JSON_ELEMENT_OBJECT tmpobj;
+				api_qs_array_get_object(&arr2,i,&tmpobj);
+				int32_t* id = api_qs_object_get_integer(&tmpobj,"id");
+				printf("id : %d\n",*id);
+				printf("value : %s\n",api_qs_object_get_string(&tmpobj,"value"));
 			}
 		}
 	}

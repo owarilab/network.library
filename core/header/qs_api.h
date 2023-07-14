@@ -119,6 +119,18 @@ int api_qs_object_push_array(QS_JSON_ELEMENT_OBJECT* object,const char* name,QS_
 int api_qs_object_push_object(QS_JSON_ELEMENT_OBJECT* object,const char* name,QS_JSON_ELEMENT_OBJECT* push_object);
 char* api_qs_json_encode_object(QS_JSON_ELEMENT_OBJECT* object,size_t buffer_size);
 
+int api_qs_json_decode_object(QS_MEMORY_CONTEXT* context, QS_JSON_ELEMENT_OBJECT* object, const char* json);
+int32_t* api_qs_object_get_integer(QS_JSON_ELEMENT_OBJECT* object,const char* name);
+char* api_qs_object_get_string(QS_JSON_ELEMENT_OBJECT* object,const char* name);
+int api_qs_object_get_array(QS_JSON_ELEMENT_OBJECT* object,const char* name,QS_JSON_ELEMENT_ARRAY* dst_array);
+int api_qs_object_get_object(QS_JSON_ELEMENT_OBJECT* object,const char* name,QS_JSON_ELEMENT_OBJECT* dst_object);
+int32_t api_qs_array_get_length(QS_JSON_ELEMENT_ARRAY* object);
+int32_t* api_qs_array_get_integer(QS_JSON_ELEMENT_ARRAY* object,int32_t offset);
+char* api_qs_array_get_string(QS_JSON_ELEMENT_ARRAY* object,int32_t offset);
+int api_qs_array_get_array(QS_JSON_ELEMENT_ARRAY* object,int32_t offset,QS_JSON_ELEMENT_ARRAY* dst_array);
+int api_qs_array_get_object(QS_JSON_ELEMENT_ARRAY* object,int32_t offset,QS_JSON_ELEMENT_OBJECT* dst_object);
+
+
 int api_qs_csv_read_file(QS_MEMORY_CONTEXT* context, QS_CSV_CONTEXT* csv, const char* csv_file_path);
 int api_qs_csv_parse(QS_MEMORY_CONTEXT* context, QS_CSV_CONTEXT* csv, const char * src_csv);
 int32_t api_qs_csv_get_line_length(QS_CSV_CONTEXT* csv);
@@ -148,6 +160,9 @@ char* api_qs_get_http_method(QS_EVENT_PARAMETER params);
 char* api_qs_get_http_path(QS_EVENT_PARAMETER params);
 char* api_qs_get_http_get_parameter(QS_EVENT_PARAMETER params, const char* name);
 char* api_qs_get_http_post_parameter(QS_EVENT_PARAMETER params, const char* name);
+char* api_qs_get_http_post_body(QS_EVENT_PARAMETER params);
+void api_qs_get_http_post_json_object(QS_EVENT_PARAMETER params, QS_JSON_ELEMENT_OBJECT* object);
+
 void api_qs_send_response(QS_EVENT_PARAMETER params, const char* response);
 
 QS_SERVER_CONTEXT* api_qs_get_server_context(QS_EVENT_PARAMETER params);

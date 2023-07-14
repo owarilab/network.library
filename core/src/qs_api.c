@@ -195,6 +195,147 @@ char* api_qs_json_encode_object(QS_JSON_ELEMENT_OBJECT* object,size_t buffer_siz
 	char* json = (char*)QS_GET_POINTER(memory, memid_json);
 	return json;
 }
+
+int api_qs_json_decode_object(QS_MEMORY_CONTEXT* context, QS_JSON_ELEMENT_OBJECT* object, const char* json)
+{
+	object->memid_object = -1;
+	object->memory = NULL;
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	QS_NODE* hashroot = qs_get_json_root(memory, qs_json_decode_h(memory, json, 8, 128));
+	if (NULL == hashroot || hashroot->id != ELEMENT_HASH) {
+		return -1;
+	}
+	object->memid_object = hashroot->element_munit;
+	object->memory = (void*)memory;
+	return 0;
+}
+int32_t* api_qs_object_get_integer(QS_JSON_ELEMENT_OBJECT* object,const char* name)
+{
+	if(object->memid_object==-1){
+		return NULL;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)object->memory;
+	return qs_get_hash_integer(memory,object->memid_object,name);
+}
+char* api_qs_object_get_string(QS_JSON_ELEMENT_OBJECT* object,const char* name)
+{
+	if(object->memid_object==-1){
+		return NULL;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)object->memory;
+	return qs_get_hash_string(memory,object->memid_object,name);
+}
+int api_qs_object_get_array(QS_JSON_ELEMENT_OBJECT* object,const char* name,QS_JSON_ELEMENT_ARRAY* dst_array)
+{
+	dst_array->memid_array = -1;
+	dst_array->memory = NULL;
+	if(object->memid_object==-1){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)object->memory;
+	int32_t hash_id = qs_get_hash_id( memory, object->memid_object, name );
+	if( hash_id != ELEMENT_ARRAY){
+		return -1;
+	}
+	dst_array->memory = (void*)memory;
+	dst_array->memid_array = qs_get_hash( memory, object->memid_object, name );
+	return 0;
+}
+int api_qs_object_get_object(QS_JSON_ELEMENT_OBJECT* object,const char* name,QS_JSON_ELEMENT_OBJECT* dst_object)
+{
+	dst_object->memid_object = -1;
+	dst_object->memory = NULL;
+	if(object->memid_object==-1){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)object->memory;
+	int32_t hash_id = qs_get_hash_id( memory, object->memid_object, name );
+	if( hash_id != ELEMENT_HASH){
+		return -1;
+	}
+	dst_object->memory = (void*)memory;
+	dst_object->memid_object = qs_get_hash( memory, object->memid_object, name );
+	return 0;
+}
+int32_t api_qs_array_get_length(QS_JSON_ELEMENT_ARRAY* array)
+{
+	if(array->memid_array==-1){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)array->memory;
+	return qs_array_length(memory,array->memid_array);
+}
+int32_t* api_qs_array_get_integer(QS_JSON_ELEMENT_ARRAY* array,int32_t offset)
+{
+	if(array->memid_array==-1){
+		return NULL;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)array->memory;
+	QS_ARRAY_ELEMENT* elm = qs_array_get(memory,array->memid_array,offset);
+	if(elm==NULL){
+		return NULL;
+	}
+	if(elm->id != ELEMENT_LITERAL_NUM){
+		return NULL;
+	}
+	return QS_PINT32(memory,elm->munit);
+}
+char* api_qs_array_get_string(QS_JSON_ELEMENT_ARRAY* array,int32_t offset)
+{
+	if(array->memid_array==-1){
+		return NULL;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)array->memory;
+	QS_ARRAY_ELEMENT* elm = qs_array_get(memory,array->memid_array,offset);
+	if(elm==NULL){
+		return NULL;
+	}
+	if(elm->id != ELEMENT_LITERAL_STR){
+		return NULL;
+	}
+	return (char*)QS_GET_POINTER(memory,elm->munit);
+}
+int api_qs_array_get_array(QS_JSON_ELEMENT_ARRAY* array,int32_t offset,QS_JSON_ELEMENT_ARRAY* dst_array)
+{
+	dst_array->memid_array = -1;
+	dst_array->memory = NULL;
+	if(array->memid_array==-1){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)array->memory;
+	QS_ARRAY_ELEMENT* elm = qs_array_get(memory,array->memid_array,offset);
+	if(elm==NULL){
+		return -1;
+	}
+	if(elm->id != ELEMENT_ARRAY){
+		return -1;
+	}
+	dst_array->memory = (void*)memory;
+	dst_array->memid_array = elm->munit;
+	return 0;
+}
+int api_qs_array_get_object(QS_JSON_ELEMENT_ARRAY* array,int32_t offset,QS_JSON_ELEMENT_OBJECT* dst_object)
+{
+	dst_object->memid_object = -1;
+	dst_object->memory = NULL;
+	if(array->memid_array==-1){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)array->memory;
+	QS_ARRAY_ELEMENT* elm = qs_array_get(memory,array->memid_array,offset);
+	if(elm==NULL){
+		return -1;
+	}
+	if(elm->id != ELEMENT_HASH){
+		return -1;
+	}
+	dst_object->memory = (void*)memory;
+	dst_object->memid_object = elm->munit;
+	return 0;
+}
+
+
+
 int api_qs_csv_read_file(QS_MEMORY_CONTEXT* context, QS_CSV_CONTEXT* csv, const char* csv_file_path)
 {
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
@@ -930,6 +1071,27 @@ char* api_qs_get_http_post_parameter(void* params, const char* name)
 	char* value = (char*)QS_GET_POINTER(http_request->temporary_memory, qs_get_hash(http_request->temporary_memory, http_request->memid_post_parameter_hash, name));
 	return value;
 }
+
+char* api_qs_get_http_post_body(QS_EVENT_PARAMETER params)
+{
+	QS_RECV_INFO *rinfo = (QS_RECV_INFO *)params;
+	QS_SERVER_CONNECTION_INFO * tinfo = (QS_SERVER_CONNECTION_INFO *)rinfo->tinfo;
+	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
+	char *body = (char*)qs_upointer(option->memory_pool, rinfo->recvbuf_munit);
+	return body;
+}
+
+void api_qs_get_http_post_json_object(QS_EVENT_PARAMETER params, QS_JSON_ELEMENT_OBJECT* object)
+{
+	QS_RECV_INFO *rinfo = (QS_RECV_INFO *)params;
+	QS_SERVER_CONNECTION_INFO * tinfo = (QS_SERVER_CONNECTION_INFO *)rinfo->tinfo;
+	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
+	QS_SERVER_CONTEXT* context = (QS_SERVER_CONTEXT*)option->application_data;
+	QS_HTTP_REQUEST_COMMON* http_request = (QS_HTTP_REQUEST_COMMON*)context->system_data;
+	object->memid_object = http_request->memid_post_parameter_hash;
+	object->memory = (void*)option->memory_pool;
+}
+
 void api_qs_send_response(void* params, const char* response)
 {
 	QS_RECV_INFO *rinfo = (QS_RECV_INFO *)params;
