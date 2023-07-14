@@ -278,7 +278,7 @@ int32_t* api_qs_array_get_integer(QS_JSON_ELEMENT_ARRAY* array,int32_t offset)
 	if(elm->id != ELEMENT_LITERAL_NUM){
 		return NULL;
 	}
-	return QS_PINT32(memory,elm->munit);
+	return QS_PINT32(memory,elm->memid_array_element_data);
 }
 char* api_qs_array_get_string(QS_JSON_ELEMENT_ARRAY* array,int32_t offset)
 {
@@ -293,7 +293,7 @@ char* api_qs_array_get_string(QS_JSON_ELEMENT_ARRAY* array,int32_t offset)
 	if(elm->id != ELEMENT_LITERAL_STR){
 		return NULL;
 	}
-	return (char*)QS_GET_POINTER(memory,elm->munit);
+	return (char*)QS_GET_POINTER(memory,elm->memid_array_element_data);
 }
 int api_qs_array_get_array(QS_JSON_ELEMENT_ARRAY* array,int32_t offset,QS_JSON_ELEMENT_ARRAY* dst_array)
 {
@@ -311,7 +311,7 @@ int api_qs_array_get_array(QS_JSON_ELEMENT_ARRAY* array,int32_t offset,QS_JSON_E
 		return -1;
 	}
 	dst_array->memory = (void*)memory;
-	dst_array->memid_array = elm->munit;
+	dst_array->memid_array = elm->memid_array_element_data;
 	return 0;
 }
 int api_qs_array_get_object(QS_JSON_ELEMENT_ARRAY* array,int32_t offset,QS_JSON_ELEMENT_OBJECT* dst_object)
@@ -330,7 +330,7 @@ int api_qs_array_get_object(QS_JSON_ELEMENT_ARRAY* array,int32_t offset,QS_JSON_
 		return -1;
 	}
 	dst_object->memory = (void*)memory;
-	dst_object->memid_object = elm->munit;
+	dst_object->memid_object = elm->memid_array_element_data;
 	return 0;
 }
 
