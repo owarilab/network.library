@@ -44,14 +44,14 @@ int32_t qs_csv_file_load(QS_MEMORY_POOL* memory, const char * file_name)
 	}
 	return qs_csv_parse(memory,buffer);
 }
+
 int32_t qs_csv_parse(QS_MEMORY_POOL* memory, const char * src_csv)
 {
-	int32_t memid_csv = qs_create_memory_block(memory,sizeof(QS_CSV));
+	int32_t memid_csv = qs_csv_init(memory);
 	if(-1==memid_csv){
 		return -1;
 	}
 	QS_CSV* csv = (QS_CSV*)QS_GET_POINTER(memory,memid_csv);
-	csv->memid_csv_array = -1;
 	int32_t memid_tokens = -1;
 	if( -1 == ( memid_tokens = qs_inittoken( memory, 1000, QS_TOKEN_READ_BUFFER_SIZE_MIN ) ) ){
 		return -1;
@@ -64,6 +64,10 @@ int32_t qs_csv_parse(QS_MEMORY_POOL* memory, const char * src_csv)
 	if( tokens->token_munit == -1 ){
 		return -1;
 	}
+
+	//dump
+	//qs_tokendump(memory,memid_tokens);
+
 	QS_TOKEN *token_list = (QS_TOKEN*)QS_GET_POINTER(memory,tokens->token_munit);
 	int32_t memid_current_array = -1;
 	int i;
@@ -139,4 +143,136 @@ char* qs_csv_get_row(QS_MEMORY_POOL* memory, int32_t memid_csv, int32_t line_pos
 		return NULL;
 	}
 	return (char*)QS_GET_POINTER(memory,row_elm->memid_array_element_data);
+}
+
+char* qs_csv_build_csv(QS_MEMORY_POOL* memory, int32_t memid_csv, size_t buffer_size)
+{
+	if(-1==memid_csv){
+		return NULL;
+	}
+	QS_CSV* csv = (QS_CSV*)QS_GET_POINTER(memory,memid_csv);
+	int32_t memid_csv_string = -1;
+	if(-1==qs_create_memory_block(memory,sizeof(char) * buffer_size)){
+		return NULL;
+	}
+	char* csv_string = (char*)QS_GET_POINTER(memory,memid_csv_string);
+	size_t link_len = 0;
+	int32_t i;
+	for(i=0;i<qs_array_length(memory,csv->memid_csv_array);i++){
+		QS_ARRAY_ELEMENT* elm = qs_array_get(memory,csv->memid_csv_array,i);
+		if(NULL==elm){
+			return NULL;
+		}
+		int32_t j;
+		for(j=0;j<qs_array_length(memory,elm->memid_array_element_data);j++){
+			QS_ARRAY_ELEMENT* row_elm = qs_array_get(memory,elm->memid_array_element_data,j);
+			if(NULL==row_elm){
+				return NULL;
+			}
+			char* str = (char*)QS_GET_POINTER(memory,row_elm->memid_array_element_data);
+
+			// check numeric
+			int is_numeric = 1;
+			int k;
+			for(k=0;k<qs_strlen(str);k++){
+				if(k == 0 && str[k] == '-') continue;
+				if(!isdigit((unsigned char)str[k]) && str[k]!='.'){
+					is_numeric = 0;
+					break;
+				}
+			}
+
+			if(!is_numeric){
+				if(link_len+2>=buffer_size){
+					return NULL;
+				}
+				link_len = qs_strlink( csv_string, link_len, "\"", 1, buffer_size );
+				if(link_len+qs_strlen(str)+1>=buffer_size){
+					return NULL;
+				}
+				link_len = qs_strlink( csv_string, link_len, str, qs_strlen(str), buffer_size );
+				if(link_len+2>=buffer_size){
+					return NULL;
+				}
+				link_len = qs_strlink( csv_string, link_len, "\"", 1, buffer_size );
+			}else{
+				if(link_len+qs_strlen(str)>=buffer_size){
+					return NULL;
+				}
+				link_len = qs_strlink( csv_string, link_len, str, qs_strlen(str), buffer_size );
+			}
+			if(j!=qs_array_length(memory,elm->memid_array_element_data)-1){
+				if(link_len+1>=buffer_size){
+					return NULL;
+				}
+				link_len = qs_strlink( csv_string, link_len, ",", 1, buffer_size );
+			}
+		}
+		if(i!=qs_array_length(memory,csv->memid_csv_array)-1){
+			if(link_len+1>=buffer_size){
+				return NULL;
+			}
+			link_len = qs_strlink( csv_string, link_len, "\n", 1, buffer_size );
+		}
+	}
+	return (char*)QS_GET_POINTER(memory,memid_csv_string);
+}
+
+int32_t qs_csv_init(QS_MEMORY_POOL* memory)
+{
+	int32_t memid_csv;
+	if(-1==(memid_csv = qs_create_memory_block(memory,sizeof(QS_CSV)))){
+		return -1;
+	}
+	QS_CSV* csv = (QS_CSV*)QS_GET_POINTER(memory,memid_csv);
+	csv->memid_csv_array = -1;
+	return memid_csv;
+}
+
+int32_t qs_csv_add_row(QS_MEMORY_POOL* memory, int32_t memid_csv, int32_t line_pos, const char* row)
+{
+	if(-1==memid_csv){
+		return -1;
+	}
+	QS_CSV* csv = (QS_CSV*)QS_GET_POINTER(memory,memid_csv);
+	int32_t current_length = qs_array_length(memory, csv->memid_csv_array);
+	if(line_pos >= current_length){
+		for(int32_t i = current_length; i < line_pos; i++){
+			int32_t empty_memid_array = -1;
+			if(-1 == qs_array_push_string(memory, &empty_memid_array, "")){
+				return -1;
+			}
+			if(-1 == qs_array_push(memory, &csv->memid_csv_array, ELEMENT_ARRAY, empty_memid_array)){
+				return -1;
+			}
+		}
+		int32_t memid_array = -1;
+		if(-1==qs_array_push_string(memory,&memid_array,row)){
+			return -1;
+		}
+		if(-1==qs_array_push(memory,&csv->memid_csv_array,ELEMENT_ARRAY,memid_array)){
+			return -1;
+		}
+	}else{
+		QS_ARRAY_ELEMENT* elm = qs_array_get(memory,csv->memid_csv_array,line_pos);
+		if(NULL==elm){
+			return -1;
+		}
+		if(-1==qs_array_push_string(memory,&elm->memid_array_element_data,row)){
+			return -1;
+		}
+	}
+	return QS_SYSTEM_OK;
+}
+
+int32_t qs_csv_add_line(QS_MEMORY_POOL* memory, int32_t memid_csv, int32_t memid_array)
+{
+	if(-1==memid_csv){
+		return -1;
+	}
+	QS_CSV* csv = (QS_CSV*)QS_GET_POINTER(memory,memid_csv);
+	if(-1==qs_array_push(memory,&csv->memid_csv_array,ELEMENT_ARRAY,memid_array)){
+		return -1;
+	}
+	return 0;
 }
