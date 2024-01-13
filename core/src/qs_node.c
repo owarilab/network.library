@@ -37,7 +37,6 @@ int32_t qs_createrootnode( QS_MEMORY_POOL* _ppool )
 	rootnode = (QS_NODE*)QS_GET_POINTER( _ppool, rootnode_munit );
 	rootnode->id                = ELEMENT_ROOT;
 	rootnode->element_munit     = -1;
-	rootnode->element_munit     = -1;
 	rootnode->pos               = 0;
 	rootnode->elmsize           = 0;
 	rootnode->exec_tmp_munit    = -1;

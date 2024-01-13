@@ -123,9 +123,9 @@ int32_t qs_json_encode_hash( QS_MEMORY_POOL* _ppool, int32_t memid_hash, size_t 
 	return qs_json_encode( _ppool, (QS_NODE*)QS_GET_POINTER(_ppool, memid_node), buffer_size );
 }
 
-int32_t qs_json_encode_array( QS_MEMORY_POOL* _ppool, int32_t memid_hash, size_t buffer_size )
+int32_t qs_json_encode_array( QS_MEMORY_POOL* _ppool, int32_t memid_array, size_t buffer_size )
 {
-	int32_t memid_node = qs_make_json_root(_ppool,memid_hash,ELEMENT_ARRAY);
+	int32_t memid_node = qs_make_json_root(_ppool,memid_array,ELEMENT_ARRAY);
 	if(-1==memid_node){
 		return -1;
 	}
@@ -629,14 +629,14 @@ int32_t qs_json_decode_parser_array( QS_MEMORY_POOL* _ppool, QS_NODE* node, QS_T
 	return working_munit;
 }
 
-int32_t qs_make_json_root( QS_MEMORY_POOL* _ppool, int32_t data_munit, int id )
+int32_t qs_make_json_root( QS_MEMORY_POOL* _ppool, int32_t memid_data, int id )
 {
 	int32_t rootnode_munit = -1;
 	do{
 		rootnode_munit = qs_createrootnode( _ppool );
 		QS_NODE *rootnode = (QS_NODE*)QS_GET_POINTER( _ppool, rootnode_munit );
 		rootnode->id = id;
-		qs_addelement( _ppool, rootnode, id, data_munit );
+		qs_addelement( _ppool, rootnode, id, memid_data );
 	}while( false );
 	return rootnode_munit;
 }

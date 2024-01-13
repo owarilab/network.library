@@ -212,6 +212,7 @@ void* qs_offsetpointer( QS_MEMORY_POOL* memory, int32_t id, size_t size, int32_t
 size_t qs_usize( QS_MEMORY_POOL* memory, int32_t id );
 size_t qs_free( QS_MEMORY_POOL* memory );
 size_t qs_memory_available_size( QS_MEMORY_POOL* memory );
+size_t qs_memory_use_size( QS_MEMORY_POOL* memory );
 void qs_set_buffer( QS_MEMORY_POOL* memory, int32_t id, QS_BYTE_BUFFER* pbuffer );
 uint16_t qs_pop_little_to_host_bit16( QS_BYTE_BUFFER* pbuffer );
 uint16_t qs_pop_big_to_host_bit16( QS_BYTE_BUFFER* pbuffer );
@@ -229,6 +230,8 @@ uint32_t qs_safe_malloc( QS_MEMORY_POOL* memory, size_t allocate_size, QS_MEMORY
 uint32_t qs_malloc( QS_MEMORY_POOL* memory, size_t allocate_size, QS_MEMORY_UNIT** unit );
 size_t qs_realloc_memory( QS_MEMORY_POOL* memory, size_t allocate_size, QS_MEMORY_UNIT** current_unit );
 uint32_t qs_initialize_memory_block( QS_MEMORY_UNIT * unit );
+
+
 
 // debug
 void qs_memory_info( QS_MEMORY_POOL* memory );

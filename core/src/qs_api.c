@@ -50,6 +50,7 @@ int api_qs_send_ws_message_common(QS_RECV_INFO *qs_recv_info,const char* message
 int api_qs_init()
 {
 	qs_srand_32();
+	qs_srand_64();
 	return 0;
 }
 
@@ -73,6 +74,11 @@ void api_qs_memory_info(QS_MEMORY_CONTEXT* context)
 {
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
 	qs_memory_info(memory);
+}
+size_t api_qs_memory_available_size(QS_MEMORY_CONTEXT* context)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	return qs_memory_available_size(memory);
 }
 int api_qs_memory_free(QS_MEMORY_CONTEXT* context)
 {
@@ -195,6 +201,19 @@ char* api_qs_json_encode_object(QS_JSON_ELEMENT_OBJECT* object,size_t buffer_siz
 	char* json = (char*)QS_GET_POINTER(memory, memid_json);
 	return json;
 }
+char* api_qs_json_encode_array(QS_JSON_ELEMENT_ARRAY* array,size_t buffer_size)
+{
+	if(array->memid_array==-1){
+		return 0;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)array->memory;
+	int32_t memid_json = qs_json_encode_array(memory, array->memid_array, buffer_size);
+	if (-1 == memid_json) {
+		return 0;
+	}
+	char* json = (char*)QS_GET_POINTER(memory, memid_json);
+	return json;
+}
 
 int api_qs_json_decode_object(QS_MEMORY_CONTEXT* context, QS_JSON_ELEMENT_OBJECT* object, const char* json)
 {
@@ -255,6 +274,23 @@ int api_qs_object_get_object(QS_JSON_ELEMENT_OBJECT* object,const char* name,QS_
 	}
 	dst_object->memory = (void*)memory;
 	dst_object->memid_object = qs_get_hash( memory, object->memid_object, name );
+	return 0;
+}
+int api_qs_object_get_keys(QS_JSON_ELEMENT_OBJECT* object,QS_JSON_ELEMENT_ARRAY* dst_array)
+{
+	dst_array->memid_array = -1;
+	dst_array->memory = NULL;
+	if(object->memid_object==-1){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)object->memory;
+	int is_sort_asc = 1;
+	int32_t memid_array = qs_get_hash_keys(memory,object->memid_object,is_sort_asc);
+	if(-1==memid_array){
+		return -1;
+	}
+	dst_array->memory = (void*)memory;
+	dst_array->memid_array = memid_array;
 	return 0;
 }
 int32_t api_qs_array_get_length(QS_JSON_ELEMENT_ARRAY* array)
@@ -1210,9 +1246,9 @@ int api_qs_kvs_delete(QS_KVS_CONTEXT* kvs_context,const char* key)
 	qs_get_cache_page(cache,&cache_page);
 	return qs_remove_hash(cache_page.memory,cache_page.hash_id,key);
 }
-int api_qs_kvs_keys(QS_JSON_ELEMENT_ARRAY* array, QS_KVS_CONTEXT* kvs_context)
+int32_t api_qs_kvs_keys(QS_JSON_ELEMENT_ARRAY* array, QS_KVS_CONTEXT* kvs_context)
 {
-	int key_length = 0;
+	int32_t key_length = 0;
 	QS_MEMORY_POOL* cache_main_memory = (QS_MEMORY_POOL*)kvs_context->memory;
 	QS_MEMORY_POOL* cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(cache_main_memory,kvs_context->memid_kvs_memory);
 	QS_CACHE* cache = (QS_CACHE*)QS_GET_POINTER(cache_memory,kvs_context->memid_kvs);
@@ -1229,6 +1265,35 @@ int api_qs_kvs_keys(QS_JSON_ELEMENT_ARRAY* array, QS_KVS_CONTEXT* kvs_context)
 		//	(char*)QS_GET_POINTER(cache_page.memory,he->memid_hash_element_data)
 		//);
 		key_length++;
+	}
+	return key_length;
+}
+
+int32_t api_qs_kvs_sorted_keys(QS_JSON_ELEMENT_ARRAY* array, QS_KVS_CONTEXT* kvs_context, int32_t is_sort_asc)
+{
+	int32_t key_length = 0;
+	QS_MEMORY_POOL* cache_main_memory = (QS_MEMORY_POOL*)kvs_context->memory;
+	QS_MEMORY_POOL* cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(cache_main_memory,kvs_context->memid_kvs_memory);
+	QS_CACHE* cache = (QS_CACHE*)QS_GET_POINTER(cache_memory,kvs_context->memid_kvs);
+	QS_CACHE_PAGE cache_page;
+	qs_get_cache_page(cache,&cache_page);
+
+	int32_t memid_sorted_keys = qs_get_hash_keys(cache_page.memory,cache_page.hash_id,is_sort_asc);
+	if(-1 == memid_sorted_keys){
+		return -1;
+	}
+
+	key_length = qs_array_length(cache_page.memory,memid_sorted_keys);
+	int32_t i;
+	QS_ARRAY_ELEMENT* ae;
+	for(i=0;i<key_length;i++){
+		ae = qs_array_get(cache_page.memory,memid_sorted_keys,i);
+		if(NULL == ae){
+			continue;
+		}
+		int32_t memid_key = ae->memid_array_element_data;
+		char* key = (char*)QS_GET_POINTER(cache_page.memory,memid_key);
+		api_qs_array_push_string(array,key);
 	}
 	return key_length;
 }
@@ -1376,4 +1441,16 @@ int api_qs_http_response_json(QS_EVENT_PARAMETER params, QS_JSON_ELEMENT_OBJECT*
 	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
 	//QS_SERVER_CONTEXT* context = (QS_SERVER_CONTEXT*)option->application_data;
 	return http_json_response_common(tinfo,option,dest_temporary_memory,object->memid_object,buffer_size);
+}
+
+char* api_qs_uniqid(QS_MEMORY_CONTEXT* memory_context, int32_t length)
+{
+	QS_MEMORY_POOL * memory = ( QS_MEMORY_POOL* )memory_context->memory;
+	int32_t memid_string = qs_create_memory_block(memory, length + 1);
+	if(-1==memid_string){
+		return NULL;
+	}
+	char* string = (char*)QS_GET_POINTER(memory, memid_string);
+	qs_uniqid_r32(string,length);
+	return string;
 }

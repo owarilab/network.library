@@ -1144,6 +1144,12 @@ size_t qs_memory_available_size( QS_MEMORY_POOL* memory )
 	return freeSize;
 }
 
+size_t qs_memory_use_size( QS_MEMORY_POOL* memory )
+{
+	size_t use_size = ( memory->size - ( ( memory->bottom - memory->top ) ) );
+	return use_size;
+}
+
 void qs_set_buffer( QS_MEMORY_POOL* memory, int32_t id, QS_BYTE_BUFFER* pbuffer )
 {
 	if( id < memory->fix_memory_block_size || id >= memory->block_size ){

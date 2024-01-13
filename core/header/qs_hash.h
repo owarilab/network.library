@@ -35,6 +35,7 @@ extern "C"{
 #include "qs_core.h"
 #include "qs_type.h"
 #include "qs_array.h"
+#include "qs_chain_array.h"
 #include "qs_memory_allocator.h"
 #include "qs_string.h"
 #if defined(__LINUX__) || defined(__BSD_UNIX__) || defined(__ANDROID__) || defined(__IOS__)
@@ -97,6 +98,7 @@ QS_HASH_ELEMENT* qs_get_hash_element( QS_MEMORY_POOL* memory, int32_t memid_hash
 int32_t qs_hash_length( QS_MEMORY_POOL* memory, int32_t memid_hash );
 int32_t qs_init_hash_foreach( QS_MEMORY_POOL* memory, int32_t memid_hash, QS_HASH_FOREACH* hf );
 QS_HASH_ELEMENT* qs_hash_foreach( QS_MEMORY_POOL* memory, QS_HASH_FOREACH* hf );
+int32_t qs_get_hash_keys( QS_MEMORY_POOL* memory, int32_t memid_hash, int is_sort_asc);
 
 #endif /*_QS_HASH_H_*/
 

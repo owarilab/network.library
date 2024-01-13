@@ -6,6 +6,9 @@ int32_t qs_create_chain_array(QS_MEMORY_POOL* memory,size_t chain_size, size_t d
 	int32_t header_size = (sizeof(int32_t)*8);
 	int32_t block_size = data_size+(sizeof(int32_t)*2);
 	int32_t chain_id = qs_create_memory_block(memory,header_size+(block_size*chain_size));
+	if( -1 == chain_id){
+		return -1;
+	}
 	uint8_t* chain_root = (uint8_t*)QS_GET_POINTER(memory,chain_id);
 	memset(chain_root,0,qs_usize(memory,chain_id));
 	int32_t* pv = (int32_t*)chain_root;

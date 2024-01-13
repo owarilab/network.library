@@ -107,6 +107,7 @@ int api_qs_memory_alloc(QS_MEMORY_CONTEXT* context, size_t alloc_size);
 int api_qs_memory_clean(QS_MEMORY_CONTEXT* context);
 void api_qs_memory_info(QS_MEMORY_CONTEXT* context);
 int api_qs_memory_free(QS_MEMORY_CONTEXT* context);
+size_t api_qs_memory_available_size(QS_MEMORY_CONTEXT* context);
 int api_qs_array_create(QS_MEMORY_CONTEXT* context, QS_JSON_ELEMENT_ARRAY* array);
 int api_qs_array_push_integer(QS_JSON_ELEMENT_ARRAY* array,int32_t value);
 int api_qs_array_push_string(QS_JSON_ELEMENT_ARRAY* array,const char* value);
@@ -118,12 +119,14 @@ int api_qs_object_push_string(QS_JSON_ELEMENT_OBJECT* object,const char* name,co
 int api_qs_object_push_array(QS_JSON_ELEMENT_OBJECT* object,const char* name,QS_JSON_ELEMENT_ARRAY* array);
 int api_qs_object_push_object(QS_JSON_ELEMENT_OBJECT* object,const char* name,QS_JSON_ELEMENT_OBJECT* push_object);
 char* api_qs_json_encode_object(QS_JSON_ELEMENT_OBJECT* object,size_t buffer_size);
+char* api_qs_json_encode_array(QS_JSON_ELEMENT_ARRAY* array,size_t buffer_size);
 
 int api_qs_json_decode_object(QS_MEMORY_CONTEXT* context, QS_JSON_ELEMENT_OBJECT* object, const char* json);
 int32_t* api_qs_object_get_integer(QS_JSON_ELEMENT_OBJECT* object,const char* name);
 char* api_qs_object_get_string(QS_JSON_ELEMENT_OBJECT* object,const char* name);
 int api_qs_object_get_array(QS_JSON_ELEMENT_OBJECT* object,const char* name,QS_JSON_ELEMENT_ARRAY* dst_array);
 int api_qs_object_get_object(QS_JSON_ELEMENT_OBJECT* object,const char* name,QS_JSON_ELEMENT_OBJECT* dst_object);
+int api_qs_object_get_keys(QS_JSON_ELEMENT_OBJECT* object,QS_JSON_ELEMENT_ARRAY* dst_array);
 int32_t api_qs_array_get_length(QS_JSON_ELEMENT_ARRAY* object);
 int32_t* api_qs_array_get_integer(QS_JSON_ELEMENT_ARRAY* object,int32_t offset);
 char* api_qs_array_get_string(QS_JSON_ELEMENT_ARRAY* object,int32_t offset);
@@ -177,12 +180,15 @@ int api_qs_kvs_create_b1mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kv
 int api_qs_kvs_set(QS_KVS_CONTEXT* kvs_context,const char* key, const char* value, int32_t life_time);
 char* api_qs_kvs_get(QS_KVS_CONTEXT* kvs_context,const char* key);
 int api_qs_kvs_delete(QS_KVS_CONTEXT* kvs_context,const char* key);
-int api_qs_kvs_keys(QS_JSON_ELEMENT_ARRAY* array, QS_KVS_CONTEXT* kvs_context);
+int32_t api_qs_kvs_keys(QS_JSON_ELEMENT_ARRAY* array, QS_KVS_CONTEXT* kvs_context);
+int32_t api_qs_kvs_sorted_keys(QS_JSON_ELEMENT_ARRAY* array, QS_KVS_CONTEXT* kvs_context, int32_t is_sort_asc);
 
 int api_qs_room_create(QS_SERVER_CONTEXT* context, const char* name, QS_MEMORY_CONTEXT* dest_memory, QS_JSON_ELEMENT_OBJECT* dest_object);
 int api_qs_room_list(QS_SERVER_CONTEXT* context, QS_MEMORY_CONTEXT* dest_memory, QS_JSON_ELEMENT_OBJECT* dest_object);
 int api_qs_room_join(QS_SERVER_CONTEXT* context, const char* room_id, const char* connection_id, QS_MEMORY_CONTEXT* dest_memory, QS_JSON_ELEMENT_OBJECT* dest_object);
 int api_qs_http_response_json(QS_EVENT_PARAMETER params, QS_JSON_ELEMENT_OBJECT* object, size_t buffer_size);
+
+char* api_qs_uniqid(QS_MEMORY_CONTEXT* memory_context, int32_t length);
 
 #endif /*_QS_API_H_*/
 
