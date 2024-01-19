@@ -48,6 +48,7 @@ int32_t qs_create_array( QS_MEMORY_POOL* _ppool, size_t allocsize )
 	for( i = 0; i < allocsize; i++ ){
 		(elm+i)->id = 0;
 		(elm+i)->memid_array_element_data = -1;
+		(elm+i)->memid_numeric_buffer = -1;
 	}
 	return tmpmunit;
 }
@@ -135,6 +136,7 @@ int32_t qs_resize_array( QS_MEMORY_POOL* _ppool, int32_t munit )
 			for( i = parray->max_size; i < parray->max_size + allocsize; i++ ){
 				(elm+i)->id = 0;
 				(elm+i)->memid_array_element_data = -1;
+				(elm+i)->memid_numeric_buffer = -1;
 			}
 			parray->max_size += allocsize;
 		}
