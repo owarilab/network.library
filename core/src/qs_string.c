@@ -385,6 +385,7 @@ uint32_t qs_ihash( const char* s, uint32_t range )
 	return ( v % range );
 }
 
+// example : Sun Sep 16 01:03:52 1973\n\0 = 26byte
 int qs_utc_time( char* dest, size_t dest_size )
 {
 #ifdef __WINDOWS__
