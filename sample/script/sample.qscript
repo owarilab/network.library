@@ -1,0 +1,115 @@
+
+cnt = rand() % 100;
+loopcnt=cnt;
+while(loopcnt>0){
+    r = rand() % 10;
+    echo("v = " + r + "\n");
+    loopcnt--;
+}
+echo("cnt " + cnt + "\n");
+
+
+if(1)
+{
+    // comment
+    file_name="hoge.txt";
+    if(file_exist(file_name)){
+        echo(file_name + " exist\n");
+    }
+    if(file_exist("aaaaaa.txt")){
+    }else{
+        echo("aaaaaa.txt not exist\n");
+    }
+    file_add(file_name,"aa");
+
+    file_put("put.txt","t:" + gmtime());
+
+    echo(gmtime() + "\n" );
+
+    party = [100,200,300];
+    len=count(party);
+
+    echo("len = " + len + "\n");
+
+    party[0] = 1231;
+    party[1] = 1431;
+    party[2] = 1931;
+
+    i=0;
+    while(i<len){
+    echo( "v = " + party[i] + "\n" );
+    i=i+1;
+    }
+
+    echo(json_encode(party)+"\n");
+
+    i=0;
+    while(i<1000){
+    i=i+1;
+    }
+
+    result_html = make_html("<h1>sample</h1>");
+    echo (result_html);
+
+    sample_func(i,"hoge");
+}
+
+/*
+ * comment
+ */
+def sample_func(arg1, arg2)
+{
+   echo( "arg1=" + arg1 + " , arg2=" + arg2 + "\n" );
+}
+
+/*
+ * comment
+ */
+def hash_dump_test()
+{
+    hash=[ 
+        "id" : "dummu_id",
+        "params" : [30, 555],
+        "arr" :[
+                [
+                    ["v1":1,"v2":2,"v3":3]
+                ],
+                [
+                    [1,2,3]
+                ]
+            ]
+        ];
+    echo(json_encode(hash)+"\n");
+    echo("hash value : " + hash["id"] + "\n");
+
+    dec_hash=json_decode(json_encode(hash));
+    echo(dec_hash);
+
+    hash2=["data":hash];
+    echo(json_encode(hash2)+"\n");
+}
+
+/* html test */
+def make_html(body)
+{
+    http_header="HTTP/1.1 200 OK
+Content-Type: text/html
+Connection: close
+
+";
+
+header="<html>
+<head>
+
+</head>
+<body>
+";
+
+footer="
+</body>
+</html>
+";
+
+    html=http_header+header+body+footer;
+    return html;
+}
