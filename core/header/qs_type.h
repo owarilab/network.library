@@ -61,6 +61,10 @@ extern "C"{
 #define ELEMENT_HASH_OP				23
 #define ELEMENT_LITERAL_BIN			24
 #define ELEMENT_QUEUE				25
+#define ELEMENT_INCREMENT           26
+#define ELEMENT_INCREMENT_AFTER     27
+#define ELEMENT_DECREMENT           28
+#define ELEMENT_DECREMENT_AFTER     29
 #define ELEMENT_NULL				1000
 
 #endif /*_QS_TYPE_H_*/

@@ -33,6 +33,7 @@ extern "C"{
 #define _QS_SCRIPT_H_
 
 #include "qs_core.h"
+#include "qs_random.h"
 #include "qs_hash.h"
 #include "qs_array.h"
 #include "qs_variable.h"
@@ -121,6 +122,7 @@ int32_t qs_create_return( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, int32_t da
 int qs_add_system_function( QS_MEMORY_POOL* _ppool, int32_t munit, char* functionname, QS_SCRIPT_FUNCTION func, int32_t id );
 int qs_add_user_function( QS_MEMORY_POOL* _ppool, int32_t munit, char* functionname, int32_t function_munit, int32_t id );
 
+void qs_set_return_string( QS_MEMORY_POOL* _ppool, int32_t memid_return, int32_t memid_value_string, const char* result);
 // system function
 void* qs_script_system_function_echo( QS_MEMORY_POOL* _ppool, void* args );
 void* qs_script_system_function_count( QS_MEMORY_POOL* _ppool, void* args );
@@ -133,9 +135,7 @@ void* qs_script_system_function_file_add( QS_MEMORY_POOL* _ppool, void* args );
 void* qs_script_system_function_json_encode( QS_MEMORY_POOL* _ppool, void* args );
 void* qs_script_system_function_json_decode( QS_MEMORY_POOL* _ppool, void* args );
 void* qs_script_system_function_gmtime( QS_MEMORY_POOL* _ppool, void* args );
-
-int32_t qs_init_http_script( QS_MEMORY_POOL* _ppool, const char* script_file, const char* ini_json_file );
-int32_t qs_add_http_request( QS_MEMORY_POOL* _ppool, int32_t script_munit, char* arg, int32_t header_munit, int32_t get_parameter_munit, int32_t post_parameter_munit );
+void* qs_script_system_function_rand( QS_MEMORY_POOL* _ppool, void* args );
 
 #endif /*_QS_SCRIPT_H_*/
 

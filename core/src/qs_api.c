@@ -1160,6 +1160,7 @@ int api_qs_script_read_file(QS_MEMORY_CONTEXT* memory_context, QS_SERVER_SCRIPT_
 	qs_add_system_function( script_memory, script_context->memid_script, "json_encode", qs_script_system_function_json_encode, 0 );
 	qs_add_system_function( script_memory, script_context->memid_script, "json_decode", qs_script_system_function_json_decode, 0 );
 	qs_add_system_function( script_memory, script_context->memid_script, "gmtime", qs_script_system_function_gmtime, 0 );
+	qs_add_system_function( script_memory, script_context->memid_script, "rand", qs_script_system_function_rand, 0 );
 	qs_import_script( script_memory, &script_context->memid_script, (char*)file_path );
 	script_context->memory = (void*)script_memory;
 	return 0;

@@ -301,7 +301,7 @@ int qs_parse_code_core( QS_MEMORY_POOL* _ppool, QS_SCRIPT* pscript, QS_NODE* nod
 		case ID_NUM:
 		case ID_STR:
 		case ID_OP:
-			printf("?%d\n",token_list[i].type);
+			printf("qs_parse_code_core error : %d\n",token_list[i].type);
 			error=1;
 			break;
 	}
@@ -632,7 +632,7 @@ int qs_parse_expr( QS_MEMORY_POOL* _ppool, QS_SCRIPT* pscript, QS_NODE* node, QS
 				qs_addelement( _ppool, node, ELEMENT_OP_LITERAL_MINUS, tmpmunit );
 			}
 			else{
-				//printf("?? : %s\n",(char*)QS_GET_POINTER( _ppool, pt[index].buf_munit ));
+				//printf("other expr ?? : %s\n",(char*)QS_GET_POINTER( _ppool, pt[index].buf_munit ));
 			}
 		}
 	}
@@ -672,7 +672,30 @@ int qs_parse_symbol( QS_MEMORY_POOL* _ppool, QS_SCRIPT* pscript, QS_NODE* node, 
 		return index;
 	}
 	pbuf = (char*)QS_GET_POINTER( _ppool, token_list[index].buf_munit );
-	if( !strcmp( "=", pbuf )
+	// increment, decrement
+	if( !strcmp( "++", pbuf ) || !strcmp( "--", pbuf) ){
+		childmunit = qs_addnodeelement( _ppool, node );
+		childnode = (QS_NODE*)QS_GET_POINTER( _ppool, childmunit );
+		qs_addelement( _ppool, childnode, ELEMENT_VALIABLE, tmpmunit );
+		stmtmunit = qs_addnodeelement( _ppool, childnode );
+		stmtnode = (QS_NODE*)QS_GET_POINTER( _ppool, stmtmunit );
+		int32_t memid_op = token_list[index].buf_munit;
+		index++;
+		if(!strcmp( pbuf, "++" )){
+			qs_addelement( _ppool, stmtnode, ELEMENT_INCREMENT_AFTER, memid_op );
+		}
+		else if(!strcmp( pbuf, "--" )){
+			qs_addelement( _ppool, stmtnode, ELEMENT_DECREMENT_AFTER, memid_op );
+		}
+		// variable
+		qs_addelement( _ppool, stmtnode, ELEMENT_VALIABLE, tmpmunit );
+		// =
+		int32_t memid_op2 = qs_create_memory_block( _ppool, 8 );
+		char* pbuf2 = (char*)QS_GET_POINTER( _ppool, memid_op2 );
+		qs_strcopy( pbuf2, "=", QS_PUNIT_USIZE( _ppool, memid_op2 ) );
+		qs_addelement( _ppool, childnode, ELEMENT_ASSIGNMENT, memid_op2 );
+	}
+	else if( !strcmp( "=", pbuf )
 		|| !strcmp( "+=", pbuf )
 		|| !strcmp( "-=", pbuf )
 		|| !strcmp( "*=", pbuf )
@@ -1886,6 +1909,8 @@ int32_t qs_exec_expr( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* node,
 	QS_NODE *workelemlist;
 	QS_NODE *tmpnode;
 	int32_t tmpmunit;
+	int is_increment = 0;
+	int is_decrement = 0;
 	int is_numeric = 1;
 	char* pbuf;
 	char* opbuf;
@@ -1905,6 +1930,14 @@ int32_t qs_exec_expr( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* node,
 				is_numeric = 0;
 			}
 		}
+		else if( tmpnode->id == ELEMENT_INCREMENT_AFTER )
+		{
+			is_increment = ELEMENT_INCREMENT_AFTER;
+		}
+		else if( tmpnode->id == ELEMENT_DECREMENT_AFTER)
+		{
+			is_decrement = ELEMENT_DECREMENT_AFTER;
+		}
 		else if( tmpnode->id == ELEMENT_VALIABLE )
 		{
 			char* pname = (char*)QS_GET_POINTER( _ppool, tmpnode->element_munit );
@@ -1915,6 +1948,18 @@ int32_t qs_exec_expr( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* node,
 				csize = QS_PUNIT_USIZE( _ppool, tmphashmunit );
 				tmpid = qs_get_hash_id( _ppool, pscript->v_hash_munit, pname );
 				qs_array_push( _ppool, &workingmunit, tmpid, tmphashmunit );
+				if(tmpid == ELEMENT_LITERAL_NUM){
+					if(is_increment==ELEMENT_INCREMENT_AFTER){
+						NUMERIC_CAST* pv = (NUMERIC_CAST*)QS_PNUMERIC( _ppool, tmphashmunit );
+						NUMERIC_CAST v = *pv;
+						qs_add_hash_integer( _ppool, pscript->v_hash_munit, pname, v+1 );
+					}
+					else if(is_decrement==ELEMENT_DECREMENT_AFTER){
+						NUMERIC_CAST* pv = (NUMERIC_CAST*)QS_PNUMERIC( _ppool, tmphashmunit );
+						NUMERIC_CAST v = *pv;
+						qs_add_hash_integer( _ppool, pscript->v_hash_munit, pname, v-1 );
+					}
+				}
 			}
 			else{
 				int32_t* pi;
@@ -2503,14 +2548,26 @@ int qs_add_user_function( QS_MEMORY_POOL* _ppool, int32_t munit, char* functionn
 	return error;
 }
 
+void qs_set_return_string( QS_MEMORY_POOL* _ppool, int32_t memid_return, int32_t memid_value_string, const char* result)
+{
+	QS_FUNCTION_RETURN* pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, memid_return );
+	char* pbuf = (char*)qs_upointer( _ppool, memid_value_string );
+	qs_strcopy( pbuf, result, QS_PUNIT_USIZE( _ppool, memid_value_string ) );
+	pret->munit = memid_value_string;
+	pret->id = ELEMENT_LITERAL_STR;
+}
+
 void* qs_script_system_function_echo( QS_MEMORY_POOL* _ppool, void* args )
 {
 	QS_ARRAY* parray = (QS_ARRAY*)args;
 	QS_ARRAY_ELEMENT* elm;
 	QS_FUNCTION_RETURN* pret;
-	int32_t retmunit = -1;
-	retmunit = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
-	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, retmunit );
+	int32_t memid_return = -1;
+	memid_return = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
+	if( -1 == memid_return ){
+		return NULL;
+	}
+	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, memid_return );
 	pret->id	= 0;
 	pret->munit	= -1;
 	if( parray != NULL )
@@ -2547,12 +2604,15 @@ void* qs_script_system_function_count( QS_MEMORY_POOL* _ppool, void* args )
 	QS_ARRAY* parray = (QS_ARRAY*)args;
 	QS_ARRAY_ELEMENT* elm;
 	QS_FUNCTION_RETURN* pret;
-	int32_t retmunit = -1;
-	retmunit = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
-	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, retmunit );
+	int32_t memid_return = -1;
+	memid_return = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
+	if( -1 == memid_return ){
+		return NULL;
+	}
+	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, memid_return );
 	pret->id	= 0;
 	pret->munit	= -1;
-	pret->refid = retmunit;
+	pret->refid = memid_return;
 	if( parray != NULL )
 	{
 		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->memid );
@@ -2594,12 +2654,15 @@ void* qs_script_system_function_file_exist( QS_MEMORY_POOL* _ppool, void* args )
 	QS_ARRAY* parray = (QS_ARRAY*)args;
 	QS_ARRAY_ELEMENT* elm;
 	QS_FUNCTION_RETURN* pret;
-	int32_t retmunit = -1;
-	retmunit = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
-	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, retmunit );
+	int32_t memid_return = -1;
+	memid_return = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
+	if( -1 == memid_return ){
+		return NULL;
+	}
+	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, memid_return );
 	pret->id	= 0;
 	pret->munit	= -1;
-	pret->refid = retmunit;
+	pret->refid = memid_return;
 	if( parray != NULL )
 	{
 		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->memid );
@@ -2636,12 +2699,15 @@ void* qs_script_system_function_file_size( QS_MEMORY_POOL* _ppool, void* args )
 	QS_ARRAY* parray = (QS_ARRAY*)args;
 	QS_ARRAY_ELEMENT* elm;
 	QS_FUNCTION_RETURN* pret;
-	int32_t retmunit = -1;
-	retmunit = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
-	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, retmunit );
+	int32_t memid_return = -1;
+	memid_return = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
+	if( -1 == memid_return ){
+		return NULL;
+	}
+	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, memid_return );
 	pret->id	= 0;
 	pret->munit	= -1;
-	pret->refid = retmunit;
+	pret->refid = memid_return;
 	if( parray != NULL )
 	{
 		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->memid );
@@ -2678,12 +2744,15 @@ void* qs_script_system_function_file_extension( QS_MEMORY_POOL* _ppool, void* ar
 	QS_ARRAY* parray = (QS_ARRAY*)args;
 	QS_ARRAY_ELEMENT* elm;
 	QS_FUNCTION_RETURN* pret;
-	int32_t retmunit = -1;
-	retmunit = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
-	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, retmunit );
+	int32_t memid_return = -1;
+	memid_return = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
+	if( -1 == memid_return ){
+		return NULL;
+	}
+	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, memid_return );
 	pret->id	= 0;
 	pret->munit	= -1;
-	pret->refid = retmunit;
+	pret->refid = memid_return;
 	if( parray != NULL )
 	{
 		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->memid );
@@ -2714,12 +2783,15 @@ void* qs_script_system_function_file_get( QS_MEMORY_POOL* _ppool, void* args )
 	QS_ARRAY* parray = (QS_ARRAY*)args;
 	QS_ARRAY_ELEMENT* elm;
 	QS_FUNCTION_RETURN* pret;
-	int32_t retmunit = -1;
-	retmunit = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
-	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, retmunit );
+	int32_t memid_return = -1;
+	memid_return = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
+	if( -1 == memid_return ){
+		return NULL;
+	}
+	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, memid_return );
 	pret->id	= 0;
 	pret->munit	= -1;
-	pret->refid = retmunit;
+	pret->refid = memid_return;
 	if( parray != NULL )
 	{
 		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->memid );
@@ -2763,12 +2835,15 @@ void* qs_script_system_function_file_put( QS_MEMORY_POOL* _ppool, void* args )
 	QS_ARRAY* parray = (QS_ARRAY*)args;
 	QS_ARRAY_ELEMENT* elm;
 	QS_FUNCTION_RETURN* pret;
-	int32_t retmunit = -1;
-	retmunit = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
-	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, retmunit );
+	int32_t memid_return = -1;
+	memid_return = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
+	if( -1 == memid_return ){
+		return NULL;
+	}
+	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, memid_return );
 	pret->id	= 0;
 	pret->munit	= -1;
-	pret->refid = retmunit;
+	pret->refid = memid_return;
 	if( parray != NULL )
 	{
 		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->memid );
@@ -2779,16 +2854,15 @@ void* qs_script_system_function_file_put( QS_MEMORY_POOL* _ppool, void* args )
 				if( elm[0].id == ELEMENT_LITERAL_STR && elm[1].id == ELEMENT_LITERAL_STR )
 				{
 					int32_t string_munit = qs_create_memory_block( _ppool, 8 );
-					if( 0 != qs_fwrite( (char*)QS_GET_POINTER( _ppool, elm[0].memid_array_element_data ), (char*)QS_GET_POINTER( _ppool, elm[1].memid_array_element_data ), QS_PUNIT_USIZE(_ppool,elm[1].memid_array_element_data) ) )
-					{
-						*((char*)QS_GET_POINTER(_ppool,string_munit)) = '0';
-					}
-					else{
-						*((char*)QS_GET_POINTER(_ppool,string_munit)) = '1';
-					}
-					*((char*)QS_GET_POINTER(_ppool,string_munit)+1) = '\0';
-					pret->munit = string_munit;
-					pret->id = ELEMENT_LITERAL_STR;
+					char* file_name = (char*)QS_GET_POINTER( _ppool, elm[0].memid_array_element_data );
+					char* write_data = (char*)QS_GET_POINTER( _ppool, elm[1].memid_array_element_data );
+					size_t write_size = QS_PUNIT_USIZE(_ppool,elm[1].memid_array_element_data);
+					qs_set_return_string( 
+						_ppool,
+						memid_return,
+						string_munit,
+						(0 != qs_fwrite( file_name, write_data, write_size )) ? "0" : "1"
+					);
 				}
 			}
 		}
@@ -2801,12 +2875,15 @@ void* qs_script_system_function_file_add( QS_MEMORY_POOL* _ppool, void* args )
 	QS_ARRAY* parray = (QS_ARRAY*)args;
 	QS_ARRAY_ELEMENT* elm;
 	QS_FUNCTION_RETURN* pret;
-	int32_t retmunit = -1;
-	retmunit = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
-	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, retmunit );
+	int32_t memid_return = -1;
+	memid_return = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
+	if( -1 == memid_return ){
+		return NULL;
+	}
+	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, memid_return );
 	pret->id	= 0;
 	pret->munit	= -1;
-	pret->refid = retmunit;
+	pret->refid = memid_return;
 	if( parray != NULL )
 	{
 		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->memid );
@@ -2817,16 +2894,18 @@ void* qs_script_system_function_file_add( QS_MEMORY_POOL* _ppool, void* args )
 				if( elm[0].id == ELEMENT_LITERAL_STR && elm[1].id == ELEMENT_LITERAL_STR )
 				{
 					int32_t string_munit = qs_create_memory_block( _ppool, 8 );
-					if( 0 != qs_fwrite_a( (char*)QS_GET_POINTER( _ppool, elm[0].memid_array_element_data ), (char*)QS_GET_POINTER( _ppool, elm[1].memid_array_element_data ), QS_PUNIT_USIZE(_ppool,elm[1].memid_array_element_data) ) )
-					{
-						*((char*)QS_GET_POINTER(_ppool,string_munit)) = '0';
+					if(-1 == string_munit){
+						return pret;
 					}
-					else{
-						*((char*)QS_GET_POINTER(_ppool,string_munit)) = '1';
-					}
-					*((char*)QS_GET_POINTER(_ppool,string_munit)+1) = '\0';
-					pret->munit = string_munit;
-					pret->id = ELEMENT_LITERAL_STR;
+					char* file_name = (char*)QS_GET_POINTER( _ppool, elm[0].memid_array_element_data );
+					char* write_data = (char*)QS_GET_POINTER( _ppool, elm[1].memid_array_element_data );
+					size_t write_size = QS_PUNIT_USIZE(_ppool,elm[1].memid_array_element_data);
+					qs_set_return_string( 
+						_ppool,
+						memid_return,
+						string_munit,
+						(0 != qs_fwrite_a( file_name, write_data, write_size )) ? "0" : "1"
+					);
 				}
 			}
 		}
@@ -2839,12 +2918,15 @@ void* qs_script_system_function_json_encode( QS_MEMORY_POOL* _ppool, void* args 
 	QS_ARRAY* parray = (QS_ARRAY*)args;
 	QS_ARRAY_ELEMENT* elm;
 	QS_FUNCTION_RETURN* pret;
-	int32_t retmunit = -1;
-	retmunit = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
-	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, retmunit );
+	int32_t memid_return = -1;
+	memid_return = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
+	if( -1 == memid_return ){
+		return NULL;
+	}
+	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, memid_return );
 	pret->id	= 0;
 	pret->munit	= -1;
-	pret->refid = retmunit;
+	pret->refid = memid_return;
 	if( parray != NULL )
 	{
 		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->memid );
@@ -2876,12 +2958,15 @@ void* qs_script_system_function_json_decode( QS_MEMORY_POOL* _ppool, void* args 
 	QS_ARRAY* parray = (QS_ARRAY*)args;
 	QS_ARRAY_ELEMENT* elm;
 	QS_FUNCTION_RETURN* pret;
-	int32_t retmunit = -1;
-	retmunit = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
-	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, retmunit );
+	int32_t memid_return = -1;
+	memid_return = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
+	if( -1 == memid_return ){
+		return NULL;
+	}
+	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, memid_return );
 	pret->id	= 0;
 	pret->munit	= -1;
-	pret->refid = retmunit;
+	pret->refid = memid_return;
 	if( parray != NULL )
 	{
 		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->memid );
@@ -2906,14 +2991,17 @@ void* qs_script_system_function_json_decode( QS_MEMORY_POOL* _ppool, void* args 
 void* qs_script_system_function_gmtime( QS_MEMORY_POOL* _ppool, void* args )
 {
 	QS_FUNCTION_RETURN* pret;
-	int32_t retmunit = -1;
-	retmunit = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
-	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, retmunit );
+	int32_t memid_return = -1;
+	memid_return = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
+	if( -1 == memid_return ){
+		return NULL;
+	}
+	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, memid_return );
 	pret->id	= 0;
 	pret->munit	= -1;
-	pret->refid = retmunit;
-	int32_t string_munit = qs_create_memory_block( _ppool, 256 );
-	if( string_munit <= 0 ){
+	pret->refid = memid_return;
+	int32_t string_munit = qs_create_memory_block( _ppool, 64 );
+	if( -1 == string_munit ){
 		printf( "string_munit error\n" );
 		return pret;
 	}
@@ -2923,65 +3011,32 @@ void* qs_script_system_function_gmtime( QS_MEMORY_POOL* _ppool, void* args )
 	return pret;
 }
 
-int32_t qs_init_http_script( QS_MEMORY_POOL* _ppool, const char* script_file, const char* ini_json_file )
+void* qs_script_system_function_rand( QS_MEMORY_POOL* _ppool, void* args )
 {
-	int32_t script_munit = -1;
-	do{
-		if( 0 >=( script_munit = qs_init_script( _ppool, 128, 64, 5000 ) ) )
-		{
-			printf( "qs_init_script error\n" );
-			break;
-		}
-		QS_SCRIPT *pscript = (QS_SCRIPT *)QS_GET_POINTER( _ppool, script_munit );
-		QS_FILE_INFO info;
-		if( 0 == qs_fget_info( (char*)ini_json_file, &info ) ){
-			int32_t json_string_munit = qs_create_memory_block( _ppool, sizeof( char )*info.size+1 );
-			if( 0 == qs_fread( (char*)ini_json_file, (char*)QS_GET_POINTER(_ppool,json_string_munit), QS_PUNIT_USIZE(_ppool,json_string_munit) ) ){
-				int32_t root_munit = qs_json_decode( _ppool, (char*)QS_GET_POINTER(_ppool,json_string_munit) );
-				QS_NODE* rootnode = (QS_NODE*)QS_GET_POINTER(_ppool,root_munit);
-				QS_NODE* workelemlist = ( QS_NODE* )QS_GET_POINTER( _ppool, rootnode->element_munit );
-				qs_add_hash_value_kstring( _ppool, pscript->v_hash_munit, "_INI", workelemlist[0].element_munit, workelemlist[0].id );
-			}
-		}
-		qs_add_system_function( _ppool, script_munit, "echo", qs_script_system_function_echo, 0 );
-		qs_add_system_function( _ppool, script_munit, "count", qs_script_system_function_count, 0 );
-		qs_add_system_function( _ppool, script_munit, "file_exist", qs_script_system_function_file_exist, 0 );
-		qs_add_system_function( _ppool, script_munit, "file_size", qs_script_system_function_file_size, 0 );
-		qs_add_system_function( _ppool, script_munit, "file_extension", qs_script_system_function_file_extension, 0 );
-		qs_add_system_function( _ppool, script_munit, "file_get", qs_script_system_function_file_get, 0 );
-		qs_add_system_function( _ppool, script_munit, "file_put", qs_script_system_function_file_put, 0 );
-		qs_add_system_function( _ppool, script_munit, "file_add", qs_script_system_function_file_add, 0 );
-		qs_add_system_function( _ppool, script_munit, "json_encode", qs_script_system_function_json_encode, 0 );
-		qs_add_system_function( _ppool, script_munit, "json_decode", qs_script_system_function_json_decode, 0 );
-		qs_add_system_function( _ppool, script_munit, "gmtime", qs_script_system_function_gmtime, 0 );
-		qs_import_script( _ppool, &script_munit, (char*)script_file );
-	}while( false );
-	return script_munit;
-}
-
-int32_t qs_add_http_request( QS_MEMORY_POOL* _ppool, int32_t script_munit, char* arg, int32_t header_munit, int32_t get_parameter_munit, int32_t post_parameter_munit )
-{
-	if( script_munit==-1){
-		return QS_SYSTEM_ERROR;
+	QS_FUNCTION_RETURN* pret;
+	int32_t memid_return = -1;
+	memid_return = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
+	if( -1 == memid_return ){
+		return NULL;
 	}
-	QS_SCRIPT *pscript = (QS_SCRIPT *)QS_GET_POINTER( _ppool, script_munit );
-	if( header_munit > 0 ){
-		qs_add_hash_value_kstring( _ppool, pscript->v_hash_munit, "_HEADER", header_munit, ELEMENT_HASH );
+	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, memid_return );
+	pret->id	= 0;
+	pret->munit	= -1;
+	pret->refid = memid_return;
+	int32_t string_munit = qs_create_memory_block( _ppool, NUMERIC_BUFFER_SIZE );
+	if( -1 == string_munit ){
+		printf( "string_munit error\n" );
+		return pret;
 	}
-	if( get_parameter_munit > 0 ){
-		qs_add_hash_value_kstring( _ppool, pscript->v_hash_munit, "_GET", get_parameter_munit, ELEMENT_HASH );
+	char* pbuf = (char*)QS_GET_POINTER(_ppool,string_munit);
+	int32_t rand_value = qs_rand_32();
+	if( rand_value < 0 ){
+		rand_value = -rand_value;
 	}
-	if( post_parameter_munit > 0 ){
-		qs_add_hash_value_kstring( _ppool, pscript->v_hash_munit, "_POST", post_parameter_munit, ELEMENT_HASH );
-	}
-	if( arg != NULL ){
-		qs_add_hash_value( 
-			_ppool
-			, pscript->v_hash_munit
-			, "arg"
-			, arg
-			, ELEMENT_LITERAL_STR
-		);
-	}
-	return QS_SYSTEM_OK;
+	qs_itoa( rand_value, pbuf, QS_PUNIT_USIZE(_ppool,string_munit) );
+	NUMERIC_CAST* pv = QS_PNUMERIC(_ppool,string_munit);
+	*pv = rand_value;
+	pret->munit = string_munit;
+	pret->id = ELEMENT_LITERAL_NUM;
+	return pret;
 }

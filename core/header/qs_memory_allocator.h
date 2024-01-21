@@ -79,6 +79,12 @@ extern "C"{
 #define QS_PINT64( _memory, munit_id ) (int64_t*)(QS_GET_POINTER(_memory,munit_id)+QS_PUNIT_USIZE(_memory,munit_id)-sizeof(int64_t))
 #define QS_INT64( _memory, munit_id ) (*(int64_t*)(QS_GET_POINTER(_memory,munit_id)+QS_PUNIT_USIZE(_memory,munit_id)-sizeof(int64_t)))
 
+#ifdef NUMERIC_CAST_64
+#define QS_PNUMERIC QS_PINT64
+#else
+#define QS_PNUMERIC QS_PINT32
+#endif
+
 
 #define BYTE_SWAP_BIT16( v ) (v >> 8) | ( (v & 0xff) << 8 )
 #define BYTE_SWAP_BIT32( v ) (v >> 24) | ( (v & 0x000000ff) << 24 ) | ( (v & 0x0000ff00) << 8 ) | ( (v & 0x00ff0000) >> 8 )
