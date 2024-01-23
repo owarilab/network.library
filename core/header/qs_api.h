@@ -103,6 +103,7 @@ typedef struct QS_CSV_CONTEXT
 } QS_CSV_CONTEXT;
 
 int api_qs_init();
+uint32_t api_qs_rand();
 int api_qs_memory_alloc(QS_MEMORY_CONTEXT* context, size_t alloc_size);
 int api_qs_memory_clean(QS_MEMORY_CONTEXT* context);
 void api_qs_memory_info(QS_MEMORY_CONTEXT* context);

@@ -98,7 +98,7 @@ extern "C"{
 #endif
 
 # define snprintf(s, n, format, ...) \
-	_snprintf_s(s, n, _TRUNCATE, format, __VA_ARGS__)
+	_snprintf_s(s, n, _TRUNCATE, format, ##__VA_ARGS__)
 # define qs_sprintf(s, n, format, ...) \
 	sprintf_s(s, n, format, __VA_ARGS__)
 #else //  !__WINDOWS__

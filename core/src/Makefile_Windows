@@ -1,0 +1,22 @@
+PROGRAM=libqs_core_win.a
+PROGRAMOUT=../
+CC=x86_64-w64-mingw32-gcc
+AR=x86_64-w64-mingw32-ar
+INCDIR = -I ../header
+DEFINE  = -D_WINDOWS
+CFLAG = $(DEFINE) $(INCDIR) -Wall -O0 -Wno-unknown-pragmas
+SOURCES=$(wildcard *.c)
+OBJGROUP    = $(SOURCES:.c=_win.o)
+
+all: $(PROGRAM)
+
+$(PROGRAM): $(OBJGROUP)
+	$(AR) r $(PROGRAMOUT)$(PROGRAM) $(OBJGROUP)
+
+%_win.o: %.c
+	$(CC) $(CFLAG) -c $< -o $@
+
+.PHONY: clean
+clean:
+	rm -f $(PROGRAMOUT)$(PROGRAM)
+	rm -f ./*_win.o

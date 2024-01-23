@@ -54,6 +54,11 @@ int api_qs_init()
 	return 0;
 }
 
+uint32_t api_qs_rand()
+{
+	return qs_rand_32();
+}
+
 int api_qs_memory_alloc(QS_MEMORY_CONTEXT* context, size_t alloc_size)
 {
 	context->memory = NULL;
