@@ -859,14 +859,14 @@ void qs_set_sock_option( QS_SOCKET_OPTION *option )
 {
 	socklen_t len;
 #ifdef __WINDOWS__
-	(void) setsockopt(option->sockid, SOL_SOCKET, SO_RCVBUF, (const char*)&option->recvbuffer_size, sizeof(option->recvbuffer_size));
-	(void)setsockopt(option->sockid, SOL_SOCKET, SO_SNDBUF, (const char*)&option->sendbuffer_size, sizeof(option->sendbuffer_size));
+	(void) setsockopt(option->sockid, SOL_SOCKET, SO_RCVBUF, (char*)&option->recvbuffer_size, sizeof(option->recvbuffer_size));
+	(void)setsockopt(option->sockid, SOL_SOCKET, SO_SNDBUF, (char*)&option->sendbuffer_size, sizeof(option->sendbuffer_size));
 	len = sizeof(option->recvbuffer_size);
-	if (getsockopt(option->sockid, SOL_SOCKET, SO_RCVBUF, (const char*)&option->recvbuffer_size, &len) == -1) {
+	if (getsockopt(option->sockid, SOL_SOCKET, SO_RCVBUF, (char*)&option->recvbuffer_size, &len) == -1) {
 		perror("getsockopt");
 	}
 	len = sizeof(option->sendbuffer_size);
-	if (getsockopt(option->sockid, SOL_SOCKET, SO_SNDBUF, (const char*)&option->sendbuffer_size, &len) == -1) {
+	if (getsockopt(option->sockid, SOL_SOCKET, SO_SNDBUF, (char*)&option->sendbuffer_size, &len) == -1) {
 		perror("getsockopt");
 	}
 #else
@@ -919,8 +919,9 @@ int qs_set_block(QS_SOCKET_ID fd, int flag )
 #endif
 	int error = 0;
 #ifdef __WINDOWS__
-	flag = !(flag);
-	ioctlsocket(fd, FIONBIO, &flag);
+	u_long ulflag = 0;
+	ulflag = !flag;
+	ioctlsocket(fd, FIONBIO, &ulflag);
 #else
 	if( ( flags = fcntl( fd, F_GETFL, 0 ) ) == -1 )
 	{
@@ -1040,11 +1041,19 @@ QS_SOCKET_ID qs_server_socket( QS_SOCKET_OPTION *option, int is_ipv6 )
 		}
 		opt = 1;
 		opt_len = sizeof( opt );
+#ifdef __WINDOWS__
+		if( setsockopt( sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt, opt_len ) == -1 )
+		{
+			qs_close_socket( &sock, "setsockopt" );
+			break;
+		}
+#else
 		if( setsockopt( sock, SOL_SOCKET, SO_REUSEADDR, &opt, opt_len ) == -1 )
 		{
 			qs_close_socket( &sock, "setsockopt" );
 			break;
 		}
+#endif
 		if( bind( sock, option->addr->ai_addr, option->addr->ai_addrlen) == -1 )
 		{
 			qs_close_socket( &sock, "bind" );
@@ -1418,6 +1427,21 @@ int qs_check_socket_error(QS_SOCKET_ID sock)
 	int getopt_val;
 	socklen_t len;
 	len = sizeof( len );
+
+#ifdef __WINDOWS__
+	if( getsockopt( sock, SOL_SOCKET, SO_ERROR, (char*)&getopt_val, &len ) != -1 )
+	{
+		if( getopt_val == 0 )
+		{
+			return 0;
+		}
+		else{
+			char errbuf[256];
+			strerror_s(errbuf,255,getopt_val);
+			return -1;
+		}
+	}
+#else
 	if( getsockopt( sock, SOL_SOCKET, SO_ERROR, &getopt_val, &len ) != -1 )
 	{
 		if( getopt_val == 0 )
@@ -1425,15 +1449,11 @@ int qs_check_socket_error(QS_SOCKET_ID sock)
 			return 0;
 		}
 		else{
-#ifdef __WINDOWS__
-			char errbuf[256];
-			strerror_s(errbuf,255,getopt_val);
-#else
 			(void)fprintf(stderr, "getsockopt:%d:%s\n", getopt_val, strerror(getopt_val));
-#endif
 			return -1;
 		}
 	}
+#endif
 	return -1;
 }
 
