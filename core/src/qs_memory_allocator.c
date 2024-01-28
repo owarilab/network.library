@@ -330,7 +330,7 @@ size_t qs_initialize_mmapmemory_f( const char* file_name, QS_MEMORY_POOL** memor
 	DWORD access = GENERIC_READ | GENERIC_WRITE;
 	DWORD open = OPEN_EXISTING;
 	if (INVALID_HANDLE_VALUE == ((*memory)->h_file = CreateFile(file_name, access, 0, 0, open, 0, 0))) {
-		printf("CreateFile error : %d\n",GetLastError());
+		printf("CreateFile error : %ld\n",GetLastError());
 		return 0;
 	}
 	DWORD map_flag = PAGE_READWRITE;
@@ -1293,11 +1293,19 @@ void qs_memory_info( QS_MEMORY_POOL* memory )
 	printf(  "# memory info\n");
 	printf(  "#############################################################\n");
 	freeSize = ( ( memory->bottom - memory->top ) );
+#ifdef __WINDOWS__
+	printf(  "total : %llu Byte\n", memory->size );
+	printf(  "use   : %llu Byte\n", memory->size - freeSize );
+	printf(  "free  : %llu Byte\n", freeSize );
+	printf(  "blocks : %llu\n", memory->block_size );
+	printf(  "max size : %llu Byte\n", memory->max_size );
+#else
 	printf(  "total : %lu Byte\n", memory->size );
 	printf(  "use   : %lu Byte\n", memory->size - freeSize );
 	printf(  "free  : %lu Byte\n", freeSize );
 	printf(  "blocks : %lu\n", memory->block_size );
 	printf(  "max size : %lu Byte\n", memory->max_size );
+#endif
 	printf(  "memory top = %p\n", ( (uint8_t*)memory->memory ) );
 	printf(  "memory end = %p\n", ( (uint8_t*)memory->memory + memory->size ) );
 	printf(  "memory freetop = %p\n", ( (uint8_t*)memory->memory + memory->top ) );
@@ -1332,6 +1340,23 @@ void qs_memory_block_info( QS_MEMORY_POOL* memory )
 	for( i = (memory->block_size-1); i >= 0; i-- )
 	{
 		unit = (QS_MEMORY_UNIT*)( ( (uint8_t*)memory->memory + memory->end ) - ( memory_block_one_size * ( memory->block_size - i ) ) );
+#ifdef __WINDOWS__
+		(void) fprintf(
+				stdout
+			, "[%lld] addr:%p:%p, p:%p, pend:%p, memsize:%lld Byte, status:%d, id:%d, parent:%d, child:%d, type:%d\n"
+			, memory->block_size - ( i + 1 )
+			, unit
+			, (uint8_t*)(unit) + memory_block_one_size
+			, (uint8_t*)memory->memory + unit->p
+			, (uint8_t*)memory->memory + unit->p + unit->size
+			, unit->size
+			, unit->status
+			, unit->id
+			, unit->parent
+			, unit->child
+			, unit->type
+		);
+#else
 		(void) fprintf(
 				stdout
 			, "[%ld] addr:%p:%p, p:%p, pend:%p, memsize:%ld Byte, status:%d, id:%d, parent:%d, child:%d, type:%d\n"
@@ -1347,6 +1372,7 @@ void qs_memory_block_info( QS_MEMORY_POOL* memory )
 			, unit->child
 			, unit->type
 		);
+#endif
 		if( unit->status == MEMORY_STATUS_FREE ){
 			++free_count;
 		}
