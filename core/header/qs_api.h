@@ -188,6 +188,7 @@ int api_qs_room_create(QS_SERVER_CONTEXT* context, const char* name, QS_MEMORY_C
 int api_qs_room_list(QS_SERVER_CONTEXT* context, QS_MEMORY_CONTEXT* dest_memory, QS_JSON_ELEMENT_OBJECT* dest_object);
 int api_qs_room_join(QS_SERVER_CONTEXT* context, const char* room_id, const char* connection_id, QS_MEMORY_CONTEXT* dest_memory, QS_JSON_ELEMENT_OBJECT* dest_object);
 int api_qs_http_response_json(QS_EVENT_PARAMETER params, QS_JSON_ELEMENT_OBJECT* object, size_t buffer_size);
+int api_qs_http_response_raw_json(QS_EVENT_PARAMETER params, QS_MEMORY_CONTEXT* temporary_memory,char* json);
 
 char* api_qs_uniqid(QS_MEMORY_CONTEXT* memory_context, int32_t length);
 

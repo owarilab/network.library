@@ -1449,6 +1449,15 @@ int api_qs_http_response_json(QS_EVENT_PARAMETER params, QS_JSON_ELEMENT_OBJECT*
 	return http_json_response_common(tinfo,option,dest_temporary_memory,object->memid_object,buffer_size);
 }
 
+int api_qs_http_response_raw_json(QS_EVENT_PARAMETER params, QS_MEMORY_CONTEXT* temporary_memory,char* json)
+{
+	QS_MEMORY_POOL * dest_temporary_memory = ( QS_MEMORY_POOL* )temporary_memory->memory;
+	QS_RECV_INFO *rinfo = (QS_RECV_INFO *)params;
+	QS_SERVER_CONNECTION_INFO * tinfo = (QS_SERVER_CONNECTION_INFO *)rinfo->tinfo;
+	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
+	return http_json_response_send(tinfo,option,dest_temporary_memory,json);
+}
+
 char* api_qs_uniqid(QS_MEMORY_CONTEXT* memory_context, int32_t length)
 {
 	QS_MEMORY_POOL * memory = ( QS_MEMORY_POOL* )memory_context->memory;
