@@ -2,7 +2,7 @@ PROGRAM = libqs.dll
 CC      = x86_64-w64-mingw32-gcc
 DEFINE  = -D_WINDOWS
 INCDIR  = -I ../../core/header
-CFLAG   = $(INCDIR) $(DEFINE) -Wall -O 
+CFLAG   = $(INCDIR) $(DEFINE) -Wall -O -Wno-unknown-pragmas
 LIBA = ../../core/libqs_core_win.a
 MYSOCKETOBJGROUP = libqs.o $(LIBA)
 
