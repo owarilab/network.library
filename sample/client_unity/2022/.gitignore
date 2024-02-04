@@ -1,0 +1,10 @@
+/Library/*
+/Temp/*
+/.vsconfig
+/Assembly-CSharp.csproj
+/*.sln
+/Logs/*
+/obj/*
+/UserSettings/*
+/.vs/*
+
