@@ -8,6 +8,7 @@ namespace QS
     {
         private bool isJumping = false;
         private bool isFalling = false;
+        private float reloadTime = 0;
         private float jumpY = 0;
         private float hoverTime = 0;
         private Vector3 jumpVector = new Vector3(0, 0, 0);
@@ -41,6 +42,27 @@ namespace QS
             transform.rotation = quaternion;
         }
 
+        public void Action()
+        {
+            if (reloadTime > 0)
+            {
+                return;
+            }
+            string prefabName = "ball";
+            GameObject ballPrefab = Resources.Load<GameObject>($"Prefabs/{prefabName}");
+            if (ballPrefab != null)
+            {
+                Vector3 position = transform.position + transform.forward * 2;
+                GameObject ball = Instantiate(ballPrefab, position, transform.rotation);
+                ball.GetComponent<Rigidbody>().AddForce(transform.forward * 1000);
+            }
+            else
+            {
+                Debug.LogError($"Prefab '{prefabName}' not found in Resources/Prefabs directory.");
+            }
+            reloadTime = 0.2f;
+        }
+
         public void Jump(float jumpPower = 10.0f, float minJumpPower = 1.5f, float maxJumpPower = 5.0f)
         {
             if(isFalling){
@@ -60,6 +82,13 @@ namespace QS
 
         void LateUpdate()
         {
+            if (reloadTime > 0)
+            {
+                reloadTime -= Time.deltaTime;
+                if(reloadTime < 0){
+                    reloadTime = 0;
+                }
+            }
             if (isFalling)
             {
                 characterController.Move((jumpVector * -1) * Time.deltaTime);

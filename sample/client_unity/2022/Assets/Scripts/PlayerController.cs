@@ -71,15 +71,40 @@ namespace QS
 
         void LateUpdate()
         {
-            // マウスのドラッグでカメラを回転させる
+            // ボールを投げる
+            //if (Input.GetMouseButtonDown(0))
             if (Input.GetMouseButton(0))
+            {
+                this.character.Action();
+            }
+
+            // PS4R2でボールを投げる
+            float r2 = Input.GetAxis("PS4R2");
+            if (r2 > 0.5)
+            {
+                this.character.Action();
+            }
+
+            // マウスのドラッグでカメラを回転させる
+            if (Input.GetMouseButton(1))
             {
                 float mouse_x = Input.GetAxis("Mouse X") * cameraSpeed;
                 lookH += mouse_x;
             }
 
+            // PS4RStickXでカメラを回転させる
+            float rstick_x = Input.GetAxis("PS4RStickX") * cameraSpeed * 0.1f;
+            lookH += rstick_x;
+
+
             // スペースキーを押している間ジャンプ
             if (Input.GetKey(KeyCode.Space))
+            {
+                this.character.Jump();
+            }
+
+            // PS4Jumpでジャンプ
+            if (Input.GetButtonDown("PS4Jump"))
             {
                 this.character.Jump();
             }
