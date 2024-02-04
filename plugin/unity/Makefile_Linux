@@ -2,23 +2,23 @@ PROGRAM = libqs.so
 CC      = gcc
 DEFINE  = -D_LINUX
 INCDIR  = -I ../../core/header
-CFLAG   = $(INCDIR) $(DEFINE) -pthread -Wall -O
+CFLAG   = $(INCDIR) $(DEFINE) -pthread -Wall -O -fPIC
 LIBA = ../../core/libqs_core.a
 MYSOCKETOBJGROUP = libqs.o $(LIBA)
 
 all: $(PROGRAM)
 
 $(LIBA):
-	cd ../../core/src && make -f Makefile
+	cd ../../core/src && make _LINUX_SHARED=1 -f Makefile
 
 $(PROGRAM): $(MYSOCKETOBJGROUP)
-	$(CC) $(CFLAG) -shared $(LIBDIR) -o $(PROGRAM) $(MYSOCKETOBJGROUP) -fPIC
+	$(CC) $(CFLAG) -shared $(LIBDIR) -o $(PROGRAM) $(MYSOCKETOBJGROUP)
 
 libqs.o: libqs.c
 	$(CC) $(CFLAG) -c libqs.c -o libqs.o
 
 .PHONY: clean
 clean: 
-	cd ../../core/src && make -f Makefile clean
+	cd ../../core/src && make _LINUX_SHARED=1 -f Makefile clean
 	rm -f $(PROGRAM) 
 	rm -f ./*.o
