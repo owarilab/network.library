@@ -616,8 +616,8 @@ int32_t qs_make_connection_info( QS_SOCKET_OPTION *option )
 
 int32_t qs_make_connection_info_core( QS_SOCKET_OPTION *option, QS_SERVER_CONNECTION_INFO* tinfo, int index )
 {
-	size_t recvbuffer_size = sizeof( char ) * ( option->recvbuffer_size );
-	size_t msgbuffer_size = sizeof( char ) * ( option->msgbuffer_size );
+	size_t recvbuffer_size = ( option->recvbuffer_size );
+	size_t msgbuffer_size = ( option->msgbuffer_size );
 	tinfo->id = -1;
 	tinfo->index = index;
 	tinfo->qs_socket_option= option;
@@ -1034,7 +1034,7 @@ QS_SOCKET_ID qs_server_socket( QS_SOCKET_OPTION *option, int is_ipv6 )
 			printf( "getnameinfo():%s\n",gai_strerror( errcode ) );
 			break;
 		}
-		if( ( sock = socket( option->addr->ai_family, option->addr->ai_socktype, option->addr-> ai_protocol ) ) == -1 )
+		if( ( sock = socket( option->addr->ai_family, option->addr->ai_socktype, option->addr->ai_protocol ) ) == -1 )
 		{
 			qs_error("socket");
 			break;
@@ -1314,31 +1314,46 @@ QS_SOCKET_ID qs_accept(QS_SOCKET_OPTION *option)
 	int i;
 	struct sockaddr_storage from;
 	socklen_t len = (socklen_t) sizeof(from);
-	if (-1 == (acc = accept(option->sockid, (struct sockaddr *) &from, &len))) {
-		//if (errno != 0 && errno != EINTR && errno != EAGAIN) {
+
 #ifdef __WINDOWS__
-		if (errno != 0 && errno != EAGAIN && errno != ENOENT && WSAGetLastError() != WSAEWOULDBLOCK)
+	if (INVALID_SOCKET == (acc = accept(option->sockid, (struct sockaddr *) &from, &len))) {
+		if (WSAGetLastError() != WSAEWOULDBLOCK) {
+			perror("accept");
+		}
+	}
 #else
-		if (errno != 0 && errno != EAGAIN)
-#endif
+	if (-1 == (acc = accept(option->sockid, (struct sockaddr *) &from, &len))) {
+		if (errno != EAGAIN && errno != EWOULDBLOCK)
 		{
 			perror("accept");
 		}
 	}
+#endif
+
+#ifdef __WINDOWS__
+	if (acc == INVALID_SOCKET && option->sockid6 != -1) {
+		if (INVALID_SOCKET == (acc = accept(option->sockid6, (struct sockaddr *) &from, &len))) {
+			if (WSAGetLastError() != WSAEWOULDBLOCK){
+				perror("accept");
+			}
+		}
+	}
+#else
 	if (acc == -1 && option->sockid6 != -1) {
 		if (-1 == (acc = accept(option->sockid6, (struct sockaddr *) &from, &len))) {
-			//if (errno != 0 && errno != EINTR && errno != EAGAIN) {
-#ifdef __WINDOWS__
-			if (errno != 0 && errno != EAGAIN && errno != ENOENT && WSAGetLastError() != WSAEWOULDBLOCK)
-#else
-			if (errno != 0 && errno != EAGAIN)
-#endif
+			if (errno != EAGAIN && errno != EWOULDBLOCK)
 			{
 				perror("accept");
 			}
 		}
 	}
+#endif
+
+#ifdef __WINDOWS__
+	if (acc != INVALID_SOCKET)
+#else
 	if (acc != -1)
+#endif
 	{
 		int32_t* wait_id = (int32_t*)qs_get_chain(option->memory_pool, option->memid_accept_wait_pool, NULL);
 		if (NULL != wait_id) {
@@ -1379,7 +1394,12 @@ QS_SOCKET_ID qs_accept(QS_SOCKET_OPTION *option)
 			qs_remove_chain(option->memory_pool, option->memid_accept_wait_pool, (void*)wait_id);
 		}
 	}
+
+#ifdef __WINDOWS__
+	if (acc != INVALID_SOCKET)
+#else
 	if (acc != -1)
+#endif
 	{
 		QS_SERVER_CONNECTION_INFO* current = (QS_SERVER_CONNECTION_INFO*)qs_offsetpointer(option->memory_pool, option->connection_munit, sizeof(QS_SERVER_CONNECTION_INFO), 0);
 		for (i = 0; i < option->maxconnection; i++)
@@ -1574,7 +1594,7 @@ int32_t qs_socket( QS_SOCKET_OPTION *option )
 void qs_free_socket( QS_SOCKET_OPTION *option )
 {
 #ifdef __WINDOWS__
-	if( option->sockid > -1 ){
+	if( option->sockid != -1 ){
 		shutdown(option->sockid, SD_BOTH);
 		closesocket( option->sockid );
 	}
@@ -1597,6 +1617,19 @@ void qs_free_socket( QS_SOCKET_OPTION *option )
 	}
 #endif
 	option->sockid = -1;
+
+	int i;
+	QS_SERVER_CONNECTION_INFO* child;
+	QS_SERVER_CONNECTION_INFO* current = (QS_SERVER_CONNECTION_INFO*)qs_offsetpointer(option->memory_pool, option->connection_munit, sizeof(QS_SERVER_CONNECTION_INFO), 0);
+	for (i = 0; i < option->maxconnection; i++)
+	{
+		child = current++;
+		if (child->id == -1)
+		{
+			continue;
+		}
+		qs_close_socket(&child->id, NULL);
+	}
 }
 
 void qs_recv_event(QS_SOCKET_OPTION *option, QS_SERVER_CONNECTION_INFO *child, socklen_t srlen)
@@ -1694,7 +1727,7 @@ void qs_server_update(QS_SOCKET_OPTION *option)
 	if (option->mode != SOCKET_MODE_NONBLOCKING) {
 		return;
 	}
-	size_t buffer_size = (sizeof(char) * (option->recvbuffer_size)) - 1;
+	size_t buffer_size = option->recvbuffer_size - 1;
 	socklen_t srlen;
 	QS_SERVER_CONNECTION_INFO *child;
 	if (option->socket_type == SOCKET_TYPE_SERVER_TCP)
@@ -1766,7 +1799,7 @@ void qs_nonblocking_client(QS_SOCKET_OPTION *option)
 	if(-1==option->sockid){
 		return;
 	}
-	size_t buffer_size = sizeof(char) * (option->recvbuffer_size);
+	size_t buffer_size = option->recvbuffer_size;
 	qs_set_block(option->sockid, 0);
 	if( -1 == ( option->connection_munit = qs_create_memory_block( option->memory_pool, sizeof( QS_SERVER_CONNECTION_INFO ) ) ) ){
 		return;
@@ -1779,7 +1812,7 @@ void qs_nonblocking_client(QS_SOCKET_OPTION *option)
 	if( -1 == ( child->recvinfo_munit = qs_create_memory_block( option->memory_pool, sizeof( QS_RECV_INFO ) ) ) ){
 		return;
 	}
-	if( -1 == ( child->recvmsg_munit = qs_create_memory_block( option->memory_pool, sizeof( char) * ( option->msgbuffer_size ) ) ) ){
+	if( -1 == ( child->recvmsg_munit = qs_create_memory_block( option->memory_pool, option->msgbuffer_size ) ) ){
 		return;
 	}
 	child->qs_socket_option = option;
@@ -1812,7 +1845,7 @@ void qs_client_update(QS_SOCKET_OPTION *option)
 	{
 		return;
 	}
-	size_t buffer_size = sizeof(char) * (option->recvbuffer_size);
+	size_t buffer_size = option->recvbuffer_size;
 	socklen_t srlen;
 	QS_SERVER_CONNECTION_INFO* child = (QS_SERVER_CONNECTION_INFO*)QS_GET_POINTER(option->memory_pool,option->connection_munit);
 	if (option->socket_type == SOCKET_TYPE_CLIENT_TCP)
@@ -2197,7 +2230,7 @@ size_t qs_make_udpmsg( void* sendbin, const char* msg, ssize_t size, uint32_t pa
 	MEMORY_PUSH_BIT32_B2( qs_endian(), ptr, payload_type );
 	cptr = (char*)ptr;
 	memcpy( cptr, msg, size );
-	return (size_t) ( ( sizeof( char ) * size ) + headersize );
+	return (size_t) ( size + headersize );
 }
 
 ssize_t qs_send_udpmsg( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockparam, const char* msg, ssize_t size, uint32_t payload_type, struct sockaddr *pfrom, socklen_t fromlen  )
