@@ -465,12 +465,17 @@ void qs_array_dump( QS_MEMORY_POOL* _ppool, int32_t munit, int index )
 			for( k=0;k<index+1;k++ ){ printf("  "); }
 			printf("%s",(char*)QS_GET_POINTER(_ppool,(elm+i)->memid_array_element_data));
 		}
-		if( (elm+i)->id == ELEMENT_LITERAL_NUM_64 ){
+		else if( (elm+i)->id == ELEMENT_LITERAL_NUM_64 ){
 			if( i > 0 ){ printf(",\n"); }
 			for( k=0;k<index+1;k++ ){ printf("  "); }
 			printf("%s",(char*)QS_GET_POINTER(_ppool,(elm+i)->memid_array_element_data));
 		}
-		if( (elm+i)->id == ELEMENT_LITERAL_STR ){
+		else if( (elm+i)->id == ELEMENT_LITERAL_NUM_U64 ){
+			if( i > 0 ){ printf(",\n"); }
+			for( k=0;k<index+1;k++ ){ printf("  "); }
+			printf("%s",(char*)QS_GET_POINTER(_ppool,(elm+i)->memid_array_element_data));
+		}
+		else if( (elm+i)->id == ELEMENT_LITERAL_STR ){
 			if( i > 0 ){ printf(",\n"); }
 			for( k=0;k<index+1;k++ ){ printf("  "); }
 			printf("\"%s\"",(char*)QS_GET_POINTER(_ppool,(elm+i)->memid_array_element_data));

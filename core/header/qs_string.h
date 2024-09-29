@@ -44,6 +44,7 @@ extern "C"{
 #endif
 
 int qs_ltoa( int64_t value, char* target, size_t size );
+int qs_ultoa( uint64_t value, char* target, size_t size );
 int qs_itoa( int32_t value, char* target, size_t size );
 int32_t qs_find_char( char* target, size_t target_size, char delimiter_ch );
 char* qs_readline( char* buf, size_t buffer_size,char* target, char delimiter_ch );

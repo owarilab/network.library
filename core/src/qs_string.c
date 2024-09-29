@@ -66,6 +66,38 @@ int qs_ltoa( int64_t value, char* target, size_t size )
 	return error_code;
 }
 
+int qs_ultoa( uint64_t value, char* target, size_t size )
+{
+	int error_code = 0;
+	int index,len;
+	char c;
+	char* tmpp = target;
+	do{
+		*tmpp++ = ( ( value % 10 ) + 0x30 );
+		if( value <= 9 ){
+			break;
+		}
+		if( ( tmpp - target ) >= size-2 ){
+			error_code = -1;
+			break;
+		}
+		value = value / 10;
+	}while( true );
+	*tmpp++ = '\0';
+	index = 0;
+	len = ( tmpp - target ) - 1;
+	// reverse
+	if( len > 1 ){
+		do{
+			c = *(target+index);
+			*(target+index) = *(target+(len-1)-index);
+			*(target+(len-1)-index) = c;
+			index++;
+		}while( index < len/2 );
+	}
+	return error_code;
+}
+
 int qs_itoa( int32_t value, char* target, size_t size )
 {
 	int64_t v64 = value;

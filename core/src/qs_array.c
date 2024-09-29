@@ -231,6 +231,38 @@ int32_t qs_array_push_big_integer( QS_MEMORY_POOL* _ppool, int32_t* pmunit, int6
 	return QS_SYSTEM_OK;
 }
 
+int32_t qs_array_push_unsigned_big_integer( QS_MEMORY_POOL* _ppool, int32_t* pmunit, uint64_t value )
+{
+	QS_ARRAY* parray;
+	QS_ARRAY_ELEMENT* elm;
+	(*pmunit) = qs_resize_array( _ppool, (*pmunit) );
+	parray = (QS_ARRAY*)QS_GET_POINTER( _ppool, (*pmunit) );
+	elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid );
+	if( parray->len >= parray->max_size ){
+		return QS_SYSTEM_ERROR;
+	}
+	elm[parray->len].id = ELEMENT_LITERAL_NUM_U64;
+	if( elm[parray->len].memid_numeric_buffer == -1 ){
+		if( -1 == ( elm[parray->len].memid_numeric_buffer = qs_create_memory_block( _ppool, UI64_BUFFER_SIZE ) ) ){
+			return QS_SYSTEM_ERROR;
+		}
+	}
+	else{
+		if( qs_usize(_ppool,elm[parray->len].memid_numeric_buffer) < UI64_BUFFER_SIZE ){
+			if( -1 == ( elm[parray->len].memid_numeric_buffer = qs_create_memory_block( _ppool, UI64_BUFFER_SIZE ) ) ){
+				return QS_SYSTEM_ERROR;
+			}
+		}
+	}
+	elm[parray->len].memid_array_element_data = elm[parray->len].memid_numeric_buffer;
+
+	qs_ultoa( value, (char*)QS_GET_POINTER(_ppool,elm[parray->len].memid_array_element_data), qs_usize(_ppool,elm[parray->len].memid_array_element_data) );
+	uint64_t* pv = QS_PUINT64(_ppool,elm[parray->len].memid_array_element_data);
+	*pv = value;
+	parray->len++;
+	return QS_SYSTEM_OK;
+}
+
 int32_t qs_array_push_string( QS_MEMORY_POOL* _ppool, int32_t* pmunit, const char* value )
 {
 	QS_ARRAY* parray;

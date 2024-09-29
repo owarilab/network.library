@@ -76,8 +76,12 @@ extern "C"{
 #define QS_PUNIT_USIZE( _memory, munit_id ) (*(uint64_t*)((((uint8_t*)_memory->memory+_memory->end)-(_memory->memory_block_size_one*(munit_id+1)))+sizeof(uint64_t)))
 #define QS_PINT32( _memory, munit_id ) (int32_t*)(QS_GET_POINTER(_memory,munit_id)+QS_PUNIT_USIZE(_memory,munit_id)-sizeof(int32_t))
 #define QS_INT32( _memory, munit_id ) (*(int32_t*)(QS_GET_POINTER(_memory,munit_id)+QS_PUNIT_USIZE(_memory,munit_id)-sizeof(int32_t)))
+#define QS_PUINT32( _memory, munit_id ) (uint32_t*)(QS_GET_POINTER(_memory,munit_id)+QS_PUNIT_USIZE(_memory,munit_id)-sizeof(uint32_t))
+#define QS_UINT32( _memory, munit_id ) (*(uint32_t*)(QS_GET_POINTER(_memory,munit_id)+QS_PUNIT_USIZE(_memory,munit_id)-sizeof(uint32_t))
 #define QS_PINT64( _memory, munit_id ) (int64_t*)(QS_GET_POINTER(_memory,munit_id)+QS_PUNIT_USIZE(_memory,munit_id)-sizeof(int64_t))
 #define QS_INT64( _memory, munit_id ) (*(int64_t*)(QS_GET_POINTER(_memory,munit_id)+QS_PUNIT_USIZE(_memory,munit_id)-sizeof(int64_t)))
+#define QS_PUINT64( _memory, munit_id ) (uint64_t*)(QS_GET_POINTER(_memory,munit_id)+QS_PUNIT_USIZE(_memory,munit_id)-sizeof(uint64_t))
+#define QS_UINT64( _memory, munit_id ) (*(uint64_t*)(QS_GET_POINTER(_memory,munit_id)+QS_PUNIT_USIZE(_memory,munit_id)-sizeof(uint64_t)))
 
 #ifdef NUMERIC_CAST_64
 #define QS_PNUMERIC QS_PINT64
