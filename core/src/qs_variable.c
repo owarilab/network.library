@@ -550,6 +550,20 @@ void qs_hash_dump( QS_MEMORY_POOL* _ppool, int32_t h_munit, int index )
 								  );
 							cnt++;
 						}
+						else if( hashelement[i].id == ELEMENT_LITERAL_NUM_64 ){
+							printf( "\"%s\":%s"
+									, (char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_name )
+									, (char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_element_data )
+								  );
+							cnt++;
+						}
+						else if( hashelement[i].id == ELEMENT_LITERAL_NUM_U64 ){
+							printf( "\"%s\":%s"
+									, (char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_name )
+									, (char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_element_data )
+								  );
+							cnt++;
+						}
 					}
 				}
 			}

@@ -306,6 +306,52 @@ QS_HASH_ELEMENT* qs_add_hash_integer( QS_MEMORY_POOL* memory, int32_t memid_hash
 	return is_push;
 }
 
+QS_HASH_ELEMENT* qs_add_hash_big_integer( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, int64_t value )
+{
+	int32_t memid_name = qs_make_hash_name( memory, memid_hash, name );
+	if( memid_name == -1 ){
+		return NULL;
+	}
+	int32_t memid_data = qs_get_hash( memory, memid_hash, name );
+	if( memid_data == -1 ){
+		if( -1 == ( memid_data = qs_create_memory_block( memory, I64_BUFFER_SIZE ) ) ){
+			return NULL;
+		}
+	}
+	size_t data_size = qs_usize(memory,memid_data);
+	qs_ltoa( value, (char*)QS_GET_POINTER(memory,memid_data), data_size );
+	int64_t* pv = QS_PINT64(memory,memid_data);
+	*pv = value;
+	QS_HASH_ELEMENT* is_push = qs_add_hash( memory, memid_hash, memid_name, memid_data, ELEMENT_LITERAL_NUM_64 );
+	if( NULL==is_push){
+		printf("[qs_add_hash_big_integer] is_push is NULL\n");
+	}
+	return is_push;
+}
+
+QS_HASH_ELEMENT* qs_add_hash_unsigned_big_integer( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, int64_t value )
+{
+	int32_t memid_name = qs_make_hash_name( memory, memid_hash, name );
+	if( memid_name == -1 ){
+		return NULL;
+	}
+	int32_t memid_data = qs_get_hash( memory, memid_hash, name );
+	if( memid_data == -1 ){
+		if( -1 == ( memid_data = qs_create_memory_block( memory, UI64_BUFFER_SIZE ) ) ){
+			return NULL;
+		}
+	}
+	size_t data_size = qs_usize(memory,memid_data);
+	qs_ultoa( value, (char*)QS_GET_POINTER(memory,memid_data), data_size );
+	uint64_t* pv = QS_PUINT64(memory,memid_data);
+	*pv = value;
+	QS_HASH_ELEMENT* is_push = qs_add_hash( memory, memid_hash, memid_name, memid_data, ELEMENT_LITERAL_NUM_U64 );
+	if( NULL==is_push){
+		printf("[qs_add_hash_unsigned_big_integer] is_push is NULL\n");
+	}
+	return is_push;
+}
+
 void qs_add_hash_integer_kint( QS_MEMORY_POOL* memory, int32_t memid_hash, int32_t memid_name_string, int32_t value )
 {
 	int32_t memid_data;
@@ -487,6 +533,42 @@ int32_t* qs_get_hash_integer( QS_MEMORY_POOL* memory, int32_t memid_hash, const 
 		return NULL;
 	}
 	return QS_PINT32(memory,elm->memid_hash_element_data);
+}
+
+int64_t* qs_get_hash_big_integer( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name )
+{
+	if( memid_hash == -1 ){
+		return NULL;
+	}
+	struct QS_HASH *hash = (struct QS_HASH *)QS_GET_POINTER( memory, memid_hash );
+	struct QS_HASH *hashchild = (struct QS_HASH *)QS_GET_POINTER( memory, hash->hash_munit );
+	uint32_t hashkey = qs_ihash( hash_name, hash->hash_size );
+	QS_HASH_ELEMENT* elm = qs_get_hash_core( memory, hash, hashchild, hash_name, hashkey );
+	if(elm==NULL){
+		return NULL;
+	}
+	if(elm->id != ELEMENT_LITERAL_NUM_64){
+		return NULL;
+	}
+	return QS_PINT64(memory,elm->memid_hash_element_data);
+}
+
+uint64_t* qs_get_hash_unsigned_big_integer( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name )
+{
+	if( memid_hash == -1 ){
+		return NULL;
+	}
+	struct QS_HASH *hash = (struct QS_HASH *)QS_GET_POINTER( memory, memid_hash );
+	struct QS_HASH *hashchild = (struct QS_HASH *)QS_GET_POINTER( memory, hash->hash_munit );
+	uint32_t hashkey = qs_ihash( hash_name, hash->hash_size );
+	QS_HASH_ELEMENT* elm = qs_get_hash_core( memory, hash, hashchild, hash_name, hashkey );
+	if(elm==NULL){
+		return NULL;
+	}
+	if(elm->id != ELEMENT_LITERAL_NUM_U64){
+		return NULL;
+	}
+	return QS_PUINT64(memory,elm->memid_hash_element_data);
 }
 
 int32_t qs_get_hash( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name )

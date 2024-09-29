@@ -79,6 +79,8 @@ void qs_add_hash_array_empty_string( QS_MEMORY_POOL* memory, int32_t memid_hash,
 QS_HASH_ELEMENT* qs_add_hash_binary( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, uint8_t* binary, size_t size );
 void qs_add_hash_value( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, const char* value, int32_t id );
 QS_HASH_ELEMENT* qs_add_hash_integer( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, int32_t value );
+QS_HASH_ELEMENT* qs_add_hash_big_integer( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, int64_t value );
+QS_HASH_ELEMENT* qs_add_hash_unsigned_big_integer( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, int64_t value );
 void qs_add_hash_integer_kint( QS_MEMORY_POOL* memory, int32_t memid_hash, int32_t memid_name_string, int32_t value );
 QS_HASH_ELEMENT* qs_add_hash_string( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, const char* value );
 void qs_add_hash_value_kstring( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, int32_t memid_data, int32_t id );
@@ -87,6 +89,8 @@ int32_t qs_move_hash( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* ha
 int32_t qs_remove_hash( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name );
 char* qs_get_hash_string( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name );
 int32_t* qs_get_hash_integer( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name );
+int64_t* qs_get_hash_big_integer( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name );
+uint64_t* qs_get_hash_unsigned_big_integer( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name );
 int32_t qs_get_hash( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name );
 int32_t qs_get_hash_fix_ihash( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name, uint32_t hashkey );
 QS_HASH_ELEMENT* qs_get_hash_core( QS_MEMORY_POOL* memory, struct QS_HASH *hash, QS_HASH *hashchild, const char* hash_name, uint32_t hashkey );
