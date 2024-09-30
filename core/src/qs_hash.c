@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2017 Katsuya Owari
+ * Copyright (c) 2014-2024 Katsuya Owari
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -365,6 +365,37 @@ void qs_add_hash_integer_kint( QS_MEMORY_POOL* memory, int32_t memid_hash, int32
 	QS_HASH_ELEMENT* is_push = qs_add_hash( memory, memid_hash, memid_name_string, memid_data, ELEMENT_LITERAL_NUM );
 	if( NULL==is_push){
 		printf("[qs_add_hash_integer_kint] is_push is NULL\n");
+	}
+}
+
+void qs_add_hash_big_integer_kint( QS_MEMORY_POOL* memory, int32_t memid_hash, int32_t memid_name_string, int64_t value )
+{
+	int32_t memid_data;
+	if( -1 == ( memid_data = qs_create_memory_block( memory, I64_BUFFER_SIZE ) ) ){
+		return;
+	}
+	size_t data_size = qs_usize(memory,memid_data);
+	qs_ltoa( value, (char*)QS_GET_POINTER(memory,memid_data), data_size );
+	int64_t* pv = QS_PINT64(memory,memid_data);
+	*pv = value;
+	QS_HASH_ELEMENT* is_push = qs_add_hash( memory, memid_hash, memid_name_string, memid_data, ELEMENT_LITERAL_NUM_64 );
+	if( NULL==is_push){
+		printf("[qs_add_hash_big_integer_kint] is_push is NULL\n");
+	}
+}
+void qs_add_hash_unsigned_big_integer_kint( QS_MEMORY_POOL* memory, int32_t memid_hash, int32_t memid_name_string, uint64_t value )
+{
+	int32_t memid_data;
+	if( -1 == ( memid_data = qs_create_memory_block( memory, UI64_BUFFER_SIZE ) ) ){
+		return;
+	}
+	size_t data_size = qs_usize(memory,memid_data);
+	qs_ultoa( value, (char*)QS_GET_POINTER(memory,memid_data), data_size );
+	uint64_t* pv = QS_PUINT64(memory,memid_data);
+	*pv = value;
+	QS_HASH_ELEMENT* is_push = qs_add_hash( memory, memid_hash, memid_name_string, memid_data, ELEMENT_LITERAL_NUM_U64 );
+	if( NULL==is_push){
+		printf("[qs_add_hash_unsigned_big_integer_kint] is_push is NULL\n");
 	}
 }
 

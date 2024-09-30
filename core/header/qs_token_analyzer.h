@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2017 Katsuya Owari
+ * Copyright (c) 2014-2024 Katsuya Owari
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -54,6 +54,7 @@ extern "C"{
 #define ID_SYS_LOOP			10
 #define ID_SYS_WHILE		11
 #define ID_SYS_NEWLINE		12
+#define ID_NUM_U64			107	
 
 
 // system words 

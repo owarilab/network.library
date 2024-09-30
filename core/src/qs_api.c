@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2017 Katsuya Owari
+ * Copyright (c) 2014-2024 Katsuya Owari
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -109,6 +109,22 @@ int api_qs_array_push_integer(QS_JSON_ELEMENT_ARRAY* array,int32_t value)
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)array->memory;
 	return qs_array_push_integer(memory,&array->memid_array,value);
 }
+int api_qs_array_push_big_integer(QS_JSON_ELEMENT_ARRAY* array,int64_t value)
+{
+	if(array->memid_array==-1){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)array->memory;
+	return qs_array_push_big_integer(memory,&array->memid_array,value);
+}
+int api_qs_array_push_unsigned_big_integer(QS_JSON_ELEMENT_ARRAY* array,uint64_t value)
+{
+	if(array->memid_array==-1){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)array->memory;
+	return qs_array_push_unsigned_big_integer(memory,&array->memid_array,value);
+}
 int api_qs_array_push_string(QS_JSON_ELEMENT_ARRAY* array,const char* value)
 {
 	if(array->memid_array==-1){
@@ -158,6 +174,30 @@ int api_qs_object_push_integer(QS_JSON_ELEMENT_OBJECT* object,const char* name,i
 	}
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)object->memory;
 	QS_HASH_ELEMENT* elm = qs_add_hash_integer(memory,object->memid_object,name,value);
+	if(NULL==elm){
+		return -1;
+	}
+	return 0;
+}
+int api_qs_object_push_big_integer(QS_JSON_ELEMENT_OBJECT* object,const char* name,int64_t value)
+{
+	if(object->memid_object==-1){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)object->memory;
+	QS_HASH_ELEMENT* elm = qs_add_hash_big_integer(memory,object->memid_object,name,value);
+	if(NULL==elm){
+		return -1;
+	}
+	return 0;
+}
+int api_qs_object_push_unsigned_big_integer(QS_JSON_ELEMENT_OBJECT* object,const char* name,uint64_t value)
+{
+	if(object->memid_object==-1){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)object->memory;
+	QS_HASH_ELEMENT* elm = qs_add_hash_unsigned_big_integer(memory,object->memid_object,name,value);
 	if(NULL==elm){
 		return -1;
 	}
@@ -241,6 +281,22 @@ int32_t* api_qs_object_get_integer(QS_JSON_ELEMENT_OBJECT* object,const char* na
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)object->memory;
 	return qs_get_hash_integer(memory,object->memid_object,name);
 }
+int64_t* api_qs_object_get_big_integer(QS_JSON_ELEMENT_OBJECT* object,const char* name)
+{
+	if(object->memid_object==-1){
+		return NULL;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)object->memory;
+	return qs_get_hash_big_integer(memory,object->memid_object,name);
+}
+uint64_t* api_qs_object_get_unsigned_big_integer(QS_JSON_ELEMENT_OBJECT* object,const char* name)
+{
+	if(object->memid_object==-1){
+		return NULL;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)object->memory;
+	return qs_get_hash_unsigned_big_integer(memory,object->memid_object,name);
+}
 char* api_qs_object_get_string(QS_JSON_ELEMENT_OBJECT* object,const char* name)
 {
 	if(object->memid_object==-1){
@@ -320,6 +376,36 @@ int32_t* api_qs_array_get_integer(QS_JSON_ELEMENT_ARRAY* array,int32_t offset)
 		return NULL;
 	}
 	return QS_PINT32(memory,elm->memid_array_element_data);
+}
+int64_t* api_qs_array_get_big_integer(QS_JSON_ELEMENT_ARRAY* object,int32_t offset)
+{
+	if(object->memid_array==-1){
+		return NULL;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)object->memory;
+	QS_ARRAY_ELEMENT* elm = qs_array_get(memory,object->memid_array,offset);
+	if(elm==NULL){
+		return NULL;
+	}
+	if(elm->id != ELEMENT_LITERAL_NUM_64){
+		return NULL;
+	}
+	return QS_PINT64(memory,elm->memid_array_element_data);
+}
+uint64_t* api_qs_array_get_unsigned_big_integer(QS_JSON_ELEMENT_ARRAY* object,int32_t offset)
+{
+	if(object->memid_array==-1){
+		return NULL;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)object->memory;
+	QS_ARRAY_ELEMENT* elm = qs_array_get(memory,object->memid_array,offset);
+	if(elm==NULL){
+		return NULL;
+	}
+	if(elm->id != ELEMENT_LITERAL_NUM_U64){
+		return NULL;
+	}
+	return QS_PUINT64(memory,elm->memid_array_element_data);
 }
 char* api_qs_array_get_string(QS_JSON_ELEMENT_ARRAY* array,int32_t offset)
 {

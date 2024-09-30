@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2017 Katsuya Owari
+ * Copyright (c) 2014-2024 Katsuya Owari
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -192,6 +192,20 @@ int32_t qs_json_encode_parser_hash( QS_MEMORY_POOL* _ppool, int32_t buf_munit, i
 								qs_add_json_element( _ppool, buf_munit, (char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_element_data ), qs_strlen((char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_element_data )), 1 );
 								cnt++;
 							}
+							else if( hashelement[i].id == ELEMENT_LITERAL_NUM_64 ){
+								qs_add_json_element( _ppool, buf_munit, "\"", 1, 0);
+								qs_add_json_element( _ppool, buf_munit, (char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_name ), qs_strlen((char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_name )), 1 );
+								qs_add_json_element( _ppool, buf_munit, "\":", 2, 0);
+								qs_add_json_element( _ppool, buf_munit, (char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_element_data ), qs_strlen((char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_element_data )), 1 );
+								cnt++;
+							}
+							else if( hashelement[i].id == ELEMENT_LITERAL_NUM_U64 ){
+								qs_add_json_element( _ppool, buf_munit, "\"", 1, 0);
+								qs_add_json_element( _ppool, buf_munit, (char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_name ), qs_strlen((char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_name )), 1 );
+								qs_add_json_element( _ppool, buf_munit, "\":", 2, 0);
+								qs_add_json_element( _ppool, buf_munit, (char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_element_data ), qs_strlen((char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_element_data )), 1 );
+								cnt++;
+							}
 							else{
 								qs_add_json_element( _ppool, buf_munit, "\"", 1, 0);
 								qs_add_json_element( _ppool, buf_munit, (char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_name ), qs_strlen((char*)QS_GET_POINTER( _ppool, hashelement[i].memid_hash_name )), 1 );
@@ -228,7 +242,19 @@ int32_t qs_json_encode_parser_array( QS_MEMORY_POOL* _ppool, int32_t buf_munit, 
 					}
 					qs_add_json_element( _ppool, buf_munit, (char*)QS_GET_POINTER( _ppool, (elm+i)->memid_array_element_data ), qs_strlen((char*)QS_GET_POINTER( _ppool, (elm+i)->memid_array_element_data)), 1 );
 				}
-				if( (elm+i)->id == ELEMENT_LITERAL_STR ){
+				else if( (elm+i)->id == ELEMENT_LITERAL_NUM_64 ){
+					if( i > 0 ){ 
+						qs_add_json_element( _ppool, buf_munit, ",", 1, 0);
+					}
+					qs_add_json_element( _ppool, buf_munit, (char*)QS_GET_POINTER( _ppool, (elm+i)->memid_array_element_data ), qs_strlen((char*)QS_GET_POINTER( _ppool, (elm+i)->memid_array_element_data)), 1 );
+				}
+				else if( (elm+i)->id == ELEMENT_LITERAL_NUM_U64 ){
+					if( i > 0 ){ 
+						qs_add_json_element( _ppool, buf_munit, ",", 1, 0);
+					}
+					qs_add_json_element( _ppool, buf_munit, (char*)QS_GET_POINTER( _ppool, (elm+i)->memid_array_element_data ), qs_strlen((char*)QS_GET_POINTER( _ppool, (elm+i)->memid_array_element_data)), 1 );
+				}
+				else if( (elm+i)->id == ELEMENT_LITERAL_STR ){
 					if( i > 0 ){ 
 						qs_add_json_element( _ppool, buf_munit, ",", 1, 0);
 					}
@@ -490,9 +516,33 @@ int32_t qs_json_decode_parser_hash( QS_MEMORY_POOL* _ppool, QS_NODE* node, QS_TO
 				qs_add_hash( _ppool, working_munit, token_list[ptokens->workpos].buf_munit, token_list[ptokens->workpos+2].buf_munit, ELEMENT_LITERAL_STR );
 				ptokens->workpos+=2;
 			}
+			if( token_list[ptokens->workpos+2].type == ID_OP && *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+2].buf_munit)) == '-'){
+				if( ptokens->workpos+3 >= ptokens->currentpos ){
+					//printf( "invalid json format1\n" );
+					working_munit = -1;
+					break;
+				}
+				//printf("is minus number\n");
+				if( token_list[ptokens->workpos+3].type == ID_NUM ){
+					qs_add_hash_integer_kint(_ppool,working_munit,token_list[ptokens->workpos].buf_munit,-atoi((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+3].buf_munit)));
+					//qs_add_hash( _ppool, working_munit, token_list[ptokens->workpos].buf_munit, token_list[ptokens->workpos+2].buf_munit, ELEMENT_LITERAL_STR );
+					ptokens->workpos+=3;
+				}
+				if( token_list[ptokens->workpos+3].type == ID_NUM_U64 ){
+					int64_t num = atol((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+3].buf_munit));
+					qs_add_hash_big_integer_kint(_ppool,working_munit,token_list[ptokens->workpos].buf_munit,-num);
+					ptokens->workpos+=3;
+				}
+			}
 			else if( token_list[ptokens->workpos+2].type == ID_NUM ){
 				qs_add_hash_integer_kint(_ppool,working_munit,token_list[ptokens->workpos].buf_munit,atoi((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+2].buf_munit)));
 				//qs_add_hash( _ppool, working_munit, token_list[ptokens->workpos].buf_munit, token_list[ptokens->workpos+2].buf_munit, ELEMENT_LITERAL_STR );
+				ptokens->workpos+=2;
+			}
+			else if( token_list[ptokens->workpos+2].type == ID_NUM_U64 ){
+				//printf("u64 : %s\n",(char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+2].buf_munit));
+				uint64_t num = strtoul((char*)QS_GET_POINTER(_ppool, token_list[ptokens->workpos+2].buf_munit), NULL, 10);
+				qs_add_hash_unsigned_big_integer_kint(_ppool,working_munit,token_list[ptokens->workpos].buf_munit,num);
 				ptokens->workpos+=2;
 			}
 			else if( token_list[ptokens->workpos+2].type == ID_SIGN ){
@@ -562,8 +612,26 @@ int32_t qs_json_decode_parser_array( QS_MEMORY_POOL* _ppool, QS_NODE* node, QS_T
 		if( token_list[ptokens->workpos].type == ID_STR ) {
 			qs_array_push( _ppool, &working_munit, ELEMENT_LITERAL_STR, token_list[ptokens->workpos].buf_munit );
 		}
+		else if( token_list[ptokens->workpos].type == ID_OP && *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos].buf_munit)) == '-' ){
+			if( ptokens->workpos+1 >= ptokens->currentpos ){
+				//printf( "invalid json format1\n" );
+				working_munit = -1;
+				break;
+			}
+			if( token_list[ptokens->workpos+1].type == ID_NUM ){
+				NUMERIC_CAST* pnum = QS_PNUMERIC( _ppool, token_list[ptokens->workpos+1].buf_munit );
+				qs_array_push_integer( _ppool, &working_munit, -(*pnum) );
+			}
+			else if( token_list[ptokens->workpos+1].type == ID_NUM_U64 ){
+				int64_t* pnum = QS_PINT64( _ppool, token_list[ptokens->workpos+1].buf_munit );
+				qs_array_push_big_integer( _ppool, &working_munit, -(*pnum) );
+			}
+		}
 		else if( token_list[ptokens->workpos].type == ID_NUM ) {
 			qs_array_push( _ppool, &working_munit, ELEMENT_LITERAL_NUM, token_list[ptokens->workpos].buf_munit );
+		}
+		else if( token_list[ptokens->workpos].type == ID_NUM_U64 ) {
+			qs_array_push( _ppool, &working_munit, ELEMENT_LITERAL_NUM_U64, token_list[ptokens->workpos].buf_munit );
 		}
 		else if( token_list[ptokens->workpos].type == ID_FLOAT ) {
 			qs_array_push( _ppool, &working_munit, ELEMENT_LITERAL_FLOAT, token_list[ptokens->workpos].buf_munit );

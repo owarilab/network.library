@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2017 Katsuya Owari
+ * Copyright (c) 2014-2024 Katsuya Owari
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -140,10 +140,12 @@ extern "C"{
 #define NUMERIC_CAST I64_CAST
 #define NUMERIC_CHAR_BYTE I64_CHAR_BYTE
 #define NUMERIC_BUFFER_SIZE I64_BUFFER_SIZE
+#define QS_PNUMERIC QS_PINT64
 #else
 #define NUMERIC_CAST int32_t
 #define NUMERIC_CHAR_BYTE 20
 #define NUMERIC_BUFFER_SIZE (NUMERIC_CHAR_BYTE+sizeof(NUMERIC_CAST))
+#define QS_PNUMERIC QS_PINT32
 #endif
 
 #define QS_MAX_FILE_DESCRIPTOR 1024

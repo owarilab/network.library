@@ -28,6 +28,81 @@ int main()
     QS_JSON_ELEMENT_ARRAY root_array;
     api_qs_array_create(&memory_context, &root_array);
 
+    if(1)
+    {
+        api_qs_array_push_big_integer(&root_array, -1);
+        api_qs_array_push_big_integer(&root_array, 2);
+        api_qs_array_push_big_integer(&root_array, 3);
+        api_qs_array_push_big_integer(&root_array, 4);
+
+        // json encode
+        char* json = api_qs_json_encode_array(&root_array, 1024 * 1024 * 1);
+        printf("%s\n", json);
+
+        api_qs_object_push_unsigned_big_integer(&root_object, "lv1", UINT64_MAX-1);
+        api_qs_object_push_big_integer(&root_object, "lv2", INT64_MAX);
+        api_qs_object_push_big_integer(&root_object, "lv3", INT64_MIN);
+        api_qs_object_push_big_integer(&root_object, "lv4", INT64_MAX);
+        api_qs_object_push_array(&root_object, "array", &root_array);
+
+        // json encode object
+        char* json2 = api_qs_json_encode_object(&root_object, 1024 * 1024 * 1);
+        printf("%s\n", json2);
+
+        // json decode object
+        QS_JSON_ELEMENT_OBJECT object;
+        api_qs_json_decode_object(&memory_context, &object, json2);
+
+        int32_t* lv1 = api_qs_object_get_integer(&object, "lv1");
+
+        if(lv1)
+        {
+            printf("lv1 is int32 : %d\n", *lv1);
+        }
+
+        uint64_t* lv1_2 = api_qs_object_get_unsigned_big_integer(&object, "lv1");
+
+        if(lv1_2)
+        {
+            printf("lv1 is uint64 : %lu\n", *lv1_2);
+        }
+
+        uint64_t* lv2 = api_qs_object_get_unsigned_big_integer(&object, "lv2");
+
+        if(lv2)
+        {
+            printf("lv2 is uint64 : %lu\n", *lv2);
+        }
+
+        int64_t* lv3 = api_qs_object_get_big_integer(&object, "lv3");
+
+        if(lv3)
+        {
+            printf("lv3 is int64 : %ld\n", *lv3);
+        }
+
+        int64_t* lv4 = api_qs_object_get_big_integer(&object, "lv4");
+
+        if(lv4)
+        {
+            printf("lv4 is int64 : %ld\n", *lv4);
+        }
+
+        QS_JSON_ELEMENT_ARRAY array;
+        api_qs_object_get_array(&object, "array", &array);
+
+        int32_t* value = api_qs_array_get_integer(&array, 0);
+
+        if(value)
+        {
+            printf("array val1 : %d\n", *value);
+        }
+
+        api_qs_memory_free(&memory_context);
+
+        return 0;
+    }
+
     // create object loop 10
 
     for (int i = 0; i < 10; i++)
@@ -116,7 +191,7 @@ int main()
                 api_qs_object_get_array(&root_object, key, &array);
                 for(int j = 0; j < api_qs_array_get_length(&array); j++)
                 {
-                    char* value = api_qs_array_get_string(&array, j);
+                    //char* value = api_qs_array_get_string(&array, j);
                     //printf("k : %s , value : %s\n", key, value);
                 }
             }
@@ -144,7 +219,7 @@ int main()
         api_qs_object_get_array(&root_object, key, &array);
         for(int j = 0; j < api_qs_array_get_length(&array); j++)
         {
-            char* value = api_qs_array_get_string(&array, j);
+            //char* value = api_qs_array_get_string(&array, j);
             //printf("k : %s , value : %s\n", key, value);
         }
     }

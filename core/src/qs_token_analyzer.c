@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2017 Katsuya Owari
+ * Copyright (c) 2014-2024 Katsuya Owari
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -463,15 +463,47 @@ int qs_addtoken( QS_MEMORY_POOL* _ppool, QS_TOKENS *ptokens, char* tokenbuf, int
 	ptoken = ( QS_TOKEN* )QS_GET_POINTER(_ppool,ptokens->token_munit)+ptokens->currentpos;
 	*(tokenbuf+((*tokensize)++)) = '\0';
 	if( type == ID_NUM ){
-		if( -1 == ( ptoken->buf_munit = qs_create_memory_block( _ppool, sizeof(char)*(*tokensize) + sizeof( NUMERIC_CAST ) ) ) ){
-			printf("allocate token buf munit error.\n");
+
+		char* endptr;
+		uint64_t num = strtoul(tokenbuf,&endptr,10);
+		if( *endptr == '\0' ){
+			if( num > INT32_MAX ){
+				//printf("token : %s(%lu) is uint64\n",tokenbuf,num);
+				type = ID_NUM_U64;
+			}
+			else{
+				//printf("token : %s(%lu) is uint32\n",tokenbuf,num);
+			}
+		}
+		else{
+			printf("token : %s is not numeric\n",tokenbuf);
 			return -1;
 		}
-		pbuf = (char*)QS_GET_POINTER(_ppool,ptoken->buf_munit);
-		ptoken->size = (*tokensize);
-		memcpy(pbuf,tokenbuf,(*tokensize));
-		int32_t* pv = QS_PINT32(_ppool,ptoken->buf_munit);
-		*pv = atoi(tokenbuf);
+
+		// TODO : fix 64bit
+		if(sizeof( NUMERIC_CAST ) == sizeof( int32_t ) && num > INT32_MAX){
+			//printf("is u64 cast\n");
+			type = ID_NUM_U64;
+			if( -1 == ( ptoken->buf_munit = qs_create_memory_block( _ppool, sizeof(char)*(*tokensize) + sizeof( UI64_CAST ) ) ) ){
+				printf("allocate token buf munit error.\n");
+				return -1;
+			}
+			pbuf = (char*)QS_GET_POINTER(_ppool,ptoken->buf_munit);
+			ptoken->size = (*tokensize);
+			memcpy(pbuf,tokenbuf,(*tokensize));
+			UI64_CAST* pv = QS_PUINT64(_ppool,ptoken->buf_munit);
+			*pv = (UI64_CAST)num;
+		}else{
+			if( -1 == ( ptoken->buf_munit = qs_create_memory_block( _ppool, sizeof(char)*(*tokensize) + sizeof( NUMERIC_CAST ) ) ) ){
+				printf("allocate token buf munit error.\n");
+				return -1;
+			}
+			pbuf = (char*)QS_GET_POINTER(_ppool,ptoken->buf_munit);
+			ptoken->size = (*tokensize);
+			memcpy(pbuf,tokenbuf,(*tokensize));
+			NUMERIC_CAST* pv = QS_PNUMERIC(_ppool,ptoken->buf_munit);
+			*pv = (NUMERIC_CAST)num;
+		}
 	}
 	else{
 		if( -1 == ( ptoken->buf_munit = qs_create_memory_block( _ppool, sizeof(char)*(*tokensize) ) ) ){

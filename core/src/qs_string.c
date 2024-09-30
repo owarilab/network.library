@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2017 Katsuya Owari
+ * Copyright (c) 2014-2024 Katsuya Owari
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -34,21 +34,24 @@ int qs_ltoa( int64_t value, char* target, size_t size )
 	int i,index,len;
 	char c;
 	char* tmpp = target;
+	uint64_t uvalue;
 	if( value < 0 ){
 		isminus = true;
-		value = -value;
+		uvalue = -value; // -INT64_MIN is over INT64_MAX 
 		*tmpp++ = '-';
+	}else{
+		uvalue = value;
 	}
 	do{
-		*tmpp++ = ( ( value % 10 ) + 0x30 );
-		if( value <= 9 ){
+		*tmpp++ = ( ( uvalue % 10 ) + 0x30 );
+		if( uvalue <= 9 ){
 			break;
 		}
 		if( ( tmpp - target ) >= size-2 ){
 			error_code = -1;
 			break;
 		}
-		value = value / 10;
+		uvalue = uvalue / 10;
 	}while( true );
 	*tmpp++ = '\0';
 	i = isminus;
