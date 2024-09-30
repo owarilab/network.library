@@ -273,6 +273,14 @@ int api_qs_json_decode_object(QS_MEMORY_CONTEXT* context, QS_JSON_ELEMENT_OBJECT
 	object->memory = (void*)memory;
 	return 0;
 }
+int api_qs_object_exist(QS_JSON_ELEMENT_OBJECT* object,const char* name)
+{
+	if(object->memid_object==-1){
+		return 0;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)object->memory;
+	return qs_get_hash(memory,object->memid_object,name)!=-1;
+}
 int32_t* api_qs_object_get_integer(QS_JSON_ELEMENT_OBJECT* object,const char* name)
 {
 	if(object->memid_object==-1){
@@ -296,6 +304,81 @@ uint64_t* api_qs_object_get_unsigned_big_integer(QS_JSON_ELEMENT_OBJECT* object,
 	}
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)object->memory;
 	return qs_get_hash_unsigned_big_integer(memory,object->memid_object,name);
+}
+int32_t api_qs_object_get_integer_val(QS_JSON_ELEMENT_OBJECT* object,const char* name)
+{
+	if(object->memid_object==-1){
+		return 0;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)object->memory;
+	int32_t* val = qs_get_hash_integer(memory,object->memid_object,name);
+	if(NULL==val){
+		return 0;
+	}
+	return *val;
+}
+int64_t api_qs_object_get_big_integer_val(QS_JSON_ELEMENT_OBJECT* object,const char* name)
+{
+	if(object->memid_object==-1){
+		return 0;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)object->memory;
+
+	int64_t return_val = 0;
+	int32_t id = qs_get_hash_id(memory,object->memid_object,name);
+	if(id == ELEMENT_LITERAL_NUM_64){
+		int64_t* val = qs_get_hash_big_integer(memory,object->memid_object,name);
+		if(NULL==val){
+			return 0;
+		}
+		return_val = *val;
+	}
+	else if(id == ELEMENT_LITERAL_NUM_U64){
+		uint64_t* val = qs_get_hash_unsigned_big_integer(memory,object->memid_object,name);
+		if(NULL==val){
+			return 0;
+		}
+		return_val = *val;
+	}
+	else if(id == ELEMENT_LITERAL_NUM){
+		int32_t* val = qs_get_hash_integer(memory,object->memid_object,name);
+		if(NULL==val){
+			return 0;
+		}
+		return_val = *val;
+	}
+	return return_val;
+}
+uint64_t api_qs_object_get_unsigned_big_integer_val(QS_JSON_ELEMENT_OBJECT* object,const char* name)
+{
+	if(object->memid_object==-1){
+		return 0;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)object->memory;
+	uint64_t return_val = 0;
+	int32_t id = qs_get_hash_id(memory,object->memid_object,name);
+	if(id == ELEMENT_LITERAL_NUM_64){
+		int64_t* val = qs_get_hash_big_integer(memory,object->memid_object,name);
+		if(NULL==val){
+			return 0;
+		}
+		return_val = *val;
+	}
+	else if(id == ELEMENT_LITERAL_NUM_U64){
+		uint64_t* val = qs_get_hash_unsigned_big_integer(memory,object->memid_object,name);
+		if(NULL==val){
+			return 0;
+		}
+		return_val = *val;
+	}
+	else if(id == ELEMENT_LITERAL_NUM){
+		int32_t* val = qs_get_hash_integer(memory,object->memid_object,name);
+		if(NULL==val){
+			return 0;
+		}
+		return_val = *val;
+	}
+	return return_val;
 }
 char* api_qs_object_get_string(QS_JSON_ELEMENT_OBJECT* object,const char* name)
 {

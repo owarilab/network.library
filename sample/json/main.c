@@ -30,7 +30,7 @@ int main()
 
     if(1)
     {
-        api_qs_array_push_big_integer(&root_array, -1);
+        api_qs_array_push_unsigned_big_integer(&root_array, UINT64_MAX);
         api_qs_array_push_big_integer(&root_array, 2);
         api_qs_array_push_big_integer(&root_array, 3);
         api_qs_array_push_big_integer(&root_array, 4);
@@ -39,7 +39,10 @@ int main()
         char* json = api_qs_json_encode_array(&root_array, 1024 * 1024 * 1);
         printf("%s\n", json);
 
-        api_qs_object_push_unsigned_big_integer(&root_object, "lv1", UINT64_MAX-1);
+        api_qs_object_push_unsigned_big_integer(&root_object, "lv1", UINT64_MAX);
+        //api_qs_object_push_unsigned_big_integer(&root_object, "lv1", 1);
+        //api_qs_object_push_unsigned_big_integer(&root_object, "lv1", UINT64_MAX);
+
         api_qs_object_push_big_integer(&root_object, "lv2", INT64_MAX);
         api_qs_object_push_big_integer(&root_object, "lv3", INT64_MIN);
         api_qs_object_push_big_integer(&root_object, "lv4", INT64_MAX);
@@ -53,49 +56,37 @@ int main()
         QS_JSON_ELEMENT_OBJECT object;
         api_qs_json_decode_object(&memory_context, &object, json2);
 
-        int32_t* lv1 = api_qs_object_get_integer(&object, "lv1");
+        uint64_t lv1 = api_qs_object_get_unsigned_big_integer_val(&object, "lv1");
+        printf("lv1 : %lu\n", lv1);
 
-        if(lv1)
-        {
-            printf("lv1 is int32 : %d\n", *lv1);
-        }
+        int64_t lv2 = api_qs_object_get_big_integer_val(&object, "lv2");
+        printf("lv2 : %ld\n", lv2);
 
-        uint64_t* lv1_2 = api_qs_object_get_unsigned_big_integer(&object, "lv1");
+        int64_t lv3 = api_qs_object_get_big_integer_val(&object, "lv3");
+        printf("lv3 : %ld\n", lv3);
 
-        if(lv1_2)
-        {
-            printf("lv1 is uint64 : %lu\n", *lv1_2);
-        }
-
-        uint64_t* lv2 = api_qs_object_get_unsigned_big_integer(&object, "lv2");
-
-        if(lv2)
-        {
-            printf("lv2 is uint64 : %lu\n", *lv2);
-        }
-
-        int64_t* lv3 = api_qs_object_get_big_integer(&object, "lv3");
-
-        if(lv3)
-        {
-            printf("lv3 is int64 : %ld\n", *lv3);
-        }
-
-        int64_t* lv4 = api_qs_object_get_big_integer(&object, "lv4");
+        uint64_t* lv4 = api_qs_object_get_unsigned_big_integer(&object, "lv4");
 
         if(lv4)
         {
-            printf("lv4 is int64 : %ld\n", *lv4);
+            printf("lv4 is int64 : %lu\n", *lv4);
         }
 
         QS_JSON_ELEMENT_ARRAY array;
         api_qs_object_get_array(&object, "array", &array);
 
-        int32_t* value = api_qs_array_get_integer(&array, 0);
+        uint64_t* value = api_qs_array_get_unsigned_big_integer(&array, 0);
 
         if(value)
         {
-            printf("array val1 : %d\n", *value);
+            printf("array val1 is uint64 : %lu\n", *value);
+        }
+
+        int64_t* value2 = api_qs_array_get_big_integer(&array, 0);
+
+        if(value2)
+        {
+            printf("array val1 is int64 : %ld\n", *value2);
         }
 
         api_qs_memory_free(&memory_context);

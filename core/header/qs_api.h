@@ -127,9 +127,15 @@ char* api_qs_json_encode_object(QS_JSON_ELEMENT_OBJECT* object,size_t buffer_siz
 char* api_qs_json_encode_array(QS_JSON_ELEMENT_ARRAY* array,size_t buffer_size);
 
 int api_qs_json_decode_object(QS_MEMORY_CONTEXT* context, QS_JSON_ELEMENT_OBJECT* object, const char* json);
+int api_qs_object_exist(QS_JSON_ELEMENT_OBJECT* object,const char* name);
 int32_t* api_qs_object_get_integer(QS_JSON_ELEMENT_OBJECT* object,const char* name);
 int64_t* api_qs_object_get_big_integer(QS_JSON_ELEMENT_OBJECT* object,const char* name);
 uint64_t* api_qs_object_get_unsigned_big_integer(QS_JSON_ELEMENT_OBJECT* object,const char* name);
+
+int32_t api_qs_object_get_integer_val(QS_JSON_ELEMENT_OBJECT* object,const char* name);
+int64_t api_qs_object_get_big_integer_val(QS_JSON_ELEMENT_OBJECT* object,const char* name);
+uint64_t api_qs_object_get_unsigned_big_integer_val(QS_JSON_ELEMENT_OBJECT* object,const char* name);
+
 char* api_qs_object_get_string(QS_JSON_ELEMENT_OBJECT* object,const char* name);
 int api_qs_object_get_array(QS_JSON_ELEMENT_OBJECT* object,const char* name,QS_JSON_ELEMENT_ARRAY* dst_array);
 int api_qs_object_get_object(QS_JSON_ELEMENT_OBJECT* object,const char* name,QS_JSON_ELEMENT_OBJECT* dst_object);

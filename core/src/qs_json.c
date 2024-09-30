@@ -529,8 +529,9 @@ int32_t qs_json_decode_parser_hash( QS_MEMORY_POOL* _ppool, QS_NODE* node, QS_TO
 					ptokens->workpos+=3;
 				}
 				if( token_list[ptokens->workpos+3].type == ID_NUM_U64 ){
-					int64_t num = atol((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+3].buf_munit));
-					qs_add_hash_big_integer_kint(_ppool,working_munit,token_list[ptokens->workpos].buf_munit,-num);
+					uint64_t num = strtoul((char*)QS_GET_POINTER(_ppool, token_list[ptokens->workpos+3].buf_munit), NULL, 10);
+					//printf("num(%s):%lu\n",(char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+3].buf_munit),num);
+					qs_add_hash_big_integer_kint(_ppool,working_munit,token_list[ptokens->workpos].buf_munit,(int64_t)-num);
 					ptokens->workpos+=3;
 				}
 			}
@@ -623,8 +624,8 @@ int32_t qs_json_decode_parser_array( QS_MEMORY_POOL* _ppool, QS_NODE* node, QS_T
 				qs_array_push_integer( _ppool, &working_munit, -(*pnum) );
 			}
 			else if( token_list[ptokens->workpos+1].type == ID_NUM_U64 ){
-				int64_t* pnum = QS_PINT64( _ppool, token_list[ptokens->workpos+1].buf_munit );
-				qs_array_push_big_integer( _ppool, &working_munit, -(*pnum) );
+				uint64_t* pnum = QS_PUINT64( _ppool, token_list[ptokens->workpos+1].buf_munit );
+				qs_array_push_big_integer( _ppool, &working_munit, (int64_t)-(*pnum) );
 			}
 		}
 		else if( token_list[ptokens->workpos].type == ID_NUM ) {
