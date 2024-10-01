@@ -1,17 +1,53 @@
+/*
+ * sample script
+ */
 
-cnt = rand() % 100;
-loopcnt=cnt;
-while(loopcnt>0){
-    r = rand() % 10;
-    echo("v = " + r + "\n");
-    loopcnt--;
-}
-echo("cnt " + cnt + "\n");
+// hash test
+config = [
+    "port" : 8080,
+    "maxcon" : 100,
+    "objects" : [
+        "obj1" : [
+            "name" : "obj1_name",
+            "value" : 1
+        ],
+        "obj2" : [
+            "name" : "obj2_name",
+            "value" : 2
+        ],
+    ],
+    "int_array":[
+        1,2,3,4
+    ],
+    "str_array":[
+        "a","bb","cccc"
+    ]
+];
+
+echo(config);
+json = json_encode(config);
+echo(json + "\n");
+echo(json_decode(json));
+
+test_obj = [];
+test_obj["val"] = 1;
+echo(test_obj);
 
 
-if(1)
+is_enable=0
+if(is_enable)
 {
-    // comment
+    // while loop test
+    cnt = rand() % 100;
+    loopcnt=cnt;
+    while(loopcnt>0){
+        r = rand() % 10;
+        echo("v = " + r + "\n");
+        loopcnt--;
+    }
+    echo("cnt " + cnt + "\n");
+
+    // file test
     file_name="hoge.txt";
     if(file_exist(file_name)){
         echo(file_name + " exist\n");
@@ -113,3 +149,4 @@ footer="
     html=http_header+header+body+footer;
     return html;
 }
+
