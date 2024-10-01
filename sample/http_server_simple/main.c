@@ -122,7 +122,9 @@ int on_ws_event(QS_EVENT_PARAMETER params)
 {
 	char* message = api_qs_get_ws_message(params);
 	api_qs_send_ws_message(params,message);
+	//api_qs_send_ws_message(params,"Hello World!");
 	//api_qs_send_ws_message_plane(params,message);
+	//api_qs_send_ws_message_plane(params,"Hello World!");
 	return 0;
 }
 

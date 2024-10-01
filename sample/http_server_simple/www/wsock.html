@@ -7,15 +7,108 @@
 <title>ws sample</title>
 <script type="text/javascript">
 var ws_socket = null;
+var self_uuid = '';
+var self_con_id = '';
 window.onload=function()
 {
-	ws_socket = new WebSocket('ws://localhost:8080');
+	ws_socket = new WebSocket('ws://localhost:4444');
 	ws_socket.addEventListener('open', function (event) {
-		ws_socket.send('dummy');
+		self_uuid = Math.random().toString(36).slice(-8);
+		ws_socket.send(self_uuid);
 	});
 	ws_socket.addEventListener('message', function (event) {
     	console.log('recv : ', event.data);
+		try{
+			let json = JSON.parse(event.data);
+			if(json.id !== undefined && json.type !== undefined && json.message !== undefined)
+			{
+				let con_id = json.id;
+				if(json.type === 'message')
+				{
+					// echo back
+					if(json.message === self_uuid){
+						self_con_id = con_id;
+						// find room and join or create
+						room_list(con_id);
+					}
+				} else if(json.type === 'join'){
+					// join other user
+					if(con_id !== self_con_id)
+					{
+						console.log('join : ', con_id);
+						// send hello message
+						ws_socket.send('hello ' + con_id + ' my con id is ' + self_con_id);
+					}
+				} else if(json.type === 'leave'){
+					// leave other user
+					console.log('leave : ', con_id);
+				}
+			}
+		}catch(e){
+			console.log('error : ', e);
+		}
 	});
+}
+function room_list(con_id)
+{
+	let xhr = new XMLHttpRequest();
+	xhr.open('GET', 'http://localhost:4444/api/v1/room/list', true);
+	xhr.onreadystatechange = function() {
+		if (xhr.readyState === 4) {
+			if (xhr.status === 200) {
+				console.log('room list response : ', xhr.responseText);
+				let json = JSON.parse(xhr.responseText);
+				let is_join = false;
+				if(json.list !== undefined)
+				{
+					for(let i=0; i<json.list.length; i++)
+					{
+						let room_id = json.list[i].id;
+						room_join(room_id,con_id);
+						is_join = true;
+						break;
+					}
+				}
+
+				if(!is_join)
+				{
+					room_create('test_room', con_id);
+				}
+			}
+		}
+	};
+	xhr.send();
+}
+function room_create(room_name, con_id)
+{
+	let xhr = new XMLHttpRequest();
+	xhr.open('POST', 'http://localhost:4444/api/v1/room/create', true);
+	xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+	xhr.onreadystatechange = function() {
+		if (xhr.readyState === 4) {
+			if (xhr.status === 200) {
+				console.log('room create response : ', xhr.responseText);
+				let json = JSON.parse(xhr.responseText);
+				let room_id = json.id;
+				room_join(room_id,con_id);
+			}
+		}
+	};
+	xhr.send('name=' + room_name);
+}
+function room_join(room_id,con_id)
+{
+	let xhr = new XMLHttpRequest();
+	xhr.open('POST', 'http://localhost:4444/api/v1/room/join', true);
+	xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+	xhr.onreadystatechange = function() {
+		if (xhr.readyState === 4) {
+			if (xhr.status === 200) {
+				console.log('room join response : ', xhr.responseText);
+			}
+		}
+	};
+	xhr.send('room_id=' + room_id + '&connection_id=' + con_id);
 }
 </script>
 </head>
