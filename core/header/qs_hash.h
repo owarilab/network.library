@@ -86,7 +86,7 @@ void qs_add_hash_big_integer_kint( QS_MEMORY_POOL* memory, int32_t memid_hash, i
 void qs_add_hash_unsigned_big_integer_kint( QS_MEMORY_POOL* memory, int32_t memid_hash, int32_t memid_name_string, uint64_t value );
 QS_HASH_ELEMENT* qs_add_hash_string( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, const char* value );
 void qs_add_hash_value_kstring( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, int32_t memid_data, int32_t id );
-void qs_add_hash_emptystring( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, size_t string_size );
+QS_HASH_ELEMENT* qs_add_hash_emptystring( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, size_t string_size );
 int32_t qs_move_hash( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name_from, const char* hash_name_to );
 int32_t qs_remove_hash( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name );
 char* qs_get_hash_string( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* hash_name );

@@ -196,6 +196,7 @@ char* api_qs_script_get_parameter(QS_SERVER_SCRIPT_CONTEXT* script_context, cons
 
 int api_qs_kvs_create_b1mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context);
 int api_qs_kvs_create_b1mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path);
+int api_qs_kvs_create_b8mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path);
 int api_qs_kvs_set(QS_KVS_CONTEXT* kvs_context,const char* key, const char* value, int32_t life_time);
 char* api_qs_kvs_get(QS_KVS_CONTEXT* kvs_context,const char* key);
 size_t api_qs_kvs_get_buffer_size(QS_KVS_CONTEXT* kvs_context,const char* key);

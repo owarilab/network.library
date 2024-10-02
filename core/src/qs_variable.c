@@ -193,8 +193,22 @@ int32_t qs_create_storage_cache_B1MB( const char* store_name, QS_MEMORY_POOL** p
 {
 	size_t key_size = 64;
 	size_t hash_size = 1000;
-	size_t cache_size = 1;
-	size_t page_allocate_size = SIZE_KBYTE*980;
+	size_t cache_size = 1; 	// If the swap option is enabled, move keys of this cache size to the swap memory. If not swapping, 0 is acceptable.
+	size_t page_allocate_size = SIZE_MBYTE*980;
+	int32_t cache_id = qs_create_storage_cache(store_name,pp_memory,cache_size,page_allocate_size,hash_size,key_size);
+	if(-1==cache_id){
+		printf("qs_create_cache error\n");
+		return -1;
+	}
+	return cache_id;
+}
+
+int32_t qs_create_storage_cache_B8MB( const char* store_name, QS_MEMORY_POOL** pp_memory )
+{
+	size_t key_size = 64;
+	size_t hash_size = 1000;
+	size_t cache_size = 1; 	// If the swap option is enabled, move keys of this cache size to the swap memory. If not swapping, 0 is acceptable.
+	size_t page_allocate_size = SIZE_MBYTE*8;
 	int32_t cache_id = qs_create_storage_cache(store_name,pp_memory,cache_size,page_allocate_size,hash_size,key_size);
 	if(-1==cache_id){
 		printf("qs_create_cache error\n");

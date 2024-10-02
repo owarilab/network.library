@@ -408,17 +408,18 @@ QS_HASH_ELEMENT* qs_add_hash_string( QS_MEMORY_POOL* memory, int32_t memid_hash,
 	}
 	int32_t memid_data = qs_get_hash( memory, memid_hash, name );
 	size_t data_size = 0;
+	size_t size = strlen( value )+1;
 	if( memid_data == -1 ){
-		if( -1 == ( memid_data = qs_create_memory_block( memory, strlen( value )+1 ) ) ){
+		if( -1 == ( memid_data = qs_create_memory_block( memory, size ) ) ){
 			return NULL;
 		}
 		data_size = qs_usize( memory, memid_data );
 	}
 	else{
-		size_t size = strlen( value )+1;
+		
 		data_size = qs_usize( memory, memid_data );
 		if( data_size < size ){
-			if( -1 == ( memid_data = qs_create_memory_block( memory, strlen( value )+1 ) ) ){
+			if( -1 == ( memid_data = qs_create_memory_block( memory, size ) ) ){
 				return NULL;
 			}
 		}
@@ -433,16 +434,16 @@ QS_HASH_ELEMENT* qs_add_hash_string( QS_MEMORY_POOL* memory, int32_t memid_hash,
 	return is_push;
 }
 
-void qs_add_hash_emptystring( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, size_t string_size )
+QS_HASH_ELEMENT* qs_add_hash_emptystring( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, size_t string_size )
 {
 	char* pbuf;
 	int32_t memid_data;
 	int32_t memid_name = qs_make_hash_name( memory, memid_hash, name );
 	if( memid_name == -1 ){
-		return;
+		return NULL;
 	}
 	if( -1 == ( memid_data = qs_create_memory_block( memory, string_size ) ) ){
-		return;
+		return NULL;
 	}
 	pbuf = (char*)QS_GET_POINTER( memory, memid_data );
 	//memset( pbuf, 0, qs_usize( memory, memid_data ) );
@@ -451,6 +452,7 @@ void qs_add_hash_emptystring( QS_MEMORY_POOL* memory, int32_t memid_hash, const 
 	if( NULL==is_push){
 		printf("[qs_add_hash_emptystring] is_push is NULL\n");
 	}
+	return is_push;
 }
 
 void qs_add_hash_value_kstring( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* name, int32_t memid_data, int32_t id )
