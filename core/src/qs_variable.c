@@ -80,6 +80,21 @@ int32_t qs_create_cache_B1MB( QS_MEMORY_POOL* memory)
 	return cache_id;
 }
 
+int32_t qs_create_cache_B8MB( QS_MEMORY_POOL* memory)
+{
+	size_t key_size = 64;
+	size_t hash_size = 4096;
+	size_t cache_size = 10000;
+	size_t chain_allocate_size = cache_size*(key_size+20);
+	size_t page_allocate_size = (qs_memory_available_size(memory) - (chain_allocate_size + SIZE_KBYTE * 8)) / 2;
+	int32_t cache_id = qs_create_cache(memory,chain_allocate_size,cache_size,page_allocate_size,hash_size,key_size);
+	if(-1==cache_id){
+		printf("qs_create_cache error\n");
+		return -1;
+	}
+	return cache_id;
+}
+
 int32_t qs_create_cache_B128MB( QS_MEMORY_POOL* memory)
 {
 	size_t key_size = 64;

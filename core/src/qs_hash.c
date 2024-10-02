@@ -301,7 +301,7 @@ QS_HASH_ELEMENT* qs_add_hash_integer( QS_MEMORY_POOL* memory, int32_t memid_hash
 	*pv = value;
 	QS_HASH_ELEMENT* is_push = qs_add_hash( memory, memid_hash, memid_name, memid_data, ELEMENT_LITERAL_NUM );
 	if( NULL==is_push){
-		printf("[qs_add_hash_integer] is_push is NULL\n");
+		//printf("[qs_add_hash_integer] is_push is NULL\n");
 	}
 	return is_push;
 }
@@ -324,7 +324,7 @@ QS_HASH_ELEMENT* qs_add_hash_big_integer( QS_MEMORY_POOL* memory, int32_t memid_
 	*pv = value;
 	QS_HASH_ELEMENT* is_push = qs_add_hash( memory, memid_hash, memid_name, memid_data, ELEMENT_LITERAL_NUM_64 );
 	if( NULL==is_push){
-		printf("[qs_add_hash_big_integer] is_push is NULL\n");
+		//printf("[qs_add_hash_big_integer] is_push is NULL\n");
 	}
 	return is_push;
 }
@@ -347,7 +347,7 @@ QS_HASH_ELEMENT* qs_add_hash_unsigned_big_integer( QS_MEMORY_POOL* memory, int32
 	*pv = value;
 	QS_HASH_ELEMENT* is_push = qs_add_hash( memory, memid_hash, memid_name, memid_data, ELEMENT_LITERAL_NUM_U64 );
 	if( NULL==is_push){
-		printf("[qs_add_hash_unsigned_big_integer] is_push is NULL\n");
+		//printf("[qs_add_hash_unsigned_big_integer] is_push is NULL\n");
 	}
 	return is_push;
 }
@@ -429,7 +429,7 @@ QS_HASH_ELEMENT* qs_add_hash_string( QS_MEMORY_POOL* memory, int32_t memid_hash,
 	memcpy( pbuf, value, data_size );
 	QS_HASH_ELEMENT* is_push = qs_add_hash( memory, memid_hash, memid_name, memid_data, ELEMENT_LITERAL_STR );
 	if( NULL==is_push){
-		printf("[qs_add_hash_string] is_push is NULL\n");
+		//printf("[qs_add_hash_string] is_push is NULL\n");
 	}
 	return is_push;
 }
@@ -450,7 +450,7 @@ QS_HASH_ELEMENT* qs_add_hash_emptystring( QS_MEMORY_POOL* memory, int32_t memid_
 	pbuf[0] = '\0';
 	QS_HASH_ELEMENT* is_push = qs_add_hash( memory, memid_hash, memid_name, memid_data, ELEMENT_LITERAL_STR );
 	if( NULL==is_push){
-		printf("[qs_add_hash_emptystring] is_push is NULL\n");
+		//printf("[qs_add_hash_emptystring] is_push is NULL\n");
 	}
 	return is_push;
 }

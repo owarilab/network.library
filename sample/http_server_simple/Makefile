@@ -3,7 +3,7 @@ CC      = gcc
 DEFINE  = -D_LINUX
 CFLAG   = -pthread -Wall -O
 #CFLAG   = -Wall -O2
-INCDIR  = 
+INCDIR  = -I ../../core/header
 LIBA = ../../core/libqs_core.a
 MYSOCKETOBJGROUP = main.o $(LIBA)
 

@@ -1403,6 +1403,20 @@ int api_qs_kvs_create_b1mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kv
 	kvs_context->is_persistence = false;
 	return 0;
 }
+int api_qs_kvs_create_b8mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)memory_context->memory;
+	kvs_context->memid_kvs_memory = qs_create_mini_memory(memory, SIZE_MBYTE * 8);
+	QS_MEMORY_POOL* cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(memory,kvs_context->memid_kvs_memory);
+	kvs_context->memid_kvs = qs_create_cache_B8MB(cache_memory);
+	if(-1 == kvs_context->memid_kvs) {
+		return -1;
+	}
+	kvs_context->memory = (void*)memory;
+	memset(kvs_context->persistence_file_path,0,sizeof(kvs_context->persistence_file_path));
+	kvs_context->is_persistence = false;
+	return 0;
+}
 int api_qs_kvs_create_b1mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path)
 {
 	QS_MEMORY_POOL* memory = NULL;
