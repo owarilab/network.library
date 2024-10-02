@@ -80,7 +80,7 @@ int main( int argc, char *argv[], char *envp[] )
 	}
 
 	// kvs test
-	if(1)
+	if(0)
 	{
 		QS_KVS_CONTEXT kvs;
 		if(-1!=api_qs_server_get_kvs(context,&kvs)){
