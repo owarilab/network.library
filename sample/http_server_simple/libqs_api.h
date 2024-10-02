@@ -51,9 +51,11 @@ typedef struct QS_MEMORY_CONTEXT
 
 typedef struct QS_KVS_CONTEXT
 {
+	int32_t is_persistence;
 	int32_t memid_kvs;
 	int32_t memid_kvs_memory;
 	void* memory;
+	char persistence_file_path[2048];
 } QS_KVS_CONTEXT;
 
 typedef struct QS_SERVER_CONTEXT
@@ -193,12 +195,14 @@ int api_qs_script_run(QS_SERVER_SCRIPT_CONTEXT* script_context);
 char* api_qs_script_get_parameter(QS_SERVER_SCRIPT_CONTEXT* script_context, const char* name);
 
 int api_qs_kvs_create_b1mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context);
+int api_qs_kvs_create_b1mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path);
 int api_qs_kvs_set(QS_KVS_CONTEXT* kvs_context,const char* key, const char* value, int32_t life_time);
 char* api_qs_kvs_get(QS_KVS_CONTEXT* kvs_context,const char* key);
 size_t api_qs_kvs_get_buffer_size(QS_KVS_CONTEXT* kvs_context,const char* key);
 int api_qs_kvs_delete(QS_KVS_CONTEXT* kvs_context,const char* key);
 int32_t api_qs_kvs_keys(QS_JSON_ELEMENT_ARRAY* array, QS_KVS_CONTEXT* kvs_context);
 int32_t api_qs_kvs_sorted_keys(QS_JSON_ELEMENT_ARRAY* array, QS_KVS_CONTEXT* kvs_context, int32_t is_sort_asc);
+int api_qs_persistence_kvs_memory_free(QS_KVS_CONTEXT* kvs_context);
 
 int api_qs_room_create(QS_SERVER_CONTEXT* context, const char* name, QS_MEMORY_CONTEXT* dest_memory, QS_JSON_ELEMENT_OBJECT* dest_object);
 int api_qs_room_list(QS_SERVER_CONTEXT* context, QS_MEMORY_CONTEXT* dest_memory, QS_JSON_ELEMENT_OBJECT* dest_object);

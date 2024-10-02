@@ -429,7 +429,7 @@ int api_qs_object_get_keys(QS_JSON_ELEMENT_OBJECT* object,QS_JSON_ELEMENT_ARRAY*
 	}
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)object->memory;
 	int is_sort_asc = 1;
-	int32_t memid_array = qs_get_hash_keys(memory,object->memid_object,is_sort_asc);
+	int32_t memid_array = qs_get_hash_keys(memory,memory,object->memid_object,is_sort_asc);
 	if(-1==memid_array){
 		return -1;
 	}
@@ -758,6 +758,8 @@ int api_qs_server_get_kvs(QS_SERVER_CONTEXT* context,QS_KVS_CONTEXT* kvs_context
 	kvs_context->memory = kvs_memory_pool;
 	kvs_context->memid_kvs_memory = context->memid_kvs_memory;
 	kvs_context->memid_kvs = context->memid_kvs;
+	kvs_context->is_persistence = false;
+	memset(kvs_context->persistence_file_path,0,sizeof(kvs_context->persistence_file_path));
 	return 0;
 }
 void api_qs_set_on_connect_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_connect )
@@ -1397,12 +1399,33 @@ int api_qs_kvs_create_b1mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kv
 		return -1;
 	}
 	kvs_context->memory = (void*)memory;
+	memset(kvs_context->persistence_file_path,0,sizeof(kvs_context->persistence_file_path));
+	kvs_context->is_persistence = false;
+	return 0;
+}
+int api_qs_kvs_create_b1mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path)
+{
+	QS_MEMORY_POOL* memory = NULL;
+	kvs_context->memid_kvs = qs_create_storage_cache_B1MB(file_path,&memory);
+	if(-1 == kvs_context->memid_kvs) {
+		return -1;
+	}
+	kvs_context->memory = (void*)memory;
+	memset(kvs_context->persistence_file_path,0,sizeof(kvs_context->persistence_file_path));
+	snprintf(kvs_context->persistence_file_path,sizeof(kvs_context->persistence_file_path),"%s",file_path);
+	kvs_context->is_persistence = true;
+	kvs_context->memid_kvs_memory = -1;
 	return 0;
 }
 int api_qs_kvs_set(QS_KVS_CONTEXT* kvs_context,const char* key, const char* value, int32_t life_time)
 {
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)kvs_context->memory;
-	QS_MEMORY_POOL* cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(memory,kvs_context->memid_kvs_memory);
+	QS_MEMORY_POOL* cache_memory = NULL;
+	if(kvs_context->is_persistence){
+		cache_memory = memory;
+	}else{
+		cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(memory,kvs_context->memid_kvs_memory);
+	}
 	QS_CACHE* cache = (QS_CACHE*)QS_GET_POINTER(cache_memory,kvs_context->memid_kvs);
 	size_t key_size = strlen(key);
 	if( key_size >= cache->max_key_size && key_size <= 0){
@@ -1414,7 +1437,12 @@ int api_qs_kvs_set(QS_KVS_CONTEXT* kvs_context,const char* key, const char* valu
 char* api_qs_kvs_get(QS_KVS_CONTEXT* kvs_context,const char* key)
 {
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)kvs_context->memory;
-	QS_MEMORY_POOL* cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(memory,kvs_context->memid_kvs_memory);
+	QS_MEMORY_POOL* cache_memory = NULL;
+	if(kvs_context->is_persistence){
+		cache_memory = memory;
+	}else{
+		cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(memory,kvs_context->memid_kvs_memory);
+	}
 	QS_CACHE* cache = (QS_CACHE*)QS_GET_POINTER(cache_memory,kvs_context->memid_kvs);
 	char* value = NULL;
 	QS_CACHE_PAGE cache_page;
@@ -1428,7 +1456,12 @@ char* api_qs_kvs_get(QS_KVS_CONTEXT* kvs_context,const char* key)
 size_t api_qs_kvs_get_buffer_size(QS_KVS_CONTEXT* kvs_context,const char* key)
 {
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)kvs_context->memory;
-	QS_MEMORY_POOL* cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(memory,kvs_context->memid_kvs_memory);
+	QS_MEMORY_POOL* cache_memory = NULL;
+	if(kvs_context->is_persistence){
+		cache_memory = memory;
+	}else{
+		cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(memory,kvs_context->memid_kvs_memory);
+	}
 	QS_CACHE* cache = (QS_CACHE*)QS_GET_POINTER(cache_memory,kvs_context->memid_kvs);
 	size_t buffer_size = 0;
 	QS_CACHE_PAGE cache_page;
@@ -1442,7 +1475,12 @@ size_t api_qs_kvs_get_buffer_size(QS_KVS_CONTEXT* kvs_context,const char* key)
 int api_qs_kvs_delete(QS_KVS_CONTEXT* kvs_context,const char* key)
 {
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)kvs_context->memory;
-	QS_MEMORY_POOL* cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(memory,kvs_context->memid_kvs_memory);
+	QS_MEMORY_POOL* cache_memory = NULL;
+	if(kvs_context->is_persistence){
+		cache_memory = memory;
+	}else{
+		cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(memory,kvs_context->memid_kvs_memory);
+	}
 	QS_CACHE* cache = (QS_CACHE*)QS_GET_POINTER(cache_memory,kvs_context->memid_kvs);
 	QS_CACHE_PAGE cache_page;
 	qs_get_cache_page(cache,&cache_page);
@@ -1452,7 +1490,12 @@ int32_t api_qs_kvs_keys(QS_JSON_ELEMENT_ARRAY* array, QS_KVS_CONTEXT* kvs_contex
 {
 	int32_t key_length = 0;
 	QS_MEMORY_POOL* cache_main_memory = (QS_MEMORY_POOL*)kvs_context->memory;
-	QS_MEMORY_POOL* cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(cache_main_memory,kvs_context->memid_kvs_memory);
+	QS_MEMORY_POOL* cache_memory = NULL;
+	if(kvs_context->is_persistence){
+		cache_memory = cache_main_memory;
+	}else{
+		cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(cache_main_memory,kvs_context->memid_kvs_memory);
+	}
 	QS_CACHE* cache = (QS_CACHE*)QS_GET_POINTER(cache_memory,kvs_context->memid_kvs);
 	QS_CACHE_PAGE cache_page;
 	qs_get_cache_page(cache,&cache_page);
@@ -1474,30 +1517,49 @@ int32_t api_qs_kvs_keys(QS_JSON_ELEMENT_ARRAY* array, QS_KVS_CONTEXT* kvs_contex
 int32_t api_qs_kvs_sorted_keys(QS_JSON_ELEMENT_ARRAY* array, QS_KVS_CONTEXT* kvs_context, int32_t is_sort_asc)
 {
 	int32_t key_length = 0;
+	QS_MEMORY_POOL* sort_buffer_memory = (QS_MEMORY_POOL*)array->memory;
 	QS_MEMORY_POOL* cache_main_memory = (QS_MEMORY_POOL*)kvs_context->memory;
-	QS_MEMORY_POOL* cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(cache_main_memory,kvs_context->memid_kvs_memory);
+	QS_MEMORY_POOL* cache_memory = NULL;
+	if(kvs_context->is_persistence){
+		cache_memory = cache_main_memory;
+	}else{
+		cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(cache_main_memory,kvs_context->memid_kvs_memory);
+	}
 	QS_CACHE* cache = (QS_CACHE*)QS_GET_POINTER(cache_memory,kvs_context->memid_kvs);
 	QS_CACHE_PAGE cache_page;
 	qs_get_cache_page(cache,&cache_page);
 
-	int32_t memid_sorted_keys = qs_get_hash_keys(cache_page.memory,cache_page.hash_id,is_sort_asc);
+	printf("api_qs_kvs_sorted_keys b\n");
+
+	int32_t memid_sorted_keys = qs_get_hash_keys(sort_buffer_memory,cache_page.memory,cache_page.hash_id,is_sort_asc);
 	if(-1 == memid_sorted_keys){
 		return -1;
 	}
 
-	key_length = qs_array_length(cache_page.memory,memid_sorted_keys);
+	printf("api_qs_kvs_sorted_keys a\n");
+
+	key_length = qs_array_length(sort_buffer_memory,memid_sorted_keys);
 	int32_t i;
 	QS_ARRAY_ELEMENT* ae;
 	for(i=0;i<key_length;i++){
-		ae = qs_array_get(cache_page.memory,memid_sorted_keys,i);
+		ae = qs_array_get(sort_buffer_memory,memid_sorted_keys,i);
 		if(NULL == ae){
 			continue;
 		}
 		int32_t memid_key = ae->memid_array_element_data;
-		char* key = (char*)QS_GET_POINTER(cache_page.memory,memid_key);
+		char* key = (char*)QS_GET_POINTER(sort_buffer_memory,memid_key);
 		api_qs_array_push_string(array,key);
 	}
 	return key_length;
+}
+
+int api_qs_persistence_kvs_memory_free(QS_KVS_CONTEXT* kvs_context)
+{
+	if(kvs_context->is_persistence){
+		QS_MEMORY_POOL* cache_main_memory = (QS_MEMORY_POOL*)kvs_context->memory;
+		qs_free(cache_main_memory);
+	}
+	return 0;
 }
 
 int api_qs_room_create(QS_SERVER_CONTEXT* context, const char* name, QS_MEMORY_CONTEXT* dest_memory, QS_JSON_ELEMENT_OBJECT* dest_object)

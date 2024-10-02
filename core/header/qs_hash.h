@@ -104,7 +104,7 @@ QS_HASH_ELEMENT* qs_get_hash_element( QS_MEMORY_POOL* memory, int32_t memid_hash
 int32_t qs_hash_length( QS_MEMORY_POOL* memory, int32_t memid_hash );
 int32_t qs_init_hash_foreach( QS_MEMORY_POOL* memory, int32_t memid_hash, QS_HASH_FOREACH* hf );
 QS_HASH_ELEMENT* qs_hash_foreach( QS_MEMORY_POOL* memory, QS_HASH_FOREACH* hf );
-int32_t qs_get_hash_keys( QS_MEMORY_POOL* memory, int32_t memid_hash, int is_sort_asc);
+int32_t qs_get_hash_keys( QS_MEMORY_POOL* dest_memory, QS_MEMORY_POOL* src_memory, int32_t memid_hash, int is_sort_asc);
 
 #endif /*_QS_HASH_H_*/
 

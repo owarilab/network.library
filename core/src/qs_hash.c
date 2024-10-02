@@ -845,7 +845,7 @@ QS_HASH_ELEMENT* qs_hash_foreach( QS_MEMORY_POOL* memory, QS_HASH_FOREACH* hf )
 	return ret;
 }
 
-int32_t qs_get_hash_keys( QS_MEMORY_POOL* memory, int32_t memid_hash, int is_sort_asc)
+int32_t qs_get_hash_keys( QS_MEMORY_POOL* dest_memory, QS_MEMORY_POOL* src_memory, int32_t memid_hash, int is_sort_asc)
 {
 	int32_t ret = -1;
 	int32_t memid_array = -1;
@@ -854,19 +854,19 @@ int32_t qs_get_hash_keys( QS_MEMORY_POOL* memory, int32_t memid_hash, int is_sor
 	struct QS_HASH *hashchild;
 	struct QS_HASH_ELEMENT *hashelement;
 	int32_t i,j;
-	hash = (struct QS_HASH *)QS_GET_POINTER( memory, memid_hash );
-	hashchild = (struct QS_HASH *)QS_GET_POINTER( memory, hash->hash_munit );
+	hash = (struct QS_HASH *)QS_GET_POINTER( src_memory, memid_hash );
+	hashchild = (struct QS_HASH *)QS_GET_POINTER( src_memory, hash->hash_munit );
 	for( j = 0; j < hash->hash_size; j++ )
 	{
 		if( hashchild[j].hash_munit >= 0 )
 		{
-			hashelement = (struct QS_HASH_ELEMENT*)QS_GET_POINTER( memory, hashchild[j].hash_munit );
+			hashelement = (struct QS_HASH_ELEMENT*)QS_GET_POINTER( src_memory, hashchild[j].hash_munit );
 			for( i = 0; i < hashchild[j].hash_size; i++ )
 			{
 				if( hashelement[i].memid_hash_name >= 0 )
 				{
-					const char* name = (char*)QS_GET_POINTER( memory, hashelement[i].memid_hash_name );
-					if( QS_SYSTEM_ERROR == qs_array_push_string( memory, &memid_array, name ) ){
+					const char* name = (char*)QS_GET_POINTER( src_memory, hashelement[i].memid_hash_name );
+					if( QS_SYSTEM_ERROR == qs_array_push_string( dest_memory, &memid_array, name ) ){
 						return ret;
 					}
 				}
@@ -874,24 +874,24 @@ int32_t qs_get_hash_keys( QS_MEMORY_POOL* memory, int32_t memid_hash, int is_sor
 		}
 	}
 
-	int32_t array_size = qs_array_length( memory, memid_array );
-	int32_t sort_buffer = qs_create_memory_block( memory, sizeof( int32_t ) * array_size );
+	int32_t array_size = qs_array_length( dest_memory, memid_array );
+	int32_t sort_buffer = qs_create_memory_block( dest_memory, sizeof( int32_t ) * array_size );
 	if( sort_buffer == -1 ){
 		return ret;
 	}
 
-	int32_t* sort_num_array = (int32_t*)QS_GET_POINTER( memory, sort_buffer );
+	int32_t* sort_num_array = (int32_t*)QS_GET_POINTER( dest_memory, sort_buffer );
 	for( i = 0; i < array_size; ++i ){
-		QS_ARRAY_ELEMENT* elm = qs_array_get( memory, memid_array, i );
+		QS_ARRAY_ELEMENT* elm = qs_array_get( dest_memory, memid_array, i );
 		if( elm == NULL ){
 			return ret;
 		}
 		int32_t memid_name = elm->memid_array_element_data;
-		const char* name = (char*)QS_GET_POINTER( memory, memid_name );
+		const char* name = (char*)QS_GET_POINTER( dest_memory, memid_name );
 		sort_num_array[i] = memid_name;
 		for( j = i-1; j >= 0; j-- )
 		{
-			const char* name2 = (char*)QS_GET_POINTER( memory, sort_num_array[j] );
+			const char* name2 = (char*)QS_GET_POINTER( dest_memory, sort_num_array[j] );
 			int cmp = strcmp( name, name2 );
 			if( is_sort_asc ? cmp < 0 : cmp > 0 ){
 				int32_t memid_name2 = sort_num_array[j];
@@ -905,8 +905,8 @@ int32_t qs_get_hash_keys( QS_MEMORY_POOL* memory, int32_t memid_hash, int is_sor
 	}
 	
 	for( i = 0; i < array_size; ++i ){
-		const char* name = (char*)QS_GET_POINTER( memory, sort_num_array[i] );
-		if( QS_SYSTEM_ERROR == qs_array_push_string( memory, &memid_sorted_array, name ) ){
+		const char* name = (char*)QS_GET_POINTER( dest_memory, sort_num_array[i] );
+		if( QS_SYSTEM_ERROR == qs_array_push_string( dest_memory, &memid_sorted_array, name ) ){
 			return ret;
 		}
 	}
