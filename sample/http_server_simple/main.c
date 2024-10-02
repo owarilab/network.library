@@ -64,6 +64,21 @@ int main( int argc, char *argv[], char *envp[] )
 	api_qs_set_on_http_event(context, on_http_event );
 	api_qs_set_on_websocket_event(context, on_ws_event );
 	api_qs_set_on_close_event(context, on_close );
+
+	// test
+	if(0)
+	{
+		for(int i=0;i<1000;i++){
+			char* room_name = api_qs_uniqid(&g_temporary_memory,32);
+			QS_JSON_ELEMENT_OBJECT object;
+			api_qs_room_create(context,room_name,&g_temporary_memory,&object);
+			char* json = api_qs_json_encode_object(&object,1024);
+			printf("room_info : %s\n",json);
+			api_qs_memory_clean(&g_temporary_memory);
+		}
+		api_qs_router_memory_info(context);
+	}
+
 	for(;;){
 		api_qs_update(context);
 		api_qs_sleep(context);

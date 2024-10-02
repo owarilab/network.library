@@ -157,6 +157,7 @@ char* api_qs_csv_get_row(QS_CSV_CONTEXT* csv, int32_t line_pos, int32_t row_pos)
 
 int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_connection);
 int api_qs_server_create_router(QS_SERVER_CONTEXT* context);
+void api_qs_router_memory_info(QS_SERVER_CONTEXT* context);
 int api_qs_server_create_kvs(QS_SERVER_CONTEXT* context, int kvs_memory_type);
 int api_qs_server_get_kvs(QS_SERVER_CONTEXT* context,QS_KVS_CONTEXT* kvs_context);
 void api_qs_set_on_connect_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_connect );
