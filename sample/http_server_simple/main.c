@@ -65,7 +65,7 @@ int main( int argc, char *argv[], char *envp[] )
 	api_qs_set_on_websocket_event(context, on_ws_event );
 	api_qs_set_on_close_event(context, on_close );
 
-	// test
+	// router test
 	if(0)
 	{
 		for(int i=0;i<1000;i++){
@@ -77,6 +77,55 @@ int main( int argc, char *argv[], char *envp[] )
 			api_qs_memory_clean(&g_temporary_memory);
 		}
 		api_qs_router_memory_info(context);
+	}
+
+	// kvs test
+	if(1)
+	{
+		QS_KVS_CONTEXT kvs;
+		if(-1!=api_qs_server_get_kvs(context,&kvs)){
+			for(int i=0;i<10;i++){
+				char* key = api_qs_uniqid(&g_temporary_memory,32);
+				char value[128];
+				memset(value,0,sizeof(value));
+				int is_create_buffer = 1;
+				if(is_create_buffer){
+					// create buffer (size sizeof(value) bytes)
+					memset(value,' ',sizeof(value)-1);
+					if(-1 != api_qs_kvs_set(&kvs,key,value,0)){
+						char* cache_value = api_qs_kvs_get(&kvs,key);
+						size_t buffer_size = api_qs_kvs_get_buffer_size(&kvs,key);
+						char* random_value = api_qs_uniqid(&g_temporary_memory,128);
+						snprintf(cache_value,buffer_size,"value_%d_%s",i, random_value);
+						char* after_cache_value = api_qs_kvs_get(&kvs,key);
+						size_t after_buffer_size = api_qs_kvs_get_buffer_size(&kvs,key);
+						printf("key : %s , value : %s , buffer_size : %d, strlen(%d)\n",key,after_cache_value,(int)after_buffer_size,(int)strlen(after_cache_value));
+					}
+				}else{
+					char* random_value = api_qs_uniqid(&g_temporary_memory,16);
+					snprintf(value,sizeof(value),"value_%d_%s",i, random_value);
+					api_qs_kvs_set(&kvs,key,value,0);
+				}
+				api_qs_memory_clean(&g_temporary_memory);
+			}
+
+			QS_JSON_ELEMENT_OBJECT object;
+			QS_JSON_ELEMENT_ARRAY array;
+			api_qs_object_create(&g_temporary_memory,&object);
+			api_qs_array_create(&g_temporary_memory,&array);
+			int32_t key_length = api_qs_kvs_keys(&array,&kvs);
+			api_qs_object_push_integer(&object,"len",key_length);
+			api_qs_object_push_array(&object,"keys",&array);
+			char* json = api_qs_json_encode_object(&object,1024 * 512);
+			printf("kvs_info : %s\n",json);
+			for(int i=0;i<api_qs_array_get_length(&array);i++){
+				char* key = api_qs_array_get_string(&array,i);
+				char* value = api_qs_kvs_get(&kvs,key);
+				printf("key : %s , value : %s\n",key,value);
+			}
+			printf("key_length : %d\n",key_length);
+			api_qs_memory_clean(&g_temporary_memory);
+		}
 	}
 
 	for(;;){

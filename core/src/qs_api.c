@@ -1425,6 +1425,20 @@ char* api_qs_kvs_get(QS_KVS_CONTEXT* kvs_context,const char* key)
 	}
 	return value;
 }
+size_t api_qs_kvs_get_buffer_size(QS_KVS_CONTEXT* kvs_context,const char* key)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)kvs_context->memory;
+	QS_MEMORY_POOL* cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(memory,kvs_context->memid_kvs_memory);
+	QS_CACHE* cache = (QS_CACHE*)QS_GET_POINTER(cache_memory,kvs_context->memid_kvs);
+	size_t buffer_size = 0;
+	QS_CACHE_PAGE cache_page;
+	qs_get_cache_page(cache,&cache_page);
+	int32_t memid_hash_value = qs_get_hash(cache_page.memory,cache_page.hash_id,key);
+	if(-1 != memid_hash_value){
+		buffer_size = qs_usize(cache_page.memory, memid_hash_value);
+	}
+	return buffer_size;
+}
 int api_qs_kvs_delete(QS_KVS_CONTEXT* kvs_context,const char* key)
 {
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)kvs_context->memory;
