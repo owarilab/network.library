@@ -28,7 +28,9 @@ namespace QS
         {
             // player prefsからplayerIdを取得
             this.playerId = PlayerPrefs.GetString("playerId");
-            if(this.playerId == "")
+            
+            // １台のPCでdebug用に一旦コメントアウト
+            //if(this.playerId == "")
             {
                 this.playerId = System.Guid.NewGuid().ToString();
                 PlayerPrefs.SetString("playerId", this.playerId);

@@ -9,8 +9,7 @@ namespace QS
 {
     public class NetworkPlayerManager : MonoBehaviour
     {
-        //private static string serverUrl = "http://localhost:8080";
-        private static string serverUrl = "http://172.26.34.195:8080";
+        private static string serverUrl = "http://localhost:8080";
 
         //typedef void(UNITY_INTERFACE_API *libqs_api_callback_unity_debug_log)(const char* str);
         public delegate void libqs_api_callback_unity_debug_log(string str);
