@@ -23,6 +23,8 @@ cd plugin/unity
 bash build.sh
 ```
 ## Move Plugin
+
+```bash
 mv libqs.dll sample/client_unity/Assets/Plugins/
 mv libqs.so sample/client_unity/Assets/Plugins/
-
+```
