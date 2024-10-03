@@ -31,7 +31,7 @@ namespace QS
                 {
                     NetworkPlayerController networkPlayerController = networkPlayerControllers[playerId];
                     networkPlayerController.SetMoveToTransform(playerCharacterData.position, playerCharacterData.rotation, playerCharacterData.scale);
-                    
+
                     //networkPlayerController.transform.position = playerCharacterData.position;
                     //networkPlayerController.transform.rotation = playerCharacterData.rotation;
                     //networkPlayerController.transform.localScale = playerCharacterData.scale;
@@ -49,7 +49,7 @@ namespace QS
             while (true)
             {
                 yield return SendPlayerSyncRequest();
-                yield return new WaitForSeconds(0.1f);
+                yield return new WaitForSeconds(0.01f);
             }
             yield return null;
         }

@@ -28,7 +28,7 @@ namespace QS
 
                 // 減衰運動
                 Vector3 velocity = Vector3.zero;
-                float smoothTime = 0.01f;
+                float smoothTime = 0.1f;
                 this.transform.position = Vector3.SmoothDamp(this.transform.position, this.moveToPos, ref velocity, smoothTime);
 
                 // 回転を徐々に補完
