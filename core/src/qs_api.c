@@ -42,7 +42,7 @@ void api_qs_on_recv( void* params );
 void api_qs_exec_http(QS_RECV_INFO *rinfo);
 void api_qs_exec_websocket(QS_RECV_INFO *rinfo);
 int api_qs_core_on_connect(QS_SERVER_CONNECTION_INFO* connection);
-void* api_qs_core_on_recv( void* args );
+int32_t api_qs_core_on_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
 int api_qs_core_on_close(QS_SERVER_CONNECTION_INFO* connection);
 int api_qs_send_ws_message_common(QS_RECV_INFO *qs_recv_info,const char* message,int is_plane);
 //---------------------------------------------------
@@ -644,7 +644,7 @@ int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_conn
 	qs_set_send_buffer(server, SIZE_KBYTE*128);
 	qs_set_message_buffer(server, SIZE_KBYTE*32);
 	set_on_connect_event(server, api_qs_core_on_connect );
-	set_on_packet_recv_event(server, api_qs_core_on_recv );
+	set_on_plain_recv_event(server, api_qs_core_on_recv );
 	set_on_close_event(server, api_qs_core_on_close );
 	if (-1 == qs_socket(server)) {
 		free(context); context=NULL;
@@ -1081,10 +1081,10 @@ int api_qs_core_on_connect(QS_SERVER_CONNECTION_INFO* connection)
 	}
 	return 0;
 }
-void* api_qs_core_on_recv( void* args )
+int32_t api_qs_core_on_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info)
 {
-	api_qs_on_recv( args );
-	return ( (void *) NULL );
+	api_qs_on_recv( (void*)qs_recv_info );
+	return 0;
 }
 int api_qs_core_on_close(QS_SERVER_CONNECTION_INFO* connection)
 {

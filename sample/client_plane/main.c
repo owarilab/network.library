@@ -28,23 +28,21 @@
 #include "qs_socket.h"
 
 int on_connect(QS_SERVER_CONNECTION_INFO* connection);
-int32_t on_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info );
-void* on_pkt_recv( void* args );
+int32_t on_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
 int on_close(QS_SERVER_CONNECTION_INFO* connection);
-int32_t on_udp_client_payload_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
 
 int main( int argc, char *argv[], char *envp[] )
 {
-	QS_SOCKET_OPTION* tcp_client = qs_create_tcp_client_plane("localhost", "52001");
+	QS_SOCKET_OPTION* tcp_client = qs_create_tcp_client_plain("localhost", "52001");
 	set_on_connect_event(tcp_client,on_connect);
-	set_on_packet_recv_event(tcp_client, on_pkt_recv );
+	set_on_plain_recv_event(tcp_client, on_recv );
 	set_on_close_event(tcp_client,on_close);
 	qs_socket(tcp_client);
 	//qs_wait_client_socket(tcp_client);
 	
 	while(1){
 		qs_client_update(tcp_client);
-		qs_sleep(10);
+		qs_sleep(1000);
 	}
 	qs_free_socket(tcp_client);
 	qs_free(tcp_client->memory_pool);
@@ -57,19 +55,13 @@ int on_connect(QS_SERVER_CONNECTION_INFO* connection)
 	return 0;
 }
 
-void* on_pkt_recv( void* args )
+int32_t on_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info)
 {
-	QS_RECV_INFO *rinfo = (QS_RECV_INFO*)args;
-	QS_SERVER_CONNECTION_INFO *connection = (QS_SERVER_CONNECTION_INFO*)rinfo->tinfo;
-	QS_SOCKET_OPTION* tcp_client = (QS_SOCKET_OPTION*)connection->qs_socket_option;
-	printf("on_pkt_recv\n");
-
-	char* msg = (char*)QS_GET_POINTER(tcp_client->memory_pool,rinfo->recvbuf_munit);
+	printf("on_recv\n");
+	char* msg = (char*)payload;
 	msg+=6; // skip header bytes
-	int len = rinfo->recvlen;
-	printf("msg len:%d , msg:%s\n",len,msg);
-
-	return ( (void *) NULL );
+	printf("msg len:%d , msg:%s\n",(int)payload_len,msg);
+	return 0;
 }
 
 int on_close(QS_SERVER_CONNECTION_INFO* connection)

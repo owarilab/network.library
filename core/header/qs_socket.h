@@ -91,7 +91,7 @@ typedef int QS_SOCKET_ID;
 #define SOCK_TYPE_NORMAL_UDP 2		// udp socket
 
 // protocol
-#define PROTOCOL_PLAIN 1			// plane
+#define PROTOCOL_PLAIN 1			// plain
 #define PROTOCOL_SIMPLE 2			// simple protocol
 
 typedef struct QS_SOCKPARAM
@@ -170,6 +170,7 @@ typedef struct QS_SEND_INFO
 typedef void* (*QS_CALLBACK)( void* args );
 typedef int (*QS_CONNECTION_EVENT_CALLBACK)( QS_SERVER_CONNECTION_INFO* connection );
 typedef int32_t (*QS_ON_RECV)(uint32_t payload_type, uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info );
+typedef int32_t (*QS_ON_PLAIN_RECV)(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info );
 typedef int (*QS_USER_RECV)( void* connection, QS_SOCKET_ID id, char* buf, size_t buffer_size, int flag );
 typedef int (*QS_USER_SEND)( void* connection, QS_SOCKET_ID id, char *buf, size_t buffer_size, int flag );
 typedef int (*QS_USER_PROTOCOL_FILTER)( QS_RECV_INFO* recv_info );
@@ -213,7 +214,7 @@ typedef struct QS_SOCKET_OPTION
 	uint8_t wait_read;
 	QS_CONNECTION_EVENT_CALLBACK connection_start_callback;	// callback pointer
 	QS_CALLBACK send_finish_callback;		// callback pointer
-	QS_CALLBACK plane_recv_callback;		// callback pointer
+	QS_ON_PLAIN_RECV plain_recv_callback;		// callback pointer
 	QS_CONNECTION_EVENT_CALLBACK close_callback;			// callback pointer
 	QS_CALLBACK timeout_callback;			// callback pointer
 	QS_ON_RECV payload_recv_callback;
@@ -236,10 +237,10 @@ typedef struct QS_SOCKET_OPTION
 } QS_SOCKET_OPTION;
 
 QS_SOCKET_OPTION* qs_create_tcp_server(char* hostname, char* portnum);
-QS_SOCKET_OPTION* qs_create_tcp_server_plane(char* hostname, char* portnum);
+QS_SOCKET_OPTION* qs_create_tcp_server_plain(char* hostname, char* portnum);
 QS_SOCKET_OPTION* qs_create_udp_server(char* hostname, char* portnum);
 QS_SOCKET_OPTION* qs_create_tcp_client(char* hostname, char* portnum);
-QS_SOCKET_OPTION* qs_create_tcp_client_plane(char* hostname, char* portnum);
+QS_SOCKET_OPTION* qs_create_tcp_client_plain(char* hostname, char* portnum);
 QS_SOCKET_OPTION* qs_create_udp_client(char* hostname, char* portnum);
 ssize_t qs_send_message(uint32_t payload_type, char* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
 ssize_t qs_send_message_broadcast(uint32_t payload_type, char* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
@@ -263,7 +264,7 @@ int qs_initialize_socket_option(
 
 void set_on_connect_event( QS_SOCKET_OPTION *option, QS_CONNECTION_EVENT_CALLBACK func );
 void set_on_sent_event( QS_SOCKET_OPTION *option, QS_CALLBACK func );
-void set_on_packet_recv_event( QS_SOCKET_OPTION *option, QS_CALLBACK func );
+void set_on_plain_recv_event( QS_SOCKET_OPTION *option, QS_ON_PLAIN_RECV func );
 void set_on_payload_recv_event( QS_SOCKET_OPTION *option, QS_ON_RECV func );
 void set_on_close_event( QS_SOCKET_OPTION *option, QS_CONNECTION_EVENT_CALLBACK func );
 void set_user_recv_event( QS_SOCKET_OPTION *option, QS_USER_RECV func );

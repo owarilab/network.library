@@ -34,10 +34,10 @@ int32_t on_udp_client_payload_recv(uint32_t payload_type, uint8_t* payload, size
 
 int main( int argc, char *argv[], char *envp[] )
 {
-	QS_SOCKET_OPTION* tcp_client = qs_create_tcp_client_plane("192.168.11.15", "9100");
+	QS_SOCKET_OPTION* tcp_client = qs_create_tcp_client_plain("192.168.11.15", "9100");
 	set_on_connect_event(tcp_client,on_connect);
 	//set_on_payload_recv_event(tcp_client,on_recv);
-	set_on_packet_recv_event(tcp_client, on_pkt_recv );
+	set_on_plain_recv_event(tcp_client, on_pkt_recv );
 	set_on_close_event(tcp_client,on_close);
 	qs_socket(tcp_client);
 	

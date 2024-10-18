@@ -58,7 +58,7 @@ QS_SOCKET_OPTION* qs_create_tcp_server(char* hostname, char* portnum)
 	return option;
 }
 
-QS_SOCKET_OPTION* qs_create_tcp_server_plane(char* hostname, char* portnum)
+QS_SOCKET_OPTION* qs_create_tcp_server_plain(char* hostname, char* portnum)
 {
 	QS_MEMORY_POOL* memory_pool = NULL;
 	QS_SOCKET_OPTION *option;
@@ -115,7 +115,7 @@ QS_SOCKET_OPTION* qs_create_tcp_client(char* hostname, char* portnum)
 	return option;
 }
 
-QS_SOCKET_OPTION* qs_create_tcp_client_plane(char* hostname, char* portnum)
+QS_SOCKET_OPTION* qs_create_tcp_client_plain(char* hostname, char* portnum)
 {
 	QS_MEMORY_POOL* memory_pool = NULL;
 	QS_SOCKET_OPTION *option;
@@ -340,7 +340,7 @@ int qs_initialize_socket_option(
 	option->wait_read = 0;
 	option->connection_start_callback	= NULL;
 	option->send_finish_callback		= NULL;
-	option->plane_recv_callback			= NULL;
+	option->plain_recv_callback			= NULL;
 	option->payload_recv_callback 		= NULL;
 	option->close_callback				= NULL;
 	option->timeout_callback			= NULL;
@@ -438,9 +438,9 @@ void set_on_sent_event( QS_SOCKET_OPTION *option, QS_CALLBACK func )
 {
 	option->send_finish_callback = func;
 }
-void set_on_packet_recv_event( QS_SOCKET_OPTION *option, QS_CALLBACK func )
+void set_on_plain_recv_event( QS_SOCKET_OPTION *option, QS_ON_PLAIN_RECV func )
 {
-	option->plane_recv_callback = func;
+	option->plain_recv_callback = func;
 }
 void set_on_payload_recv_event( QS_SOCKET_OPTION *option, QS_ON_RECV func )
 {
@@ -1596,8 +1596,8 @@ void qs_recv_event(QS_SOCKET_OPTION *option, QS_SERVER_CONNECTION_INFO *child, s
 			qs_add_accept_pool(option, child);
 			break;
 		case 1:
-			if (option->plane_recv_callback != NULL){
-				option->plane_recv_callback((void*)rinfo);
+			if (option->plain_recv_callback != NULL){
+				option->plain_recv_callback((uint8_t*)QS_GET_POINTER(option->memory_pool, rinfo->recvbuf_munit), rinfo->recvlen, rinfo);
 			}
 			else if (option->payload_recv_callback != NULL){
 				option->payload_recv_callback(child->sockparam.payload_type, (uint8_t*)QS_GET_POINTER(option->memory_pool, rinfo->recvbuf_munit), rinfo->recvlen, rinfo);
