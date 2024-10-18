@@ -30,9 +30,11 @@ namespace QS
                 if(networkPlayerControllers.ContainsKey(playerId))
                 {
                     NetworkPlayerController networkPlayerController = networkPlayerControllers[playerId];
-                    networkPlayerController.transform.position = playerCharacterData.position;
-                    networkPlayerController.transform.rotation = playerCharacterData.rotation;
-                    networkPlayerController.transform.localScale = playerCharacterData.scale;
+                    networkPlayerController.SetMoveToTransform(playerCharacterData.position, playerCharacterData.rotation, playerCharacterData.scale);
+
+                    //networkPlayerController.transform.position = playerCharacterData.position;
+                    //networkPlayerController.transform.rotation = playerCharacterData.rotation;
+                    //networkPlayerController.transform.localScale = playerCharacterData.scale;
                 }else{
                     GameObject networkPlayer = Instantiate(networkPlayerPrefab, playerCharacterData.position, playerCharacterData.rotation);
                     NetworkPlayerController networkPlayerController = networkPlayer.GetComponent<NetworkPlayerController>();
@@ -47,7 +49,7 @@ namespace QS
             while (true)
             {
                 yield return SendPlayerSyncRequest();
-                yield return new WaitForSeconds(0.1f);
+                yield return new WaitForSeconds(0.01f);
             }
             yield return null;
         }
