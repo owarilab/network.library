@@ -27,6 +27,7 @@
 
 #include "qs_socket.h"
 int on_connect(QS_SERVER_CONNECTION_INFO* connection);
+int32_t on_plain_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
 int32_t on_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info );
 int on_close(QS_SERVER_CONNECTION_INFO* connection);
 int32_t on_udp_client_payload_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
@@ -38,6 +39,12 @@ int main( int argc, char *argv[], char *envp[] )
 	set_on_payload_recv_event(tcp_client,on_recv);
 	set_on_close_event(tcp_client,on_close);
 	qs_socket(tcp_client);
+
+	QS_SOCKET_OPTION* tcp_plain_client = qs_create_tcp_client_plain("localhost", "52001");
+	set_on_connect_event(tcp_plain_client,on_connect);
+	set_on_plain_recv_event(tcp_plain_client,on_plain_recv);
+	set_on_close_event(tcp_plain_client,on_close);
+	qs_socket(tcp_plain_client);
 	
 	QS_SOCKET_OPTION*  udp_client = qs_create_udp_client("localhost", "52001");
 	set_on_payload_recv_event(udp_client, on_udp_client_payload_recv);
@@ -45,14 +52,18 @@ int main( int argc, char *argv[], char *envp[] )
 	
 	while(1){
 		qs_client_update(tcp_client);
+		qs_client_update(tcp_plain_client);
 		qs_client_update(udp_client);
 		qs_sleep(100000);
 		qs_client_send_message(0x01,"test1",4,tcp_client);
 		qs_sleep(100000);
 		qs_client_send_message(0x02,"test2",4,udp_client);
 	}
+
 	qs_free_socket(tcp_client);
 	qs_free(tcp_client->memory_pool);
+	qs_free_socket(tcp_plain_client);
+	qs_free(tcp_plain_client->memory_pool);
 	qs_free_socket(udp_client);
 	qs_free(udp_client->memory_pool);
 	return 0;
@@ -61,6 +72,15 @@ int main( int argc, char *argv[], char *envp[] )
 int on_connect(QS_SERVER_CONNECTION_INFO* connection)
 {
 	printf("on_connect\n");
+	return 0;
+}
+
+int32_t on_plain_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info)
+{
+	printf("on_plain_recv\n");
+	char* msg = (char*)payload;
+	msg+=6; // skip header bytes
+	printf("msg len:%d , msg:%s\n",(int)payload_len,msg);
 	return 0;
 }
 
