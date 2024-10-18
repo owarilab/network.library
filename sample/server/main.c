@@ -39,6 +39,7 @@ int main( int argc, char *argv[], char *envp[] )
 	set_on_connect_event(option,on_connect);
 	set_on_payload_recv_event(option,on_recv);
 	set_on_close_event(option,on_close);
+	qs_set_session_timeout(option,0); // no timeout
 	qs_socket(option);
 	
 	QS_SOCKET_OPTION* udp_option = qs_create_udp_server(NULL, "52001");

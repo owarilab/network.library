@@ -335,6 +335,7 @@ int qs_initialize_socket_option(
 	option->t_usec				= 0;	// default 0usec
 	option->s_sec				= 5;	// default 5sec
 	option->s_usec				= 0;	// default 0usec
+	option->session_timeout_sec = 5;
 	option->sleep_usec			= 1000;
 	option->wait_read = 0;
 	option->connection_start_callback	= NULL;
@@ -395,6 +396,7 @@ int qs_initialize_socket_option(
 	option->mmap_memory_pool = mmap_memory_pool;
 	option->application_data = NULL;
 	option->addr = NULL;
+	option->client_connection_status = 0;
 
 	qs_finit(&option->log_access_file_info);
 	qs_finit(&option->log_debug_file_info);
@@ -473,6 +475,10 @@ void qs_set_select_timeout( QS_SOCKET_OPTION *option, int32_t sec, int32_t usec 
 {
 	option->s_sec = sec;
 	option->s_usec = usec;
+}
+void qs_set_session_timeout( QS_SOCKET_OPTION *option, int32_t sec )
+{
+	option->session_timeout_sec = sec;
 }
 
 void qs_set_recv_buffer( QS_SOCKET_OPTION* option, size_t buffer_size )
@@ -1134,109 +1140,21 @@ QS_SOCKET_ID qs_client_socket( QS_SOCKET_OPTION *option )
 			return sock;
 		}
 	}
-
-	if (option->t_sec <= 0 && option->t_usec <= 0)
-	{
-		if (connect(sock, option->addr->ai_addr, option->addr->ai_addrlen) == -1) {
-			qs_close_socket(&sock, "connect");
-			freeaddrinfo(option->addr);
-			return sock;
-		}
-		if (-1 == qs_check_socket_error(sock))
-		{
-			qs_close_socket(&sock, "connect");
-			freeaddrinfo(option->addr);
-			return sock;
-		}
-		freeaddrinfo(option->addr);
-		return sock;
-	}
-
-
-	do {
-		int width;
-		struct timeval timeout;
-		fd_set mask, write_mask, read_mask;
-		int connectSuccess = false;
-		(void)qs_set_block(sock, 0);
-		if (connect(sock, option->addr->ai_addr, option->addr->ai_addrlen) == -1)
-		{
-#ifdef __WINDOWS__
-			int err = WSAGetLastError();
-			if (err != 0 && err != WSAEWOULDBLOCK)
-#else
-			if (errno != EINPROGRESS && errno != EINTR)
-#endif
-			{
-				qs_close_socket(&sock, "select");
-				freeaddrinfo(option->addr);
-				break;
-			}
-		}
-		else {
-			(void)qs_set_block(sock, 1);
-			freeaddrinfo(option->addr);
-			break;
-		}
-		width = 0;
-		FD_ZERO(&mask);
-		FD_SET(sock, &mask);
-		width = (int)(sock + 1);
-		timeout.tv_sec = option->t_sec;
-		timeout.tv_usec = option->t_usec;
-		for (;;)
-		{
-			write_mask = mask;
-			read_mask = mask;
-			fd_set* pwrite = &write_mask;
-			if (option->wait_read == 1) {
-				pwrite = NULL;
-			}
-			switch (select(width, &read_mask, pwrite, NULL, &timeout))
-			{
-			case -1:
-				if (errno != EINTR)
-				{
-					qs_close_socket(&sock, "select");
-					freeaddrinfo(option->addr);
-				}
-				break;
-			case 0:
-				qs_close_socket(&sock, "select:timeout");
-				freeaddrinfo(option->addr);
-				break;
-			default:
-				if ((pwrite != NULL && FD_ISSET(sock, pwrite)) || FD_ISSET(sock, &read_mask))
-				{
-					if (-1 == qs_check_socket_error(sock))
-					{
-						qs_close_socket(&sock, "connect");
-					}
-					else {
-						(void)qs_set_block(sock, 1);
-						connectSuccess = true;
-					}
-					freeaddrinfo(option->addr);
-				}
-				break;
-			}
-			if (-1 == sock || connectSuccess == true) {
-				break;
-			}
-		}
-	} while (false);
-
 	return sock;
 }
 
-QS_SOCKET_ID qs_wait_client_socket(QS_SOCKET_ID sock,QS_SOCKET_OPTION *option)
+QS_SOCKET_ID qs_wait_client_socket(QS_SOCKET_OPTION *option)
 {
+	QS_SOCKET_ID sock = option->sockid;
+	if(option->client_connection_status != 0){
+		return sock;
+	}
+	
 	do {
 		int width;
 		struct timeval timeout;
 		fd_set mask, write_mask, read_mask;
 		int connectSuccess = false;
-		(void)qs_set_block(sock, 0);
 		if (connect(sock, option->addr->ai_addr, option->addr->ai_addrlen) == -1)
 		{
 #ifdef __WINDOWS__
@@ -1252,7 +1170,6 @@ QS_SOCKET_ID qs_wait_client_socket(QS_SOCKET_ID sock,QS_SOCKET_OPTION *option)
 			}
 		}
 		else {
-			(void)qs_set_block(sock, 1);
 			freeaddrinfo(option->addr);
 			break;
 		}
@@ -1291,8 +1208,8 @@ QS_SOCKET_ID qs_wait_client_socket(QS_SOCKET_ID sock,QS_SOCKET_OPTION *option)
 						qs_close_socket(&sock, "connect");
 					}
 					else {
-						(void)qs_set_block(sock, 1);
 						connectSuccess = true;
+						option->client_connection_status = 1;
 					}
 					freeaddrinfo(option->addr);
 				}
@@ -1385,7 +1302,7 @@ QS_SOCKET_ID qs_accept(QS_SOCKET_OPTION *option)
 					child->memid_connection_data = -1;
 					//qs_initialize_connection_info(option, child);
 					if (option->connection_start_callback != NULL) {
-						option->connection_start_callback((void*)child);
+						option->connection_start_callback(child);
 					}
 					acc = -1;
 					break;
@@ -1427,7 +1344,7 @@ QS_SOCKET_ID qs_accept(QS_SOCKET_OPTION *option)
 				child->memid_connection_data = -1;
 				//qs_initialize_connection_info(option, child);
 				if (option->connection_start_callback != NULL) {
-					option->connection_start_callback((void*)child);
+					option->connection_start_callback(child);
 				}
 				break;
 			}
@@ -1767,9 +1684,11 @@ void qs_server_update(QS_SOCKET_OPTION *option)
 				}
 				qs_recv_event(option,child,srlen);
 				if(child->recv_counter==0){
-					if(temp_time - child->create_time > option->s_usec){
-						//printf("recv timeout\n");
-						qs_add_accept_pool(option, child);
+					if(option->session_timeout_sec > 0){
+						if(temp_time - child->create_time > option->session_timeout_sec){
+							//printf("session timeout\n");
+							qs_add_accept_pool(option, child);
+						}
 					}
 				}
 				if (child->id == -1)
@@ -1824,9 +1743,9 @@ void qs_nonblocking_client(QS_SOCKET_OPTION *option)
 	}
 	else {
 		child->sockparam.type = SOCK_TYPE_NORMAL_UDP;
-	}
-	if( option->connection_start_callback != NULL ){
-		option->connection_start_callback( (void*)child );
+		if( option->connection_start_callback != NULL ){
+			option->connection_start_callback( child );
+		}
 	}
 }
 
@@ -1845,11 +1764,49 @@ void qs_client_update(QS_SOCKET_OPTION *option)
 	{
 		return;
 	}
+
 	size_t buffer_size = option->recvbuffer_size;
 	socklen_t srlen;
 	QS_SERVER_CONNECTION_INFO* child = (QS_SERVER_CONNECTION_INFO*)QS_GET_POINTER(option->memory_pool,option->connection_munit);
 	if (option->socket_type == SOCKET_TYPE_CLIENT_TCP)
 	{
+		if(option->client_connection_status == 0)
+		{
+			if(option->addr == NULL)
+			{
+				printf("addr is null\n");
+				return;
+			}
+			QS_SOCKET_ID sock = option->sockid;
+			if (connect(sock, option->addr->ai_addr, option->addr->ai_addrlen) == -1)
+			{
+#ifdef __WINDOWS__
+				int err = WSAGetLastError();
+				if (err != 0 && err != WSAEWOULDBLOCK)
+#else
+				if (errno != EINPROGRESS && errno != EINTR)
+#endif
+				{
+					qs_close_socket_common(option, child, 0);
+					freeaddrinfo(option->addr);
+					return;
+				}
+			}
+			else {
+				option->client_connection_status = 1;
+				freeaddrinfo(option->addr);
+				if( option->connection_start_callback != NULL ){
+					option->connection_start_callback( child );
+				}
+			}
+		}
+
+		// continue to connect
+		if(option->client_connection_status != 1)
+		{
+			return;
+		}
+
 		if (child->id != -1)
 		{
 			if (option->user_recv_function != NULL) {
@@ -1910,6 +1867,11 @@ int qs_client_is_connecting(QS_SOCKET_OPTION *option)
 	if (child->id == -1){
 		return 0;
 	}
+	// continue to connect
+	if(option->client_connection_status != 1)
+	{
+		return 0;
+	}
 	return 1;
 }
 
@@ -1954,6 +1916,9 @@ int qs_pre_packetfilter( QS_SOCKET_OPTION *option, struct QS_RECV_INFO *rinfo, Q
 					ret = 1;
 				}
 			}
+		}
+		else if( option->protocol == PROTOCOL_PLAIN ){
+			ret = 1;
 		}else{
 			ret = 1;
 		}

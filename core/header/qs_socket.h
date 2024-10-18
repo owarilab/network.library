@@ -208,6 +208,7 @@ typedef struct QS_SOCKET_OPTION
 	int32_t t_sec;							// connection timeout (sec)
 	int32_t s_sec;							// timeout( select, pool, epool )
 	int32_t s_usec;							// timeout( select, pool, epool )
+	int32_t session_timeout_sec;
 	int32_t sleep_usec;
 	uint8_t wait_read;
 	QS_CONNECTION_EVENT_CALLBACK connection_start_callback;	// callback pointer
@@ -226,6 +227,7 @@ typedef struct QS_SOCKET_OPTION
 	QS_MEMORY_POOL* mmap_memory_pool;		// mmap memory pool
 	void* application_data;
 	struct addrinfo *addr;
+	int client_connection_status;
 	QS_FILE_INFO log_access_file_info;      // log file
 	QS_FILE_INFO log_error_file_info;       // log file
 	QS_FILE_INFO log_warning_file_info;     // log file
@@ -270,6 +272,7 @@ void set_user_protocol_filter(QS_SOCKET_OPTION *option, QS_USER_PROTOCOL_FILTER 
 void qs_set_timeout_event( QS_SOCKET_OPTION *option, QS_CALLBACK func );
 void qs_set_connection_timeout( QS_SOCKET_OPTION *option, int32_t sec, int32_t usec );
 void qs_set_select_timeout( QS_SOCKET_OPTION *option, int32_t sec, int32_t usec );
+void qs_set_session_timeout( QS_SOCKET_OPTION *option, int32_t sec );
 void qs_set_recv_buffer( QS_SOCKET_OPTION* option, size_t buffer_size );
 void qs_set_send_buffer( QS_SOCKET_OPTION* option, size_t buffer_size );
 void qs_set_message_buffer( QS_SOCKET_OPTION* option, size_t buffer_size );
@@ -296,7 +299,7 @@ int qs_set_block(QS_SOCKET_ID fd, int flag );
 int qs_get_sockaddr_info( QS_SOCKET_OPTION *option, struct sockaddr_storage *saddr, socklen_t *addr_len );
 QS_SOCKET_ID qs_server_socket( QS_SOCKET_OPTION *option, int is_ipv6 );
 QS_SOCKET_ID qs_client_socket( QS_SOCKET_OPTION *option );
-QS_SOCKET_ID qs_wait_client_socket(QS_SOCKET_ID sock, QS_SOCKET_OPTION *option);
+QS_SOCKET_ID qs_wait_client_socket(QS_SOCKET_OPTION *option);
 QS_SOCKET_ID qs_accept(QS_SOCKET_OPTION *option);
 
 int qs_check_socket_error(QS_SOCKET_ID sock);
