@@ -38,7 +38,9 @@
 #include "qs_random.h"
 #include "qs_csv.h"
 
-void api_qs_on_recv( void* params );
+void api_qs_on_plain_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
+void api_qs_on_simple_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
+void api_qs_on_http_recv(QS_RECV_INFO *rinfo);
 void api_qs_exec_http(QS_RECV_INFO *rinfo);
 void api_qs_exec_websocket(QS_RECV_INFO *rinfo);
 int api_qs_core_on_connect(QS_SERVER_CONNECTION_INFO* connection);
@@ -590,7 +592,7 @@ char* api_qs_csv_get_row(QS_CSV_CONTEXT* csv, int32_t line_pos, int32_t row_pos)
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)csv->memory;
 	return qs_csv_get_row(memory,csv->memid_csv,line_pos,row_pos);
 }
-int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_connection)
+int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_connection, int32_t server_type)
 {
 	if( ( (*ppcontext) = ( QS_SERVER_CONTEXT * )malloc( sizeof( QS_SERVER_CONTEXT ) ) ) == NULL ){
 		return -1;
@@ -601,6 +603,7 @@ int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_conn
 	QS_SERVER_CONTEXT* context = *ppcontext;
 	context->system_data = NULL;
 	context->on_connect = NULL;
+	context->on_plain_event = NULL;
 	context->on_http_event = NULL;
 	context->on_ws_event = NULL;
 	context->on_close = NULL;
@@ -610,6 +613,7 @@ int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_conn
 	context->memid_router = -1;
 	context->kvs_memory = NULL;
 	context->memid_kvs = -1;
+	context->server_type = server_type;
 	QS_MEMORY_POOL* main_memory_pool = NULL;
 	//int32_t max_connection = 100;
 	//if( qs_initialize_memory( &main_memory_pool, SIZE_MBYTE * 24, SIZE_MBYTE * 24, MEMORY_ALIGNMENT_SIZE_BIT_64, FIX_MUNIT_SIZE, 1, SIZE_KBYTE * 16 ) <= 0 ){
@@ -662,6 +666,12 @@ int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_conn
 	server->application_data = (void*)context;
 	//qs_memory_info(main_memory_pool);
 	return 0;
+}
+void api_qs_set_server_session_timeout(QS_SERVER_CONTEXT* context, int32_t timeout)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	QS_SOCKET_OPTION* server = (QS_SOCKET_OPTION*)QS_GET_POINTER(memory, context->memid_server);
+	qs_set_session_timeout(server, timeout);
 }
 int api_qs_server_create_router(QS_SERVER_CONTEXT* context)
 {
@@ -766,6 +776,10 @@ void api_qs_set_on_connect_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION o
 {
 	context->on_connect = on_connect;
 }
+void api_qs_set_on_plain_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_plain_event )
+{
+	context->on_plain_event = on_plain_event;
+}
 void api_qs_set_on_http_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_http_event )
 {
 	context->on_http_event = on_http_event;
@@ -846,10 +860,25 @@ void api_qs_free(QS_SERVER_CONTEXT* context)
 	}
 	free(context);
 }
-
-void api_qs_on_recv( void* params )
+void api_qs_on_plain_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info)
 {
-	QS_RECV_INFO *rinfo = (QS_RECV_INFO *)params;
+	QS_SERVER_CONTEXT* context = ((QS_SOCKET_OPTION*)qs_recv_info->tinfo->qs_socket_option)->application_data;
+	if(context->on_plain_event != NULL){
+		context->on_plain_event((void*)qs_recv_info);
+	}
+	QS_MEMORY_POOL* main_memory_pool = (QS_MEMORY_POOL*)context->memory;
+	SYSTEM_UPDATE_SCHEDULER* scheduler = (SYSTEM_UPDATE_SCHEDULER*)QS_GET_POINTER(main_memory_pool, context->memid_scheduler);
+	scheduler->counter++;
+}
+void api_qs_on_simple_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info)
+{
+	QS_SERVER_CONTEXT* context = ((QS_SOCKET_OPTION*)qs_recv_info->tinfo->qs_socket_option)->application_data;
+	QS_MEMORY_POOL* main_memory_pool = (QS_MEMORY_POOL*)context->memory;
+	SYSTEM_UPDATE_SCHEDULER* scheduler = (SYSTEM_UPDATE_SCHEDULER*)QS_GET_POINTER(main_memory_pool, context->memid_scheduler);
+	scheduler->counter++;
+}
+void api_qs_on_http_recv(QS_RECV_INFO *rinfo)
+{
 	switch( qs_http_protocol_filter_with_websocket(rinfo) )
 	{
 		case -1:
@@ -1083,7 +1112,16 @@ int api_qs_core_on_connect(QS_SERVER_CONNECTION_INFO* connection)
 }
 int32_t api_qs_core_on_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info)
 {
-	api_qs_on_recv( (void*)qs_recv_info );
+	QS_SERVER_CONNECTION_INFO * connection = (QS_SERVER_CONNECTION_INFO *)qs_recv_info->tinfo;
+	QS_SERVER_CONTEXT* context = ((QS_SOCKET_OPTION*)connection->qs_socket_option)->application_data;
+	//printf("api_qs_core_on_recv : server_type:%d\n",context->server_type);
+	if(context->server_type==QS_SERVER_TYPE_HTTP){
+		//printf("api_qs_core_on_recv : http\n");
+		api_qs_on_http_recv(qs_recv_info);
+	}else if(context->server_type==QS_SERVER_TYPE_PLAIN){
+		//printf("api_qs_core_on_recv : plain\n");
+		api_qs_on_plain_recv(payload,payload_len,qs_recv_info);
+	}
 	return 0;
 }
 int api_qs_core_on_close(QS_SERVER_CONNECTION_INFO* connection)
@@ -1323,6 +1361,19 @@ void api_qs_send_response(void* params, const char* response)
 	QS_SERVER_CONNECTION_INFO * tinfo = (QS_SERVER_CONNECTION_INFO *)rinfo->tinfo;
 	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
 	qs_send( option, &tinfo->sockparam, (char*)response, qs_strlen( response ), 0 );
+}
+uint8_t* api_qs_get_plain_payload(QS_EVENT_PARAMETER params)
+{
+	QS_RECV_INFO *rinfo = (QS_RECV_INFO *)params;
+	QS_SERVER_CONNECTION_INFO * tinfo = (QS_SERVER_CONNECTION_INFO *)rinfo->tinfo;
+	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
+	uint8_t* payload = (uint8_t*)QS_GET_POINTER(option->memory_pool, rinfo->recvbuf_munit);
+	return payload;
+}
+size_t api_qs_get_plain_payload_length(QS_EVENT_PARAMETER params)
+{
+	QS_RECV_INFO *rinfo = (QS_RECV_INFO *)params;
+	return rinfo->recvlen;
 }
 QS_SERVER_CONTEXT* api_qs_get_server_context(QS_EVENT_PARAMETER params)
 {

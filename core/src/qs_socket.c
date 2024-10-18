@@ -293,7 +293,23 @@ ssize_t qs_client_send_message(uint32_t payload_type, char* payload, size_t payl
 	}
 	return ret;
 }
-
+ssize_t qs_client_send(char* payload, size_t payload_len, QS_SOCKET_OPTION *option)
+{
+	ssize_t ret = 0;
+	if( option == NULL ){
+		return ret;
+	}
+	if( option->connection_munit != -1 )
+	{
+		QS_SERVER_CONNECTION_INFO* qs_connection_info = (QS_SERVER_CONNECTION_INFO*)QS_GET_POINTER(option->memory_pool, option->connection_munit);
+		if( qs_connection_info != NULL && qs_connection_info->sockparam.acc != -1 ){
+			if( -1 == ( ret = qs_send(option, &qs_connection_info->sockparam, payload, payload_len, 0) ) ){
+				qs_close_socket_common(option, qs_connection_info, 1);
+			}
+		}
+	}
+	return ret;
+}
 int32_t qs_set_client_id(QS_SOCKET_OPTION *option,uint32_t id)
 {
 	if( option == NULL ){

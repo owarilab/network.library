@@ -46,7 +46,7 @@ UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_init()
 
 UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_init_http_server(uint32_t server_port, uint32_t max_connection)
 {
-	if(0 > api_qs_server_init(&server_context,server_port,max_connection)){return -1;}
+	if(0 > api_qs_server_init(&server_context,server_port,max_connection,QS_SERVER_TYPE_HTTP)){return -1;}
 	//if(-1==api_qs_server_create_router(libqs_working_data.server_context)){return -1;}
 	//if(-1==api_qs_server_create_kvs(libqs_working_data.server_context,QS_KVS_MEMORY_TYPE_B1MB)){return -1;}
 	//if(-1==api_qs_server_create_logger_access(libqs_working_data.server_context,"./access_log.txt")){return -1;}

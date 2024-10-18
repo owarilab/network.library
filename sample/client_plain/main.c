@@ -40,9 +40,15 @@ int main( int argc, char *argv[], char *envp[] )
 	qs_socket(tcp_client);
 	//qs_wait_client_socket(tcp_client);
 	
+	int timer = time(0);
 	while(1){
 		qs_client_update(tcp_client);
 		qs_sleep(1000);
+		if(time(0) - timer > 2){
+			printf("timeout\n");
+			qs_client_send("test",4,tcp_client);
+			timer = time(0);
+		}
 	}
 	qs_free_socket(tcp_client);
 	qs_free(tcp_client->memory_pool);

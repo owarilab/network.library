@@ -35,6 +35,10 @@ extern "C"{
 #include <sys/types.h>
 #include <inttypes.h>
 
+#define QS_SERVER_TYPE_PLAIN 100
+#define QS_SERVER_TYPE_SIMPLE 200
+#define QS_SERVER_TYPE_HTTP 300
+
 #define QS_KVS_MEMORY_TYPE_B1MB 0
 #define QS_KVS_MEMORY_TYPE_B128MB 1
 #define QS_KVS_MEMORY_TYPE_B256MB 2
@@ -68,9 +72,12 @@ typedef struct QS_SERVER_CONTEXT
 	time_t current_time;
 	time_t update_time;
 	QS_EVENT_FUNCTION on_connect;
+	QS_EVENT_FUNCTION on_plain_event;
 	QS_EVENT_FUNCTION on_http_event;
 	QS_EVENT_FUNCTION on_ws_event;
 	QS_EVENT_FUNCTION on_close;
+
+	int32_t server_type;
 
 	void* router_memory;
 	int32_t memid_router;
@@ -157,12 +164,14 @@ int32_t api_qs_csv_get_line_length(QS_CSV_CONTEXT* csv);
 int32_t api_qs_csv_get_row_length(QS_CSV_CONTEXT* csv, int32_t line_pos);
 char* api_qs_csv_get_row(QS_CSV_CONTEXT* csv, int32_t line_pos, int32_t row_pos);
 
-int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_connection);
+int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_connection, int32_t server_type);
+void api_qs_set_server_session_timeout(QS_SERVER_CONTEXT* context, int32_t timeout);
 int api_qs_server_create_router(QS_SERVER_CONTEXT* context);
 void api_qs_router_memory_info(QS_SERVER_CONTEXT* context);
 int api_qs_server_create_kvs(QS_SERVER_CONTEXT* context, int kvs_memory_type);
 int api_qs_server_get_kvs(QS_SERVER_CONTEXT* context,QS_KVS_CONTEXT* kvs_context);
 void api_qs_set_on_connect_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_connect );
+void api_qs_set_on_plain_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_plain_event );
 void api_qs_set_on_http_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_http_event );
 void api_qs_set_on_websocket_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_ws_event );
 void api_qs_set_on_close_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_close );
@@ -185,6 +194,9 @@ char* api_qs_get_http_post_body(QS_EVENT_PARAMETER params);
 void api_qs_get_http_post_json_object(QS_EVENT_PARAMETER params, QS_JSON_ELEMENT_OBJECT* object);
 
 void api_qs_send_response(QS_EVENT_PARAMETER params, const char* response);
+
+uint8_t* api_qs_get_plain_payload(QS_EVENT_PARAMETER params);
+size_t api_qs_get_plain_payload_length(QS_EVENT_PARAMETER params);
 
 QS_SERVER_CONTEXT* api_qs_get_server_context(QS_EVENT_PARAMETER params);
 int api_qs_script_read_file(QS_MEMORY_CONTEXT* memory_context, QS_SERVER_SCRIPT_CONTEXT* script_context,const char* file_path);

@@ -248,6 +248,7 @@ ssize_t qs_send_message_othercast(uint32_t payload_type, char* payload, size_t p
 ssize_t qs_send_message_multicast(uint32_t payload_type, char* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info, QS_MEMORY_POOL* array_memory, int32_t array_munit);
 ssize_t qs_send_message_multiothercast(uint32_t payload_type, char* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info, QS_MEMORY_POOL* array_memory, int32_t array_munit);
 ssize_t qs_client_send_message(uint32_t payload_type, char* payload, size_t payload_len, QS_SOCKET_OPTION *option);
+ssize_t qs_client_send(char* payload, size_t payload_len, QS_SOCKET_OPTION *option);
 int32_t qs_set_client_id(QS_SOCKET_OPTION *option,uint32_t id);
 
 int qs_initialize_socket_option( 
