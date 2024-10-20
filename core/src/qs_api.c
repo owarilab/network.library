@@ -47,6 +47,10 @@ int api_qs_core_on_connect(QS_SERVER_CONNECTION_INFO* connection);
 int32_t api_qs_core_on_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
 int api_qs_core_on_close(QS_SERVER_CONNECTION_INFO* connection);
 int api_qs_send_ws_message_common(QS_RECV_INFO *qs_recv_info,const char* message,int is_plane);
+
+int api_qs_client_on_connect(QS_SERVER_CONNECTION_INFO* connection);
+int32_t api_qs_client_on_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
+int api_qs_client_on_close(QS_SERVER_CONNECTION_INFO* connection);
 //---------------------------------------------------
 
 int api_qs_init()
@@ -591,6 +595,101 @@ char* api_qs_csv_get_row(QS_CSV_CONTEXT* csv, int32_t line_pos, int32_t row_pos)
 	}
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)csv->memory;
 	return qs_csv_get_row(memory,csv->memid_csv,line_pos,row_pos);
+}
+int api_qs_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host, int port)
+{
+	if( ( (*ppcontext) = ( QS_CLIENT_CONTEXT * )malloc( sizeof( QS_CLIENT_CONTEXT ) ) ) == NULL ){
+		return -1;
+	}
+	QS_CLIENT_CONTEXT* context = *ppcontext;
+	context->on_connect = NULL;
+	context->on_plain_event = NULL;
+	context->on_close = NULL;
+	context->memory = NULL;
+	context->current_time = time(NULL);
+	context->update_time = 0;
+	QS_MEMORY_POOL* main_memory_pool = NULL;
+	size_t temporary_memory_size = SIZE_MBYTE * 8LLU;
+	size_t alloc_size = (SIZE_KBYTE * 700LLU) + temporary_memory_size;
+	if( qs_initialize_memory( &main_memory_pool, alloc_size, alloc_size, MEMORY_ALIGNMENT_SIZE_BIT_64, FIX_MUNIT_SIZE, 1, SIZE_KBYTE * 16 ) <= 0 ){
+		free(context); context=NULL;
+		return -2;
+	}
+	context->memory = (void*)main_memory_pool;
+	if( -1 == ( context->memid_temporary_memory = qs_create_mini_memory( main_memory_pool, temporary_memory_size ) ) ){
+		free(context); context=NULL;
+		return -3;
+	}
+	int32_t client_munit = qs_create_memory_block(main_memory_pool, sizeof(QS_SOCKET_OPTION));
+	if (client_munit == -1) {
+		free(context); context=NULL;
+		return -4;
+	}
+	char hostname[1024];
+	memset( hostname, 0, sizeof( hostname ) );
+	snprintf( hostname, sizeof( hostname ) -1, "%s", host );
+	char portnum[32];
+	memset( portnum, 0, sizeof( portnum ) );
+	snprintf( portnum, sizeof( portnum ) -1, "%d", port );
+	size_t maxconnection = 1;
+	QS_SOCKET_OPTION* client = (QS_SOCKET_OPTION*)QS_GET_POINTER(main_memory_pool, client_munit);
+	if (-1 == qs_initialize_socket_option(client, hostname, portnum, SOCKET_TYPE_CLIENT_TCP, SOCKET_MODE_CLIENT_NONBLOCKING, PROTOCOL_PLAIN, maxconnection, main_memory_pool, NULL)) {
+		free(context); context=NULL;
+		return -5;
+	}
+	set_on_connect_event(client, api_qs_client_on_connect );
+	set_on_plain_recv_event(client, api_qs_client_on_recv );
+	set_on_close_event(client, api_qs_client_on_close );
+	if (-1 == qs_socket(client)) {
+		free(context); context=NULL;
+		return -6;
+	}
+	context->memid_client = client_munit;
+	client->application_data = (void*)context;
+	return 0;
+}
+void api_qs_set_client_on_connect_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_connect )
+{
+	context->on_connect = on_connect;
+}
+void api_qs_set_client_on_plain_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_plain_event )
+{
+	context->on_plain_event = on_plain_event;
+}
+void api_qs_set_client_on_close_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_close )
+{
+	context->on_close = on_close;
+}
+void api_qs_client_update(QS_CLIENT_CONTEXT* context)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	QS_SOCKET_OPTION* client = (QS_SOCKET_OPTION*)QS_GET_POINTER(memory, context->memid_client);
+	qs_client_update(client);
+}
+void api_qs_client_sleep(QS_CLIENT_CONTEXT* context)
+{
+	qs_sleep(10);
+}
+QS_CLIENT_CONTEXT* api_qs_client_get_context(QS_EVENT_PARAMETER params)
+{
+	QS_RECV_INFO* recv_info = (QS_RECV_INFO*)params;
+	QS_SOCKET_OPTION* client = (QS_SOCKET_OPTION*)recv_info->tinfo->qs_socket_option;
+	QS_CLIENT_CONTEXT* context = (QS_CLIENT_CONTEXT*)client->application_data;
+	return context;
+}
+int api_qs_client_send(QS_CLIENT_CONTEXT* context, const char* payload, size_t payload_len)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	QS_SOCKET_OPTION* client = (QS_SOCKET_OPTION*)QS_GET_POINTER(memory, context->memid_client);
+	return qs_client_send((char*)payload,payload_len,client);
+}
+void api_qs_client_free(QS_CLIENT_CONTEXT* context)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	QS_SOCKET_OPTION* client = (QS_SOCKET_OPTION*)QS_GET_POINTER(memory, context->memid_client);
+	qs_free_socket(client);
+	qs_free(client->memory_pool);
+	free(context);
 }
 int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_connection, int32_t server_type)
 {
@@ -1383,6 +1482,36 @@ QS_SERVER_CONTEXT* api_qs_get_server_context(QS_EVENT_PARAMETER params)
 	QS_SERVER_CONTEXT* context = (QS_SERVER_CONTEXT*)option->application_data;
 	return context;
 }
+
+int api_qs_client_on_connect(QS_SERVER_CONNECTION_INFO* connection)
+{
+	printf("api_qs_client_on_connect\n");
+	QS_CLIENT_CONTEXT* context = ((QS_SOCKET_OPTION*)connection->qs_socket_option)->application_data;
+	if(context->on_connect != NULL){
+		context->on_connect((void*)connection);
+	}
+	return 0;
+}
+int32_t api_qs_client_on_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info)
+{
+	printf("api_qs_client_on_recv\n");
+	QS_SERVER_CONNECTION_INFO * connection = (QS_SERVER_CONNECTION_INFO *)qs_recv_info->tinfo;
+	QS_CLIENT_CONTEXT* context = ((QS_SOCKET_OPTION*)connection->qs_socket_option)->application_data;
+	if(context->on_plain_event != NULL){
+		context->on_plain_event((void*)qs_recv_info);
+	}
+	return 0;
+}
+int api_qs_client_on_close(QS_SERVER_CONNECTION_INFO* connection)
+{
+	printf("api_qs_client_on_close\n");
+	QS_CLIENT_CONTEXT* context = ((QS_SOCKET_OPTION*)connection->qs_socket_option)->application_data;
+	if(context->on_close != NULL){
+		context->on_close((void*)connection);
+	}
+	return 0;
+}
+
 int api_qs_script_read_file(QS_MEMORY_CONTEXT* memory_context, QS_SERVER_SCRIPT_CONTEXT* script_context,const char* file_path)
 {
 	QS_MEMORY_POOL * script_memory = (QS_MEMORY_POOL *)memory_context->memory;

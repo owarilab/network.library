@@ -87,6 +87,18 @@ typedef struct QS_SERVER_CONTEXT
 	int32_t memid_kvs;
 } QS_SERVER_CONTEXT;
 
+typedef struct QS_CLIENT_CONTEXT
+{
+	void* memory;
+	int32_t memid_temporary_memory;
+	int32_t memid_client;
+	time_t current_time;
+	time_t update_time;
+	QS_EVENT_FUNCTION on_connect;
+	QS_EVENT_FUNCTION on_plain_event;
+	QS_EVENT_FUNCTION on_close;
+} QS_CLIENT_CONTEXT;
+
 typedef struct QS_SERVER_SCRIPT_CONTEXT
 {
 	int32_t memid_script;
@@ -163,6 +175,17 @@ int api_qs_csv_parse(QS_MEMORY_CONTEXT* context, QS_CSV_CONTEXT* csv, const char
 int32_t api_qs_csv_get_line_length(QS_CSV_CONTEXT* csv);
 int32_t api_qs_csv_get_row_length(QS_CSV_CONTEXT* csv, int32_t line_pos);
 char* api_qs_csv_get_row(QS_CSV_CONTEXT* csv, int32_t line_pos, int32_t row_pos);
+
+int api_qs_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host, int port);
+void api_qs_set_client_on_connect_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_connect );
+void api_qs_set_client_on_plain_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_plain_event );
+void api_qs_set_client_on_close_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_close );
+void api_qs_client_update(QS_CLIENT_CONTEXT* context);
+void api_qs_client_sleep(QS_CLIENT_CONTEXT* context);
+QS_CLIENT_CONTEXT* api_qs_client_get_context(QS_EVENT_PARAMETER params);
+int api_qs_client_send(QS_CLIENT_CONTEXT* context, const char* payload, size_t payload_len);
+void api_qs_client_free(QS_CLIENT_CONTEXT* context);
+
 
 int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_connection, int32_t server_type);
 void api_qs_set_server_session_timeout(QS_SERVER_CONTEXT* context, int32_t timeout);

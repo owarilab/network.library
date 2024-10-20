@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
 #include "qs_api.h"
 
 int on_connect(QS_EVENT_PARAMETER params);
@@ -53,9 +54,13 @@ int main( int argc, char *argv[], char *envp[] )
 	api_qs_set_on_connect_event(context, on_connect );
 	api_qs_set_on_plain_event(context, on_recv );
 	api_qs_set_on_close_event(context, on_close );
+	int timer = time(0);
 	for(;;){
 		api_qs_update(context);
 		api_qs_sleep(context);
+		if(time(0) - timer > 10){
+			timer = time(0);
+		}
 	}
 	api_qs_free(context);
 	api_qs_memory_free(&g_temporary_memory);
@@ -74,6 +79,9 @@ int on_recv(QS_EVENT_PARAMETER params)
     uint8_t* payload = api_qs_get_plain_payload(params);
     size_t payload_len = api_qs_get_plain_payload_length(params);
     printf("payload:%s, len:%d\n",(char*)payload,(int)payload_len);
+
+	api_qs_send_response(params, "hoge");
+
     return 0;
 }
 

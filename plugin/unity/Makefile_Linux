@@ -2,7 +2,7 @@ PROGRAM = libqs.so
 CC      = gcc
 DEFINE  = -D_LINUX
 INCDIR  = -I ../../core/header
-CFLAG   = $(INCDIR) $(DEFINE) -pthread -Wall -O -fPIC
+CFLAG   = $(INCDIR) $(DEFINE) -Wall -O -fPIC
 LIBA = ../../core/libqs_core.a
 MYSOCKETOBJGROUP = libqs.o $(LIBA)
 
