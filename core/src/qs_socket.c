@@ -971,12 +971,13 @@ int qs_get_sockaddr_info( QS_SOCKET_OPTION *option, struct sockaddr_storage *sad
 //	printf( "qs_get_sockaddr_info: port=%s, host=%s\n", (char *)qs_upointer( option->memory_pool,option->port_num_munit ), (char *)qs_upointer( option->memory_pool,option->host_name_munit ) );
 //#endif
 	(void) memset( &hints, 0, sizeof( hints ) );
-	if( ( option->inetflag & INET_FLAG_BIT_IPV6 ) == 0 ){
-		hints.ai_family = AF_INET;
-	}
-	else{
-		hints.ai_family = AF_INET6;
-	}
+//	if( ( option->inetflag & INET_FLAG_BIT_IPV6 ) == 0 ){
+//		hints.ai_family = AF_INET;
+//	}
+//	else{
+//		hints.ai_family = AF_INET6;
+//	}
+	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	if( option->socket_type == SOCKET_TYPE_CLIENT_TCP )
 	{

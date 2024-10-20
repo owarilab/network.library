@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
 #include "qs_api.h"
 
 int on_connect(QS_EVENT_PARAMETER params);
