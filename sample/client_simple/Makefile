@@ -3,8 +3,8 @@ CC      = gcc
 DEFINE  = -D_LINUX
 CFLAG   = -pthread -Wall -O
 #CFLAG   = -Wall -O2
-INCDIR  = -I ../../core/header
-LIBA = ../../core/libqs_core.a
+INCDIR  = -I ../../core/header -I ../../ssl/header -I/usr/include/openssl
+LIBA = ../../core/libqs_core.a ../../ssl/libqs_ssl_module.a -lssl -lcrypto
 MYSOCKETOBJGROUP = main.o $(LIBA)
 
 build: $(PROGRAM)

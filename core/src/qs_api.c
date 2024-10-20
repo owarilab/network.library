@@ -648,6 +648,12 @@ int api_qs_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host, int port
 	client->application_data = (void*)context;
 	return 0;
 }
+int api_qs_client_get_socket(QS_CLIENT_CONTEXT* context)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	QS_SOCKET_OPTION* client = (QS_SOCKET_OPTION*)QS_GET_POINTER(memory, context->memid_client);
+	return client->sockid;
+}
 void api_qs_set_client_on_connect_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_connect )
 {
 	context->on_connect = on_connect;
@@ -765,6 +771,12 @@ int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_conn
 	server->application_data = (void*)context;
 	//qs_memory_info(main_memory_pool);
 	return 0;
+}
+int api_qs_server_get_socket(QS_SERVER_CONTEXT* context)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	QS_SOCKET_OPTION* server = (QS_SOCKET_OPTION*)QS_GET_POINTER(memory, context->memid_server);
+	return server->sockid;
 }
 void api_qs_set_server_session_timeout(QS_SERVER_CONTEXT* context, int32_t timeout)
 {

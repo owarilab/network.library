@@ -29,41 +29,98 @@
 #include <stdlib.h>
 #include <time.h>
 #include "qs_api.h"
+#include "qs_openssl_module.h"
 
 int on_connect(QS_EVENT_PARAMETER params);
 int on_recv(QS_EVENT_PARAMETER params);
 int on_close(QS_EVENT_PARAMETER params);
-
-QS_MEMORY_CONTEXT g_temporary_memory;
 
 int main( int argc, char *argv[], char *envp[] )
 {
 #ifdef __WINDOWS__
 	SetConsoleOutputCP(CP_UTF8);
 #endif
-	api_qs_memory_alloc(&g_temporary_memory,1024*1024*4);
-    const char* server_host = "localhost";
-	int server_port = 52001;
-	QS_CLIENT_CONTEXT* context = 0;
-    int error = 0;
-	if(0 != (error=api_qs_client_init(&context,server_host,server_port))){
-        printf("api_qs_client_init error:%d\n",error);
-        return -1;
-    }
-	api_qs_set_client_on_connect_event(context, on_connect );
-	api_qs_set_client_on_plain_event(context, on_recv );
-	api_qs_set_client_on_close_event(context, on_close );
-	int timer = time(0);
-	for(;;){
-		api_qs_client_update(context);
-		api_qs_client_sleep(context);
-		if(time(0) - timer > 3){
-			api_qs_client_send(context,"test1",5);
-			timer = time(0);
-		}
+
+	QS_SSL_MODULE_CONTEXT context;
+	memset(&context, 0, sizeof(context));
+	const char* server_host = "datatracker.ietf.org";
+	int server_port = 443;
+	if(0 != qs_openssl_module_connect(&context,server_host,server_port)){
+		printf("qs_openssl_module_connect error\n");
+		return -1;
 	}
-	api_qs_client_free(context);
-	api_qs_memory_free(&g_temporary_memory);
+	printf("connecting start...\n");
+	int phase = 0;
+	while(1){
+		if(phase == 0){
+			// connect
+			do{
+				int ret = SSL_connect(context.ssl);
+				if(ret == 1){
+					printf("Connected with %s encryption\n", SSL_get_cipher(context.ssl));
+					const char* get_request = "GET /doc/html/rfc6455 HTTP/1.1\r\nHost: datatracker.ietf.org\r\nConnection: close\r\n\r\n";
+					printf("sending:%s\n",get_request);
+					SSL_write(context.ssl, get_request, strlen(get_request));
+					phase = 1;
+					break;
+				}
+				int err = SSL_get_error(context.ssl, ret);
+				if (err != SSL_ERROR_WANT_READ && err != SSL_ERROR_WANT_WRITE) {
+					printf("SSL_connect error\n");
+					ERR_print_errors_fp(stderr);
+					phase = 2;
+					break;
+				}
+			}while(0);
+		}
+		else if(phase == 1){
+			// read
+			do{
+				int ret = SSL_read(context.ssl, context.read_buffer, sizeof(context.read_buffer));
+				if(ret > 0){
+					int read_bytes = ret;
+					printf("read_bytes:%d\n",read_bytes);
+					printf("read_body:\n%s\n",context.read_buffer);
+					memset(context.read_buffer, 0, sizeof(context.read_buffer));
+					//phase = 2;
+					break;
+				}
+				int err = SSL_get_error(context.ssl, ret);
+				if (err != SSL_ERROR_WANT_READ && err != SSL_ERROR_WANT_WRITE) {
+					printf("SSL_read error\n");
+					ERR_print_errors_fp(stderr);
+					exit(EXIT_FAILURE);
+				}
+			}while(0);
+		}
+		else if(phase == 2){
+			break;
+		}
+		api_qs_client_sleep(context.client_context);
+	}
+	qs_openssl_module_free(&context);
+
+    //const char* server_host = "localhost";
+	//int server_port = 52001;
+	//QS_CLIENT_CONTEXT* context = 0;
+    //int error = 0;
+	//if(0 != (error=api_qs_client_init(&context,server_host,server_port))){
+    //    printf("api_qs_client_init error:%d\n",error);
+    //    return -1;
+    //}
+	//api_qs_set_client_on_connect_event(context, on_connect );
+	//api_qs_set_client_on_plain_event(context, on_recv );
+	//api_qs_set_client_on_close_event(context, on_close );
+	//int timer = time(0);
+	//for(;;){
+	//	api_qs_client_update(context);
+	//	api_qs_client_sleep(context);
+	//	if(time(0) - timer > 3){
+	//		api_qs_client_send(context,"test1",5);
+	//		timer = time(0);
+	//	}
+	//}
+	//api_qs_client_free(context);
 	return 0;
 }
 

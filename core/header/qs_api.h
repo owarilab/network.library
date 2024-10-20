@@ -177,6 +177,7 @@ int32_t api_qs_csv_get_row_length(QS_CSV_CONTEXT* csv, int32_t line_pos);
 char* api_qs_csv_get_row(QS_CSV_CONTEXT* csv, int32_t line_pos, int32_t row_pos);
 
 int api_qs_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host, int port);
+int api_qs_client_get_socket(QS_CLIENT_CONTEXT* context);
 void api_qs_set_client_on_connect_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_connect );
 void api_qs_set_client_on_plain_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_plain_event );
 void api_qs_set_client_on_close_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_close );
@@ -188,6 +189,7 @@ void api_qs_client_free(QS_CLIENT_CONTEXT* context);
 
 
 int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_connection, int32_t server_type);
+int api_qs_server_get_socket(QS_SERVER_CONTEXT* context);
 void api_qs_set_server_session_timeout(QS_SERVER_CONTEXT* context, int32_t timeout);
 int api_qs_server_create_router(QS_SERVER_CONTEXT* context);
 void api_qs_router_memory_info(QS_SERVER_CONTEXT* context);
