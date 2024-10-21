@@ -42,6 +42,12 @@ extern "C"{
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
+#define QS_SSL_MODULE_PHASE_CONNECT 0
+#define QS_SSL_MODULE_PHASE_READ_HEADER 1
+#define QS_SSL_MODULE_PHASE_READ_BODY 2
+#define QS_SSL_MODULE_PHASE_READ_CHUNKED_BODY 3
+#define QS_SSL_MODULE_PHASE_DISCONNECT 4
+
 typedef struct QS_SSL_MODULE_CONTEXT
 {
     SSL_CTX *ctx;
@@ -49,13 +55,25 @@ typedef struct QS_SSL_MODULE_CONTEXT
     QS_CLIENT_CONTEXT* client_context;
     char host[1024];
     char port[16];
+    char request_buffer[1024 * 1024];
     char read_buffer[1024 * 1024];
     int socket;
+
+    // working data
+    int phase;
+	size_t body_length;
+	size_t total_read_body_length;
+	size_t temp_chunked_size;
+	size_t temp_chunked_read_size;
+	char header_buffer[1024 * 1024];
+	char body_buffer[1024 * 1024 * 4];
+    char* body_buffer_ptr;
 } QS_SSL_MODULE_CONTEXT;
 
 int qs_openssl_module_connect(QS_SSL_MODULE_CONTEXT* context,const char* server_host, int server_port);
 SSL_CTX* qs_openssl_module_ssl_create_context();
 SSL* qs_openssl_module_ssl_create(SSL_CTX* ctx, int sock);
+int qs_openssl_module_update(QS_SSL_MODULE_CONTEXT* context);
 int qs_openssl_module_free(QS_SSL_MODULE_CONTEXT* context);
 
 #endif /*_QS_OPENSSL_MODULE_H_*/

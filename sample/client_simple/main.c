@@ -49,56 +49,28 @@ int main( int argc, char *argv[], char *envp[] )
 		printf("qs_openssl_module_connect error\n");
 		return -1;
 	}
+
+	snprintf(context.request_buffer,sizeof(context.request_buffer),
+		"GET /doc/html/rfc6455 HTTP/1.1\r\n"
+		"Host: %s\r\n"
+		"Connection: close\r\n"
+		"\r\n",
+		server_host);
+
 	printf("connecting start...\n");
-	int phase = 0;
+
 	while(1){
-		if(phase == 0){
-			// connect
-			do{
-				int ret = SSL_connect(context.ssl);
-				if(ret == 1){
-					printf("Connected with %s encryption\n", SSL_get_cipher(context.ssl));
-					const char* get_request = "GET /doc/html/rfc6455 HTTP/1.1\r\nHost: datatracker.ietf.org\r\nConnection: close\r\n\r\n";
-					printf("sending:%s\n",get_request);
-					SSL_write(context.ssl, get_request, strlen(get_request));
-					phase = 1;
-					break;
-				}
-				int err = SSL_get_error(context.ssl, ret);
-				if (err != SSL_ERROR_WANT_READ && err != SSL_ERROR_WANT_WRITE) {
-					printf("SSL_connect error\n");
-					ERR_print_errors_fp(stderr);
-					phase = 2;
-					break;
-				}
-			}while(0);
-		}
-		else if(phase == 1){
-			// read
-			do{
-				int ret = SSL_read(context.ssl, context.read_buffer, sizeof(context.read_buffer));
-				if(ret > 0){
-					int read_bytes = ret;
-					printf("read_bytes:%d\n",read_bytes);
-					printf("read_body:\n%s\n",context.read_buffer);
-					memset(context.read_buffer, 0, sizeof(context.read_buffer));
-					//phase = 2;
-					break;
-				}
-				int err = SSL_get_error(context.ssl, ret);
-				if (err != SSL_ERROR_WANT_READ && err != SSL_ERROR_WANT_WRITE) {
-					printf("SSL_read error\n");
-					ERR_print_errors_fp(stderr);
-					exit(EXIT_FAILURE);
-				}
-			}while(0);
-		}
-		else if(phase == 2){
+		qs_openssl_module_update(&context);
+		if(context.phase == QS_SSL_MODULE_PHASE_DISCONNECT){
 			break;
 		}
 		api_qs_client_sleep(context.client_context);
 	}
 	qs_openssl_module_free(&context);
+
+	printf("qs_client_simple_result\n");
+	printf("header:\n%s\n",context.header_buffer);
+	printf("body:\n%s\n",context.body_buffer);
 
     //const char* server_host = "localhost";
 	//int server_port = 52001;
