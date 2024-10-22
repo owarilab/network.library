@@ -45,7 +45,16 @@ extern "C"{
 #define QS_KVS_MEMORY_TYPE_B512MB 3
 #define QS_KVS_MEMORY_TYPE_B1024MB 4
 
-#define QS_EVENT_PARAMETER void*
+#define QS_EVENT_PARAMETER_TYPE_RECV 1
+#define QS_EVENT_PARAMETER_TYPE_CONNECTION 2
+
+typedef struct QS_EVENT_PARAMETER_STRUCT
+{
+    int32_t parameter_type;
+    void* params;
+} QS_EVENT_PARAMETER_STRUCT;
+
+#define QS_EVENT_PARAMETER QS_EVENT_PARAMETER_STRUCT*
 typedef int (*QS_EVENT_FUNCTION)( QS_EVENT_PARAMETER params );
 
 typedef struct QS_MEMORY_CONTEXT
@@ -97,6 +106,7 @@ typedef struct QS_CLIENT_CONTEXT
 	QS_EVENT_FUNCTION on_connect;
 	QS_EVENT_FUNCTION on_plain_event;
 	QS_EVENT_FUNCTION on_close;
+	void* client_data;
 } QS_CLIENT_CONTEXT;
 
 typedef struct QS_SERVER_SCRIPT_CONTEXT

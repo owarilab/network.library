@@ -48,7 +48,7 @@ extern "C"{
 #define QS_SSL_MODULE_PHASE_READ_CHUNKED_BODY 3
 #define QS_SSL_MODULE_PHASE_DISCONNECT 4
 
-typedef struct QS_SSL_MODULE_CONTEXT
+typedef struct QS_HTTP_CLIENT_CONTEXT
 {
     SSL_CTX *ctx;
     SSL *ssl;
@@ -70,14 +70,15 @@ typedef struct QS_SSL_MODULE_CONTEXT
 	char header_buffer[1024 * 1024];
 	char body_buffer[1024 * 1024 * 4];
     char* body_buffer_ptr;
-} QS_SSL_MODULE_CONTEXT;
+} QS_HTTP_CLIENT_CONTEXT;
 
-int qs_openssl_module_connect(QS_SSL_MODULE_CONTEXT* context,const char* server_host, int server_port, int is_ssl);
-SSL_CTX* qs_openssl_module_ssl_create_context();
-SSL* qs_openssl_module_ssl_create(SSL_CTX* ctx, int sock);
-int qs_openssl_module_update(QS_SSL_MODULE_CONTEXT* context);
-int qs_openssl_module_recv(QS_SSL_MODULE_CONTEXT* context, char* payload, size_t payload_size);
-int qs_openssl_module_free(QS_SSL_MODULE_CONTEXT* context);
+int api_qs_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char* server_host, int server_port, int is_ssl);
+SSL_CTX* api_qs_http_client_ssl_create_context();
+SSL* api_qs_http_client_ssl_create(SSL_CTX* ctx, int sock);
+int api_qs_http_client_update(QS_HTTP_CLIENT_CONTEXT* context);
+int api_qs_http_client_recv(QS_HTTP_CLIENT_CONTEXT* context, char* payload, size_t payload_size);
+int api_qs_http_client_free(QS_HTTP_CLIENT_CONTEXT* context);
+int api_qs_http_client_get_header(QS_HTTP_CLIENT_CONTEXT* context, const char* key, char* value, size_t value_size);
 
 #endif /*_QS_OPENSSL_MODULE_H_*/
 

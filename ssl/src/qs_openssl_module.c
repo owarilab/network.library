@@ -3,36 +3,54 @@
 //#define QS_OPENSSL_MODULE_DEBUG 1
 
 
-int qs_openssl_module_on_connect(QS_EVENT_PARAMETER params);
-int qs_openssl_module_on_recv(QS_EVENT_PARAMETER params);
-int qs_openssl_module_on_close(QS_EVENT_PARAMETER params);
+int api_qs_http_client_on_connect(QS_EVENT_PARAMETER params);
+int api_qs_http_client_on_recv(QS_EVENT_PARAMETER params);
+int api_qs_http_client_on_close(QS_EVENT_PARAMETER params);
 
-int qs_openssl_module_on_connect(QS_EVENT_PARAMETER params)
+int api_qs_http_client_on_connect(QS_EVENT_PARAMETER params)
 {
-    printf("qs_openssl_module_on_connect\n");
-
-    // TODO : send http request
-
+#if QS_OPENSSL_MODULE_DEBUG
+    printf("api_qs_http_client_on_connect\n");
+#endif
+    QS_CLIENT_CONTEXT* context = api_qs_client_get_context(params);
+    QS_HTTP_CLIENT_CONTEXT* http_client_context = (QS_HTTP_CLIENT_CONTEXT*)context->client_data;
+#if QS_OPENSSL_MODULE_DEBUG
+    printf("sending request:%s\n",http_client_context->request_buffer);
+#endif
+    api_qs_send_response(params, http_client_context->request_buffer);
+    http_client_context->phase = QS_SSL_MODULE_PHASE_READ_HEADER;
 	return 0;
 }
 
-int qs_openssl_module_on_recv(QS_EVENT_PARAMETER params)
+int api_qs_http_client_on_recv(QS_EVENT_PARAMETER params)
 {
-    printf("qs_openssl_module_on_recv\n");
+#if QS_OPENSSL_MODULE_DEBUG
+    printf("api_qs_http_client_on_recv\n");
+#endif
     uint8_t* payload = api_qs_get_plain_payload(params);
     size_t payload_len = api_qs_get_plain_payload_length(params);
-    printf("payload:%s, len:%d\n",(char*)payload,(int)payload_len);
+#if QS_OPENSSL_MODULE_DEBUG
+    printf(">>>>>\npayload:%s\n>>>>>>\n, len:%d\n",(char*)payload,(int)payload_len);
+#endif
+    QS_CLIENT_CONTEXT* context = api_qs_client_get_context(params);
+    QS_HTTP_CLIENT_CONTEXT* http_client_context = (QS_HTTP_CLIENT_CONTEXT*)context->client_data;
+    api_qs_http_client_recv(http_client_context,(char*)payload,payload_len);
     return 0;
 }
 
-int qs_openssl_module_on_close(QS_EVENT_PARAMETER params)
+int api_qs_http_client_on_close(QS_EVENT_PARAMETER params)
 {
-    printf("qs_openssl_module_on_close\n");
-	return 0;
+#if QS_OPENSSL_MODULE_DEBUG
+    printf("api_qs_http_client_on_close\n");
+#endif
+    QS_CLIENT_CONTEXT* context = api_qs_client_get_context(params);
+    QS_HTTP_CLIENT_CONTEXT* http_client_context = (QS_HTTP_CLIENT_CONTEXT*)context->client_data;
+    http_client_context->phase = QS_SSL_MODULE_PHASE_DISCONNECT;
+    return 0;
 }
 
 
-SSL_CTX* qs_openssl_module_ssl_create_context()
+SSL_CTX* api_qs_http_client_ssl_create_context()
 {
 	SSL_CTX *ctx;
 	SSL_library_init();
@@ -48,7 +66,7 @@ SSL_CTX* qs_openssl_module_ssl_create_context()
 	return ctx;
 }
 
-SSL* qs_openssl_module_ssl_create(SSL_CTX* ctx, int sock)
+SSL* api_qs_http_client_ssl_create(SSL_CTX* ctx, int sock)
 {
 	SSL *ssl;
 	ssl = SSL_new(ctx);
@@ -61,7 +79,7 @@ SSL* qs_openssl_module_ssl_create(SSL_CTX* ctx, int sock)
 	return ssl;
 }
 
-int qs_openssl_module_connect(QS_SSL_MODULE_CONTEXT* context,const char* server_host, int server_port, int is_ssl)
+int api_qs_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char* server_host, int server_port, int is_ssl)
 {
     context->ssl = NULL;
     context->ctx = NULL;
@@ -88,17 +106,19 @@ int qs_openssl_module_connect(QS_SSL_MODULE_CONTEXT* context,const char* server_
         return -1;
     }
 
+    context->client_context->client_data = context;
+
     context->socket = api_qs_client_get_socket(context->client_context);
 
     if(context->is_ssl)
     {
-        context->ctx = qs_openssl_module_ssl_create_context();
+        context->ctx = api_qs_http_client_ssl_create_context();
         if(context->ctx == NULL)
         {
             return -1;
         }
 
-        context->ssl = qs_openssl_module_ssl_create(context->ctx, context->socket);
+        context->ssl = api_qs_http_client_ssl_create(context->ctx, context->socket);
         if(context->ssl == NULL)
         {
             return -1;
@@ -107,15 +127,15 @@ int qs_openssl_module_connect(QS_SSL_MODULE_CONTEXT* context,const char* server_
         // call connect()
         api_qs_client_update(context->client_context);
     }else{
-        api_qs_set_client_on_connect_event(context->client_context, qs_openssl_module_on_connect );
-        api_qs_set_client_on_plain_event(context->client_context, qs_openssl_module_on_recv );
-        api_qs_set_client_on_close_event(context->client_context, qs_openssl_module_on_close );
+        api_qs_set_client_on_connect_event(context->client_context, api_qs_http_client_on_connect );
+        api_qs_set_client_on_plain_event(context->client_context, api_qs_http_client_on_recv );
+        api_qs_set_client_on_close_event(context->client_context, api_qs_http_client_on_close );
     }
 
     return 0;
 }
 
-int qs_openssl_module_update(QS_SSL_MODULE_CONTEXT* context)
+int api_qs_http_client_update(QS_HTTP_CLIENT_CONTEXT* context)
 {
     if(context->phase == QS_SSL_MODULE_PHASE_DISCONNECT){
         return 0;
@@ -167,30 +187,40 @@ int qs_openssl_module_update(QS_SSL_MODULE_CONTEXT* context)
 
         int read_bytes = ret;
         char* payload = context->read_buffer;
-        return qs_openssl_module_recv(context,payload,read_bytes);
+        int api_qs_http_client_recv_ret = api_qs_http_client_recv(context,payload,read_bytes);
+        memset(context->read_buffer, 0, sizeof(context->read_buffer));
+        return api_qs_http_client_recv_ret;
     }
     return 0;
 }
 
-int qs_openssl_module_recv(QS_SSL_MODULE_CONTEXT* context, char* payload, size_t payload_size)
+int api_qs_http_client_recv(QS_HTTP_CLIENT_CONTEXT* context, char* payload, size_t payload_size)
 {
+#if QS_OPENSSL_MODULE_DEBUG
+    printf("api_qs_http_client_recv. phase:%d, payload_size:%ld\n",context->phase,payload_size);
+#endif
     if(context->phase == QS_SSL_MODULE_PHASE_READ_HEADER){
         // read header
         do{
-            char*header_end = strstr(context->read_buffer,"\r\n\r\n");
+            int new_line_size = 4;
+            char *header_end = strstr(payload, "\r\n\r\n");
+            if (!header_end) {
+                header_end = strstr(payload, "\n\n");
+                new_line_size = 2;
+            }
             if(header_end != 0){
-                int header_length = header_end - context->read_buffer;
+                int header_length = header_end - payload;
                 if(header_length > sizeof(context->header_buffer)){
                     printf("header_length is too long %d > %d\n",header_length,(int)sizeof(context->header_buffer));
                     context->phase = QS_SSL_MODULE_PHASE_DISCONNECT;
                     break;
                 }
-                memcpy(context->header_buffer,context->read_buffer,header_length);
+                memcpy(context->header_buffer,payload,header_length);
                 context->header_buffer[header_length] = 0;
 #if QS_OPENSSL_MODULE_DEBUG
                 printf("header(%d):\n%s\n",header_length,context->header_buffer);
 #endif
-                char* body = header_end + 4;
+                char* body = header_end + new_line_size;
 
                 int read_body_length = 0;
 
@@ -214,7 +244,7 @@ int qs_openssl_module_recv(QS_SSL_MODULE_CONTEXT* context, char* payload, size_t
 #endif
                         body = chunked_body + 2;
                         context->body_length += context->temp_chunked_size;
-                        read_body_length = payload_size - (body - context->read_buffer);
+                        read_body_length = payload_size - (body - payload);
                         context->phase = QS_SSL_MODULE_PHASE_READ_CHUNKED_BODY;
                     }
                 }
@@ -232,7 +262,7 @@ int qs_openssl_module_recv(QS_SSL_MODULE_CONTEXT* context, char* payload, size_t
                     printf("\n");
 #endif
                     context->body_length += content_length_size;
-                    read_body_length = payload_size - (body - context->read_buffer);
+                    read_body_length = payload_size - (body - payload);
                     context->phase = QS_SSL_MODULE_PHASE_READ_BODY;
                 }
 
@@ -246,19 +276,36 @@ int qs_openssl_module_recv(QS_SSL_MODULE_CONTEXT* context, char* payload, size_t
 #endif
                 memcpy(context->body_buffer_ptr,body,read_body_length);
                 context->body_buffer_ptr += read_body_length;
-            }
 
-            memset(context->read_buffer, 0, sizeof(context->read_buffer));
+                if(context->total_read_body_length >= context->body_length){
+#if QS_OPENSSL_MODULE_DEBUG
+                    printf("body total(%ld) >= body_length(%ld)\n",context->total_read_body_length,context->body_length);
+#endif
+                    context->phase = QS_SSL_MODULE_PHASE_DISCONNECT;
+                }
+            }
         }while(0);
     }
     else if(context->phase == QS_SSL_MODULE_PHASE_READ_BODY){
+#if QS_OPENSSL_MODULE_DEBUG
         printf("QS_SSL_MODULE_PHASE_READ_BODY\n");
+#endif
+        context->total_read_body_length += payload_size;
+        memcpy(context->body_buffer_ptr,payload,payload_size);
+        context->body_buffer_ptr += payload_size;
+
+        if(context->total_read_body_length >= context->body_length){
+#if QS_OPENSSL_MODULE_DEBUG
+            printf("body total(%ld) >= body_length(%ld)\n",context->total_read_body_length,context->body_length);
+#endif
+            context->phase = QS_SSL_MODULE_PHASE_DISCONNECT;
+        }
     }
     else if(context->phase == QS_SSL_MODULE_PHASE_READ_CHUNKED_BODY){
         // read chunked body
         do{
-            char* p_read_pos = context->read_buffer;
-            char* body = context->read_buffer;
+            char* p_read_pos = payload;
+            char* body = payload;
             int read_body_length = 0;
             int current_read_bytes = payload_size;
             int continue_read = 0;
@@ -330,13 +377,12 @@ int qs_openssl_module_recv(QS_SSL_MODULE_CONTEXT* context, char* payload, size_t
                     context->body_buffer_ptr += read_body_length;
                 }
             }while(continue_read);
-            memset(context->read_buffer, 0, sizeof(context->read_buffer));
         }while(0);
     }
     return 0;
 }
 
-int qs_openssl_module_free(QS_SSL_MODULE_CONTEXT* context)
+int api_qs_http_client_free(QS_HTTP_CLIENT_CONTEXT* context)
 {
     if(context->ssl != NULL)
     {
@@ -361,3 +407,24 @@ int qs_openssl_module_free(QS_SSL_MODULE_CONTEXT* context)
     return 0;
 }
 
+int api_qs_http_client_get_header(QS_HTTP_CLIENT_CONTEXT* context, const char* key, char* value, size_t value_size)
+{
+    const char* start = strstr(context->header_buffer, key);
+    if (start) {
+        start += strlen(key);
+        const char* end = strstr(start, "\r\n");
+        if (!end) {
+            end = strstr(start, "\n");
+        }
+        if (end) {
+            size_t len = end - start;
+            if (len >= value_size) {
+                len = value_size - 1;
+            }
+            strncpy(value, start, len);
+            value[len] = '\0';
+            return 0;
+        }
+    }
+    return -1;
+}
