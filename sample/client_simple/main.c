@@ -45,7 +45,7 @@ int main( int argc, char *argv[], char *envp[] )
 	memset(&context, 0, sizeof(context));
 	const char* server_host = "datatracker.ietf.org";
 	int server_port = 443;
-	if(0 != qs_openssl_module_connect(&context,server_host,server_port)){
+	if(0 != qs_openssl_module_connect(&context,server_host,server_port,1)){
 		printf("qs_openssl_module_connect error\n");
 		return -1;
 	}
