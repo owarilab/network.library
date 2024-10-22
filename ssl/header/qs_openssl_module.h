@@ -59,6 +59,8 @@ typedef struct QS_SSL_MODULE_CONTEXT
     char read_buffer[1024 * 1024];
     int socket;
 
+    int is_ssl;
+
     // working data
     int phase;
 	size_t body_length;
@@ -70,10 +72,11 @@ typedef struct QS_SSL_MODULE_CONTEXT
     char* body_buffer_ptr;
 } QS_SSL_MODULE_CONTEXT;
 
-int qs_openssl_module_connect(QS_SSL_MODULE_CONTEXT* context,const char* server_host, int server_port);
+int qs_openssl_module_connect(QS_SSL_MODULE_CONTEXT* context,const char* server_host, int server_port, int is_ssl);
 SSL_CTX* qs_openssl_module_ssl_create_context();
 SSL* qs_openssl_module_ssl_create(SSL_CTX* ctx, int sock);
 int qs_openssl_module_update(QS_SSL_MODULE_CONTEXT* context);
+int qs_openssl_module_recv(QS_SSL_MODULE_CONTEXT* context, char* payload, size_t payload_size);
 int qs_openssl_module_free(QS_SSL_MODULE_CONTEXT* context);
 
 #endif /*_QS_OPENSSL_MODULE_H_*/
