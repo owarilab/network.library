@@ -237,7 +237,8 @@ int32_t qs_csv_add_row(QS_MEMORY_POOL* memory, int32_t memid_csv, int32_t line_p
 	QS_CSV* csv = (QS_CSV*)QS_GET_POINTER(memory,memid_csv);
 	int32_t current_length = qs_array_length(memory, csv->memid_csv_array);
 	if(line_pos >= current_length){
-		for(int32_t i = current_length; i < line_pos; i++){
+		int32_t i;
+		for(i = current_length; i < line_pos; i++){
 			int32_t empty_memid_array = -1;
 			if(-1 == qs_array_push_string(memory, &empty_memid_array, "")){
 				return -1;
