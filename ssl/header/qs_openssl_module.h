@@ -58,9 +58,8 @@ typedef struct QS_HTTP_CLIENT_CONTEXT
     char request_buffer[1024 * 1024];
     char read_buffer[1024 * 1024];
     int socket;
-
     int is_ssl;
-
+    
     // working data
     int phase;
 	size_t body_length;

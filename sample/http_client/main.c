@@ -31,10 +31,6 @@
 #include "qs_api.h"
 #include "qs_openssl_module.h"
 
-int on_connect(QS_EVENT_PARAMETER params);
-int on_recv(QS_EVENT_PARAMETER params);
-int on_close(QS_EVENT_PARAMETER params);
-
 int main( int argc, char *argv[], char *envp[] )
 {
 #ifdef __WINDOWS__
@@ -43,11 +39,18 @@ int main( int argc, char *argv[], char *envp[] )
 
 	QS_HTTP_CLIENT_CONTEXT context;
 	memset(&context, 0, sizeof(context));
-	// 接続先を example.com に変更
-	const char* server_host = "google.com";
-	const char* request_path = "/";
-	int server_port = 443;
-	int is_ssl = 1;
+
+	// ssl
+	//const char* server_host = "www.google.com";
+	//const char* request_path = "/";
+	//int server_port = 443;
+	//int is_ssl = 1;
+
+	// plain
+	const char* server_host = "localhost";
+	const char* request_path = "/index.html";
+	int server_port = 4444;
+	int is_ssl = 0;
 	if(0 != api_qs_http_client_connect(&context,server_host,server_port,is_ssl)){
 		printf("api_qs_http_client_connect error\n");
 		return -1;
@@ -73,7 +76,7 @@ int main( int argc, char *argv[], char *envp[] )
 	api_qs_http_client_free(&context);
 
 	printf("qs_client_simple_result\n");
-	printf("header:\n%s\n",context.header_buffer);
+	printf("header:\n%s\n\n\n",context.header_buffer);
 
 	char http_version[16];
 	int status_code;
@@ -96,49 +99,8 @@ int main( int argc, char *argv[], char *envp[] )
 	api_qs_http_client_get_header(&context,"Content-Length: ",content_length,sizeof(content_length));
 	printf("content_length: %s\n", content_length);
 
-	//printf("body:\n%s\n",context.body_buffer);
-
-    //const char* server_host = "localhost";
-	//int server_port = 52001;
-	//QS_CLIENT_CONTEXT* context = 0;
-    //int error = 0;
-	//if(0 != (error=api_qs_client_init(&context,server_host,server_port))){
-    //    printf("api_qs_client_init error:%d\n",error);
-    //    return -1;
-    //}
-	//api_qs_set_client_on_connect_event(context, on_connect );
-	//api_qs_set_client_on_plain_event(context, on_recv );
-	//api_qs_set_client_on_close_event(context, on_close );
-	//int timer = time(0);
-	//for(;;){
-	//	api_qs_client_update(context);
-	//	api_qs_client_sleep(context);
-	//	if(time(0) - timer > 3){
-	//		api_qs_client_send(context,"test1",5);
-	//		timer = time(0);
-	//	}
-	//}
-	//api_qs_client_free(context);
-	return 0;
-}
-
-int on_connect(QS_EVENT_PARAMETER params)
-{
-    printf("on_connect\n");
-	return 0;
-}
-
-int on_recv(QS_EVENT_PARAMETER params)
-{
-    printf("on_recv\n");
-    uint8_t* payload = api_qs_get_plain_payload(params);
-    size_t payload_len = api_qs_get_plain_payload_length(params);
-    printf("payload:%s, len:%d\n",(char*)payload,(int)payload_len);
-    return 0;
-}
-
-int on_close(QS_EVENT_PARAMETER params)
-{
-    printf("on_close\n");
+	printf("\n\n");
+	printf("body:\n");
+	printf("%s\n",context.body_buffer);
 	return 0;
 }
