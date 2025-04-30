@@ -3,14 +3,14 @@
 //#define QS_OPENSSL_MODULE_DEBUG 1
 
 
-int api_qs_http_client_on_connect(QS_EVENT_PARAMETER params);
-int api_qs_http_client_on_recv(QS_EVENT_PARAMETER params);
-int api_qs_http_client_on_close(QS_EVENT_PARAMETER params);
+int qs_ssl_module_http_client_on_connect(QS_EVENT_PARAMETER params);
+int qs_ssl_module_http_client_on_recv(QS_EVENT_PARAMETER params);
+int qs_ssl_module_http_client_on_close(QS_EVENT_PARAMETER params);
 
-int api_qs_http_client_on_connect(QS_EVENT_PARAMETER params)
+int qs_ssl_module_http_client_on_connect(QS_EVENT_PARAMETER params)
 {
 #if QS_OPENSSL_MODULE_DEBUG
-    printf("api_qs_http_client_on_connect\n");
+    printf("qs_ssl_module_http_client_on_connect\n");
 #endif
     QS_CLIENT_CONTEXT* context = api_qs_client_get_context(params);
     QS_HTTP_CLIENT_CONTEXT* http_client_context = (QS_HTTP_CLIENT_CONTEXT*)context->client_data;
@@ -22,10 +22,10 @@ int api_qs_http_client_on_connect(QS_EVENT_PARAMETER params)
 	return 0;
 }
 
-int api_qs_http_client_on_recv(QS_EVENT_PARAMETER params)
+int qs_ssl_module_http_client_on_recv(QS_EVENT_PARAMETER params)
 {
 #if QS_OPENSSL_MODULE_DEBUG
-    printf("api_qs_http_client_on_recv\n");
+    printf("qs_ssl_module_http_client_on_recv\n");
 #endif
     uint8_t* payload = api_qs_get_plain_payload(params);
     size_t payload_len = api_qs_get_plain_payload_length(params);
@@ -34,14 +34,14 @@ int api_qs_http_client_on_recv(QS_EVENT_PARAMETER params)
 #endif
     QS_CLIENT_CONTEXT* context = api_qs_client_get_context(params);
     QS_HTTP_CLIENT_CONTEXT* http_client_context = (QS_HTTP_CLIENT_CONTEXT*)context->client_data;
-    api_qs_http_client_recv(http_client_context,(char*)payload,payload_len);
+    qs_ssl_module_http_client_recv(http_client_context,(char*)payload,payload_len);
     return 0;
 }
 
-int api_qs_http_client_on_close(QS_EVENT_PARAMETER params)
+int qs_ssl_module_http_client_on_close(QS_EVENT_PARAMETER params)
 {
 #if QS_OPENSSL_MODULE_DEBUG
-    printf("api_qs_http_client_on_close\n");
+    printf("qs_ssl_module_http_client_on_close\n");
 #endif
     QS_CLIENT_CONTEXT* context = api_qs_client_get_context(params);
     QS_HTTP_CLIENT_CONTEXT* http_client_context = (QS_HTTP_CLIENT_CONTEXT*)context->client_data;
@@ -50,7 +50,7 @@ int api_qs_http_client_on_close(QS_EVENT_PARAMETER params)
 }
 
 
-SSL_CTX* api_qs_http_client_ssl_create_context()
+SSL_CTX* qs_ssl_module_http_client_ssl_create_context()
 {
 	SSL_CTX *ctx;
 	SSL_library_init();
@@ -66,7 +66,7 @@ SSL_CTX* api_qs_http_client_ssl_create_context()
 	return ctx;
 }
 
-SSL* api_qs_http_client_ssl_create(SSL_CTX* ctx, int sock)
+SSL* qs_ssl_module_http_client_ssl_create(SSL_CTX* ctx, int sock)
 {
 	SSL *ssl;
 	ssl = SSL_new(ctx);
@@ -79,7 +79,7 @@ SSL* api_qs_http_client_ssl_create(SSL_CTX* ctx, int sock)
 	return ssl;
 }
 
-int api_qs_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char* server_host, int server_port, int is_ssl)
+int qs_ssl_module_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char* server_host, int server_port, int is_ssl)
 {
     context->ssl = NULL;
     context->ctx = NULL;
@@ -112,13 +112,13 @@ int api_qs_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char* serve
 
     if(context->is_ssl)
     {
-        context->ctx = api_qs_http_client_ssl_create_context();
+        context->ctx = qs_ssl_module_http_client_ssl_create_context();
         if(context->ctx == NULL)
         {
             return -1;
         }
 
-        context->ssl = api_qs_http_client_ssl_create(context->ctx, context->socket);
+        context->ssl = qs_ssl_module_http_client_ssl_create(context->ctx, context->socket);
         if(context->ssl == NULL)
         {
             return -1;
@@ -127,15 +127,15 @@ int api_qs_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char* serve
         // call connect()
         api_qs_client_update(context->client_context);
     }else{
-        api_qs_set_client_on_connect_event(context->client_context, api_qs_http_client_on_connect );
-        api_qs_set_client_on_plain_event(context->client_context, api_qs_http_client_on_recv );
-        api_qs_set_client_on_close_event(context->client_context, api_qs_http_client_on_close );
+        api_qs_set_client_on_connect_event(context->client_context, qs_ssl_module_http_client_on_connect );
+        api_qs_set_client_on_plain_event(context->client_context, qs_ssl_module_http_client_on_recv );
+        api_qs_set_client_on_close_event(context->client_context, qs_ssl_module_http_client_on_close );
     }
 
     return 0;
 }
 
-int api_qs_http_client_update(QS_HTTP_CLIENT_CONTEXT* context)
+int qs_ssl_module_http_client_update(QS_HTTP_CLIENT_CONTEXT* context)
 {
     if(context->phase == QS_SSL_MODULE_PHASE_DISCONNECT){
         return 0;
@@ -187,17 +187,17 @@ int api_qs_http_client_update(QS_HTTP_CLIENT_CONTEXT* context)
 
         int read_bytes = ret;
         char* payload = context->read_buffer;
-        int api_qs_http_client_recv_ret = api_qs_http_client_recv(context,payload,read_bytes);
+        int qs_ssl_module_http_client_recv_ret = qs_ssl_module_http_client_recv(context,payload,read_bytes);
         memset(context->read_buffer, 0, sizeof(context->read_buffer));
-        return api_qs_http_client_recv_ret;
+        return qs_ssl_module_http_client_recv_ret;
     }
     return 0;
 }
 
-int api_qs_http_client_recv(QS_HTTP_CLIENT_CONTEXT* context, char* payload, size_t payload_size)
+int qs_ssl_module_http_client_recv(QS_HTTP_CLIENT_CONTEXT* context, char* payload, size_t payload_size)
 {
 #if QS_OPENSSL_MODULE_DEBUG
-    printf("api_qs_http_client_recv. phase:%d, payload_size:%ld\n",context->phase,payload_size);
+    printf("qs_ssl_module_http_client_recv. phase:%d, payload_size:%ld\n",context->phase,payload_size);
 #endif
     if(context->phase == QS_SSL_MODULE_PHASE_READ_HEADER){
         // read header
@@ -382,7 +382,7 @@ int api_qs_http_client_recv(QS_HTTP_CLIENT_CONTEXT* context, char* payload, size
     return 0;
 }
 
-int api_qs_http_client_free(QS_HTTP_CLIENT_CONTEXT* context)
+int qs_ssl_module_http_client_free(QS_HTTP_CLIENT_CONTEXT* context)
 {
     if(context->ssl != NULL)
     {
@@ -407,7 +407,7 @@ int api_qs_http_client_free(QS_HTTP_CLIENT_CONTEXT* context)
     return 0;
 }
 
-int api_qs_http_client_get_header(QS_HTTP_CLIENT_CONTEXT* context, const char* key, char* value, size_t value_size)
+int qs_ssl_module_http_client_get_header(QS_HTTP_CLIENT_CONTEXT* context, const char* key, char* value, size_t value_size)
 {
     const char* start = strstr(context->header_buffer, key);
     if (start) {

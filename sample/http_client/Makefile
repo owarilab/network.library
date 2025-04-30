@@ -11,6 +11,7 @@ build: $(PROGRAM)
 
 $(LIBA):
 	cd ../../core/src && make 
+	cd ../../ssl/src && make
 
 $(PROGRAM): $(MYSOCKETOBJGROUP)
 	$(CC) $(CFLAG) $(LIBDIR) $(INCDIR) -o $(PROGRAM) $(MYSOCKETOBJGROUP)
@@ -21,5 +22,6 @@ main.o: main.c
 .PHONY: clean
 clean: 
 	cd ../../core/src && make clean
+	cd ../../ssl/src && make clean
 	rm -f $(PROGRAM) 
 	rm -f ./*.o

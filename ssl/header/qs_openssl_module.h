@@ -71,13 +71,13 @@ typedef struct QS_HTTP_CLIENT_CONTEXT
     char* body_buffer_ptr;
 } QS_HTTP_CLIENT_CONTEXT;
 
-int api_qs_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char* server_host, int server_port, int is_ssl);
-SSL_CTX* api_qs_http_client_ssl_create_context();
-SSL* api_qs_http_client_ssl_create(SSL_CTX* ctx, int sock);
-int api_qs_http_client_update(QS_HTTP_CLIENT_CONTEXT* context);
-int api_qs_http_client_recv(QS_HTTP_CLIENT_CONTEXT* context, char* payload, size_t payload_size);
-int api_qs_http_client_free(QS_HTTP_CLIENT_CONTEXT* context);
-int api_qs_http_client_get_header(QS_HTTP_CLIENT_CONTEXT* context, const char* key, char* value, size_t value_size);
+int qs_ssl_module_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char* server_host, int server_port, int is_ssl);
+SSL_CTX* qs_ssl_module_http_client_ssl_create_context();
+SSL* qs_ssl_module_http_client_ssl_create(SSL_CTX* ctx, int sock);
+int qs_ssl_module_http_client_update(QS_HTTP_CLIENT_CONTEXT* context);
+int qs_ssl_module_http_client_recv(QS_HTTP_CLIENT_CONTEXT* context, char* payload, size_t payload_size);
+int qs_ssl_module_http_client_free(QS_HTTP_CLIENT_CONTEXT* context);
+int qs_ssl_module_http_client_get_header(QS_HTTP_CLIENT_CONTEXT* context, const char* key, char* value, size_t value_size);
 
 #endif /*_QS_OPENSSL_MODULE_H_*/
 

@@ -51,8 +51,8 @@ int main( int argc, char *argv[], char *envp[] )
 	const char* request_path = "/index.html";
 	int server_port = 4444;
 	int is_ssl = 0;
-	if(0 != api_qs_http_client_connect(&context,server_host,server_port,is_ssl)){
-		printf("api_qs_http_client_connect error\n");
+	if(0 != qs_ssl_module_http_client_connect(&context,server_host,server_port,is_ssl)){
+		printf("qs_ssl_module_http_client_connect error\n");
 		return -1;
 	}
 
@@ -67,13 +67,13 @@ int main( int argc, char *argv[], char *envp[] )
 	printf("connecting start...\n");
 
 	while(1){
-		api_qs_http_client_update(&context);
+		qs_ssl_module_http_client_update(&context);
 		if(context.phase == QS_SSL_MODULE_PHASE_DISCONNECT){
 			break;
 		}
 		api_qs_client_sleep(context.client_context);
 	}
-	api_qs_http_client_free(&context);
+	qs_ssl_module_http_client_free(&context);
 
 	printf("qs_client_simple_result\n");
 	printf("header:\n%s\n\n\n",context.header_buffer);
@@ -87,16 +87,16 @@ int main( int argc, char *argv[], char *envp[] )
 	printf("status_message:%s\n",status_message);
 
 	char content_type[1024];
-	api_qs_http_client_get_header(&context,"Content-Type: ",content_type,sizeof(content_type));
+	qs_ssl_module_http_client_get_header(&context,"Content-Type: ",content_type,sizeof(content_type));
 	printf("content_type: %s\n", content_type);
 
 	char date[1024];
-	api_qs_http_client_get_header(&context,"Date: ",date,sizeof(date));
+	qs_ssl_module_http_client_get_header(&context,"Date: ",date,sizeof(date));
 	printf("date: %s\n", date);
 
 	char content_length[1024];
 	memset(content_length,0,sizeof(content_length));
-	api_qs_http_client_get_header(&context,"Content-Length: ",content_length,sizeof(content_length));
+	qs_ssl_module_http_client_get_header(&context,"Content-Length: ",content_length,sizeof(content_length));
 	printf("content_length: %s\n", content_length);
 
 	printf("\n\n");
