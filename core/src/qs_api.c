@@ -1543,6 +1543,40 @@ QS_SERVER_CONTEXT* api_qs_get_server_context(QS_EVENT_PARAMETER params)
 	QS_SERVER_CONTEXT* context = (QS_SERVER_CONTEXT*)option->application_data;
 	return context;
 }
+uint32_t api_qs_get_connection_offset(QS_EVENT_PARAMETER params)
+{
+	QS_SERVER_CONNECTION_INFO* tinfo = NULL;
+	if(params->parameter_type==QS_EVENT_PARAMETER_TYPE_RECV){
+		QS_RECV_INFO* recv_info = (QS_RECV_INFO*)params->params;
+		tinfo = (QS_SERVER_CONNECTION_INFO*)recv_info->tinfo;
+	}else if(params->parameter_type==QS_EVENT_PARAMETER_TYPE_CONNECTION){
+		tinfo = (QS_SERVER_CONNECTION_INFO*)params->params;
+	}
+	return tinfo->index;
+}
+time_t api_qs_get_connection_create_time(QS_EVENT_PARAMETER params)
+{
+	QS_SERVER_CONNECTION_INFO* tinfo = NULL;
+	if(params->parameter_type==QS_EVENT_PARAMETER_TYPE_RECV){
+		QS_RECV_INFO* recv_info = (QS_RECV_INFO*)params->params;
+		tinfo = (QS_SERVER_CONNECTION_INFO*)recv_info->tinfo;
+	}else if(params->parameter_type==QS_EVENT_PARAMETER_TYPE_CONNECTION){
+		tinfo = (QS_SERVER_CONNECTION_INFO*)params->params;
+	}
+	return tinfo->create_time;
+}
+void api_qs_send_response_by_connection_offset(QS_SERVER_CONTEXT* context, uint32_t connection_offset, const char* response)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	QS_SOCKET_OPTION* server = (QS_SOCKET_OPTION*)QS_GET_POINTER(memory, context->memid_server);
+	if(connection_offset < server->maxconnection){
+		QS_SERVER_CONNECTION_INFO *tinfo = qs_offsetpointer(server->memory_pool, server->connection_munit, sizeof(QS_SERVER_CONNECTION_INFO), connection_offset);
+		if(tinfo->sockparam.acc != -1){
+			qs_send( server, &tinfo->sockparam, (char*)response, qs_strlen( response ), 0 );
+		}
+	}
+}
+
 
 int api_qs_client_on_connect(QS_SERVER_CONNECTION_INFO* connection)
 {

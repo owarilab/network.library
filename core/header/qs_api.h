@@ -234,6 +234,9 @@ uint8_t* api_qs_get_plain_payload(QS_EVENT_PARAMETER params);
 size_t api_qs_get_plain_payload_length(QS_EVENT_PARAMETER params);
 
 QS_SERVER_CONTEXT* api_qs_get_server_context(QS_EVENT_PARAMETER params);
+uint32_t api_qs_get_connection_offset(QS_EVENT_PARAMETER params);
+time_t api_qs_get_connection_create_time(QS_EVENT_PARAMETER params);
+void api_qs_send_response_by_connection_offset(QS_SERVER_CONTEXT* context, uint32_t connection_offset, const char* response);
 int api_qs_script_read_file(QS_MEMORY_CONTEXT* memory_context, QS_SERVER_SCRIPT_CONTEXT* script_context,const char* file_path);
 int api_qs_script_set_argv_object(QS_SERVER_SCRIPT_CONTEXT* script_context,const char* name, QS_JSON_ELEMENT_OBJECT* object);
 int api_qs_script_set_argv_string(QS_SERVER_SCRIPT_CONTEXT* script_context,const char* name, const char* value);

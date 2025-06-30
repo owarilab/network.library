@@ -82,6 +82,12 @@ int on_recv(QS_EVENT_PARAMETER params)
 
 	api_qs_send_response(params, "hoge");
 
+	uint32_t connection_offset = api_qs_get_connection_offset(params);
+	time_t create_time = api_qs_get_connection_create_time(params);
+	printf("connection_offset:%d, create_time:%ld\n", connection_offset, create_time);
+	QS_SERVER_CONTEXT* context = api_qs_get_server_context(params);
+	api_qs_send_response_by_connection_offset(context, connection_offset, "send response by connection offset");
+
     return 0;
 }
 
