@@ -82,6 +82,7 @@ typedef struct QS_SERVER_CONTEXT
 	time_t update_time;
 	QS_EVENT_FUNCTION on_connect;
 	QS_EVENT_FUNCTION on_plain_event;
+	QS_EVENT_FUNCTION on_simple_event;
 	QS_EVENT_FUNCTION on_http_event;
 	QS_EVENT_FUNCTION on_ws_event;
 	QS_EVENT_FUNCTION on_close;
@@ -207,6 +208,7 @@ int api_qs_server_create_kvs(QS_SERVER_CONTEXT* context, int kvs_memory_type);
 int api_qs_server_get_kvs(QS_SERVER_CONTEXT* context,QS_KVS_CONTEXT* kvs_context);
 void api_qs_set_on_connect_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_connect );
 void api_qs_set_on_plain_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_plain_event );
+void api_qs_set_on_simple_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_simple_event );
 void api_qs_set_on_http_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_http_event );
 void api_qs_set_on_websocket_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_ws_event );
 void api_qs_set_on_close_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_close );
@@ -229,7 +231,9 @@ char* api_qs_get_http_post_body(QS_EVENT_PARAMETER params);
 void api_qs_get_http_post_json_object(QS_EVENT_PARAMETER params, QS_JSON_ELEMENT_OBJECT* object);
 
 void api_qs_send_response(QS_EVENT_PARAMETER params, const char* response);
+void api_qs_send_response_with_payload(QS_EVENT_PARAMETER params, uint32_t payload_type, const char* payload);
 
+uint32_t api_qs_get_plain_payload_type(QS_EVENT_PARAMETER params);
 uint8_t* api_qs_get_plain_payload(QS_EVENT_PARAMETER params);
 size_t api_qs_get_plain_payload_length(QS_EVENT_PARAMETER params);
 

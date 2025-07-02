@@ -39,12 +39,13 @@
 #include "qs_csv.h"
 
 void api_qs_on_plain_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
-void api_qs_on_simple_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
+void api_qs_on_simple_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
 void api_qs_on_http_recv(QS_RECV_INFO *rinfo);
 void api_qs_exec_http(QS_RECV_INFO *rinfo);
 void api_qs_exec_websocket(QS_RECV_INFO *rinfo);
 int api_qs_core_on_connect(QS_SERVER_CONNECTION_INFO* connection);
 int32_t api_qs_core_on_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
+int32_t api_qs_core_on_payload_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info );
 int api_qs_core_on_close(QS_SERVER_CONNECTION_INFO* connection);
 int api_qs_send_ws_message_common(QS_SERVER_CONNECTION_INFO *tinfo,const char* message,int is_plane);
 
@@ -715,6 +716,7 @@ int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_conn
 	context->system_data = NULL;
 	context->on_connect = NULL;
 	context->on_plain_event = NULL;
+	context->on_simple_event = NULL;
 	context->on_http_event = NULL;
 	context->on_ws_event = NULL;
 	context->on_close = NULL;
@@ -751,7 +753,13 @@ int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_conn
 	char portnum[32];
 	memset( portnum, 0, sizeof( portnum ) );
 	snprintf( portnum, sizeof( portnum ) -1, "%d", port );
-	if (-1 == qs_initialize_socket_option(server, NULL, portnum, SOCKET_TYPE_SERVER_TCP, SOCKET_MODE_NONBLOCKING, PROTOCOL_PLAIN, max_connection, main_memory_pool, NULL)) {
+
+	uint8_t protcool_type = PROTOCOL_PLAIN;
+	if(server_type == QS_SERVER_TYPE_SIMPLE){
+		protcool_type = PROTOCOL_SIMPLE;
+	}
+
+	if (-1 == qs_initialize_socket_option(server, NULL, portnum, SOCKET_TYPE_SERVER_TCP, SOCKET_MODE_NONBLOCKING, protcool_type, max_connection, main_memory_pool, NULL)) {
 		free(context); context=NULL;
 		return -5;
 	}
@@ -759,7 +767,11 @@ int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_conn
 	qs_set_send_buffer(server, SIZE_KBYTE*128);
 	qs_set_message_buffer(server, SIZE_KBYTE*32);
 	set_on_connect_event(server, api_qs_core_on_connect );
-	set_on_plain_recv_event(server, api_qs_core_on_recv );
+	if(server_type == QS_SERVER_TYPE_SIMPLE){
+		set_on_payload_recv_event(server, api_qs_core_on_payload_recv );
+	}else{
+		set_on_plain_recv_event(server, api_qs_core_on_recv );
+	}
 	set_on_close_event(server, api_qs_core_on_close );
 	if (-1 == qs_socket(server)) {
 		free(context); context=NULL;
@@ -897,6 +909,10 @@ void api_qs_set_on_plain_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_
 {
 	context->on_plain_event = on_plain_event;
 }
+void api_qs_set_on_simple_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_simple_event )
+{
+	context->on_simple_event = on_simple_event;
+}
 void api_qs_set_on_http_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_http_event )
 {
 	context->on_http_event = on_http_event;
@@ -990,9 +1006,16 @@ void api_qs_on_plain_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs
 	SYSTEM_UPDATE_SCHEDULER* scheduler = (SYSTEM_UPDATE_SCHEDULER*)QS_GET_POINTER(main_memory_pool, context->memid_scheduler);
 	scheduler->counter++;
 }
-void api_qs_on_simple_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info)
+void api_qs_on_simple_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info)
 {
+	//printf("api_qs_on_simple_recv payload_type=%u payload_len=%zu\n", payload_type, payload_len);
 	QS_SERVER_CONTEXT* context = ((QS_SOCKET_OPTION*)qs_recv_info->tinfo->qs_socket_option)->application_data;
+	if(context->on_simple_event != NULL){
+		QS_EVENT_PARAMETER_STRUCT params;
+		params.parameter_type = QS_EVENT_PARAMETER_TYPE_RECV;
+		params.params = (void*)qs_recv_info;
+		context->on_simple_event(&params);
+	}
 	QS_MEMORY_POOL* main_memory_pool = (QS_MEMORY_POOL*)context->memory;
 	SYSTEM_UPDATE_SCHEDULER* scheduler = (SYSTEM_UPDATE_SCHEDULER*)QS_GET_POINTER(main_memory_pool, context->memid_scheduler);
 	scheduler->counter++;
@@ -1252,6 +1275,16 @@ int32_t api_qs_core_on_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *
 	}else if(context->server_type==QS_SERVER_TYPE_PLAIN){
 		//printf("api_qs_core_on_recv : plain\n");
 		api_qs_on_plain_recv(payload,payload_len,qs_recv_info);
+	}
+	return 0;
+}
+int32_t api_qs_core_on_payload_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info )
+{
+	//printf("api_qs_core_on_payload_recv : payload_type:%u, payload_len:%zu \n",payload_type,payload_len);
+	QS_SERVER_CONNECTION_INFO * connection = (QS_SERVER_CONNECTION_INFO *)qs_recv_info->tinfo;
+	QS_SERVER_CONTEXT* context = ((QS_SOCKET_OPTION*)connection->qs_socket_option)->application_data;
+	if(context->server_type==QS_SERVER_TYPE_SIMPLE){
+		api_qs_on_simple_recv(payload_type, payload, payload_len, qs_recv_info);
 	}
 	return 0;
 }
@@ -1516,6 +1549,24 @@ void api_qs_send_response(QS_EVENT_PARAMETER params, const char* response)
 	}
 	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
 	qs_send( option, &tinfo->sockparam, (char*)response, qs_strlen( response ), 0 );
+}
+void api_qs_send_response_with_payload(QS_EVENT_PARAMETER params, uint32_t payload_type, const char* payload)
+{
+	QS_SERVER_CONNECTION_INFO* tinfo = NULL;
+	if(params->parameter_type==QS_EVENT_PARAMETER_TYPE_RECV){
+		QS_RECV_INFO* recv_info = (QS_RECV_INFO*)params->params;
+		tinfo = (QS_SERVER_CONNECTION_INFO*)recv_info->tinfo;
+	}else if(params->parameter_type==QS_EVENT_PARAMETER_TYPE_CONNECTION){
+		tinfo = (QS_SERVER_CONNECTION_INFO*)params->params;
+	}
+	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
+	qs_send(option, &tinfo->sockparam, (char*)payload, qs_strlen(payload), payload_type);
+}
+uint32_t api_qs_get_plain_payload_type(QS_EVENT_PARAMETER params)
+{
+	QS_RECV_INFO *rinfo = (QS_RECV_INFO *)params->params;
+	QS_SERVER_CONNECTION_INFO * tinfo = (QS_SERVER_CONNECTION_INFO *)rinfo->tinfo;
+	return tinfo->sockparam.payload_type;
 }
 uint8_t* api_qs_get_plain_payload(QS_EVENT_PARAMETER params)
 {
