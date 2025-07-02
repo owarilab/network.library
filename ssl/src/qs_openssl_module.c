@@ -101,7 +101,7 @@ int qs_ssl_module_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char
     context->body_buffer_ptr = context->body_buffer;
 
     int error = 0;
-	if(0 != (error=api_qs_client_init(&context->client_context,server_host,server_port))){
+	if(0 != (error=api_qs_client_init(&context->client_context,server_host,server_port,QS_SERVER_TYPE_HTTP))){
         printf("api_qs_client_init error:%d\n",error);
         return -1;
     }
