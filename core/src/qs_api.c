@@ -1651,7 +1651,7 @@ void api_qs_send_response_by_connection_offset(QS_SERVER_CONTEXT* context, uint3
 
 int api_qs_client_on_connect(QS_SERVER_CONNECTION_INFO* connection)
 {
-	printf("api_qs_client_on_connect\n");
+	//printf("api_qs_client_on_connect\n");
 	QS_CLIENT_CONTEXT* context = ((QS_SOCKET_OPTION*)connection->qs_socket_option)->application_data;
 	if(context->on_connect != NULL){
 		QS_EVENT_PARAMETER_STRUCT params;
@@ -1663,7 +1663,7 @@ int api_qs_client_on_connect(QS_SERVER_CONNECTION_INFO* connection)
 }
 int32_t api_qs_client_on_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info)
 {
-	printf("api_qs_client_on_recv\n");
+	//printf("api_qs_client_on_recv\n");
 	QS_SERVER_CONNECTION_INFO * connection = (QS_SERVER_CONNECTION_INFO *)qs_recv_info->tinfo;
 	QS_CLIENT_CONTEXT* context = ((QS_SOCKET_OPTION*)connection->qs_socket_option)->application_data;
 	if(context->on_plain_event != NULL){
@@ -1676,7 +1676,7 @@ int32_t api_qs_client_on_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO
 }
 int32_t api_qs_client_on_simple_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info)
 {
-	printf("api_qs_client_on_simple_recv\n");
+	//printf("api_qs_client_on_simple_recv\n");
 	QS_SERVER_CONNECTION_INFO * connection = (QS_SERVER_CONNECTION_INFO *)qs_recv_info->tinfo;
 	QS_CLIENT_CONTEXT* context = ((QS_SOCKET_OPTION*)connection->qs_socket_option)->application_data;
 	if(context->on_simple_event != NULL){
@@ -1690,7 +1690,7 @@ int32_t api_qs_client_on_simple_recv(uint32_t payload_type, uint8_t* payload, si
 
 int api_qs_client_on_close(QS_SERVER_CONNECTION_INFO* connection)
 {
-	printf("api_qs_client_on_close\n");
+	//printf("api_qs_client_on_close\n");
 	QS_CLIENT_CONTEXT* context = ((QS_SOCKET_OPTION*)connection->qs_socket_option)->application_data;
 	if(context->on_close != NULL){
 		QS_EVENT_PARAMETER_STRUCT params;
