@@ -106,6 +106,7 @@ typedef struct QS_CLIENT_CONTEXT
 	time_t update_time;
 	QS_EVENT_FUNCTION on_connect;
 	QS_EVENT_FUNCTION on_plain_event;
+	QS_EVENT_FUNCTION on_simple_event;
 	QS_EVENT_FUNCTION on_close;
 	void* client_data;
 } QS_CLIENT_CONTEXT;
@@ -187,15 +188,17 @@ int32_t api_qs_csv_get_line_length(QS_CSV_CONTEXT* csv);
 int32_t api_qs_csv_get_row_length(QS_CSV_CONTEXT* csv, int32_t line_pos);
 char* api_qs_csv_get_row(QS_CSV_CONTEXT* csv, int32_t line_pos, int32_t row_pos);
 
-int api_qs_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host, int port);
+int api_qs_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host, int port, int32_t server_type);
 int api_qs_client_get_socket(QS_CLIENT_CONTEXT* context);
 void api_qs_set_client_on_connect_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_connect );
 void api_qs_set_client_on_plain_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_plain_event );
+void api_qs_set_client_on_simple_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_simple_event );
 void api_qs_set_client_on_close_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_close );
 void api_qs_client_update(QS_CLIENT_CONTEXT* context);
 void api_qs_client_sleep(QS_CLIENT_CONTEXT* context);
 QS_CLIENT_CONTEXT* api_qs_client_get_context(QS_EVENT_PARAMETER params);
 int api_qs_client_send(QS_CLIENT_CONTEXT* context, const char* payload, size_t payload_len);
+int api_qs_client_send_message(QS_CLIENT_CONTEXT* context,uint32_t payload_type, const char* payload, size_t payload_len);
 void api_qs_client_free(QS_CLIENT_CONTEXT* context);
 
 

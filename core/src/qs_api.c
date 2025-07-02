@@ -51,6 +51,7 @@ int api_qs_send_ws_message_common(QS_SERVER_CONNECTION_INFO *tinfo,const char* m
 
 int api_qs_client_on_connect(QS_SERVER_CONNECTION_INFO* connection);
 int32_t api_qs_client_on_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
+int32_t api_qs_client_on_simple_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
 int api_qs_client_on_close(QS_SERVER_CONNECTION_INFO* connection);
 //---------------------------------------------------
 
@@ -597,7 +598,7 @@ char* api_qs_csv_get_row(QS_CSV_CONTEXT* csv, int32_t line_pos, int32_t row_pos)
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)csv->memory;
 	return qs_csv_get_row(memory,csv->memid_csv,line_pos,row_pos);
 }
-int api_qs_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host, int port)
+int api_qs_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host, int port, int32_t server_type)
 {
 	if( ( (*ppcontext) = ( QS_CLIENT_CONTEXT * )malloc( sizeof( QS_CLIENT_CONTEXT ) ) ) == NULL ){
 		return -1;
@@ -605,6 +606,7 @@ int api_qs_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host, int port
 	QS_CLIENT_CONTEXT* context = *ppcontext;
 	context->on_connect = NULL;
 	context->on_plain_event = NULL;
+	context->on_simple_event = NULL;
 	context->on_close = NULL;
 	context->memory = NULL;
 	context->current_time = time(NULL);
@@ -634,12 +636,20 @@ int api_qs_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host, int port
 	snprintf( portnum, sizeof( portnum ) -1, "%d", port );
 	size_t maxconnection = 1;
 	QS_SOCKET_OPTION* client = (QS_SOCKET_OPTION*)QS_GET_POINTER(main_memory_pool, client_munit);
-	if (-1 == qs_initialize_socket_option(client, hostname, portnum, SOCKET_TYPE_CLIENT_TCP, SOCKET_MODE_CLIENT_NONBLOCKING, PROTOCOL_PLAIN, maxconnection, main_memory_pool, NULL)) {
+	uint8_t protocol_type = PROTOCOL_PLAIN;
+	if(server_type==QS_SERVER_TYPE_SIMPLE){
+		protocol_type = PROTOCOL_SIMPLE;
+	}
+	if (-1 == qs_initialize_socket_option(client, hostname, portnum, SOCKET_TYPE_CLIENT_TCP, SOCKET_MODE_CLIENT_NONBLOCKING, protocol_type, maxconnection, main_memory_pool, NULL)) {
 		free(context); context=NULL;
 		return -5;
 	}
 	set_on_connect_event(client, api_qs_client_on_connect );
-	set_on_plain_recv_event(client, api_qs_client_on_recv );
+	if( server_type==QS_SERVER_TYPE_SIMPLE ){
+		set_on_payload_recv_event(client, api_qs_client_on_simple_recv );
+	}else{
+		set_on_plain_recv_event(client, api_qs_client_on_recv );
+	}
 	set_on_close_event(client, api_qs_client_on_close );
 	if (-1 == qs_socket(client)) {
 		free(context); context=NULL;
@@ -662,6 +672,10 @@ void api_qs_set_client_on_connect_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUN
 void api_qs_set_client_on_plain_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_plain_event )
 {
 	context->on_plain_event = on_plain_event;
+}
+void api_qs_set_client_on_simple_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_simple_event )
+{
+	context->on_simple_event = on_simple_event;
 }
 void api_qs_set_client_on_close_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_close )
 {
@@ -695,6 +709,12 @@ int api_qs_client_send(QS_CLIENT_CONTEXT* context, const char* payload, size_t p
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
 	QS_SOCKET_OPTION* client = (QS_SOCKET_OPTION*)QS_GET_POINTER(memory, context->memid_client);
 	return qs_client_send((char*)payload,payload_len,client);
+}
+int api_qs_client_send_message(QS_CLIENT_CONTEXT* context,uint32_t payload_type, const char* payload, size_t payload_len)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	QS_SOCKET_OPTION* client = (QS_SOCKET_OPTION*)QS_GET_POINTER(memory, context->memid_client);
+	return qs_client_send_message(payload_type,(char*)payload,payload_len,client);
 }
 void api_qs_client_free(QS_CLIENT_CONTEXT* context)
 {
@@ -1654,6 +1674,20 @@ int32_t api_qs_client_on_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO
 	}
 	return 0;
 }
+int32_t api_qs_client_on_simple_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info)
+{
+	printf("api_qs_client_on_simple_recv\n");
+	QS_SERVER_CONNECTION_INFO * connection = (QS_SERVER_CONNECTION_INFO *)qs_recv_info->tinfo;
+	QS_CLIENT_CONTEXT* context = ((QS_SOCKET_OPTION*)connection->qs_socket_option)->application_data;
+	if(context->on_simple_event != NULL){
+		QS_EVENT_PARAMETER_STRUCT params;
+		params.parameter_type = QS_EVENT_PARAMETER_TYPE_RECV;
+		params.params = (void*)qs_recv_info;
+		context->on_simple_event(&params);
+	}
+	return 0;
+}
+
 int api_qs_client_on_close(QS_SERVER_CONNECTION_INFO* connection)
 {
 	printf("api_qs_client_on_close\n");

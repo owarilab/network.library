@@ -29,7 +29,6 @@
 #include <stdlib.h>
 #include <time.h>
 #include "qs_api.h"
-#include "qs_openssl_module.h"
 
 int on_connect(QS_EVENT_PARAMETER params);
 int on_recv(QS_EVENT_PARAMETER params);
@@ -44,19 +43,21 @@ int main( int argc, char *argv[], char *envp[] )
 	int server_port = 52001;
 	QS_CLIENT_CONTEXT* context = 0;
     int error = 0;
-	if(0 != (error=api_qs_client_init(&context,server_host,server_port))){
+	if(0 != (error=api_qs_client_init(&context,server_host,server_port,QS_SERVER_TYPE_SIMPLE))){
         printf("api_qs_client_init error:%d\n",error);
         return -1;
     }
 	api_qs_set_client_on_connect_event(context, on_connect );
-	api_qs_set_client_on_plain_event(context, on_recv );
+	//api_qs_set_client_on_plain_event(context, on_recv );
+	api_qs_set_client_on_simple_event(context, on_recv );
 	api_qs_set_client_on_close_event(context, on_close );
 	int timer = time(0);
 	for(;;){
 		api_qs_client_update(context);
 		api_qs_client_sleep(context);
 		if(time(0) - timer > 3){
-			api_qs_client_send(context,"test1",5);
+			//api_qs_client_send(context,"test1",5);
+			api_qs_client_send_message(context,0x05,"test5_data",10);
 			timer = time(0);
 		}
 	}
@@ -73,9 +74,10 @@ int on_connect(QS_EVENT_PARAMETER params)
 int on_recv(QS_EVENT_PARAMETER params)
 {
     printf("on_recv\n");
+	uint32_t payload_type = api_qs_get_plain_payload_type(params);
     uint8_t* payload = api_qs_get_plain_payload(params);
     size_t payload_len = api_qs_get_plain_payload_length(params);
-    printf("payload:%s, len:%d\n",(char*)payload,(int)payload_len);
+	printf("payload_type:0x%08x, payload_len:%zu, payload:%.*s\n", payload_type, payload_len, (int)payload_len, payload);
     return 0;
 }
 
