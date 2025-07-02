@@ -92,6 +92,7 @@ typedef struct QS_SERVER_CONTEXT
 	time_t update_time;
 	QS_EVENT_FUNCTION on_connect;
 	QS_EVENT_FUNCTION on_plain_event;
+	QS_EVENT_FUNCTION on_simple_event;
 	QS_EVENT_FUNCTION on_http_event;
 	QS_EVENT_FUNCTION on_ws_event;
 	QS_EVENT_FUNCTION on_close;
@@ -115,6 +116,7 @@ typedef struct QS_CLIENT_CONTEXT
 	time_t update_time;
 	QS_EVENT_FUNCTION on_connect;
 	QS_EVENT_FUNCTION on_plain_event;
+	QS_EVENT_FUNCTION on_simple_event;
 	QS_EVENT_FUNCTION on_close;
 	void* client_data;
 } QS_CLIENT_CONTEXT;
@@ -227,15 +229,17 @@ int32_t api_qs_csv_get_line_length(QS_CSV_CONTEXT* csv);
 int32_t api_qs_csv_get_row_length(QS_CSV_CONTEXT* csv, int32_t line_pos);
 char* api_qs_csv_get_row(QS_CSV_CONTEXT* csv, int32_t line_pos, int32_t row_pos);
 
-int api_qs_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host, int port);
+int api_qs_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host, int port, int32_t server_type);
 int api_qs_client_get_socket(QS_CLIENT_CONTEXT* context);
 void api_qs_set_client_on_connect_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_connect );
 void api_qs_set_client_on_plain_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_plain_event );
+void api_qs_set_client_on_simple_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_simple_event );
 void api_qs_set_client_on_close_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_close );
 void api_qs_client_update(QS_CLIENT_CONTEXT* context);
 void api_qs_client_sleep(QS_CLIENT_CONTEXT* context);
 QS_CLIENT_CONTEXT* api_qs_client_get_context(QS_EVENT_PARAMETER params);
 int api_qs_client_send(QS_CLIENT_CONTEXT* context, const char* payload, size_t payload_len);
+int api_qs_client_send_message(QS_CLIENT_CONTEXT* context,uint32_t payload_type, const char* payload, size_t payload_len);
 void api_qs_client_free(QS_CLIENT_CONTEXT* context);
 
 
@@ -248,6 +252,7 @@ int api_qs_server_create_kvs(QS_SERVER_CONTEXT* context, int kvs_memory_type);
 int api_qs_server_get_kvs(QS_SERVER_CONTEXT* context,QS_KVS_CONTEXT* kvs_context);
 void api_qs_set_on_connect_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_connect );
 void api_qs_set_on_plain_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_plain_event );
+void api_qs_set_on_simple_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_simple_event );
 void api_qs_set_on_http_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_http_event );
 void api_qs_set_on_websocket_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_ws_event );
 void api_qs_set_on_close_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_close );
@@ -270,7 +275,9 @@ char* api_qs_get_http_post_body(QS_EVENT_PARAMETER params);
 void api_qs_get_http_post_json_object(QS_EVENT_PARAMETER params, QS_JSON_ELEMENT_OBJECT* object);
 
 void api_qs_send_response(QS_EVENT_PARAMETER params, const char* response);
+void api_qs_send_response_with_payload(QS_EVENT_PARAMETER params, uint32_t payload_type, const char* payload);
 
+uint32_t api_qs_get_plain_payload_type(QS_EVENT_PARAMETER params);
 uint8_t* api_qs_get_plain_payload(QS_EVENT_PARAMETER params);
 size_t api_qs_get_plain_payload_length(QS_EVENT_PARAMETER params);
 
