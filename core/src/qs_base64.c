@@ -57,6 +57,13 @@ uint8_t qs_base64_char2ascii( uint8_t c )
  */
 void qs_base64_encode(char* dest, uint16_t destlength, const void* src, uint16_t length)
 {
+	if (!dest || !src || destlength == 0 || length == 0) {
+		if (dest && destlength > 0) {
+			*dest = '\0';
+		}
+		return;
+	}
+
 	int i = -1;
 	int tmpv = 0;
 	char *p = dest;
@@ -102,6 +109,13 @@ void qs_base64_encode(char* dest, uint16_t destlength, const void* src, uint16_t
  */
 void qs_base64_decode( char* dest, uint16_t destlength, const void* src, uint16_t length )
 {
+	if (!dest || !src || destlength == 0 || length == 0) {
+		if (dest && destlength > 0) {
+			*dest = '\0';
+		}
+		return;
+	}
+
 	int i = -1;
 	int tmpv = 0;
 	char *p = dest;

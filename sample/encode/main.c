@@ -43,7 +43,9 @@ int main( int argc, char *argv[], char *envp[] )
     }
 
 	// 文字列のエンコードとデコード
-	char* encoded = api_qs_base64_encode(&temporary_memory_context, "Hello, World!", 13);
+	const char* original_string = "Hello, World!";
+	size_t original_length = strlen(original_string);
+	char* encoded = api_qs_base64_encode(&temporary_memory_context, original_string, original_length);
 	if (encoded) {
 		printf("Encoded: %s\n", encoded);
 	} else {
