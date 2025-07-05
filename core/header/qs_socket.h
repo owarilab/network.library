@@ -80,6 +80,11 @@ typedef int QS_SOCKET_ID;
 // client mode
 #define SOCKET_MODE_CLIENT_NONBLOCKING 201
 
+// client status
+#define CLIENT_STATUS_DISCONNECT 0
+#define CLIENT_STATUS_CONNECTING 1
+#define CLIENT_STATUS_CONNECTED 2
+
 // status
 #define PROTOCOL_STATUS_DEFAULT 0
 #define PROTOCOL_STATUS_HTTP 3

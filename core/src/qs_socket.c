@@ -412,7 +412,7 @@ int qs_initialize_socket_option(
 	option->mmap_memory_pool = mmap_memory_pool;
 	option->application_data = NULL;
 	option->addr = NULL;
-	option->client_connection_status = 0;
+	option->client_connection_status = CLIENT_STATUS_DISCONNECT;
 
 	qs_finit(&option->log_access_file_info);
 	qs_finit(&option->log_debug_file_info);
@@ -1157,13 +1157,17 @@ QS_SOCKET_ID qs_client_socket( QS_SOCKET_OPTION *option )
 			return sock;
 		}
 	}
+	option->client_connection_status = CLIENT_STATUS_CONNECTING;
 	return sock;
 }
 
 QS_SOCKET_ID qs_wait_client_socket(QS_SOCKET_OPTION *option)
 {
 	QS_SOCKET_ID sock = option->sockid;
-	if(option->client_connection_status != 0){
+	if(option->client_connection_status == CLIENT_STATUS_DISCONNECT){
+		return -1;
+	}
+	if(option->client_connection_status == CLIENT_STATUS_CONNECTED){
 		return sock;
 	}
 	
@@ -1226,7 +1230,7 @@ QS_SOCKET_ID qs_wait_client_socket(QS_SOCKET_OPTION *option)
 					}
 					else {
 						connectSuccess = true;
-						option->client_connection_status = 1;
+						option->client_connection_status = CLIENT_STATUS_CONNECTED;
 					}
 					freeaddrinfo(option->addr);
 				}
@@ -1781,13 +1785,19 @@ void qs_client_update(QS_SOCKET_OPTION *option)
 	{
 		return;
 	}
+	if(option->client_connection_status == CLIENT_STATUS_DISCONNECT){
+		return;
+	}
 
 	size_t buffer_size = option->recvbuffer_size;
 	socklen_t srlen;
 	QS_SERVER_CONNECTION_INFO* child = (QS_SERVER_CONNECTION_INFO*)QS_GET_POINTER(option->memory_pool,option->connection_munit);
+	if (child->id == -1) {
+		return;
+	}
 	if (option->socket_type == SOCKET_TYPE_CLIENT_TCP)
 	{
-		if(option->client_connection_status == 0)
+		if(option->client_connection_status == CLIENT_STATUS_CONNECTING)
 		{
 			if(option->addr == NULL)
 			{
@@ -1804,13 +1814,15 @@ void qs_client_update(QS_SOCKET_OPTION *option)
 				if (errno != EINPROGRESS && errno != EINTR)
 #endif
 				{
+					//printf("connect error: %s\n", strerror(errno));
 					qs_close_socket_common(option, child, 0);
 					freeaddrinfo(option->addr);
+					option->client_connection_status = CLIENT_STATUS_DISCONNECT;
 					return;
 				}
 			}
 			else {
-				option->client_connection_status = 1;
+				option->client_connection_status = CLIENT_STATUS_CONNECTED;
 				freeaddrinfo(option->addr);
 				if( option->connection_start_callback != NULL ){
 					option->connection_start_callback( child );
@@ -1819,7 +1831,7 @@ void qs_client_update(QS_SOCKET_OPTION *option)
 		}
 
 		// continue to connect
-		if(option->client_connection_status != 1)
+		if(option->client_connection_status != CLIENT_STATUS_CONNECTED)
 		{
 			return;
 		}
@@ -1851,7 +1863,9 @@ void qs_client_update(QS_SOCKET_OPTION *option)
 			qs_recv_event(option,child,srlen);
 			if (child->id == -1)
 			{
+				//printf("client disconnect\n");
 				qs_close_socket_common(option, child, 0);
+				option->client_connection_status = CLIENT_STATUS_DISCONNECT;
 			}
 		}
 	}
@@ -1885,7 +1899,7 @@ int qs_client_is_connecting(QS_SOCKET_OPTION *option)
 		return 0;
 	}
 	// continue to connect
-	if(option->client_connection_status != 1)
+	if(option->client_connection_status != CLIENT_STATUS_CONNECTED)
 	{
 		return 0;
 	}
