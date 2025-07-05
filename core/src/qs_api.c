@@ -37,6 +37,7 @@
 #include "qs_packet_route.h"
 #include "qs_random.h"
 #include "qs_csv.h"
+#include "qs_sha1.h"
 
 void api_qs_on_plain_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
 void api_qs_on_simple_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
@@ -2145,4 +2146,47 @@ char* api_qs_uniqid(QS_MEMORY_CONTEXT* memory_context, int32_t length)
 	char* string = (char*)QS_GET_POINTER(memory, memid_string);
 	qs_uniqid_r32(string,length);
 	return string;
+}
+
+char* api_qs_base64_encode(QS_MEMORY_CONTEXT* memory_context, const void* data, size_t length)
+{
+	QS_MEMORY_POOL * memory = ( QS_MEMORY_POOL* )memory_context->memory;
+	int32_t memid_string = qs_create_memory_block(memory, length * 2);
+	if(-1==memid_string){
+		return NULL;
+	}
+	char* encoded = (char*)QS_GET_POINTER(memory, memid_string);
+	size_t encoded_buffer_size = qs_usize(memory, memid_string);
+	memset(encoded, 0, encoded_buffer_size);
+	qs_base64_encode(encoded, (uint16_t)encoded_buffer_size, data, (uint16_t)length);
+	return encoded;
+}
+
+char* api_qs_base64_decode(QS_MEMORY_CONTEXT* memory_context, const char* data)
+{
+	QS_MEMORY_POOL * memory = ( QS_MEMORY_POOL* )memory_context->memory;
+	int32_t memid_string = qs_create_memory_block(memory, qs_strlen(data) * 2);
+	if(-1==memid_string){
+		return NULL;
+	}
+	char* decoded = (char*)QS_GET_POINTER(memory, memid_string);
+	size_t decoded_buffer_size = qs_usize(memory, memid_string);
+	memset(decoded, 0, decoded_buffer_size);
+	qs_base64_decode(decoded, (uint16_t)decoded_buffer_size, data, (uint16_t)qs_strlen(data));
+	return decoded;
+}
+
+char* api_qs_sha1_encode(QS_MEMORY_CONTEXT* memory_context, const void* data, size_t length)
+{
+	QS_MEMORY_POOL * memory = ( QS_MEMORY_POOL* )memory_context->memory;
+	int32_t memid_string = qs_create_memory_block(memory, 20 + 1); // SHA1 produces a 20-byte hash
+	if(-1==memid_string){
+		return NULL;
+	}
+	char* encoded = (char*)QS_GET_POINTER(memory, memid_string);
+	size_t encoded_buffer_size = qs_usize(memory, memid_string);
+	memset(encoded, 0, encoded_buffer_size);
+	qs_sha1(encoded, data, (uint32_t)length);
+	encoded[20] = '\0'; // Null-terminate the string
+	return encoded;
 }
