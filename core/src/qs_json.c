@@ -546,6 +546,26 @@ int32_t qs_json_decode_parser_hash( QS_MEMORY_POOL* _ppool, QS_NODE* node, QS_TO
 				qs_add_hash_unsigned_big_integer_kint(_ppool,working_munit,token_list[ptokens->workpos].buf_munit,num);
 				ptokens->workpos+=2;
 			}
+			else if( token_list[ptokens->workpos+2].type == ID_SYMBOL)
+			{
+				if(!strcmp((char*)QS_GET_POINTER(_ppool, token_list[ptokens->workpos+2].buf_munit), "true") ){
+					qs_add_hash_integer_kint( _ppool, working_munit, token_list[ptokens->workpos].buf_munit, 1 );
+					ptokens->workpos+=2;
+				}
+				else if( !strcmp((char*)QS_GET_POINTER(_ppool, token_list[ptokens->workpos+2].buf_munit), "false") ){
+					qs_add_hash_integer_kint( _ppool, working_munit, token_list[ptokens->workpos].buf_munit, 0 );
+					ptokens->workpos+=2;
+				}
+				else if( !strcmp((char*)QS_GET_POINTER(_ppool, token_list[ptokens->workpos+2].buf_munit), "null") ){
+					qs_add_hash_integer_kint( _ppool, working_munit, token_list[ptokens->workpos].buf_munit, 0 );
+					ptokens->workpos+=2;
+				}
+				else{
+					//printf("invalid json format3, %s\n", (char*)QS_GET_POINTER(_ppool, token_list[ptokens->workpos+2].buf_munit));
+					working_munit = -1;
+					break;
+				}
+			}
 			else if( token_list[ptokens->workpos+2].type == ID_SIGN ){
 				if( *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+2].buf_munit)) == '{' ){
 					int32_t parser_child_munit = -1;
