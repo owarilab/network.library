@@ -311,6 +311,9 @@ int api_qs_http_response_json(QS_EVENT_PARAMETER params, QS_JSON_ELEMENT_OBJECT*
 int api_qs_http_response_raw_json(QS_EVENT_PARAMETER params, QS_MEMORY_CONTEXT* temporary_memory,char* json);
 
 char* api_qs_uniqid(QS_MEMORY_CONTEXT* memory_context, int32_t length);
+char* api_qs_base64_encode(QS_MEMORY_CONTEXT* memory_context, const void* data, size_t length);
+char* api_qs_base64_decode(QS_MEMORY_CONTEXT* memory_context, const char* data);
+char* api_qs_sha1_encode(QS_MEMORY_CONTEXT* memory_context, const void* data, size_t length);
 
 #endif /*_LIBQS_H_*/
 
