@@ -353,14 +353,14 @@ int qs_ssl_module_http_client_recv(QS_HTTP_CLIENT_CONTEXT* context, char* payloa
             }
 
             // If we haven't read chunk size yet
-            if (context->chunk_size_buffer_len == 0) {
-                // Look for chunk size line (end with \r\n or \n)
+            if (context->temp_chunked_size == 0) {
+                // Look for chunk size line (ends with \r\n or \n)
                 char* line_end = NULL;
                 int line_end_size = 0;
                 char* search_start = current_pos;
                 size_t search_len = remaining;
 
-                // If we have partial chunk size from previous call. combine it
+                // If we have partial chunk size from previous call, combine it
                 char combined_buffer[64];
                 if (context->chunk_size_buffer_len > 0) {
                     memcpy(combined_buffer, context->chunk_size_buffer, context->chunk_size_buffer_len);
@@ -427,7 +427,7 @@ int qs_ssl_module_http_client_recv(QS_HTTP_CLIENT_CONTEXT* context, char* payloa
                     }
                 } else {
                     // Need more data to read chunk size
-                    // Save what we habe so far in the buffer
+                    // Save what we have so far in the buffer
                     if(context->chunk_size_buffer_len == 0) {
                         size_t to_save = (remaining < sizeof(context->chunk_size_buffer)) ? remaining : sizeof(context->chunk_size_buffer);
                         memcpy(context->chunk_size_buffer, current_pos, to_save);
@@ -465,7 +465,7 @@ int qs_ssl_module_http_client_recv(QS_HTTP_CLIENT_CONTEXT* context, char* payloa
 #if QS_OPENSSL_MODULE_DEBUG
                     printf("Chunk complete: %ld bytes read\n", context->temp_chunked_read_size);
 #endif
-                    // Need to cunsume trailing \r\n after chunk data
+                    // Need to consume trailing \r\n after chunk data
                     if(remaining >= 2 && memcmp(current_pos, "\r\n", 2) == 0) {
                         current_pos += 2;
                         remaining -= 2;
