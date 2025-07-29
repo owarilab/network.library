@@ -35,7 +35,8 @@ extern "C"{
 #include <sys/types.h>
 #include <inttypes.h>
 #include <stdio.h>
-
+#include <string.h>
+#include <stdlib.h>
 #include "qs_api.h"
 
 // sudo apt install libssl-dev
@@ -64,11 +65,15 @@ typedef struct QS_HTTP_CLIENT_CONTEXT
     int phase;
 	size_t body_length;
 	size_t total_read_body_length;
+    size_t temp_max_body_length;
 	size_t temp_chunked_size;
 	size_t temp_chunked_read_size;
 	char header_buffer[1024 * 1024];
 	char body_buffer[1024 * 1024 * 4];
     char* body_buffer_ptr;
+    char chunk_size_buffer[32];
+    int chunk_size_buffer_len;
+    int waiting_for_chunk_trailer;
 } QS_HTTP_CLIENT_CONTEXT;
 
 int qs_ssl_module_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char* server_host, int server_port, int is_ssl);

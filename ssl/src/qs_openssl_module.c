@@ -94,11 +94,15 @@ int qs_ssl_module_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char
     context->phase = QS_SSL_MODULE_PHASE_CONNECT;
     context->body_length = 0;
     context->total_read_body_length = 0;
+    context->temp_max_body_length = 0;
     context->temp_chunked_size = 0;
     context->temp_chunked_read_size = 0;
     memset(context->header_buffer, 0, sizeof(context->header_buffer));
     memset(context->body_buffer, 0, sizeof(context->body_buffer));
     context->body_buffer_ptr = context->body_buffer;
+    memset(context->chunk_size_buffer, 0, sizeof(context->chunk_size_buffer));
+    context->chunk_size_buffer_len = 0;
+    context->waiting_for_chunk_trailer = 0;
 
     int error = 0;
 	if(0 != (error=api_qs_client_init(&context->client_context,server_host,server_port,QS_SERVER_TYPE_HTTP))){
@@ -232,49 +236,26 @@ int qs_ssl_module_http_client_recv(QS_HTTP_CLIENT_CONTEXT* context, char* payloa
                 size_t body_size = payload_size - (body - payload);
                 int read_body_length = 0;
 
+                // Content-Length
+                char* content_length = strstr(context->header_buffer,"Content-Length:");
                 // if Transfer-Encoding: chunked
                 char* chunked = strstr(context->header_buffer,"Transfer-Encoding: chunked");
                 if(chunked != 0){
 #if QS_OPENSSL_MODULE_DEBUG
-                    printf("chunked\n");
+                    printf("Transfer-Encoding: chunked detected\n");
 #endif
-                    // チャンクサイズ行の検出（バイナリセーフ）
-                    char* chunked_body = body;
-                    size_t remain = body_size;
-                    char* rn = memchr(chunked_body, '\r', remain);
-                    char* n = memchr(chunked_body, '\n', remain);
-                    char* line_end = NULL;
-                    if (rn && (n == NULL || rn < n)) {
-                        line_end = rn;
-                    } else if (n) {
-                        line_end = n;
+                    context->phase = QS_SSL_MODULE_PHASE_READ_CHUNKED_BODY;
+                    context->temp_chunked_size = 0;
+                    context->temp_chunked_read_size = 0;
+                    context->chunk_size_buffer_len = 0;
+                    context->waiting_for_chunk_trailer = 0;
+                    // Process any body data that came with the header
+                    if (body_size > 0) {
+                        qs_ssl_module_http_client_recv(context, body, body_size);
                     }
-                    if(line_end != 0){
-                        int chunked_length = line_end - chunked_body;
-                        char chunked_bytes[32];
-                        int copy_len = chunked_length < 31 ? chunked_length : 31;
-                        memcpy(chunked_bytes,chunked_body,copy_len);
-                        chunked_bytes[copy_len] = 0;
-                        context->temp_chunked_size = strtol(chunked_bytes,0,16);
-#if QS_OPENSSL_MODULE_DEBUG
-                        printf("chunked_bytes(%d):\n%.*s\n",chunked_length,chunked_length,chunked_bytes);
-                        printf("chunked_size:%ld bytes\n",context->temp_chunked_size);
-                        printf("\n");
-#endif
-                        // 行末の\r\nまたは\nをスキップ
-                        int skip = 1;
-                        if(line_end[0] == '\r' && line_end[1] == '\n') skip = 2;
-                        body = line_end + skip;
-                        body_size = payload_size - (body - payload);
-                        context->body_length += context->temp_chunked_size;
-                        read_body_length = body_size;
-                        context->phase = QS_SSL_MODULE_PHASE_READ_CHUNKED_BODY;
-                    }
+                    break;
                 }
-
-                // Content-Length
-                char* content_length = strstr(context->header_buffer,"Content-Length:");
-                if(content_length != 0){
+                else if(content_length != 0){
 #if QS_OPENSSL_MODULE_DEBUG
                     printf("content_length\n");
 #endif
@@ -284,27 +265,48 @@ int qs_ssl_module_http_client_recv(QS_HTTP_CLIENT_CONTEXT* context, char* payloa
                     printf("content_length_size:%d bytes\n",content_length_size);
                     printf("\n");
 #endif
-                    context->body_length += content_length_size;
+                    context->temp_max_body_length = content_length_size;
+                    context->body_length = content_length_size;
                     read_body_length = body_size;
                     context->phase = QS_SSL_MODULE_PHASE_READ_BODY;
-                }
 
-                context->total_read_body_length += read_body_length;
-                context->temp_chunked_read_size += read_body_length;
+                    context->total_read_body_length += read_body_length;
+                    context->temp_chunked_read_size += read_body_length;
 #if QS_OPENSSL_MODULE_DEBUG
-                printf("body total(%ld):\n",context->total_read_body_length);
-                printf("<<<<<<<<<<<<<<<<<<<<\n");
-                fwrite(body, 1, read_body_length, stdout);
-                printf("\n<<<<<<<<<<<<<<<<<<<<\n");
+                    printf("body total(%ld):\n",context->total_read_body_length);
+                    printf("<<<<<<<<<<<<<<<<<<<<\n");
+                    fwrite(body, 1, read_body_length, stdout);
+                    printf("\n<<<<<<<<<<<<<<<<<<<<\n");
 #endif
-                memcpy(context->body_buffer_ptr,body,read_body_length);
-                context->body_buffer_ptr += read_body_length;
+                    memcpy(context->body_buffer_ptr,body,read_body_length);
+                    context->body_buffer_ptr += read_body_length;
 
-                if(context->total_read_body_length >= context->body_length){
+                    if(context->total_read_body_length >= context->temp_max_body_length){
 #if QS_OPENSSL_MODULE_DEBUG
-                    printf("body total(%ld) >= body_length(%ld)\n",context->total_read_body_length,context->body_length);
+                        printf("body total(%ld) >= body_length(%ld)\n",context->total_read_body_length,context->body_length);
 #endif
-                    context->phase = QS_SSL_MODULE_PHASE_DISCONNECT;
+                        context->phase = QS_SSL_MODULE_PHASE_DISCONNECT;
+                    }
+                } else{
+#if QS_OPENSSL_MODULE_DEBUG
+                    printf("No Content-Length or Transfer-Encoding: chunked found, reading until disconnect\n");
+#endif
+                    context->temp_max_body_length = 1024 * 1024 * 8; // TODO BODY_MAX_SIZE
+                    context->body_length = 0;
+                    context->phase = QS_SSL_MODULE_PHASE_READ_BODY;
+                    read_body_length = body_size;
+
+                    context->total_read_body_length += read_body_length;
+                    context->temp_chunked_read_size += read_body_length;
+#if QS_OPENSSL_MODULE_DEBUG
+                    printf("body total(%ld):\n",context->total_read_body_length);
+                    printf("<<<<<<<<<<<<<<<<<<<<\n");
+                    fwrite(body, 1, read_body_length, stdout);
+                    printf("\n<<<<<<<<<<<<<<<<<<<<\n");
+#endif
+                    memcpy(context->body_buffer_ptr,body,read_body_length);
+                    context->body_buffer_ptr += read_body_length;
+                    context->body_length = read_body_length;
                 }
             }
         }while(0);
@@ -316,8 +318,9 @@ int qs_ssl_module_http_client_recv(QS_HTTP_CLIENT_CONTEXT* context, char* payloa
         context->total_read_body_length += payload_size;
         memcpy(context->body_buffer_ptr,payload,payload_size);
         context->body_buffer_ptr += payload_size;
+        context->body_length += payload_size;
 
-        if(context->total_read_body_length >= context->body_length){
+        if(context->total_read_body_length >= context->temp_max_body_length){
 #if QS_OPENSSL_MODULE_DEBUG
             printf("body total(%ld) >= body_length(%ld)\n",context->total_read_body_length,context->body_length);
 #endif
@@ -325,82 +328,162 @@ int qs_ssl_module_http_client_recv(QS_HTTP_CLIENT_CONTEXT* context, char* payloa
         }
     }
     else if(context->phase == QS_SSL_MODULE_PHASE_READ_CHUNKED_BODY){
-        // read chunked body
-        do{
-            char* p_read_pos = payload;
-            char* body = payload;
-            int read_body_length = 0;
-            int current_read_bytes = payload_size;
-            int continue_read = 0;
-            do{
-                continue_read = 0;
-                if(context->temp_chunked_read_size >= context->temp_chunked_size){
+#if QS_OPENSSL_MODULE_DEBUG
+        printf("QS_SSL_MODULE_PHASE_READ_CHUNKED_BODY: payload_size%ld\n", payload_size);
+#endif
+        char* current_pos = payload;
+        size_t remaining = payload_size;
+
+        while(remaining > 0) {
+            // If waiting for chunk trailer after chunk data
+            if (context->waiting_for_chunk_trailer) {
+                if(remaining >= 2 && memcmp(current_pos, "\r\n", 2) == 0) {
+                    current_pos += 2;
+                    remaining -= 2;
+                    context->waiting_for_chunk_trailer = 0;
+                } else if(remaining >= 1 && *current_pos == '\n') {
+                    current_pos += 1;
+                    remaining -= 1;
+                    context->waiting_for_chunk_trailer = 0;
+                } else {
+                    // Need more data for trailing CRLF
+                    return 0;                    
+                }
+                continue;
+            }
+
+            // If we haven't read chunk size yet
+            if (context->chunk_size_buffer_len == 0) {
+                // Look for chunk size line (end with \r\n or \n)
+                char* line_end = NULL;
+                int line_end_size = 0;
+                char* search_start = current_pos;
+                size_t search_len = remaining;
+
+                // If we have partial chunk size from previous call. combine it
+                char combined_buffer[64];
+                if (context->chunk_size_buffer_len > 0) {
+                    memcpy(combined_buffer, context->chunk_size_buffer, context->chunk_size_buffer_len);
+                    size_t copy_len = (remaining < (sizeof(combined_buffer) - context->chunk_size_buffer_len)) ? remaining : (sizeof(combined_buffer) - context->chunk_size_buffer_len);
+                    memcpy(combined_buffer + context->chunk_size_buffer_len, current_pos, copy_len);
+                    search_start = combined_buffer;
+                    search_len = context->chunk_size_buffer_len + copy_len;
+                }
+
+                // Search for \r\n
+                void* p = memmem(search_start, search_len, "\r\n", 2);
+                if (p) {
+                    line_end = (char*)p;
+                    line_end_size = 2;
+                } else {
+                    // Search for \n
+                    p = memmem(search_start, search_len, "\n", 1);
+                    if (p) {
+                        line_end = (char*)p;
+                        line_end_size = 1;
+                    }
+                }
+
+                if(line_end) {
+                    // Parse chunk size (hexadecimal)
+                    char chunk_size_str[32] = {0};
+                    size_t chunk_line_len = line_end - search_start;
+                    if (chunk_line_len >= sizeof(chunk_size_str)) {
+                        printf("Chunk size line too long: %zu\n", chunk_line_len);
+                        context->phase = QS_SSL_MODULE_PHASE_DISCONNECT;
+                        return -1;
+                    }
+                    memcpy(chunk_size_str, search_start, chunk_line_len);
+
+                    // Parse hex value (ignore chunk extensions after ';')
+                    char* semicolon = strchr(chunk_size_str, ';');
+                    if (semicolon) {
+                        *semicolon = '\0';
+                    }
+                    context->temp_chunked_size = strtol(chunk_size_str, NULL, 16);
                     context->temp_chunked_read_size = 0;
 #if QS_OPENSSL_MODULE_DEBUG
-                    printf("chunked\n");
+                    printf("Chunk size: %ld (0x%s)\n", context->temp_chunked_size, chunk_size_str);
 #endif
-                    char* chunked_body = strstr(body,"\r\n");
-                    if(chunked_body != 0){
-                        int chunked_length = chunked_body - body;
-                        char chunked_bytes[chunked_length+1];
-                        memcpy(chunked_bytes,body,chunked_length);
-                        chunked_bytes[chunked_length] = 0;
-                        context->temp_chunked_size = strtol(chunked_bytes,0,16);
+                    // Check for final chunk (size 0)
+                    if (context->temp_chunked_size == 0) {
 #if QS_OPENSSL_MODULE_DEBUG
-                        printf("chunked_bytes(%d):\n%s\n",chunked_length,chunked_bytes);
-                        printf("chunked_size:%ld bytes\n",context->temp_chunked_size);
-                        printf("\n");
+                        printf("Final chunk detected, waiting for trailer\n");
 #endif
-                        body = chunked_body + 2;
-                        context->body_length += context->temp_chunked_size;
-                        read_body_length = current_read_bytes - (body - p_read_pos);
-                        context->total_read_body_length += read_body_length;
-                        context->temp_chunked_read_size += read_body_length;
+                        context->phase = QS_SSL_MODULE_PHASE_DISCONNECT;
+                        return 0;
                     }
-                }else{
-                    read_body_length = current_read_bytes;
-                    context->total_read_body_length += read_body_length;
-                    context->temp_chunked_read_size += read_body_length;
-                }
 
-#if QS_OPENSSL_MODULE_DEBUG
-                printf("body total(%ld):\n",context->total_read_body_length);
-                printf("read_body_length:(%d) ,	strlen:%d\n",read_body_length,(int)strlen(body));
-                printf("<<<<<<<<<<<<<<<<<<<<\n");
-                printf("%s\n",body);
-                printf("<<<<<<<<<<<<<<<<<<<<\n");
-#endif
-
-                if(context->temp_chunked_read_size>context->temp_chunked_size){
-#if QS_OPENSSL_MODULE_DEBUG
-                    printf("chunk size is over\n");
-                    printf("temp_chunked_read_size:%ld\n",context->temp_chunked_read_size);
-                    printf("temp_chunked_size:%ld\n",context->temp_chunked_size);
-#endif
-                    int over_size = context->temp_chunked_read_size - context->temp_chunked_size;
-                    read_body_length -= over_size;
-                    context->total_read_body_length -= over_size;
-                    memcpy(context->body_buffer_ptr,body,read_body_length);
-                    context->body_buffer_ptr += read_body_length;
-
-                    body = body + read_body_length;
-                    p_read_pos = body;
-                    current_read_bytes = over_size;
-#if QS_OPENSSL_MODULE_DEBUG
-                    printf("next body %s\n",body);
-#endif
-                    if(over_size > 2){
-#if QS_OPENSSL_MODULE_DEBUG
-                        printf("over_size > 2. next chunk read\n");
-#endif
-                        continue_read = 1;
+                    // Move past chunk size line
+                    if(context->chunk_size_buffer_len > 0) {
+                        // If we used buffered data, calculate how much of current payload to skip
+                        size_t consumed_from_current = (line_end - combined_buffer) - context->chunk_size_buffer_len + line_end_size;
+                        current_pos += consumed_from_current;
+                        remaining -= consumed_from_current;
+                        context->chunk_size_buffer_len = 0;
+                    } else {
+                        current_pos = line_end + line_end_size;
+                        remaining -= (chunk_line_len + line_end_size);
                     }
-                }else{
-                    memcpy(context->body_buffer_ptr,body,read_body_length);
-                    context->body_buffer_ptr += read_body_length;
+                } else {
+                    // Need more data to read chunk size
+                    // Save what we habe so far in the buffer
+                    if(context->chunk_size_buffer_len == 0) {
+                        size_t to_save = (remaining < sizeof(context->chunk_size_buffer)) ? remaining : sizeof(context->chunk_size_buffer);
+                        memcpy(context->chunk_size_buffer, current_pos, to_save);
+                        context->chunk_size_buffer_len = to_save;
+                    } else {
+                        // Append to existing buffer
+                        size_t space_left = sizeof(context->chunk_size_buffer) - context->chunk_size_buffer_len;
+                        size_t to_append = (remaining < space_left) ? remaining : space_left;
+                        memcpy(context->chunk_size_buffer + context->chunk_size_buffer_len, current_pos, to_append);
+                        context->chunk_size_buffer_len += to_append;
+                    }
+                    return 0;
                 }
-            }while(continue_read);
-        }while(0);
+            }
+
+            // Read chunk data
+            if(context->temp_chunked_size > 0 && remaining > 0) {
+                size_t chunk_remaining = context->temp_chunked_size - context->temp_chunked_read_size;
+                size_t to_read = (remaining < chunk_remaining) ? remaining : chunk_remaining;
+#if QS_OPENSSL_MODULE_DEBUG
+                printf("Reading chunk data: %ld bytes (chunk remaining: %ld)\n", to_read, chunk_remaining);
+#endif
+                // Copy chunk data to body buffer
+                memcpy(context->body_buffer_ptr, current_pos, to_read);
+                context->body_buffer_ptr += to_read;
+                context->total_read_body_length += to_read;
+                context->body_length += to_read;
+                context->temp_chunked_read_size += to_read;
+
+                current_pos += to_read;
+                remaining -= to_read;
+
+                // Check if chunk is complete
+                if(context->temp_chunked_read_size >= context->temp_chunked_size) {
+#if QS_OPENSSL_MODULE_DEBUG
+                    printf("Chunk complete: %ld bytes read\n", context->temp_chunked_read_size);
+#endif
+                    // Need to cunsume trailing \r\n after chunk data
+                    if(remaining >= 2 && memcmp(current_pos, "\r\n", 2) == 0) {
+                        current_pos += 2;
+                        remaining -= 2;
+                    } else if(remaining >= 1 && *current_pos == '\n') {
+                        current_pos += 1;
+                        remaining -= 1;
+                    } else {
+                        // Need more data for trailing CRLF
+                        context->waiting_for_chunk_trailer = 1;
+                        return 0;
+                    }
+
+                    // Reset for next chunk
+                    context->temp_chunked_size = 0;
+                    context->temp_chunked_read_size = 0;
+                }
+            }
+        }
     }
     return 0;
 }
