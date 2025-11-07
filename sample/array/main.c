@@ -1,4 +1,6 @@
-// qs_csv sample
+/*
+ * Copyright (c) Katsuya Owari
+ */
 
 #include "qs_array.h"
 #include "qs_variable.h"

@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Katsuya Owari
+ */
+
 #include "libqs.h"
 #include <stdio.h>
 #include <string.h>

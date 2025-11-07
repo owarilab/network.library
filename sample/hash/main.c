@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Katsuya Owari
+ */
+
 #include "qs_hash.h"
 #include "qs_variable.h"
 

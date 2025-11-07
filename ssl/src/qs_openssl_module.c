@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Katsuya Owari
+ */
+
 #include "qs_openssl_module.h"
 
 //#define QS_OPENSSL_MODULE_DEBUG 1

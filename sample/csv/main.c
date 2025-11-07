@@ -1,4 +1,6 @@
-// qs_csv sample
+/*
+ * Copyright (c) Katsuya Owari
+ */
 
 #include <stdio.h>
 #include <stdlib.h>

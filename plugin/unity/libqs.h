@@ -1,3 +1,6 @@
+/*
+ * Copyright (c) Katsuya Owari
+ */
 
 #ifdef _WINDOWS
 #define UNITY_INTERFACE_API __stdcall

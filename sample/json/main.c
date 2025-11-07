@@ -1,5 +1,6 @@
-// qs_api sample
-// Path: sample/api/main.c
+/*
+ * Copyright (c) Katsuya Owari
+ */
 
 #include <stdio.h>
 #include <string.h>

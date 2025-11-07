@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Katsuya Owari
+ */
+
 #ifdef __cplusplus
 extern "C"{
 #endif

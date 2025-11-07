@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Katsuya Owari
+ */
+
 #include "qs_protocol.h"
 
 uint8_t qs_get_protocol_header_size_byte(ssize_t payload_size)
