@@ -1,1 +1,1 @@
-# General-purpose Data Transmission Library
+# Quick Start C Programing Library
