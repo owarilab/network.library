@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Katsuya Owari
+ */
+
 #include "qs_chain_array.h"
 
 int32_t qs_create_chain_array(QS_MEMORY_POOL* memory,size_t chain_size, size_t data_size)
