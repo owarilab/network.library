@@ -80,5 +80,19 @@ int main( int argc, char *argv[], char *envp[] )
 	printf("\n\n");
 	printf("body:\n");
 	printf("%s\n",context.body_buffer);
+
+	printf("total_read_body_length: %ld bytes\n", context.total_read_body_length);
+	printf("body_length: %ld bytes\n", context.body_length);
+
+	// save body to file
+	FILE* file = fopen("response_body.txt", "wb");
+	if (file) {
+		fwrite(context.body_buffer, 1, context.body_length, file);
+		fclose(file);
+		printf("Response body saved to response_body.txt\n");
+	} else {
+		printf("Failed to open file for writing\n");
+	}
+	
 	return 0;
 }
