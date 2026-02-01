@@ -1,0 +1,65 @@
+// 関数定義と制御構文(if/while)の基本サンプル
+
+// simple function
+def add(a, b)
+{
+    return a + b;
+}
+
+def abs_val(x)
+{
+    if(x < 0){
+        return -x;
+    }
+    return x;
+}
+
+// main-like body
+x = -5;
+y = 3;
+
+sum = add(x, y);
+absx = abs_val(x);
+absy = abs_val(y);
+
+echo("[add] x+y=" + sum + "\n");
+echo("[abs] x=" + absx + ", y=" + absy + "\n");
+
+// if / else-if / else
+score = 72;
+if(score >= 80){
+    grade = "A";
+}
+else if(score >= 60){
+    grade = "B";
+}
+else{
+    grade = "C";
+}
+
+echo("[if-else] grade=" + grade + "\n");
+
+// while loop with simple break-like pattern
+n = 0;
+max = 5;
+
+echo("[while] counting:" + "\n");
+while(n < max){
+    echo(" n=" + n + "\n");
+    n = n + 1;
+}
+
+// nested if in while
+idx = 0;
+
+echo("[while + if] even/odd up to 4" + "\n");
+while(idx < 5){
+    if(idx % 2 == 0){
+        kind = "even";
+    }
+    else{
+        kind = "odd";
+    }
+    echo(" idx=" + idx + " : " + kind + "\n");
+    idx = idx + 1;
+}

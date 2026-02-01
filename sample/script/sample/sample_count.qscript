@@ -1,0 +1,13 @@
+// count() の挙動確認サンプル（文字列長・配列長・ハッシュ要素数）
+
+s = "abcd";
+arr = [1,2,3,4];
+hash = [
+    "k1" : 1,
+    "k2" : 2,
+    "k3" : 3
+];
+
+echo("[count string] " + count(s) + "\n");
+echo("[count array] " + count(arr) + "\n");
+echo("[count hash] " + count(hash) + "\n");

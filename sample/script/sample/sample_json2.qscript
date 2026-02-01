@@ -1,0 +1,23 @@
+// json encode/decode の基本動作サンプル
+
+hash = [
+    "id" : "user01",
+    "name" : "Alice",
+    "scores" : [100, 80, 90]
+];
+
+echo("[original hash]\n");
+echo(hash);
+echo("\n");
+
+j = json_encode(hash);
+echo("[json string]\n");
+echo(j + "\n");
+
+h2 = json_decode(j);
+echo("[decoded hash] id=" + h2["id"] + ", name=" + h2["name"] + "\n");
+
+// wrap decoded hash and re-encode
+hash2 = ["data" : h2];
+echo("[wrapped json]\n");
+echo(json_encode(hash2) + "\n");

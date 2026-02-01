@@ -1,0 +1,25 @@
+// ファイル操作の基本をまとめたサンプル
+// - 存在確認/サイズ/拡張子取得
+// - 読み込み(file_get)
+// - 書き込み(file_put)と追記(file_add)
+
+file_name = "test_file.txt";
+
+// existence, size, extension
+echo("[file_exist] " + file_exist(file_name) + "\n");
+echo("[file_size] " + file_size(file_name) + "\n");
+echo("[file_extension] " + file_extension(file_name) + "\n");
+
+// read text content
+content = file_get(file_name);
+echo("[file_get] " + content + "\n");
+
+// write new file and append
+out_file = "tmp_put.txt";
+res_put = file_put(out_file, "hello");      // 上書き
+res_add = file_add(out_file, " world");     // 追記
+
+echo("[file_put] " + res_put + "\n");
+echo("[file_add] " + res_add + "\n");
+
+echo("[file_get after put/add] " + file_get(out_file) + "\n");

@@ -29,11 +29,16 @@ int main(int argc, char *argv[])
 	double sec_timeofday;
 	gettimeofday( &start_timeval, NULL );
 
+    const char* script_name = "sample/sample.qscript";
+    if(argc > 1 && argv[1] != NULL){
+        script_name = argv[1];
+    }
+
     for(int i=0;i<1;i++)
     {
         api_qs_memory_clean(&context);
         QS_SERVER_SCRIPT_CONTEXT script_context;
-        if(-1==api_qs_script_read_file(&context, &script_context, "sample.qscript"))
+        if(-1==api_qs_script_read_file(&context, &script_context, (char*)script_name))
         {
             printf("api_qs_script_read_file failed\n");
             return -1;

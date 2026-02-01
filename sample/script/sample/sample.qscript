@@ -1,8 +1,9 @@
 /*
  * sample script
+ * 各種ビルトイン（配列/ハッシュ・JSON・ファイル・乱数など）の動きをまとめて確認するサンプル
  */
 
-// hash test
+// hash test: ハッシュとネストした配列を生成し、JSONエンコード／デコードを試す
 config = [
     "port" : 8080,
     "maxcon" : 100,
@@ -24,17 +25,18 @@ config = [
     ]
 ];
 
-echo(config);
-json = json_encode(config);
-echo(json + "\n");
 echo(json_decode(json));
+echo(config);                      // ハッシュ全体をダンプ
+json = json_encode(config);        // JSON文字列へ変換
+echo(json + "\n");               // JSON文字列を出力
+echo(json_decode(json));           // JSONをデコードして再びダンプ
 
 test_obj = [];
 test_obj["val"] = 1;
-echo(test_obj);
+echo(test_obj);                    // 単純なハッシュ追加の例
 
 
-is_enable=0;
+is_enable=0;                       // trueにすると以下のwhile/ファイル操作テストが走る
 if(is_enable)
 {
     // while loop test
@@ -63,7 +65,7 @@ if(is_enable)
     echo(gmtime() + "\n" );
 
     party = [100,200,300];
-    len=count(party);
+    len=count(party);             // 配列長取得
 
     echo("len = " + len + "\n");
 
@@ -77,14 +79,14 @@ if(is_enable)
     i=i+1;
     }
 
-    echo(json_encode(party)+"\n");
+    echo(json_encode(party)+"\n"); // 配列をJSONに変換
 
     i=0;
     while(i<1000){
     i=i+1;
     }
 
-    result_html = make_html("<h1>sample</h1>");
+    result_html = make_html("<h1>sample</h1>"); // 簡易HTTPレスポンス文字列を生成
     echo (result_html);
 
     sample_func(i,"hoge");
@@ -95,7 +97,7 @@ if(is_enable)
  */
 def sample_func(arg1, arg2)
 {
-   echo( "arg1=" + arg1 + " , arg2=" + arg2 + "\n" );
+    echo( "arg1=" + arg1 + " , arg2=" + arg2 + "\n" ); // 関数呼び出し例
 }
 
 /*
@@ -118,14 +120,14 @@ def hash_dump_test()
     echo(json_encode(hash)+"\n");
     echo("hash value : " + hash["id"] + "\n");
 
-    dec_hash=json_decode(json_encode(hash));
+    dec_hash=json_decode(json_encode(hash)); // encode→decode往復
     echo(dec_hash);
 
     hash2=["data":hash];
     echo(json_encode(hash2)+"\n");
 }
 
-/* html test */
+/* html test: シンプルなHTTPレスポンス文字列を組み立てる */
 def make_html(body)
 {
     http_header="HTTP/1.1 200 OK
