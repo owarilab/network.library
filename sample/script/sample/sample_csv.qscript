@@ -1,0 +1,38 @@
+// CSV読み込みと出力のサンプル
+// - csv_read(file_path) でCSVを2次元配列として取得
+// - csv_build(array[,bufsize]) で配列からCSV文字列を生成
+// - csv_write(file_path, array[,bufsize]) でファイルに保存
+
+// sample/csv/sample.csv を読み込み（実行ディレクトリは sample/script を想定）
+csv_data = csv_read("../csv/sample.csv");
+
+echo("[csv_read rows] " + count(csv_data) + "\n");
+if(count(csv_data) > 0){
+    echo("[first row] " + json_encode(csv_data[0]) + "\n");
+}
+
+// 配列をCSV文字列へ
+csv_string = csv_build(csv_data);
+echo("[csv_build]\n" + csv_string + "\n");
+
+// ファイルへ書き出し
+write_result = csv_write("tmp_sample.csv", csv_data);
+echo("[csv_write] " + write_result + "\n");
+
+// 日本語・カンマ・ダブルクオートを含むケースを読み込み
+csv_jp = csv_read("../csv/sample_jp.csv");
+echo("[csv_read jp rows] " + count(csv_jp) + "\n");
+// 各行をJSONでダンプして、パース崩れを目視確認できるようにする
+i = 0;
+while(i < count(csv_jp)){
+    echo("[jp row " + i + "] " + json_encode(csv_jp[i]) + "\n");
+    i = i + 1;
+}
+
+// 再度CSV文字列化して出力
+csv_jp_string = csv_build(csv_jp);
+echo("[csv_build jp]\n" + csv_jp_string + "\n");
+
+// 書き出し（サロゲート出力確認用）
+write_result_jp = csv_write("tmp_sample_jp.csv", csv_jp);
+echo("[csv_write jp] " + write_result_jp + "\n");

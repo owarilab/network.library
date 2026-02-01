@@ -1693,6 +1693,9 @@ int api_qs_script_read_file(QS_MEMORY_CONTEXT* memory_context, QS_SERVER_SCRIPT_
 	qs_add_system_function( script_memory, script_context->memid_script, "file_get", qs_script_system_function_file_get, 0 );
 	qs_add_system_function( script_memory, script_context->memid_script, "file_put", qs_script_system_function_file_put, 0 );
 	qs_add_system_function( script_memory, script_context->memid_script, "file_add", qs_script_system_function_file_add, 0 );
+	qs_add_system_function( script_memory, script_context->memid_script, "csv_read", qs_script_system_function_csv_read, 0 );
+	qs_add_system_function( script_memory, script_context->memid_script, "csv_build", qs_script_system_function_csv_build, 0 );
+	qs_add_system_function( script_memory, script_context->memid_script, "csv_write", qs_script_system_function_csv_write, 0 );
 	qs_add_system_function( script_memory, script_context->memid_script, "json_encode", qs_script_system_function_json_encode, 0 );
 	qs_add_system_function( script_memory, script_context->memid_script, "json_decode", qs_script_system_function_json_decode, 0 );
 	qs_add_system_function( script_memory, script_context->memid_script, "gmtime", qs_script_system_function_gmtime, 0 );

@@ -3,6 +3,8 @@
  */
 
 #include "qs_script.h"
+#include "qs_csv.h"
+#include <stdlib.h>
 
 int32_t qs_init_script( QS_MEMORY_POOL* _ppool, size_t valiablehash_size, size_t functionhash_size, int32_t init_token_size )
 {
@@ -3015,5 +3017,143 @@ void* qs_script_system_function_rand( QS_MEMORY_POOL* _ppool, void* args )
 	*pv = rand_value;
 	pret->munit = string_munit;
 	pret->id = ELEMENT_LITERAL_NUM;
+	return pret;
+}
+
+void* qs_script_system_function_csv_read( QS_MEMORY_POOL* _ppool, void* args )
+{
+	QS_ARRAY* parray = (QS_ARRAY*)args;
+	QS_ARRAY_ELEMENT* elm;
+	QS_FUNCTION_RETURN* pret;
+	int32_t memid_return = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
+	if( -1 == memid_return ){
+		return NULL;
+	}
+	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, memid_return );
+	pret->id = 0;
+	pret->munit = -1;
+	pret->refid = memid_return;
+	if( parray != NULL )
+	{
+		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->memid );
+		if( elm != NULL && parray->len > 0 )
+		{
+			if( elm[0].id == ELEMENT_LITERAL_STR )
+			{
+				int32_t memid_csv = qs_csv_file_load( _ppool, (char*)QS_GET_POINTER( _ppool, elm[0].memid_array_element_data ) );
+				if( memid_csv != -1 )
+				{
+					QS_CSV* csv = (QS_CSV*)QS_GET_POINTER( _ppool, memid_csv );
+					if( csv->memid_csv_array != -1 )
+					{
+						pret->munit = csv->memid_csv_array;
+						pret->id = ELEMENT_ARRAY;
+					}
+				}
+			}
+		}
+	}
+	return pret;
+}
+
+void* qs_script_system_function_csv_build( QS_MEMORY_POOL* _ppool, void* args )
+{
+	QS_ARRAY* parray = (QS_ARRAY*)args;
+	QS_ARRAY_ELEMENT* elm;
+	QS_FUNCTION_RETURN* pret;
+	int32_t memid_return = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
+	if( -1 == memid_return ){
+		return NULL;
+	}
+	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, memid_return );
+	pret->id = 0;
+	pret->munit = -1;
+	pret->refid = memid_return;
+	size_t buffer_size = 1024 * 1024;
+	if( parray != NULL )
+	{
+		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->memid );
+		if( elm != NULL && parray->len > 0 )
+		{
+			if( parray->len > 1 && ( elm[1].id == ELEMENT_LITERAL_NUM || elm[1].id == ELEMENT_LITERAL_STR ) )
+			{
+				int tmp = atoi( (char*)QS_GET_POINTER( _ppool, elm[1].memid_array_element_data ) );
+				if( tmp > 0 ){
+					buffer_size = (size_t)tmp;
+				}
+			}
+			if( elm[0].id == ELEMENT_ARRAY )
+			{
+				int32_t memid_csv = qs_csv_init( _ppool );
+				if( memid_csv != -1 )
+				{
+					QS_CSV* csv = (QS_CSV*)QS_GET_POINTER( _ppool, memid_csv );
+					csv->memid_csv_array = elm[0].memid_array_element_data;
+					int32_t memid_csv_string = qs_csv_build_csv_memid( _ppool, memid_csv, buffer_size );
+					if( memid_csv_string != -1 )
+					{
+						pret->munit = memid_csv_string;
+						pret->id = ELEMENT_LITERAL_STR;
+					}
+				}
+			}
+		}
+	}
+	return pret;
+}
+
+void* qs_script_system_function_csv_write( QS_MEMORY_POOL* _ppool, void* args )
+{
+	QS_ARRAY* parray = (QS_ARRAY*)args;
+	QS_ARRAY_ELEMENT* elm;
+	QS_FUNCTION_RETURN* pret;
+	int32_t memid_return = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
+	if( -1 == memid_return ){
+		return NULL;
+	}
+	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, memid_return );
+	pret->id = 0;
+	pret->munit = -1;
+	pret->refid = memid_return;
+	size_t buffer_size = 1024 * 1024;
+	if( parray != NULL )
+	{
+		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->memid );
+		if( elm != NULL && parray->len > 1 )
+		{
+			if( parray->len > 2 && ( elm[2].id == ELEMENT_LITERAL_NUM || elm[2].id == ELEMENT_LITERAL_STR ) )
+			{
+				int tmp = atoi( (char*)QS_GET_POINTER( _ppool, elm[2].memid_array_element_data ) );
+				if( tmp > 0 ){
+					buffer_size = (size_t)tmp;
+				}
+			}
+			if( elm[0].id == ELEMENT_LITERAL_STR && elm[1].id == ELEMENT_ARRAY )
+			{
+				int32_t memid_csv = qs_csv_init( _ppool );
+				if( memid_csv != -1 )
+				{
+					QS_CSV* csv = (QS_CSV*)QS_GET_POINTER( _ppool, memid_csv );
+					csv->memid_csv_array = elm[1].memid_array_element_data;
+					int32_t memid_csv_string = qs_csv_build_csv_memid( _ppool, memid_csv, buffer_size );
+					if( memid_csv_string != -1 )
+					{
+						char* csv_string = (char*)QS_GET_POINTER( _ppool, memid_csv_string );
+						char* file_name = (char*)QS_GET_POINTER( _ppool, elm[0].memid_array_element_data );
+						size_t write_size = qs_strlen( csv_string );
+						int32_t string_munit = qs_create_memory_block( _ppool, 8 );
+						if( string_munit != -1 ){
+							qs_set_return_string( 
+								_ppool,
+								memid_return,
+								string_munit,
+								(0 != qs_fwrite( file_name, csv_string, write_size )) ? "0" : "1"
+							);
+						}
+					}
+				}
+			}
+		}
+	}
 	return pret;
 }

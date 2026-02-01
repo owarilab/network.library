@@ -113,6 +113,9 @@ void* qs_script_system_function_json_encode( QS_MEMORY_POOL* _ppool, void* args 
 void* qs_script_system_function_json_decode( QS_MEMORY_POOL* _ppool, void* args );
 void* qs_script_system_function_gmtime( QS_MEMORY_POOL* _ppool, void* args );
 void* qs_script_system_function_rand( QS_MEMORY_POOL* _ppool, void* args );
+void* qs_script_system_function_csv_read( QS_MEMORY_POOL* _ppool, void* args );
+void* qs_script_system_function_csv_build( QS_MEMORY_POOL* _ppool, void* args );
+void* qs_script_system_function_csv_write( QS_MEMORY_POOL* _ppool, void* args );
 
 #endif /*_QS_SCRIPT_H_*/
 
