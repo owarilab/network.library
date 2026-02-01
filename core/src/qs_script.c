@@ -1584,7 +1584,7 @@ int32_t qs_exec_array_set( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* 
 			int array_index = -1;
 			QS_ARRAY *parray = (QS_ARRAY*)QS_GET_POINTER( _ppool, tmp_node.element_munit );
 			if( parray == NULL || parray->len <= 0 ){
-				printf("clean array\n");
+				//printf("clean array\n");
 				break;
 			}
 			array_index = atoi( (char*)QS_GET_POINTER( _ppool, pret->munit ) );
@@ -1845,7 +1845,7 @@ int32_t qs_exec_array_get( QS_MEMORY_POOL* _ppool, QS_SCRIPT *pscript, QS_NODE* 
 				int array_index = -1;
 				QS_ARRAY *parray = (QS_ARRAY*)QS_GET_POINTER( _ppool, tmp_node.element_munit );
 				if( parray == NULL || parray->len <= 0 ){
-					printf("clean array\n");
+					//printf("clean array\n");
 					break;
 				}
 				if( pret != NULL ){

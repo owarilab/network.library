@@ -14,7 +14,7 @@ config = [
         "obj2" : [
             "name" : "obj2_name",
             "value" : 2
-        ],
+        ]
     ],
     "int_array":[
         1,2,3,4
@@ -34,7 +34,7 @@ test_obj["val"] = 1;
 echo(test_obj);
 
 
-is_enable=0
+is_enable=0;
 if(is_enable)
 {
     // while loop test
