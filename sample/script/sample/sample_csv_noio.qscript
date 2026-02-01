@@ -1,0 +1,15 @@
+// CSV読み込みと出力のサンプル（ファイル書き込みなしでI/O影響を排除）
+// - csv_read(file_path) でCSVを2次元配列として取得
+// - csv_build(array[,bufsize]) で配列からCSV文字列を生成
+
+// sample/csv/sample.csv を読み込み（実行ディレクトリは sample/script を想定）
+csv_data = csv_read("../csv/sample.csv");
+
+// 配列をCSV文字列へ
+csv_string = csv_build(csv_data);
+
+// 日本語・カンマ・ダブルクオートを含むケースを読み込み
+csv_jp = csv_read("../csv/sample_jp.csv");
+
+// 再度CSV文字列化
+csv_jp_string = csv_build(csv_jp);

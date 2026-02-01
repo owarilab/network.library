@@ -1,0 +1,11 @@
+// 配列をスクリプト内で組み立てて CSV 化する最小テスト
+rows = [
+    ["id","name"],
+    ["1","simple"],
+    ["2","comma,value"],      // カンマを含む値（自動で引用される）
+    ["3","quoted \"text\""], // ダブルクオートを含む値（バックスラッシュでエスケープ）
+    ["4","日本語テスト"],
+];
+
+csv_inline = csv_build(rows);
+echo(csv_inline + "\n");

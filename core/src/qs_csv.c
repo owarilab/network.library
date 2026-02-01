@@ -146,7 +146,13 @@ int32_t qs_csv_build_csv_memid(QS_MEMORY_POOL* memory, int32_t memid_csv, size_t
 			if(NULL==row_elm){
 				return -1;
 			}
+			if(row_elm->memid_array_element_data < 0){
+				return -1;
+			}
 			char* str = (char*)QS_GET_POINTER(memory,row_elm->memid_array_element_data);
+			if(str == NULL){
+				return -1;
+			}
 
 			// check numeric
 			int is_numeric = 1;

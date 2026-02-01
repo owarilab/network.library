@@ -1,0 +1,31 @@
+// CSV edge-case sanity: ensure no crash on unusual values
+
+// minimal with empty strings
+rows_empty = [
+    ["id","name"],
+    ["", ""],
+    ["5", ""],
+];
+
+csv_empty = csv_build(rows_empty);
+echo("[edge empty]\n" + csv_empty + "\n");
+
+// long field
+long_val = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+rows_long = [
+    ["id","note"],
+    ["1", long_val],
+];
+
+csv_long = csv_build(rows_long);
+echo("[edge long]\n" + csv_long + "\n");
+
+// single-column rows
+rows_single = [
+    ["only"],
+    ["x"],
+    ["y"],
+];
+
+csv_single = csv_build(rows_single);
+echo("[edge single]\n" + csv_single + "\n");
