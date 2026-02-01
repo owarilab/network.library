@@ -3,6 +3,14 @@
  * 各種ビルトイン（配列/ハッシュ・JSON・ファイル・乱数など）の動きをまとめて確認するサンプル
  */
 
+// ブロックステートメントでくくる
+echo("block test start\n");
+{
+    echo("test\n");
+}
+echo("block test end\n");
+
+
 // hash test: ハッシュとネストした配列を生成し、JSONエンコード／デコードを試す
 config = [
     "port" : 8080,
