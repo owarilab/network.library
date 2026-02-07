@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>リバーシ - Reversi</title>
+<style>
+body {
+  margin: 0;
+  padding: 16px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+  min-height: 100vh;
+}
+#container {
+  max-width: 900px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+h1 {
+  text-align: center;
+  color: #333;
+  margin: 0 0 20px 0;
+  font-size: 28px;
+}
+#canvas {
+  display: block;
+  margin: 20px auto;
+  background: #1e7a3d;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  cursor: pointer;
+}
+.controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.btn {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  background: #3b82f6;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.btn:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+.btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  transform: none;
+}
+.btn-reset {
+  background: #dc2626;
+}
+.btn-reset:hover {
+  background: #b91c1c;
+}
+.btn-pass {
+  background: #f59e0b;
+}
+.btn-pass:hover {
+  background: #d97706;
+}
+input[type="text"] {
+  padding: 10px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  flex: 1;
+  min-width: 120px;
+}
+#status {
+  text-align: center;
+  padding: 12px;
+  background: #f0f0f0;
+  border-radius: 6px;
+  margin: 16px 0;
+  font-weight: 600;
+  color: #333;
+  font-size: 16px;
+}
+#score-panel {
+  display: flex;
+  justify-content: space-around;
+  margin: 16px 0;
+  gap: 12px;
+}
+.score-box {
+  flex: 1;
+  padding: 16px;
+  border-radius: 8px;
+  text-align: center;
+  border: 3px solid transparent;
+  transition: all 0.3s;
+}
+.score-box.active {
+  border-color: #3b82f6;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+}
+.score-box.black {
+  background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
+  color: white;
+}
+.score-box.white {
+  background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+  color: #333;
+}
+.score-stone {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  margin: 0 auto 8px;
+  border: 2px solid #333;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+.score-stone.black {
+  background: radial-gradient(circle at 30% 30%, #4a4a4a, #1a1a1a);
+}
+.score-stone.white {
+  background: radial-gradient(circle at 30% 30%, #ffffff, #dcdcdc);
+}
+.score-count {
+  font-size: 32px;
+  font-weight: 700;
+  margin: 8px 0;
+}
+.score-label {
+  font-size: 14px;
+  opacity: 0.8;
+}
+#players {
+  margin-top: 16px;
+}
+.player-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  margin: 6px 0;
+  border-radius: 6px;
+  background: #f8f8f8;
+  border: 2px solid transparent;
+}
+.player-info.active {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+.player-stone {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  margin-right: 10px;
+  border: 2px solid #333;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+.player-left {
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+  font-weight: 600;
+}
+.game-over {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.8);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.game-over.show {
+  display: flex;
+}
+.game-over-content {
+  background: white;
+  padding: 40px;
+  border-radius: 12px;
+  text-align: center;
+  max-width: 400px;
+}
+.game-over-content h2 {
+  margin: 0 0 20px 0;
+  font-size: 36px;
+}
+.winner-name {
+  font-size: 28px;
+  color: #3b82f6;
+  margin: 10px 0;
+  font-weight: 700;
+}
+.final-score {
+  font-size: 18px;
+  color: #666;
+  margin-top: 16px;
+}
+#rules {
+  margin-top: 16px;
+  padding: 12px;
+  background: #eff6ff;
+  border-left: 4px solid #3b82f6;
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+#rules h3 {
+  margin: 0 0 8px 0;
+  font-size: 15px;
+  color: #1e40af;
+}
+.hint-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 0;
+  justify-content: center;
+}
+.hint-toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+.hint-toggle label {
+  cursor: pointer;
+  user-select: none;
+}
+</style>
+</head>
+<body>
+<div id="container">
+  <h1>⚫⚪ リバーシ - Reversi</h1>
+  
+  <div class="controls">
+    <input type="text" id="room_id" placeholder="ルームID" value="reversi_room">
+    <button class="btn" onclick="createRoom()">部屋作成</button>
+    <button class="btn" onclick="joinRoom()">参加</button>
+    <button class="btn" onclick="leaveRoom()">退出</button>
+    <button class="btn" onclick="listRooms()">部屋一覧</button>
+    <button class="btn btn-pass" id="pass_btn" onclick="passMove()" disabled>パス</button>
+    <button class="btn btn-reset" onclick="resetGame()">リセット</button>
+  </div>
+
+  <div id="status">接続中...</div>
+
+  <div id="score-panel">
+    <div class="score-box black" id="black-score">
+      <div class="score-stone black"></div>
+      <div class="score-count" id="black-count">2</div>
+      <div class="score-label">黒石</div>
+    </div>
+    <div class="score-box white" id="white-score">
+      <div class="score-stone white"></div>
+      <div class="score-count" id="white-count">2</div>
+      <div class="score-label">白石</div>
+    </div>
+  </div>
+
+  <div class="hint-toggle">
+    <input type="checkbox" id="show-hints" checked>
+    <label for="show-hints">有効な手を表示</label>
+  </div>
+
+  <canvas id="canvas" width="640" height="640"></canvas>
+
+  <div id="players"></div>
+
+  <div id="rules">
+    <h3>📋 ルール</h3>
+    <ul style="margin: 4px 0; padding-left: 20px;">
+      <li>8×8の盤面に交互に石を置く</li>
+      <li>相手の石を挟むと自分の色に裏返せる</li>
+      <li>置ける場所がない時はパス</li>
+      <li>両者とも置けなくなったら終了</li>
+      <li>石の数が多い方が勝ち</li>
+    </ul>
+  </div>
+</div>
+
+<div id="game-over" class="game-over">
+  <div class="game-over-content">
+    <h2>🎉</h2>
+    <div class="winner-name" id="winner-text"></div>
+    <div class="final-score" id="final-score"></div>
+    <button class="btn" onclick="closeGameOver()" style="margin-top: 20px;">閉じる</button>
+  </div>
+</div>
+
+<script>
+// Game constants
+const BOARD_SIZE = 8;
+const CELL_SIZE = 80;
+const STONE_RADIUS = 30;
+const LINE_WIDTH = 2;
+
+// Stone colors
+const STONE_BLACK = 'black';
+const STONE_WHITE = 'white';
+
+// WebSocket
+var ws_socket = null;
+var self_uuid = '';
+var self_con_id = '';
+var current_join_room_id = '';
+
+// Game state
+var gameState = {
+  board: [], // [row][col] -> 'black'|'white'|null
+  players: {}, // connection_id -> {stone: 'black'|'white', name}
+  currentTurn: null,
+  gameStarted: false,
+  gameOver: false,
+  lastMove: null, // {row, col}
+  passes: 0, // consecutive passes
+  validMoves: [] // [{row, col}]
+};
+
+// Animation
+var animatingFlips = [];
+var showHints = true;
+
+// Canvas
+var canvas, ctx;
+
+window.onload = function() {
+  canvas = document.getElementById('canvas');
+  ctx = canvas.getContext('2d');
+  
+  // Initialize empty board
+  for (let i = 0; i < BOARD_SIZE; i++) {
+    gameState.board[i] = new Array(BOARD_SIZE).fill(null);
+  }
+  
+  canvas.addEventListener('click', handleCanvasClick);
+  document.getElementById('show-hints').addEventListener('change', function(e) {
+    showHints = e.target.checked;
+    drawBoard();
+  });
+  
+  initWebSocket();
+  drawBoard();
+  
+  // Animation loop
+  setInterval(updateAnimations, 50);
+};
+
+function initWebSocket() {
+  ws_socket = new WebSocket('ws://localhost:4444');
+  
+  ws_socket.addEventListener('open', function(event) {
+    self_uuid = Math.random().toString(36).slice(-8);
+    ws_socket.send(self_uuid);
+    updateStatus('WebSocket接続完了');
+  });
+  
+  ws_socket.addEventListener('message', function(event) {
+    try {
+      let json = JSON.parse(event.data);
+      
+      if (json.type === 'message') {
+        if (json.message === self_uuid) {
+          self_con_id = json.id;
+          updateStatus('接続ID取得: ' + self_con_id.substring(0, 8));
+          return;
+        }
+        
+        try {
+          let payload = JSON.parse(json.message);
+          if (payload.game === 'reversi') {
+            handleGameMessage(payload);
+          }
+        } catch(e) {}
+      } else if (json.type === 'join') {
+        handlePlayerJoin(json.id);
+      } else if (json.type === 'leave') {
+        handlePlayerLeave(json.id);
+      }
+    } catch(e) {
+      console.error('Message parse error:', e);
+    }
+  });
+  
+  ws_socket.addEventListener('close', function(event) {
+    updateStatus('WebSocket切断');
+    current_join_room_id = '';
+  });
+}
+
+function handleGameMessage(payload) {
+  if (payload.action === 'init') {
+    gameState = payload.state;
+    gameState.gameStarted = true;
+    initializeBoard();
+    updateValidMoves();
+    updateStatus('ゲーム開始！');
+    drawBoard();
+    updatePlayers();
+    updateScores();
+    updateTurnStatus();
+  } else if (payload.action === 'move') {
+    const { row, col, player, flips } = payload;
+    gameState.board[row][col] = gameState.players[player].stone;
+    gameState.lastMove = { row, col };
+    gameState.passes = 0;
+    
+    // Animate flips
+    if (flips && flips.length > 0) {
+      flips.forEach(flip => {
+        animatingFlips.push({
+          row: flip.row,
+          col: flip.col,
+          progress: 0,
+          fromColor: gameState.board[flip.row][flip.col],
+          toColor: gameState.players[player].stone
+        });
+      });
+      
+      // Apply flips after animation starts
+      setTimeout(() => {
+        flips.forEach(flip => {
+          gameState.board[flip.row][flip.col] = gameState.players[player].stone;
+        });
+        updateScores();
+      }, 150);
+    }
+    
+    if (payload.gameOver) {
+      gameState.gameOver = true;
+      gameState.currentTurn = null;
+      drawBoard();
+      updateScores();
+      setTimeout(() => showGameOver(), 800);
+    } else {
+      gameState.currentTurn = payload.nextTurn;
+      updateValidMoves();
+      drawBoard();
+      updateScores();
+      updateTurnStatus();
+      updatePassButton();
+    }
+  } else if (payload.action === 'pass') {
+    gameState.passes++;
+    
+    if (gameState.passes >= 2 || payload.gameOver) {
+      gameState.gameOver = true;
+      gameState.currentTurn = null;
+      updateStatus('ゲーム終了');
+      setTimeout(() => showGameOver(), 500);
+    } else {
+      gameState.currentTurn = payload.nextTurn;
+      updateValidMoves();
+      updateTurnStatus();
+      updatePassButton();
+    }
+    
+    drawBoard();
+    updateScores();
+  } else if (payload.action === 'reset') {
+    gameState = payload.state;
+    gameState.gameStarted = true;
+    initializeBoard();
+    updateValidMoves();
+    drawBoard();
+    updatePlayers();
+    updateScores();
+    updateTurnStatus();
+    updatePassButton();
+  }
+}
+
+function handlePlayerJoin(connection_id) {
+  if (connection_id !== self_con_id && current_join_room_id) {
+    const playerCount = Object.keys(gameState.players).length;
+    
+    if (playerCount < 2 && !gameState.players[connection_id]) {
+      const stoneColor = playerCount === 0 ? STONE_BLACK : STONE_WHITE;
+      gameState.players[connection_id] = {
+        stone: stoneColor,
+        name: 'Player ' + connection_id.substring(0, 6)
+      };
+    }
+    
+    if (Object.keys(gameState.players).length === 2 && !gameState.gameStarted) {
+      setTimeout(() => startGame(), 500);
+    }
+    
+    updatePlayers();
+  }
+}
+
+function handlePlayerLeave(connection_id) {
+  if (gameState.players[connection_id]) {
+    delete gameState.players[connection_id];
+    
+    if (gameState.gameStarted) {
+      updateStatus('プレイヤーが退出しました。ゲームをリセットします。');
+      setTimeout(() => resetGameState(), 1000);
+    }
+    
+    updatePlayers();
+  }
+}
+
+function initializeBoard() {
+  // Clear board
+  for (let i = 0; i < BOARD_SIZE; i++) {
+    gameState.board[i] = new Array(BOARD_SIZE).fill(null);
+  }
+  
+  // Initial setup: center 4 stones
+  const mid = BOARD_SIZE / 2;
+  gameState.board[mid - 1][mid - 1] = STONE_WHITE;
+  gameState.board[mid - 1][mid] = STONE_BLACK;
+  gameState.board[mid][mid - 1] = STONE_BLACK;
+  gameState.board[mid][mid] = STONE_WHITE;
+}
+
+function startGame() {
+  if (gameState.gameStarted) return;
+  
+  const playerIds = Object.keys(gameState.players);
+  if (playerIds.length !== 2) {
+    updateStatus('2人のプレイヤーが必要です');
+    return;
+  }
+  
+  initializeBoard();
+  
+  const blackPlayer = playerIds.find(id => gameState.players[id].stone === STONE_BLACK);
+  gameState.currentTurn = blackPlayer;
+  gameState.gameStarted = true;
+  gameState.gameOver = false;
+  gameState.lastMove = null;
+  gameState.passes = 0;
+  
+  updateValidMoves();
+  
+  sendGameMessage({
+    action: 'init',
+    state: gameState
+  });
+  
+  drawBoard();
+  updatePlayers();
+  updateScores();
+  updateTurnStatus();
+  updatePassButton();
+}
+
+function resetGame() {
+  if (!gameState.gameStarted) return;
+  
+  resetGameState();
+  
+  const playerIds = Object.keys(gameState.players);
+  if (playerIds.length === 2) {
+    initializeBoard();
+    const blackPlayer = playerIds.find(id => gameState.players[id].stone === STONE_BLACK);
+    gameState.currentTurn = blackPlayer;
+    gameState.gameStarted = true;
+    updateValidMoves();
+    
+    sendGameMessage({
+      action: 'reset',
+      state: gameState
+    });
+    
+    drawBoard();
+    updatePlayers();
+    updateScores();
+    updateTurnStatus();
+    updatePassButton();
+  }
+}
+
+function resetGameState() {
+  initializeBoard();
+  gameState.gameOver = false;
+  gameState.lastMove = null;
+  gameState.currentTurn = null;
+  gameState.gameStarted = false;
+  gameState.passes = 0;
+  gameState.validMoves = [];
+  animatingFlips = [];
+}
+
+function handleCanvasClick(event) {
+  if (!gameState.gameStarted || gameState.gameOver) return;
+  if (gameState.currentTurn !== self_con_id) {
+    updateStatus('あなたのターンではありません');
+    return;
+  }
+  
+  const rect = canvas.getBoundingClientRect();
+  const x = event.clientX - rect.left;
+  const y = event.clientY - rect.top;
+  
+  const col = Math.floor(x / CELL_SIZE);
+  const row = Math.floor(y / CELL_SIZE);
+  
+  if (row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE) {
+    if (gameState.board[row][col] === null) {
+      if (isValidMove(row, col)) {
+        makeMove(row, col);
+      } else {
+        updateStatus('そこには置けません');
+      }
+    } else {
+      updateStatus('そこには既に石があります');
+    }
+  }
+}
+
+function makeMove(row, col) {
+  const myStone = gameState.players[self_con_id].stone;
+  const flips = getFlippedStones(row, col, myStone);
+  
+  if (flips.length === 0) return;
+  
+  gameState.board[row][col] = myStone;
+  gameState.lastMove = { row, col };
+  gameState.passes = 0;
+  
+  // Start flip animation
+  flips.forEach(flip => {
+    animatingFlips.push({
+      row: flip.row,
+      col: flip.col,
+      progress: 0,
+      fromColor: gameState.board[flip.row][flip.col],
+      toColor: myStone
+    });
+    gameState.board[flip.row][flip.col] = myStone;
+  });
+  
+  // Determine next turn
+  const playerIds = Object.keys(gameState.players);
+  const currentIndex = playerIds.indexOf(gameState.currentTurn);
+  const nextTurn = playerIds[(currentIndex + 1) % playerIds.length];
+  
+  // Check if next player has valid moves
+  const nextPlayerStone = gameState.players[nextTurn].stone;
+  const nextHasValidMoves = hasValidMoves(nextPlayerStone);
+  
+  let finalNextTurn = nextTurn;
+  let gameOver = false;
+  
+  if (!nextHasValidMoves) {
+    // Next player must pass, check if current player has moves
+    const currentHasValidMoves = hasValidMoves(myStone);
+    if (!currentHasValidMoves) {
+      // Game over
+      gameOver = true;
+      finalNextTurn = null;
+    } else {
+      // Current player continues
+      finalNextTurn = self_con_id;
+    }
+  }
+  
+  gameState.currentTurn = finalNextTurn;
+  
+  if (gameOver) {
+    gameState.gameOver = true;
+  }
+  
+  sendGameMessage({
+    action: 'move',
+    row, col,
+    player: self_con_id,
+    flips,
+    nextTurn: finalNextTurn,
+    gameOver
+  });
+  
+  updateScores();
+  drawBoard();
+  
+  if (gameOver) {
+    setTimeout(() => showGameOver(), 800);
+  } else {
+    updateValidMoves();
+    updateTurnStatus();
+    updatePassButton();
+  }
+}
+
+function passMove() {
+  if (!gameState.gameStarted || gameState.gameOver) return;
+  if (gameState.currentTurn !== self_con_id) return;
+  
+  gameState.passes++;
+  
+  const playerIds = Object.keys(gameState.players);
+  const currentIndex = playerIds.indexOf(gameState.currentTurn);
+  const nextTurn = playerIds[(currentIndex + 1) % playerIds.length];
+  
+  // Check if game is over (both players passed)
+  const nextPlayerStone = gameState.players[nextTurn].stone;
+  const nextHasValidMoves = hasValidMoves(nextPlayerStone);
+  
+  let gameOver = false;
+  let finalNextTurn = nextTurn;
+  
+  if (!nextHasValidMoves) {
+    // Both players have no moves, game over
+    gameOver = true;
+    finalNextTurn = null;
+  }
+  
+  gameState.currentTurn = finalNextTurn;
+  
+  if (gameOver) {
+    gameState.gameOver = true;
+  }
+  
+  sendGameMessage({
+    action: 'pass',
+    player: self_con_id,
+    nextTurn: finalNextTurn,
+    gameOver
+  });
+  
+  if (gameOver) {
+    setTimeout(() => showGameOver(), 500);
+  } else {
+    updateValidMoves();
+    updateTurnStatus();
+    updatePassButton();
+  }
+  
+  drawBoard();
+}
+
+function updateValidMoves() {
+  gameState.validMoves = [];
+  
+  if (!gameState.currentTurn || gameState.gameOver) return;
+  
+  const currentStone = gameState.players[gameState.currentTurn].stone;
+  
+  for (let row = 0; row < BOARD_SIZE; row++) {
+    for (let col = 0; col < BOARD_SIZE; col++) {
+      if (gameState.board[row][col] === null && isValidMove(row, col, currentStone)) {
+        gameState.validMoves.push({ row, col });
+      }
+    }
+  }
+}
+
+function updatePassButton() {
+  const passBtn = document.getElementById('pass_btn');
+  
+  if (gameState.currentTurn === self_con_id && 
+      gameState.gameStarted && 
+      !gameState.gameOver &&
+      gameState.validMoves.length === 0) {
+    passBtn.disabled = false;
+  } else {
+    passBtn.disabled = true;
+  }
+}
+
+function isValidMove(row, col, stone) {
+  if (!stone && gameState.currentTurn) {
+    stone = gameState.players[gameState.currentTurn].stone;
+  }
+  
+  if (!stone || gameState.board[row][col] !== null) return false;
+  
+  const flips = getFlippedStones(row, col, stone);
+  return flips.length > 0;
+}
+
+function hasValidMoves(stone) {
+  for (let row = 0; row < BOARD_SIZE; row++) {
+    for (let col = 0; col < BOARD_SIZE; col++) {
+      if (gameState.board[row][col] === null && isValidMove(row, col, stone)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function getFlippedStones(row, col, stone) {
+  const opponent = stone === STONE_BLACK ? STONE_WHITE : STONE_BLACK;
+  const flips = [];
+  
+  const directions = [
+    [-1, -1], [-1, 0], [-1, 1],
+    [0, -1],           [0, 1],
+    [1, -1],  [1, 0],  [1, 1]
+  ];
+  
+  for (let [dr, dc] of directions) {
+    const lineFlips = [];
+    let r = row + dr;
+    let c = col + dc;
+    
+    // Look for opponent stones
+    while (r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE && 
+           gameState.board[r][c] === opponent) {
+      lineFlips.push({ row: r, col: c });
+      r += dr;
+      c += dc;
+    }
+    
+    // If we end on our stone and have opponent stones in between
+    if (lineFlips.length > 0 && 
+        r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE && 
+        gameState.board[r][c] === stone) {
+      flips.push(...lineFlips);
+    }
+  }
+  
+  return flips;
+}
+
+function updateAnimations() {
+  let needsRedraw = false;
+  
+  for (let i = animatingFlips.length - 1; i >= 0; i--) {
+    animatingFlips[i].progress += 0.15;
+    
+    if (animatingFlips[i].progress >= 1) {
+      animatingFlips.splice(i, 1);
+    }
+    
+    needsRedraw = true;
+  }
+  
+  if (needsRedraw) {
+    drawBoard();
+  }
+}
+
+function drawBoard() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // Draw grid
+  ctx.strokeStyle = '#145028';
+  ctx.lineWidth = LINE_WIDTH;
+  
+  for (let i = 0; i <= BOARD_SIZE; i++) {
+    ctx.beginPath();
+    ctx.moveTo(i * CELL_SIZE, 0);
+    ctx.lineTo(i * CELL_SIZE, BOARD_SIZE * CELL_SIZE);
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.moveTo(0, i * CELL_SIZE);
+    ctx.lineTo(BOARD_SIZE * CELL_SIZE, i * CELL_SIZE);
+    ctx.stroke();
+  }
+  
+  // Draw valid move hints
+  if (showHints && gameState.currentTurn === self_con_id && !gameState.gameOver) {
+    gameState.validMoves.forEach(move => {
+      const x = move.col * CELL_SIZE + CELL_SIZE / 2;
+      const y = move.row * CELL_SIZE + CELL_SIZE / 2;
+      
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.beginPath();
+      ctx.arc(x, y, 12, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+  
+  // Draw stones
+  for (let row = 0; row < BOARD_SIZE; row++) {
+    for (let col = 0; col < BOARD_SIZE; col++) {
+      const stone = gameState.board[row][col];
+      
+      if (stone) {
+        const x = col * CELL_SIZE + CELL_SIZE / 2;
+        const y = row * CELL_SIZE + CELL_SIZE / 2;
+        
+        // Check if this stone is animating
+        const anim = animatingFlips.find(a => a.row === row && a.col === col);
+        
+        if (anim) {
+          drawFlippingStone(x, y, anim);
+        } else {
+          drawStone(x, y, stone);
+        }
+        
+        // Highlight last move
+        if (gameState.lastMove && 
+            gameState.lastMove.row === row && 
+            gameState.lastMove.col === col) {
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(x, y, STONE_RADIUS + 4, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+    }
+  }
+}
+
+function drawStone(x, y, color) {
+  // Shadow
+  ctx.beginPath();
+  ctx.arc(x + 2, y + 2, STONE_RADIUS, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.fill();
+  
+  // Stone
+  ctx.beginPath();
+  ctx.arc(x, y, STONE_RADIUS, 0, Math.PI * 2);
+  
+  const gradient = ctx.createRadialGradient(
+    x - 8, y - 8, 0,
+    x, y, STONE_RADIUS
+  );
+  
+  if (color === STONE_BLACK) {
+    gradient.addColorStop(0, '#4a4a4a');
+    gradient.addColorStop(1, '#1a1a1a');
+  } else {
+    gradient.addColorStop(0, '#ffffff');
+    gradient.addColorStop(1, '#dcdcdc');
+  }
+  
+  ctx.fillStyle = gradient;
+  ctx.fill();
+  
+  ctx.strokeStyle = color === STONE_BLACK ? '#000' : '#bbb';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+function drawFlippingStone(x, y, anim) {
+  const progress = anim.progress;
+  const scale = Math.abs(Math.cos(progress * Math.PI));
+  const currentColor = progress < 0.5 ? anim.fromColor : anim.toColor;
+  
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, 1);
+  ctx.translate(-x, -y);
+  
+  drawStone(x, y, currentColor);
+  
+  ctx.restore();
+}
+
+function updateScores() {
+  let blackCount = 0;
+  let whiteCount = 0;
+  
+  for (let row = 0; row < BOARD_SIZE; row++) {
+    for (let col = 0; col < BOARD_SIZE; col++) {
+      if (gameState.board[row][col] === STONE_BLACK) blackCount++;
+      else if (gameState.board[row][col] === STONE_WHITE) whiteCount++;
+    }
+  }
+  
+  document.getElementById('black-count').textContent = blackCount;
+  document.getElementById('white-count').textContent = whiteCount;
+  
+  // Highlight current player's score
+  const blackBox = document.getElementById('black-score');
+  const whiteBox = document.getElementById('white-score');
+  
+  blackBox.classList.remove('active');
+  whiteBox.classList.remove('active');
+  
+  if (gameState.currentTurn && gameState.players[gameState.currentTurn]) {
+    const currentStone = gameState.players[gameState.currentTurn].stone;
+    if (currentStone === STONE_BLACK) {
+      blackBox.classList.add('active');
+    } else {
+      whiteBox.classList.add('active');
+    }
+  }
+}
+
+function updatePlayers() {
+  const playersDiv = document.getElementById('players');
+  playersDiv.innerHTML = '<h3 style="margin-top: 0;">プレイヤー</h3>';
+  
+  for (let playerId in gameState.players) {
+    const player = gameState.players[playerId];
+    const isActive = gameState.currentTurn === playerId;
+    const isSelf = playerId === self_con_id;
+    
+    const div = document.createElement('div');
+    div.className = 'player-info' + (isActive ? ' active' : '');
+    
+    const left = document.createElement('div');
+    left.className = 'player-left';
+    
+    const stone = document.createElement('div');
+    stone.className = 'player-stone ' + player.stone;
+    stone.style.background = player.stone === STONE_BLACK ? 
+      'radial-gradient(circle at 30% 30%, #4a4a4a, #1a1a1a)' :
+      'radial-gradient(circle at 30% 30%, #ffffff, #dcdcdc)';
+    
+    const name = document.createElement('span');
+    name.textContent = (player.stone === STONE_BLACK ? '⚫ ' : '⚪ ') + 
+                       player.name + (isSelf ? ' (あなた)' : '');
+    
+    left.appendChild(stone);
+    left.appendChild(name);
+    div.appendChild(left);
+    playersDiv.appendChild(div);
+  }
+  
+  const playerCount = Object.keys(gameState.players).length;
+  if (!gameState.gameStarted && playerCount === 1) {
+    const waiting = document.createElement('div');
+    waiting.style.marginTop = '12px';
+    waiting.style.textAlign = 'center';
+    waiting.style.color = '#666';
+    waiting.textContent = '対戦相手を待っています...';
+    playersDiv.appendChild(waiting);
+  } else if (!gameState.gameStarted && playerCount === 2) {
+    const startBtn = document.createElement('button');
+    startBtn.className = 'btn';
+    startBtn.textContent = 'ゲーム開始';
+    startBtn.style.width = '100%';
+    startBtn.style.marginTop = '12px';
+    startBtn.onclick = startGame;
+    playersDiv.appendChild(startBtn);
+  }
+}
+
+function updateTurnStatus() {
+  if (!gameState.gameStarted) {
+    updateStatus('プレイヤーを待っています...');
+    return;
+  }
+  
+  if (gameState.gameOver) {
+    updateStatus('ゲーム終了');
+    return;
+  }
+  
+  const currentPlayer = gameState.players[gameState.currentTurn];
+  if (gameState.currentTurn === self_con_id) {
+    const myStone = currentPlayer.stone === STONE_BLACK ? '⚫' : '⚪';
+    if (gameState.validMoves.length === 0) {
+      updateStatus(myStone + ' あなたのターンですが、置ける場所がありません（パス）');
+    } else {
+      updateStatus(myStone + ' あなたのターンです！');
+    }
+  } else if (currentPlayer) {
+    const opponentStone = currentPlayer.stone === STONE_BLACK ? '⚫' : '⚪';
+    updateStatus(opponentStone + ' ' + currentPlayer.name + ' のターン');
+  }
+}
+
+function updateStatus(message) {
+  document.getElementById('status').textContent = message;
+}
+
+function showGameOver() {
+  let blackCount = 0;
+  let whiteCount = 0;
+  
+  for (let row = 0; row < BOARD_SIZE; row++) {
+    for (let col = 0; col < BOARD_SIZE; col++) {
+      if (gameState.board[row][col] === STONE_BLACK) blackCount++;
+      else if (gameState.board[row][col] === STONE_WHITE) whiteCount++;
+    }
+  }
+  
+  const winnerText = document.getElementById('winner-text');
+  const finalScore = document.getElementById('final-score');
+  
+  let winnerMessage = '';
+  
+  if (blackCount > whiteCount) {
+    const blackPlayer = Object.entries(gameState.players).find(([id, p]) => p.stone === STONE_BLACK);
+    if (blackPlayer) {
+      const [winnerId, winnerData] = blackPlayer;
+      winnerMessage = '⚫ ' + (winnerId === self_con_id ? 'あなた' : winnerData.name) + ' の勝利！';
+    }
+  } else if (whiteCount > blackCount) {
+    const whitePlayer = Object.entries(gameState.players).find(([id, p]) => p.stone === STONE_WHITE);
+    if (whitePlayer) {
+      const [winnerId, winnerData] = whitePlayer;
+      winnerMessage = '⚪ ' + (winnerId === self_con_id ? 'あなた' : winnerData.name) + ' の勝利！';
+    }
+  } else {
+    winnerMessage = '引き分け！';
+  }
+  
+  winnerText.textContent = winnerMessage;
+  finalScore.textContent = `⚫ ${blackCount} - ${whiteCount} ⚪`;
+  
+  document.getElementById('game-over').classList.add('show');
+}
+
+function closeGameOver() {
+  document.getElementById('game-over').classList.remove('show');
+}
+
+function sendGameMessage(payload) {
+  payload.game = 'reversi';
+  ws_socket.send(JSON.stringify(payload));
+}
+
+// Room management
+function createRoom() {
+  const roomId = document.getElementById('room_id').value;
+  if (!roomId) return;
+  
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', 'http://localhost:4444/api/v1/room/create', true);
+  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+  xhr.onreadystatechange = function() {
+    if (xhr.readyState === 4 && xhr.status === 200) {
+      const json = JSON.parse(xhr.responseText);
+      document.getElementById('room_id').value = json.id;
+      updateStatus('部屋を作成しました: ' + json.id);
+      setTimeout(() => joinRoom(), 100);
+    }
+  };
+  xhr.send('name=' + roomId);
+}
+
+function joinRoom() {
+  const roomId = document.getElementById('room_id').value;
+  if (!roomId || !self_con_id) return;
+  
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', 'http://localhost:4444/api/v1/room/join', true);
+  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+  xhr.onreadystatechange = function() {
+    if (xhr.readyState === 4 && xhr.status === 200) {
+      current_join_room_id = roomId;
+      updateStatus('部屋に参加しました: ' + roomId);
+      
+      const playerCount = Object.keys(gameState.players).length;
+      if (!gameState.players[self_con_id] && playerCount < 2) {
+        const stoneColor = playerCount === 0 ? STONE_BLACK : STONE_WHITE;
+        gameState.players[self_con_id] = {
+          stone: stoneColor,
+          name: 'Player ' + self_con_id.substring(0, 6)
+        };
+      }
+      
+      updatePlayers();
+      
+      if (Object.keys(gameState.players).length === 2 && !gameState.gameStarted) {
+        setTimeout(() => startGame(), 500);
+      }
+    }
+  };
+  xhr.send('room_id=' + roomId + '&connection_id=' + self_con_id);
+}
+
+function leaveRoom() {
+  if (!current_join_room_id || !self_con_id) return;
+  
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', 'http://localhost:4444/api/v1/room/leave', true);
+  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+  xhr.onreadystatechange = function() {
+    if (xhr.readyState === 4 && xhr.status === 200) {
+      updateStatus('部屋を退出しました');
+      current_join_room_id = '';
+      
+      resetGameState();
+      gameState.players = {};
+      
+      drawBoard();
+      updatePlayers();
+      updateScores();
+      updatePassButton();
+    }
+  };
+  xhr.send('room_id=' + current_join_room_id + '&connection_id=' + self_con_id);
+}
+
+function listRooms() {
+  const xhr = new XMLHttpRequest();
+  xhr.open('GET', 'http://localhost:4444/api/v1/room/list', true);
+  xhr.onreadystatechange = function() {
+    if (xhr.readyState === 4 && xhr.status === 200) {
+      const json = JSON.parse(xhr.responseText);
+      if (json.list && json.list.length > 0) {
+        const roomId = json.list[0].id;
+        document.getElementById('room_id').value = roomId;
+        updateStatus('部屋一覧を取得しました');
+      } else {
+        updateStatus('利用可能な部屋がありません');
+      }
+    }
+  };
+  xhr.send();
+}
+</script>
+</body>
+</html>
