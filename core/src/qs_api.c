@@ -1209,7 +1209,7 @@ void api_qs_exec_http(QS_RECV_INFO *rinfo)
 		if(!strcmp(api_qs_get_http_method(&params),"POST")||!strcmp(api_qs_get_http_method(&params),"GET")){
 			if(!strcmp(api_qs_get_http_path(&params),"/api/v1/room/list")){
 				if(0==api_qs_room_list(context,&memory,&object)){
-					http_status_code = api_qs_http_response_json(&params,&object,1024*8);
+					http_status_code = api_qs_http_response_json(&params,&object,SIZE_MBYTE);
 				}
 			}
 		}
