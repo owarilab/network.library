@@ -115,6 +115,10 @@ UNITY_INTERFACE_EXPORT char* UNITY_INTERFACE_API libqs_api_get_http_path(void* h
 {
 	return api_qs_get_http_path(http_request_parameter);
 }
+UNITY_INTERFACE_EXPORT char* UNITY_INTERFACE_API libqs_api_get_http_cookie_parameter(void* http_request_parameter, char* name)
+{
+	return api_qs_get_http_cookie_parameter(http_request_parameter, name);
+}
 UNITY_INTERFACE_EXPORT char* UNITY_INTERFACE_API libqs_api_get_http_get_parameter(void* http_request_parameter, char* name)
 {
 	return api_qs_get_http_get_parameter(http_request_parameter, name);

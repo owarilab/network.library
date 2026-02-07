@@ -49,6 +49,7 @@ UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_send_http_response_json
 
 UNITY_INTERFACE_EXPORT char* UNITY_INTERFACE_API libqs_api_get_http_method(void* http_request_parameter);
 UNITY_INTERFACE_EXPORT char* UNITY_INTERFACE_API libqs_api_get_http_path(void* http_request_parameter);
+UNITY_INTERFACE_EXPORT char* UNITY_INTERFACE_API libqs_api_get_http_cookie_parameter(void* http_request_parameter, char* name);
 UNITY_INTERFACE_EXPORT char* UNITY_INTERFACE_API libqs_api_get_http_get_parameter(void* http_request_parameter, char* name);
 UNITY_INTERFACE_EXPORT char* UNITY_INTERFACE_API libqs_api_get_http_post_parameter(void* http_request_parameter, char* name);
 UNITY_INTERFACE_EXPORT char* UNITY_INTERFACE_API libqs_api_get_http_post_body(void* http_request_parameter);
