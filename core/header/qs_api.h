@@ -205,6 +205,7 @@ int api_qs_send_ws_message_plane(QS_EVENT_PARAMETER params,const char* message);
 
 char* api_qs_get_http_method(QS_EVENT_PARAMETER params);
 char* api_qs_get_http_path(QS_EVENT_PARAMETER params);
+char* api_qs_get_http_cookie_parameter(QS_EVENT_PARAMETER params, const char* name);
 char* api_qs_get_http_get_parameter(QS_EVENT_PARAMETER params, const char* name);
 char* api_qs_get_http_post_parameter(QS_EVENT_PARAMETER params, const char* name);
 char* api_qs_get_http_post_body(QS_EVENT_PARAMETER params);

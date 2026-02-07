@@ -46,6 +46,7 @@ typedef struct QS_HTTP_REQUEST_COMMON
 	QS_MEMORY_POOL * temporary_memory;
 	int32_t memid_get_parameter_hash;
 	int32_t memid_post_parameter_hash;
+	int32_t memid_cookie_hash;
 	int32_t http_status_code;
 	char *method;
 	char *request;
@@ -57,6 +58,7 @@ typedef struct QS_HTTP_REQUEST_COMMON
 	char *request_path;
 	char *extension;
 	char *from_ip;
+	char *cookie;
 	QS_FILE_INFO file_info;
 } QS_HTTP_REQUEST_COMMON;
 
@@ -83,8 +85,10 @@ int qs_http_parser( QS_RECV_INFO *rinfo );
 int qs_http_parse_header( QS_RECV_INFO *rinfo, int skip_head );
 size_t qs_http_add_response_common(char* dest, size_t dest_size, int http_response_code, char* content_type, size_t content_length);
 size_t qs_http_add_cache_control(char* dest, size_t dest_size, size_t start, int max_age, QS_FILE_INFO* info);
+size_t qs_http_add_cookie(char* dest, size_t dest_size, size_t start, const char* cookie_name, const char* cookie_value, const char* path, const char* domain, int max_age, int secure, int http_only);
 size_t qs_http_document_path(char* dest, size_t dest_size,char* document_root, char* default_file, char* path);
 int32_t qs_http_parse_request_parameter(QS_MEMORY_POOL * memory,char *get_params, size_t buffer_size);
+int32_t qs_http_parse_cookie_parameter(QS_MEMORY_POOL * memory,char *cookie_params, size_t buffer_size);
 int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_request, QS_MEMORY_POOL* temporary_memory);
 int32_t http_json_response_common(QS_SERVER_CONNECTION_INFO * connection, QS_SOCKET_OPTION* option,QS_MEMORY_POOL* temporary_memory,int32_t memid_response_hash, size_t json_buffer_size);
 int32_t http_json_response_send(QS_SERVER_CONNECTION_INFO * connection, QS_SOCKET_OPTION* option,QS_MEMORY_POOL* temporary_memory,char* json);

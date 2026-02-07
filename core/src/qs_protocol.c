@@ -458,6 +458,45 @@ size_t qs_http_add_response_common(char* dest, size_t dest_size, int http_respon
 	return len;
 }
 
+size_t qs_http_add_cookie(char* dest, size_t dest_size, size_t start, const char* cookie_name, const char* cookie_value, const char* path, const char* domain, int max_age, int secure, int http_only)
+{
+	size_t len = start;
+	char* http_set_cookie = "Set-Cookie: ";
+	char cookie_buffer[1024];
+	len = qs_strlink( dest, len, http_set_cookie, qs_strlen(http_set_cookie), dest_size );
+	// cookie name and value
+	snprintf( cookie_buffer, sizeof(cookie_buffer), "%s=%s;", cookie_name, cookie_value );
+	len = qs_strlink( dest, len, cookie_buffer, qs_strlen(cookie_buffer), dest_size );
+	// path
+	if( path != NULL ){
+		snprintf( cookie_buffer, sizeof(cookie_buffer), " Path=%s;", path );
+		len = qs_strlink( dest, len, cookie_buffer, qs_strlen(cookie_buffer), dest_size );
+	}
+	// domain
+	if( domain != NULL ){
+		snprintf( cookie_buffer, sizeof(cookie_buffer), " Domain=%s;", domain );
+		len = qs_strlink( dest, len, cookie_buffer, qs_strlen(cookie_buffer), dest_size );
+	}
+	// max-age
+	if( max_age >= 0 ){
+		snprintf( cookie_buffer, sizeof(cookie_buffer), " Max-Age=%d;", max_age );
+		len = qs_strlink( dest, len, cookie_buffer, qs_strlen(cookie_buffer), dest_size );
+	}
+	// secure
+	if( secure ){
+		snprintf( cookie_buffer, sizeof(cookie_buffer), " Secure;" );
+		len = qs_strlink( dest, len, cookie_buffer, qs_strlen(cookie_buffer), dest_size );
+	}
+	// http only
+	if( http_only ){
+		snprintf( cookie_buffer, sizeof(cookie_buffer), " HttpOnly;" );
+		len = qs_strlink( dest, len, cookie_buffer, qs_strlen(cookie_buffer), dest_size );
+	}
+	// end
+	len = qs_strlink( dest, len, "\r\n", 2, dest_size );
+	return len;
+}
+
 size_t qs_http_add_cache_control(char* dest, size_t dest_size, size_t start, int max_age, QS_FILE_INFO* info)
 {
 	size_t len = start;
@@ -536,6 +575,56 @@ int32_t qs_http_parse_request_parameter(QS_MEMORY_POOL * memory,char *get_params
 	return memid_get_parameter_hash;
 }
 
+int32_t qs_http_parse_cookie_parameter(QS_MEMORY_POOL * memory,char *cookie_params, size_t buffer_size)
+{
+	// example : locale=ja-JP; sessionid=1234567890; sessionid1=aaa; sessionid2=bbb; sessionid3=ccc
+	int32_t memid_cookie_parameter_hash = -1;
+	do{
+		if(NULL==cookie_params){
+			break;
+		}
+		char* pparam = cookie_params;
+		char param_name[1024];
+		int32_t memid_value = qs_create_memory_block(memory,buffer_size);
+		if( -1 == memid_value ){
+			break;
+		}
+		int32_t memid_decode = qs_create_memory_block(memory,buffer_size);
+		if( -1 == memid_decode ){
+			break;
+		}
+		char *param_value = (char*)QS_GET_POINTER(memory,memid_value);
+		char *param_urldecode = (char*)QS_GET_POINTER(memory,memid_decode);
+		if( -1 == ( memid_cookie_parameter_hash = qs_create_hash( memory, 32 ) ) ){
+			break;
+		}
+		for(;*pparam != '\0';){
+			while( *pparam == ' ' || *pparam == ';' ){
+				pparam++;
+			}
+			if( *pparam == '\0' ){
+				break;
+			}
+			pparam = qs_read_line_delimiter( param_name, qs_usize(memory,memid_value), pparam, '=' );
+			pparam = qs_read_line_delimiter( param_value, qs_usize(memory,memid_decode), pparam, ';' );
+			size_t name_len = qs_strlen(param_name);
+			while( name_len > 0 && param_name[name_len-1] == ' ' ){
+				param_name[--name_len] = '\0';
+			}
+			size_t value_len = qs_strlen(param_value);
+			while( value_len > 0 && param_value[value_len-1] == ' ' ){
+				param_value[--value_len] = '\0';
+			}
+			if( name_len == 0 ){
+				continue;
+			}
+			qs_urldecode( param_urldecode, qs_usize(memory,memid_decode), param_value );
+			qs_add_hash_value( memory, memid_cookie_parameter_hash, param_name, param_urldecode,ELEMENT_LITERAL_STR );
+		}
+	}while(false);
+	return memid_cookie_parameter_hash;
+}
+
 int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_request, QS_MEMORY_POOL* temporary_memory)
 {
 	http_request->http_status_code = 500;
@@ -561,6 +650,7 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 	http_request->http_version = dummy_string;
 	http_request->user_agent = dummy_string;
 	http_request->from_ip = tinfo->hbuf;
+	http_request->cookie = dummy_string;
 	int32_t memid_http_method = qs_get_hash(con_memory, memid_headers, "HTTP_METHOD");
 	int32_t memid_request = qs_get_hash( con_memory, memid_headers, "REQUEST" );
 	int32_t memid_get_params = qs_get_hash( con_memory, memid_headers, "GET_PARAMS" );
@@ -568,6 +658,7 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 	int32_t memid_cache_control = qs_get_hash( con_memory, memid_headers, "Cache-Control" );
 	int32_t memid_http_version = qs_get_hash( con_memory, memid_headers, "HTTP_VERSION" );
 	int32_t memid_user_agent = qs_get_hash( con_memory, memid_headers, "User-Agent" );
+	int32_t memid_cookie = qs_get_hash( con_memory, memid_headers, "Cookie" );
 	if(-1!=memid_http_method){
 		http_request->method = (char*)QS_GET_POINTER(con_memory,memid_http_method);
 	}
@@ -588,6 +679,9 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 	}
 	if(-1!=memid_user_agent){
 		http_request->user_agent = (char*)QS_GET_POINTER(con_memory,memid_user_agent);
+	}
+	if(-1!=memid_cookie){
+		http_request->cookie = (char*)QS_GET_POINTER(con_memory,memid_cookie);
 	}
 	// printf("method : %s , request : %s\n",http_request->method,http_request->request);
 
@@ -640,6 +734,13 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 		//printf("post params\n");
 		//qs_hash_dump(temporary_memory, http_request->memid_post_parameter_hash,0);
 	}
+	http_request->memid_cookie_hash = -1;
+	if( strcmp("",http_request->cookie) ){
+		// parse cookie
+		http_request->memid_cookie_hash = qs_http_parse_cookie_parameter(temporary_memory, http_request->cookie, SIZE_KBYTE * 64);
+		//printf("cookie : %s\n",http_request->cookie);
+		//qs_hash_dump(temporary_memory, http_request->memid_cookie_hash,0);
+	}
 
 	do{
 		if( QS_SYSTEM_ERROR == qs_fget_info( http_request->request_path, &http_request->file_info ) ){
@@ -663,6 +764,11 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 			http_request->http_status_code = 200;
 			response_len = qs_http_add_response_common(response_buffer,response_buffer_size,http_request->http_status_code,"text/html",http_request->file_info.size);
 			response_len = qs_http_add_cache_control(response_buffer, response_buffer_size, response_len, 30, &http_request->file_info);
+			
+			// test set cookie
+			//response_len = qs_http_add_cookie(response_buffer, response_buffer_size, response_len, "sessionid1", "aaa", "/", NULL, 3600, 0, 1);
+			//response_len = qs_http_add_cookie(response_buffer, response_buffer_size, response_len, "sessionid2", "bbb", "/", NULL, 3600, 0, 1);
+			//response_len = qs_http_add_cookie(response_buffer, response_buffer_size, response_len, "sessionid3", "ccc", "/", NULL, 3600, 0, 1);
 		}
 		else if( !strcmp(http_request->extension,"css"))
 		{

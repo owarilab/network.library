@@ -1492,6 +1492,22 @@ char* api_qs_get_http_path(QS_EVENT_PARAMETER params)
 	QS_HTTP_REQUEST_COMMON* http_request = (QS_HTTP_REQUEST_COMMON*)context->system_data;
 	return http_request->request;
 }
+char* api_qs_get_http_cookie_parameter(QS_EVENT_PARAMETER params, const char* name)
+{
+	QS_RECV_INFO *rinfo = (QS_RECV_INFO *)params->params;
+	QS_SERVER_CONNECTION_INFO * tinfo = (QS_SERVER_CONNECTION_INFO *)rinfo->tinfo;
+	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
+	QS_SERVER_CONTEXT* context = (QS_SERVER_CONTEXT*)option->application_data;
+	QS_HTTP_REQUEST_COMMON* http_request = (QS_HTTP_REQUEST_COMMON*)context->system_data;
+	if (-1 == http_request->memid_cookie_hash) {
+		return NULL;
+	}
+	if (-1 == qs_get_hash(http_request->temporary_memory, http_request->memid_cookie_hash, name)) {
+		return NULL;
+	}
+	char* value = (char*)QS_GET_POINTER(http_request->temporary_memory, qs_get_hash(http_request->temporary_memory, http_request->memid_cookie_hash, name));
+	return value;
+}
 char* api_qs_get_http_get_parameter(QS_EVENT_PARAMETER params, const char* name)
 {
 	QS_RECV_INFO *rinfo = (QS_RECV_INFO *)params->params;
