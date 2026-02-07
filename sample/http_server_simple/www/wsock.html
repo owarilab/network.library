@@ -9,6 +9,7 @@
 var ws_socket = null;
 var self_uuid = '';
 var self_con_id = '';
+var current_join_room_id = '';
 window.onload=function()
 {
 	ws_socket = new WebSocket('ws://localhost:4444');
@@ -28,8 +29,6 @@ window.onload=function()
 					// echo back
 					if(json.message === self_uuid){
 						self_con_id = con_id;
-						// find room and join or create
-						room_list(con_id);
 					}
 				} else if(json.type === 'join'){
 					// join other user
@@ -48,6 +47,10 @@ window.onload=function()
 			console.log('error : ', e);
 		}
 	});
+	ws_socket.addEventListener('close', function (event) {
+		console.log('ws closed');
+		current_join_room_id = '';
+	});
 }
 function room_list(con_id)
 {
@@ -61,18 +64,17 @@ function room_list(con_id)
 				let is_join = false;
 				if(json.list !== undefined)
 				{
+					let room_list_div = document.getElementById('room_list');
+					let room_join_id = '';
+					room_list_div.innerHTML = '';
 					for(let i=0; i<json.list.length; i++)
 					{
 						let room_id = json.list[i].id;
-						room_join(room_id,con_id);
-						is_join = true;
-						break;
+						room_list_div.innerHTML += 'Room ID: ' + room_id + '<br>';
+						room_join_id = room_id;
 					}
-				}
-
-				if(!is_join)
-				{
-					room_create('test_room', con_id);
+					let room_join_id_input = document.getElementById('join_room_id');
+					room_join_id_input.value = room_join_id;
 				}
 			}
 		}
@@ -90,7 +92,9 @@ function room_create(room_name, con_id)
 				console.log('room create response : ', xhr.responseText);
 				let json = JSON.parse(xhr.responseText);
 				let room_id = json.id;
-				room_join(room_id,con_id);
+				console.log('created room id : ', room_id);
+				let room_join_id_input = document.getElementById('join_room_id');
+				room_join_id_input.value = room_id;
 			}
 		}
 	};
@@ -105,6 +109,22 @@ function room_join(room_id,con_id)
 		if (xhr.readyState === 4) {
 			if (xhr.status === 200) {
 				console.log('room join response : ', xhr.responseText);
+				current_join_room_id = room_id;
+			}
+		}
+	};
+	xhr.send('room_id=' + room_id + '&connection_id=' + con_id);
+}
+function room_leave(room_id,con_id)
+{
+	let xhr = new XMLHttpRequest();
+	xhr.open('POST', 'http://localhost:4444/api/v1/room/leave', true);
+	xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+	xhr.onreadystatechange = function() {
+		if (xhr.readyState === 4) {
+			if (xhr.status === 200) {
+				console.log('room leave response : ', xhr.responseText);
+				current_join_room_id = '';
 			}
 		}
 	};
@@ -113,5 +133,24 @@ function room_join(room_id,con_id)
 </script>
 </head>
 <body style="padding:0;margin:0">
+	<button onclick="room_list(self_con_id)">room list</button>
+	<form id="send_message_form">
+		Message: <input type="text" id="send_message" value="hello server">
+		<button type="button" onclick="ws_socket.send(document.getElementById('send_message').value)">send</button>
+	</form>
+	<form id="room_create_form">
+		Room ID: <input type="text" id="room_id" value="test_room">
+		<button type="button" onclick="room_create(document.getElementById('room_id').value, self_con_id)">room create</button>
+	</form>
+	<form id="room_join_form">
+		Room ID: <input type="text" id="join_room_id" value="">
+		<button type="button" onclick="room_join(document.getElementById('join_room_id').value, self_con_id)">room join</button>
+	</form>
+	<button onclick="room_leave(current_join_room_id, self_con_id)">room leave</button>
+	<br><br>
+	<div>
+		Room List:<br>
+		<div id="room_list"></div>
+	</div>
 </body>
 </html>
