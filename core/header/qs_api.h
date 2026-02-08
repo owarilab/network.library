@@ -231,8 +231,22 @@ char* api_qs_script_get_parameter(QS_SERVER_SCRIPT_CONTEXT* script_context, cons
 
 int api_qs_kvs_create_b1mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context);
 int api_qs_kvs_create_b8mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context);
+int api_qs_kvs_create_b16mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context);
+int api_qs_kvs_create_b32mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context);
+int api_qs_kvs_create_b64mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context);
+int api_qs_kvs_create_b128mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context);
+int api_qs_kvs_create_b256mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context);
+int api_qs_kvs_create_b512mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context);
+int api_qs_kvs_create_b1024mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context);
 int api_qs_kvs_create_b1mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path);
 int api_qs_kvs_create_b8mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path);
+int api_qs_kvs_create_b16mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path);
+int api_qs_kvs_create_b32mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path);
+int api_qs_kvs_create_b64mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path);
+int api_qs_kvs_create_b128mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path);
+int api_qs_kvs_create_b256mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path);
+int api_qs_kvs_create_b512mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path);
+int api_qs_kvs_create_b1024mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path);
 int api_qs_kvs_set(QS_KVS_CONTEXT* kvs_context,const char* key, const char* value, int32_t life_time);
 char* api_qs_kvs_get(QS_KVS_CONTEXT* kvs_context,const char* key);
 size_t api_qs_kvs_get_buffer_size(QS_KVS_CONTEXT* kvs_context,const char* key);

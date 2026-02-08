@@ -1770,6 +1770,54 @@ char* api_qs_script_get_parameter(QS_SERVER_SCRIPT_CONTEXT* script_context, cons
 	}
 	return (char*)QS_GET_POINTER(script_memory,memid_parameter);
 }
+static int api_qs_kvs_create_custom(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context, size_t alloc_size, size_t key_size, size_t hash_size, size_t cache_size)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)memory_context->memory;
+	kvs_context->memid_kvs_memory = qs_create_mini_memory(memory, alloc_size);
+	if(-1 == kvs_context->memid_kvs_memory){
+		return -1;
+	}
+	QS_MEMORY_POOL* cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(memory,kvs_context->memid_kvs_memory);
+	size_t chain_allocate_size = cache_size * (key_size + 20);
+	size_t available_size = qs_memory_available_size(cache_memory);
+	if(available_size <= chain_allocate_size + SIZE_KBYTE * 8){
+		return -1;
+	}
+	size_t page_allocate_size = (available_size - (chain_allocate_size + SIZE_KBYTE * 8)) / 2;
+	if(page_allocate_size == 0){
+		return -1;
+	}
+	kvs_context->memid_kvs = qs_create_cache(cache_memory,chain_allocate_size,cache_size,page_allocate_size,hash_size,key_size);
+	if(-1 == kvs_context->memid_kvs) {
+		return -1;
+	}
+	kvs_context->memory = (void*)memory;
+	memset(kvs_context->persistence_file_path,0,sizeof(kvs_context->persistence_file_path));
+	kvs_context->is_persistence = false;
+	return 0;
+}
+static int api_qs_kvs_create_persistence_custom(QS_KVS_CONTEXT* kvs_context, const char* file_path, size_t total_size, size_t key_size, size_t hash_size, size_t cache_size)
+{
+	QS_MEMORY_POOL* memory = NULL;
+	size_t chain_allocate_size = (cache_size * (key_size + 8)) + SIZE_KBYTE;
+	if(total_size <= chain_allocate_size + SIZE_KBYTE * 4){
+		return -1;
+	}
+	size_t page_allocate_size = total_size - (chain_allocate_size + SIZE_KBYTE * 4);
+	if(page_allocate_size == 0){
+		return -1;
+	}
+	kvs_context->memid_kvs = qs_create_storage_cache(file_path,&memory,cache_size,page_allocate_size,hash_size,key_size);
+	if(-1 == kvs_context->memid_kvs) {
+		return -1;
+	}
+	kvs_context->memory = (void*)memory;
+	memset(kvs_context->persistence_file_path,0,sizeof(kvs_context->persistence_file_path));
+	snprintf(kvs_context->persistence_file_path,sizeof(kvs_context->persistence_file_path),"%s",file_path);
+	kvs_context->is_persistence = true;
+	kvs_context->memid_kvs_memory = -1;
+	return 0;
+}
 int api_qs_kvs_create_b1mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context)
 {
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)memory_context->memory;
@@ -1790,6 +1838,74 @@ int api_qs_kvs_create_b8mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kv
 	kvs_context->memid_kvs_memory = qs_create_mini_memory(memory, SIZE_MBYTE * 8);
 	QS_MEMORY_POOL* cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(memory,kvs_context->memid_kvs_memory);
 	kvs_context->memid_kvs = qs_create_cache_B8MB(cache_memory);
+	if(-1 == kvs_context->memid_kvs) {
+		return -1;
+	}
+	kvs_context->memory = (void*)memory;
+	memset(kvs_context->persistence_file_path,0,sizeof(kvs_context->persistence_file_path));
+	kvs_context->is_persistence = false;
+	return 0;
+}
+int api_qs_kvs_create_b16mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context)
+{
+	return api_qs_kvs_create_custom(memory_context, kvs_context, SIZE_MBYTE * 16, 64, 65536, 20000);
+}
+int api_qs_kvs_create_b32mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context)
+{
+	return api_qs_kvs_create_custom(memory_context, kvs_context, SIZE_MBYTE * 32, 64, 131072, 40000);
+}
+int api_qs_kvs_create_b64mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context)
+{
+	return api_qs_kvs_create_custom(memory_context, kvs_context, SIZE_MBYTE * 64, 64, 262144, 80000);
+}
+int api_qs_kvs_create_b128mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)memory_context->memory;
+	kvs_context->memid_kvs_memory = qs_create_mini_memory(memory, SIZE_MBYTE * 128);
+	QS_MEMORY_POOL* cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(memory,kvs_context->memid_kvs_memory);
+	kvs_context->memid_kvs = qs_create_cache_B128MB(cache_memory);
+	if(-1 == kvs_context->memid_kvs) {
+		return -1;
+	}
+	kvs_context->memory = (void*)memory;
+	memset(kvs_context->persistence_file_path,0,sizeof(kvs_context->persistence_file_path));
+	kvs_context->is_persistence = false;
+	return 0;
+}
+int api_qs_kvs_create_b256mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)memory_context->memory;
+	kvs_context->memid_kvs_memory = qs_create_mini_memory(memory, SIZE_MBYTE * 256);
+	QS_MEMORY_POOL* cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(memory,kvs_context->memid_kvs_memory);
+	kvs_context->memid_kvs = qs_create_cache_B256MB(cache_memory);
+	if(-1 == kvs_context->memid_kvs) {
+		return -1;
+	}
+	kvs_context->memory = (void*)memory;
+	memset(kvs_context->persistence_file_path,0,sizeof(kvs_context->persistence_file_path));
+	kvs_context->is_persistence = false;
+	return 0;
+}
+int api_qs_kvs_create_b512mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)memory_context->memory;
+	kvs_context->memid_kvs_memory = qs_create_mini_memory(memory, SIZE_MBYTE * 512);
+	QS_MEMORY_POOL* cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(memory,kvs_context->memid_kvs_memory);
+	kvs_context->memid_kvs = qs_create_cache_B512MB(cache_memory);
+	if(-1 == kvs_context->memid_kvs) {
+		return -1;
+	}
+	kvs_context->memory = (void*)memory;
+	memset(kvs_context->persistence_file_path,0,sizeof(kvs_context->persistence_file_path));
+	kvs_context->is_persistence = false;
+	return 0;
+}
+int api_qs_kvs_create_b1024mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)memory_context->memory;
+	kvs_context->memid_kvs_memory = qs_create_mini_memory(memory, SIZE_MBYTE * 1024);
+	QS_MEMORY_POOL* cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(memory,kvs_context->memid_kvs_memory);
+	kvs_context->memid_kvs = qs_create_cache_B1GB(cache_memory);
 	if(-1 == kvs_context->memid_kvs) {
 		return -1;
 	}
@@ -1825,6 +1941,34 @@ int api_qs_kvs_create_b8mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* 
 	kvs_context->is_persistence = true;
 	kvs_context->memid_kvs_memory = -1;
 	return 0;
+}
+int api_qs_kvs_create_b16mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path)
+{
+	return api_qs_kvs_create_persistence_custom(kvs_context, file_path, SIZE_MBYTE * 16, 64, 65536, 20000);
+}
+int api_qs_kvs_create_b32mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path)
+{
+	return api_qs_kvs_create_persistence_custom(kvs_context, file_path, SIZE_MBYTE * 32, 64, 131072, 40000);
+}
+int api_qs_kvs_create_b64mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path)
+{
+	return api_qs_kvs_create_persistence_custom(kvs_context, file_path, SIZE_MBYTE * 64, 64, 262144, 80000);
+}
+int api_qs_kvs_create_b128mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path)
+{
+	return api_qs_kvs_create_persistence_custom(kvs_context, file_path, SIZE_MBYTE * 128, 64, 1000000, 50000);
+}
+int api_qs_kvs_create_b256mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path)
+{
+	return api_qs_kvs_create_persistence_custom(kvs_context, file_path, SIZE_MBYTE * 256, 128, 1500000, 50000);
+}
+int api_qs_kvs_create_b512mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path)
+{
+	return api_qs_kvs_create_persistence_custom(kvs_context, file_path, SIZE_MBYTE * 512, 128, 1500000, 100000);
+}
+int api_qs_kvs_create_b1024mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path)
+{
+	return api_qs_kvs_create_persistence_custom(kvs_context, file_path, SIZE_MBYTE * 1024, 256, 5000000, 100000);
 }
 int api_qs_kvs_set(QS_KVS_CONTEXT* kvs_context,const char* key, const char* value, int32_t life_time)
 {
