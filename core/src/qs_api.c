@@ -2039,6 +2039,27 @@ int api_qs_kvs_delete(QS_KVS_CONTEXT* kvs_context,const char* key)
 	qs_get_cache_page(cache,&cache_page);
 	return qs_remove_hash(cache_page.memory,cache_page.hash_id,key);
 }
+int32_t api_qs_kvs_key_length(QS_KVS_CONTEXT* kvs_context)
+{
+	int32_t key_length = 0;
+	QS_MEMORY_POOL* cache_main_memory = (QS_MEMORY_POOL*)kvs_context->memory;
+	QS_MEMORY_POOL* cache_memory = NULL;
+	if(kvs_context->is_persistence){
+		cache_memory = cache_main_memory;
+	}else{
+		cache_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(cache_main_memory,kvs_context->memid_kvs_memory);
+	}
+	QS_CACHE* cache = (QS_CACHE*)QS_GET_POINTER(cache_memory,kvs_context->memid_kvs);
+	QS_CACHE_PAGE cache_page;
+	qs_get_cache_page(cache,&cache_page);
+	QS_HASH_FOREACH hf;
+	QS_HASH_ELEMENT* he;
+	qs_init_hash_foreach( cache_page.memory, cache_page.hash_id, &hf );
+	while( NULL != ( he = qs_hash_foreach( cache_page.memory, &hf ) ) ){
+		key_length++;
+	}
+	return key_length;
+}
 int32_t api_qs_kvs_keys(QS_JSON_ELEMENT_ARRAY* array, QS_KVS_CONTEXT* kvs_context)
 {
 	int32_t key_length = 0;

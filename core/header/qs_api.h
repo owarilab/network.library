@@ -251,6 +251,7 @@ int api_qs_kvs_set(QS_KVS_CONTEXT* kvs_context,const char* key, const char* valu
 char* api_qs_kvs_get(QS_KVS_CONTEXT* kvs_context,const char* key);
 size_t api_qs_kvs_get_buffer_size(QS_KVS_CONTEXT* kvs_context,const char* key);
 int api_qs_kvs_delete(QS_KVS_CONTEXT* kvs_context,const char* key);
+int32_t api_qs_kvs_key_length(QS_KVS_CONTEXT* kvs_context);
 int32_t api_qs_kvs_keys(QS_JSON_ELEMENT_ARRAY* array, QS_KVS_CONTEXT* kvs_context);
 int32_t api_qs_kvs_sorted_keys(QS_JSON_ELEMENT_ARRAY* array, QS_KVS_CONTEXT* kvs_context, int32_t is_sort_asc);
 int api_qs_persistence_kvs_memory_free(QS_KVS_CONTEXT* kvs_context);
