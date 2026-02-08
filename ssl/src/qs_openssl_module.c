@@ -53,7 +53,7 @@ int qs_ssl_module_http_client_on_close(QS_EVENT_PARAMETER params)
     return 0;
 }
 
-
+#ifdef QS_SSL_MODULE_ENABLED
 SSL_CTX* qs_ssl_module_http_client_ssl_create_context()
 {
 	SSL_CTX *ctx;
@@ -82,11 +82,14 @@ SSL* qs_ssl_module_http_client_ssl_create(SSL_CTX* ctx, int sock)
 	SSL_set_fd(ssl, sock);
 	return ssl;
 }
+#endif // QS_SSL_MODULE_ENABLED
 
 int qs_ssl_module_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char* server_host, int server_port, int is_ssl)
 {
+#ifdef QS_SSL_MODULE_ENABLED
     context->ssl = NULL;
     context->ctx = NULL;
+#endif
     context->client_context = NULL;
     memset(context->host, 0, sizeof(context->host));
     memset(context->port, 0, sizeof(context->port));
@@ -120,6 +123,7 @@ int qs_ssl_module_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char
 
     if(context->is_ssl)
     {
+#ifdef QS_SSL_MODULE_ENABLED
         context->ctx = qs_ssl_module_http_client_ssl_create_context();
         if(context->ctx == NULL)
         {
@@ -134,6 +138,10 @@ int qs_ssl_module_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char
 
         // call connect()
         api_qs_client_update(context->client_context);
+#else
+        printf("SSL module is not enabled.\n");
+        return -1;
+#endif
     }else{
         api_qs_set_client_on_connect_event(context->client_context, qs_ssl_module_http_client_on_connect );
         api_qs_set_client_on_plain_event(context->client_context, qs_ssl_module_http_client_on_recv );
@@ -152,6 +160,7 @@ int qs_ssl_module_http_client_update(QS_HTTP_CLIENT_CONTEXT* context)
         api_qs_client_update(context->client_context);
         return 0;
     }
+#ifdef QS_SSL_MODULE_ENABLED
     if(context->phase == QS_SSL_MODULE_PHASE_CONNECT){
         // connect
         do{
@@ -199,6 +208,7 @@ int qs_ssl_module_http_client_update(QS_HTTP_CLIENT_CONTEXT* context)
         memset(context->read_buffer, 0, sizeof(context->read_buffer));
         return qs_ssl_module_http_client_recv_ret;
     }
+#endif // QS_SSL_MODULE_ENABLED
     return 0;
 }
 
@@ -494,6 +504,7 @@ int qs_ssl_module_http_client_recv(QS_HTTP_CLIENT_CONTEXT* context, char* payloa
 
 int qs_ssl_module_http_client_free(QS_HTTP_CLIENT_CONTEXT* context)
 {
+#ifdef QS_SSL_MODULE_ENABLED
     if(context->ssl != NULL)
     {
         SSL_shutdown(context->ssl);
@@ -505,6 +516,7 @@ int qs_ssl_module_http_client_free(QS_HTTP_CLIENT_CONTEXT* context)
         SSL_CTX_free(context->ctx);
         context->ctx = NULL;
     }
+#endif
     if(context->client_context != NULL)
     {
         api_qs_client_free(context->client_context);

@@ -35,9 +35,13 @@ extern "C"{
 #include <sys/types.h>
 #include <inttypes.h>
 
+#define QS_SSL_MODULE_ENABLED 1
+
+# ifdef QS_SSL_MODULE_ENABLED
 // sudo apt install libssl-dev
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+# endif
 
 #define QS_SSL_MODULE_PHASE_CONNECT 0
 #define QS_SSL_MODULE_PHASE_READ_HEADER 1
@@ -147,8 +151,10 @@ typedef struct QS_CSV_CONTEXT
 
 typedef struct QS_HTTP_CLIENT_CONTEXT
 {
+# ifdef QS_SSL_MODULE_ENABLED
     SSL_CTX *ctx;
     SSL *ssl;
+# endif
     QS_CLIENT_CONTEXT* client_context;
     char host[1024];
     char port[16];
@@ -173,8 +179,10 @@ typedef struct QS_HTTP_CLIENT_CONTEXT
 } QS_HTTP_CLIENT_CONTEXT;
 
 int qs_ssl_module_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char* server_host, int server_port, int is_ssl);
+# ifdef QS_SSL_MODULE_ENABLED
 SSL_CTX* qs_ssl_module_http_client_ssl_create_context();
 SSL* qs_ssl_module_http_client_ssl_create(SSL_CTX* ctx, int sock);
+# endif
 int qs_ssl_module_http_client_update(QS_HTTP_CLIENT_CONTEXT* context);
 int qs_ssl_module_http_client_recv(QS_HTTP_CLIENT_CONTEXT* context, char* payload, size_t payload_size);
 int qs_ssl_module_http_client_free(QS_HTTP_CLIENT_CONTEXT* context);
