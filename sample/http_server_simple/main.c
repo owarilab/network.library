@@ -163,6 +163,21 @@ int on_http_event(QS_EVENT_PARAMETER params)
 int on_ws_event(QS_EVENT_PARAMETER params)
 {
 	char* message = api_qs_get_ws_message(params);
+
+	// user data storage example
+	int is_debug = 1;
+	if(is_debug)
+	{
+		uint8_t* con_data = api_qs_get_connection_data(params);
+		size_t con_data_size = api_qs_get_connection_data_size(params);
+		char* connection_id = api_qs_get_connection_id(params);
+		if(con_data != NULL){
+			uint64_t* send_counter = (uint64_t*)con_data;
+			(*send_counter)++;
+			printf("[on_ws_event] connection_id=%s, size=%zu, count=%llu\n", connection_id, con_data_size, (unsigned long long)*send_counter);
+		}
+	}
+
 	api_qs_send_ws_message(params,message);
 	//api_qs_send_ws_message(params,"Hello World!");
 	//api_qs_send_ws_message_plane(params,message);

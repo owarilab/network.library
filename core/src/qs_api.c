@@ -1645,6 +1645,78 @@ time_t api_qs_get_connection_create_time(QS_EVENT_PARAMETER params)
 	}
 	return tinfo->create_time;
 }
+uint8_t* api_qs_get_connection_data(QS_EVENT_PARAMETER params)
+{
+	QS_SERVER_CONNECTION_INFO* tinfo = NULL;
+	if(params->parameter_type==QS_EVENT_PARAMETER_TYPE_RECV){
+		QS_RECV_INFO* recv_info = (QS_RECV_INFO*)params->params;
+		tinfo = (QS_SERVER_CONNECTION_INFO*)recv_info->tinfo;
+	}else if(params->parameter_type==QS_EVENT_PARAMETER_TYPE_CONNECTION){
+		tinfo = (QS_SERVER_CONNECTION_INFO*)params->params;
+	}
+	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
+	QS_SERVER_CONTEXT* context = (QS_SERVER_CONTEXT*)option->application_data;
+	if(-1 == context->memid_router){
+		return NULL;
+	}
+	QS_MEMORY_POOL* router_memory = (QS_MEMORY_POOL*)context->router_memory;
+	return qs_get_connection_data(router_memory, context->memid_router, tinfo->index);
+}
+size_t api_qs_get_connection_data_size(QS_EVENT_PARAMETER params)
+{
+	QS_SERVER_CONNECTION_INFO* tinfo = NULL;
+	if(params->parameter_type==QS_EVENT_PARAMETER_TYPE_RECV){
+		QS_RECV_INFO* recv_info = (QS_RECV_INFO*)params->params;
+		tinfo = (QS_SERVER_CONNECTION_INFO*)recv_info->tinfo;
+	}else if(params->parameter_type==QS_EVENT_PARAMETER_TYPE_CONNECTION){
+		tinfo = (QS_SERVER_CONNECTION_INFO*)params->params;
+	}
+	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
+	QS_SERVER_CONTEXT* context = (QS_SERVER_CONTEXT*)option->application_data;
+	if(-1 == context->memid_router){
+		return 0;
+	}
+	QS_MEMORY_POOL* router_memory = (QS_MEMORY_POOL*)context->router_memory;
+	QS_PACKET_ROUTE_NODE* route_node = qs_get_packet_route_connection_join_node(router_memory, context->memid_router, tinfo->index);
+	if(route_node == NULL){
+		return 0;
+	}
+	return route_node->con_data_size;
+}
+char* api_qs_get_connection_id(QS_EVENT_PARAMETER params)
+{
+	QS_SERVER_CONNECTION_INFO* tinfo = NULL;
+	if(params->parameter_type==QS_EVENT_PARAMETER_TYPE_RECV){
+		QS_RECV_INFO* recv_info = (QS_RECV_INFO*)params->params;
+		tinfo = (QS_SERVER_CONNECTION_INFO*)recv_info->tinfo;
+	}else if(params->parameter_type==QS_EVENT_PARAMETER_TYPE_CONNECTION){
+		tinfo = (QS_SERVER_CONNECTION_INFO*)params->params;
+	}
+	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
+	QS_SERVER_CONTEXT* context = (QS_SERVER_CONTEXT*)option->application_data;
+	if(-1 == context->memid_router){
+		return NULL;
+	}
+	QS_MEMORY_POOL* router_memory = (QS_MEMORY_POOL*)context->router_memory;
+	return qs_get_packet_route_connection_id(router_memory, context->memid_router, tinfo->index);
+}
+int32_t api_qs_set_connection_data(QS_EVENT_PARAMETER params, uint8_t* data, size_t data_size)
+{
+	QS_SERVER_CONNECTION_INFO* tinfo = NULL;
+	if(params->parameter_type==QS_EVENT_PARAMETER_TYPE_RECV){
+		QS_RECV_INFO* recv_info = (QS_RECV_INFO*)params->params;
+		tinfo = (QS_SERVER_CONNECTION_INFO*)recv_info->tinfo;
+	}else if(params->parameter_type==QS_EVENT_PARAMETER_TYPE_CONNECTION){
+		tinfo = (QS_SERVER_CONNECTION_INFO*)params->params;
+	}
+	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
+	QS_SERVER_CONTEXT* context = (QS_SERVER_CONTEXT*)option->application_data;
+	if(-1 == context->memid_router){
+		return -1;
+	}
+	QS_MEMORY_POOL* router_memory = (QS_MEMORY_POOL*)context->router_memory;
+	return qs_set_connection_data(router_memory, context->memid_router, tinfo->index, data, data_size);
+}
 void api_qs_send_response_by_connection_offset(QS_SERVER_CONTEXT* context, uint32_t connection_offset, const char* response)
 {
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;

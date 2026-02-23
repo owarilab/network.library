@@ -216,6 +216,7 @@ int32_t qs_add_packet_route_connection(QS_MEMORY_POOL* memory,int32_t packet_rou
 	if(-1 != con->data_memory_id){
 		QS_MEMORY_POOL* con_data_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(memory,con->data_memory_id);
 		qs_safe_memory_clean(con_data_memory);
+		qs_create_fix_memory_block(con_data_memory, 0, route_node->con_data_size);
 	}
 	con->connection_index = connection_index;
 	con->id = ++route_node->auto_id_counter;
@@ -536,6 +537,66 @@ int32_t qs_get_route_info(QS_MEMORY_POOL* memory, int32_t packet_route_id, QS_ME
 	qs_add_hash_string(dest_memory,memid_temp_info_hash,"owner_id",owner_id);
 	//printf("%s : %d , capacity = %d, created = %ld\n",id,route_offset,route_node->capacity,route_node->create_time);
 	return memid_temp_info_hash;
+}
+
+int32_t qs_set_connection_data(QS_MEMORY_POOL* memory, int32_t packet_route_id, int32_t connection_index, uint8_t* data, size_t data_size)
+{
+	QS_PACKET_ROUTE* packet_route = (QS_PACKET_ROUTE*)QS_GET_POINTER(memory, packet_route_id);
+	QS_PACKET_ROUTE_OFFSET* offsets = (QS_PACKET_ROUTE_OFFSET*)QS_GET_POINTER(memory, packet_route->connection_node_offsets_id);
+	int32_t route_offset = offsets[connection_index].route_chain_offset;
+	int32_t connection_chain = offsets[connection_index].route_node_chain_offset;
+	if(route_offset == -1 || connection_chain == -1){
+		return -1;
+	}
+	QS_PACKET_ROUTE_NODE* route_node = (QS_PACKET_ROUTE_NODE*)qs_get_chain_i(memory, packet_route->node_chain_array, route_offset);
+	QS_PACKET_ROUTE_NODE_CONNECTION* con = (QS_PACKET_ROUTE_NODE_CONNECTION*)qs_get_chain_i(memory, route_node->connection_chain_array, connection_chain);
+	if(-1 == con->data_memory_id){
+		return -1;
+	}
+	QS_MEMORY_POOL* data_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(memory, con->data_memory_id);
+	if(data_size >= qs_usize(data_memory, 0)){
+		return -1;
+	}
+	uint8_t* dest_data = (uint8_t*)QS_FIXPOINTER(data_memory, 0);
+	memcpy(dest_data, data, data_size);
+	dest_data[data_size] = '\0';
+	return 0;
+}
+
+uint8_t* qs_get_connection_data(QS_MEMORY_POOL* memory, int32_t packet_route_id, int32_t connection_index)
+{
+	QS_PACKET_ROUTE* packet_route = (QS_PACKET_ROUTE*)QS_GET_POINTER(memory, packet_route_id);
+	QS_PACKET_ROUTE_OFFSET* offsets = (QS_PACKET_ROUTE_OFFSET*)QS_GET_POINTER(memory, packet_route->connection_node_offsets_id);
+	int32_t route_offset = offsets[connection_index].route_chain_offset;
+	int32_t connection_chain = offsets[connection_index].route_node_chain_offset;
+	if(route_offset == -1 || connection_chain == -1){
+		return NULL;
+	}
+	QS_PACKET_ROUTE_NODE* route_node = (QS_PACKET_ROUTE_NODE*)qs_get_chain_i(memory, packet_route->node_chain_array, route_offset);
+	QS_PACKET_ROUTE_NODE_CONNECTION* con = (QS_PACKET_ROUTE_NODE_CONNECTION*)qs_get_chain_i(memory, route_node->connection_chain_array, connection_chain);
+	if(-1 == con->data_memory_id){
+		return NULL;
+	}
+	QS_MEMORY_POOL* data_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(memory, con->data_memory_id);
+	return (uint8_t*)QS_FIXPOINTER(data_memory, 0);
+}
+
+int32_t qs_set_connection_data_by_id(QS_MEMORY_POOL* memory, int32_t packet_route_id, char* connection_id, uint8_t* data, size_t data_size)
+{
+	int32_t connection_index = qs_find_packet_route_connection_id(memory, packet_route_id, connection_id);
+	if(connection_index == -1){
+		return -1;
+	}
+	return qs_set_connection_data(memory, packet_route_id, connection_index, data, data_size);
+}
+
+uint8_t* qs_get_connection_data_by_id(QS_MEMORY_POOL* memory, int32_t packet_route_id, char* connection_id)
+{
+	int32_t connection_index = qs_find_packet_route_connection_id(memory, packet_route_id, connection_id);
+	if(connection_index == -1){
+		return NULL;
+	}
+	return qs_get_connection_data(memory, packet_route_id, connection_index);
 }
 
 int32_t qs_get_route_infos(QS_MEMORY_POOL* memory, int32_t packet_route_id, QS_MEMORY_POOL* dest_memory)

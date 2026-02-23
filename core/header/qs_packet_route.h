@@ -23,7 +23,7 @@ extern "C"{
 #define QS_PACKET_ROUTE_ROUTE_SIZE_DEFAULT 1000
 #define QS_PACKET_ROUTE_DATA_SIZE_DEFAULT SIZE_KBYTE*2
 #define QS_PACKET_ROUTE_LIFE_TIME_SEC_DEFAULT 60 * 5
-#define QS_PACKET_ROUTE_CONNECTION_DATA_SIZE_DEFAULT SIZE_KBYTE*0
+#define QS_PACKET_ROUTE_CONNECTION_DATA_SIZE_DEFAULT SIZE_KBYTE*1
 
 typedef struct QS_PACKET_ROUTE_NODE
 {
@@ -89,6 +89,10 @@ int32_t qs_remove_packet_route_core(QS_MEMORY_POOL* memory,int32_t packet_route_
 int32_t qs_update_packet_route(QS_MEMORY_POOL* memory, int32_t packet_route_id);
 int32_t qs_set_route_data(QS_MEMORY_POOL* memory, int32_t packet_route_id,int32_t route_offset, uint8_t* data, size_t data_size);
 uint8_t* qs_get_route_data(QS_MEMORY_POOL* memory, int32_t packet_route_id,int32_t route_offset);
+int32_t qs_set_connection_data(QS_MEMORY_POOL* memory, int32_t packet_route_id, int32_t connection_index, uint8_t* data, size_t data_size);
+uint8_t* qs_get_connection_data(QS_MEMORY_POOL* memory, int32_t packet_route_id, int32_t connection_index);
+int32_t qs_set_connection_data_by_id(QS_MEMORY_POOL* memory, int32_t packet_route_id, char* connection_id, uint8_t* data, size_t data_size);
+uint8_t* qs_get_connection_data_by_id(QS_MEMORY_POOL* memory, int32_t packet_route_id, char* connection_id);
 int32_t qs_get_route_info(QS_MEMORY_POOL* memory, int32_t packet_route_id, QS_MEMORY_POOL* dest_memory,int32_t route_offset);
 int32_t qs_get_route_infos(QS_MEMORY_POOL* memory, int32_t packet_route_id, QS_MEMORY_POOL* dest_memory);
 #endif /*_QS_PACKET_ROUTE_H_*/
