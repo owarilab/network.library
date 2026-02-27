@@ -4,6 +4,48 @@
 
 #include "qs_protocol.h"
 
+#include <string.h>
+
+static void qs_http_canonicalize_header_name(char* out, size_t out_size, const char* in)
+{
+	if (out == NULL || out_size == 0) {
+		return;
+	}
+	out[0] = '\0';
+	if (in == NULL) {
+		return;
+	}
+	int upper_next = 1;
+	size_t w = 0;
+	for (size_t i = 0; in[i] != '\0' && w + 1 < out_size; i++) {
+		char c = in[i];
+		if (c == '-') {
+			out[w++] = c;
+			upper_next = 1;
+			continue;
+		}
+		if (c >= 'A' && c <= 'Z') {
+			if (!upper_next) {
+				c = (char)(c - 'A' + 'a');
+			}
+			out[w++] = c;
+			upper_next = 0;
+			continue;
+		}
+		if (c >= 'a' && c <= 'z') {
+			if (upper_next) {
+				c = (char)(c - 'a' + 'A');
+			}
+			out[w++] = c;
+			upper_next = 0;
+			continue;
+		}
+		out[w++] = c;
+		upper_next = 0;
+	}
+	out[w] = '\0';
+}
+
 uint8_t qs_get_protocol_header_size_byte(ssize_t payload_size)
 {
 	uint8_t size_byte = 0;
@@ -407,7 +449,16 @@ int qs_http_parse_header( QS_RECV_INFO *rinfo, int skip_head )
 				++target_pt;
 			}
 			target_pt = qs_read_line_delimiter( headerparam, sizeof(headerparam), target_pt, '\0' );
-			qs_add_hash_string( con_memory, psockparam->http_header_munit, headername, headerparam );
+			char canonical_headername[256];
+			qs_http_canonicalize_header_name(canonical_headername, sizeof(canonical_headername), headername);
+			if (canonical_headername[0] != '\0') {
+				qs_add_hash_string( con_memory, psockparam->http_header_munit, canonical_headername, headerparam );
+				if (strcmp(canonical_headername, headername) != 0) {
+					qs_add_hash_string( con_memory, psockparam->http_header_munit, headername, headerparam );
+				}
+			} else {
+				qs_add_hash_string( con_memory, psockparam->http_header_munit, headername, headerparam );
+			}
 			if( (*target_pt) == '\0' ){
 				break;
 			}
