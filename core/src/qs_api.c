@@ -1564,7 +1564,7 @@ void api_qs_get_http_post_json_object(QS_EVENT_PARAMETER params, QS_JSON_ELEMENT
 	QS_SERVER_CONTEXT* context = (QS_SERVER_CONTEXT*)option->application_data;
 	QS_HTTP_REQUEST_COMMON* http_request = (QS_HTTP_REQUEST_COMMON*)context->system_data;
 	object->memid_object = http_request->memid_post_parameter_hash;
-	object->memory = (void*)option->memory_pool;
+	object->memory = (void*)http_request->temporary_memory;
 }
 
 void api_qs_send_response(QS_EVENT_PARAMETER params, const char* response)
