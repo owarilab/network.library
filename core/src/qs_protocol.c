@@ -255,6 +255,7 @@ int qs_http_parse_header( QS_RECV_INFO *rinfo, int skip_head )
 	char *target = (char*)qs_upointer(option->memory_pool, rinfo->recvbuf_munit);
 	QS_SOCKPARAM* psockparam = &tinfo->sockparam;
 	int32_t recvmsg_munit = tinfo->recvmsg_munit;
+	size_t msgbuffer_size = option->msgbuffer_size;
 	QS_MEMORY_POOL* con_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(option->memory_pool,tinfo->memid_connection_data_memory);
 
 	do{
@@ -404,6 +405,19 @@ int qs_http_parse_header( QS_RECV_INFO *rinfo, int skip_head )
 					int contentlen = atoi( (char*)QS_GET_POINTER(con_memory,qs_get_hash( con_memory, psockparam->http_header_munit, "Content-Length" )) );
 					if( contentlen > 0 )
 					{
+						if( msgbuffer_size == 0 ){
+							printf("[qs_http_parse_header] msgbuffer_size is 0, stop body copy\n");
+							psockparam->opcode = 2;
+							break;
+						}
+						if( psockparam->tmpmsglen >= (msgbuffer_size - 1) ){
+							char* recvmsg = (char*)QS_GET_POINTER(option->memory_pool,recvmsg_munit);
+							recvmsg[msgbuffer_size - 1] = '\0';
+							psockparam->tmpmsglen = msgbuffer_size - 1;
+							psockparam->opcode = 2;
+							printf("[qs_http_parse_header] body buffer full before copy: tmpmsglen=%" PRIu64 " msgbuffer_size=%zu\n", psockparam->tmpmsglen, msgbuffer_size);
+							break;
+						}
 						char* msgbuf = ( (char*)QS_GET_POINTER(option->memory_pool,recvmsg_munit) ) + psockparam->tmpmsglen;
 						ssize_t tmprcvlen = rinfo->recvlen;
 						int newline = 0;
@@ -412,10 +426,18 @@ int qs_http_parse_header( QS_RECV_INFO *rinfo, int skip_head )
 
 						}
 						else{
-							memcpy( msgbuf, target_pt, tmprcvlen );
-							msgbuf+=tmprcvlen;
-							psockparam->tmpmsglen += tmprcvlen;
-							if( psockparam->tmpmsglen >= contentlen ){
+							size_t write_max = (msgbuffer_size - 1) - (size_t)psockparam->tmpmsglen;
+							size_t copy_len = (tmprcvlen > 0) ? (size_t)tmprcvlen : 0;
+							if( copy_len > write_max ){
+								printf("[qs_http_parse_header] truncate body copy: requested=%zu write_max=%zu msgbuffer_size=%zu\n", copy_len, write_max, msgbuffer_size);
+								copy_len = write_max;
+							}
+							if( copy_len > 0 ){
+								memcpy( msgbuf, target_pt, copy_len );
+							}
+							msgbuf += copy_len;
+							psockparam->tmpmsglen += copy_len;
+							if( psockparam->tmpmsglen >= contentlen || copy_len < (size_t)((tmprcvlen > 0) ? tmprcvlen : 0) ){
 								*msgbuf = '\0';
 								psockparam->opcode = 2;
 								break;
@@ -432,14 +454,26 @@ int qs_http_parse_header( QS_RECV_INFO *rinfo, int skip_head )
 						//}
 					}
 					else{
-						char* msgbuf = ( (char*)QS_GET_POINTER(option->memory_pool,recvmsg_munit) ) + psockparam->tmpmsglen;
+						char* recvmsg = (char*)QS_GET_POINTER(option->memory_pool,recvmsg_munit);
+						size_t end_pos = 0;
+						if( msgbuffer_size > 0 ){
+							end_pos = (psockparam->tmpmsglen < msgbuffer_size) ? (size_t)psockparam->tmpmsglen : (msgbuffer_size - 1);
+						}
+						char* msgbuf = recvmsg + end_pos;
 						*msgbuf = '\0';
+						psockparam->tmpmsglen = end_pos;
 						psockparam->opcode = 2;
 					}
 				}
 				else{
-					char* msgbuf = ( (char*)QS_GET_POINTER(option->memory_pool,recvmsg_munit) ) + psockparam->tmpmsglen;
+					char* recvmsg = (char*)QS_GET_POINTER(option->memory_pool,recvmsg_munit);
+					size_t end_pos = 0;
+					if( msgbuffer_size > 0 ){
+						end_pos = (psockparam->tmpmsglen < msgbuffer_size) ? (size_t)psockparam->tmpmsglen : (msgbuffer_size - 1);
+					}
+					char* msgbuf = recvmsg + end_pos;
 					*msgbuf = '\0';
+					psockparam->tmpmsglen = end_pos;
 					psockparam->opcode = 2;
 				}
 				break;
