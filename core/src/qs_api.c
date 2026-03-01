@@ -781,9 +781,12 @@ int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_conn
 		free(context); context=NULL;
 		return -7;
 	}
-	SYSTEM_UPDATE_SCHEDULER* scheduler = (SYSTEM_UPDATE_SCHEDULER*)QS_GET_POINTER(main_memory_pool, memid_scheduler);
-	qs_initialize_scheduler_high_speed(scheduler);
+	//SYSTEM_UPDATE_SCHEDULER* scheduler = (SYSTEM_UPDATE_SCHEDULER*)QS_GET_POINTER(main_memory_pool, memid_scheduler);
 	context->memid_scheduler = memid_scheduler;
+	if( -1 == api_qs_set_scheduler(context, QS_SCHEDULER_MODE_HIGH) ){
+		free(context); context=NULL;
+		return -8;
+	}
 	server->application_data = (void*)context;
 	//qs_memory_info(main_memory_pool);
 	return 0;
@@ -793,6 +796,33 @@ int api_qs_server_get_socket(QS_SERVER_CONTEXT* context)
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
 	QS_SOCKET_OPTION* server = (QS_SOCKET_OPTION*)QS_GET_POINTER(memory, context->memid_server);
 	return server->sockid;
+}
+int api_qs_set_scheduler(QS_SERVER_CONTEXT* context, int32_t scheduler_mode)
+{
+	if(NULL==context){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	if(NULL==memory){
+		return -1;
+	}
+	SYSTEM_UPDATE_SCHEDULER* scheduler = (SYSTEM_UPDATE_SCHEDULER*)QS_GET_POINTER(memory, context->memid_scheduler);
+	if(NULL==scheduler){
+		return -1;
+	}
+	if(QS_SCHEDULER_MODE_HIGH==scheduler_mode){
+		qs_initialize_scheduler_high_speed(scheduler);
+		return 0;
+	}
+	if(QS_SCHEDULER_MODE_MIDDLE==scheduler_mode){
+		qs_initialize_scheduler_middle_speed(scheduler);
+		return 0;
+	}
+	if(QS_SCHEDULER_MODE_LOW==scheduler_mode){
+		qs_initialize_scheduler_low_speed(scheduler);
+		return 0;
+	}
+	return -1;
 }
 void api_qs_set_server_session_timeout(QS_SERVER_CONTEXT* context, int32_t timeout)
 {

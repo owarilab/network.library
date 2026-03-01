@@ -59,6 +59,8 @@ int32_t qs_log_output(QS_FILE_INFO* log_file_info,char* log)
 	if(log_file_info->f!=NULL){
 		qs_fwrite2(log_file_info,log,qs_strlen(log));
 		fflush(log_file_info->f);
+	}else{
+		printf("%s\n",log);
 	}
 	return QS_SYSTEM_OK;
 }

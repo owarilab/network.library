@@ -16,6 +16,10 @@ extern "C"{
 #define QS_SERVER_TYPE_SIMPLE 200
 #define QS_SERVER_TYPE_HTTP 300
 
+#define QS_SCHEDULER_MODE_HIGH 1
+#define QS_SCHEDULER_MODE_MIDDLE 2
+#define QS_SCHEDULER_MODE_LOW 3
+
 #define QS_KVS_MEMORY_TYPE_B1MB 0
 #define QS_KVS_MEMORY_TYPE_B128MB 1
 #define QS_KVS_MEMORY_TYPE_B256MB 2
@@ -181,6 +185,7 @@ void api_qs_client_free(QS_CLIENT_CONTEXT* context);
 
 int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_connection, int32_t server_type);
 int api_qs_server_get_socket(QS_SERVER_CONTEXT* context);
+int api_qs_set_scheduler(QS_SERVER_CONTEXT* context, int32_t scheduler_mode);
 void api_qs_set_server_session_timeout(QS_SERVER_CONTEXT* context, int32_t timeout);
 int api_qs_server_create_router(QS_SERVER_CONTEXT* context);
 void api_qs_router_memory_info(QS_SERVER_CONTEXT* context);
