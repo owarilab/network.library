@@ -4,9 +4,152 @@
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta http-equiv="Content-Style-Type" content="text/css">
 <meta http-equiv="Content-Script-Type" content="text/javascript">
-<title>sample</title>
+<title>simple http server</title>
+<link rel="stylesheet" href="/css/common.css">
+<style>
+body {
+	background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
+	color: #f8fafc;
+}
+.hero {
+	border: 1px solid rgba(148, 163, 184, 0.35);
+	border-radius: 16px;
+	padding: 24px;
+	background: rgba(15, 23, 42, 0.6);
+}
+.hero h1 {
+	margin: 0;
+	font-size: 30px;
+}
+.hero p {
+	margin: 12px 0 0;
+	color: #cbd5e1;
+	line-height: 1.6;
+}
+.badge {
+	display: inline-block;
+	margin-right: 8px;
+	margin-top: 10px;
+	padding: 4px 10px;
+	border-radius: 999px;
+	font-size: 12px;
+	background: rgba(34, 197, 94, 0.16);
+	border: 1px solid rgba(34, 197, 94, 0.55);
+	color: #bbf7d0;
+}
+.section-title {
+	margin: 24px 0 12px;
+	font-size: 18px;
+}
+.grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+	gap: 12px;
+}
+.card {
+	border: 1px solid rgba(148, 163, 184, 0.35);
+	border-radius: 14px;
+	padding: 16px;
+	background: rgba(30, 41, 59, 0.45);
+	color: inherit;
+	text-decoration: none;
+	transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.card:hover {
+	transform: translateY(-2px);
+	border-color: rgba(56, 189, 248, 0.8);
+}
+.card h3 {
+	margin: 0;
+	font-size: 17px;
+}
+.card p {
+	margin: 10px 0 0;
+	font-size: 14px;
+	color: #cbd5e1;
+	line-height: 1.5;
+}
+.card .go {
+	display: inline-block;
+	margin-top: 14px;
+	font-size: 13px;
+	color: #67e8f9;
+}
+.tips {
+	margin-top: 12px;
+	border: 1px solid rgba(148, 163, 184, 0.35);
+	border-radius: 12px;
+	background: rgba(15, 23, 42, 0.45);
+	padding: 14px 16px;
+	line-height: 1.7;
+	color: #dbeafe;
+}
+.footer {
+	margin-top: 20px;
+}
+</style>
 </head>
-<body style="padding:0;margin:0">
-	test
+<body class="page-dark">
+  <div id="site-header"></div>
+	<div class="container">
+		<div class="hero">
+			<h1>概要</h1>
+			<p>
+				HTTP + WebSocket + ルーム機能をすぐ試せる、<b>http_server_simple</b> 用トップページです。<br>
+				まずは `wsock.html` で接続/ルーム挙動を確認し、次にミニゲームを複数タブで遊んでみてください。
+			</p>
+			<span class="badge">HTTP API: /api/v1/room/*</span>
+			<span class="badge">WebSocket: ws://localhost:4444</span>
+		</div>
+
+		<h2 class="section-title">通信デモ</h2>
+		<div class="grid">
+			<a class="card" href="/wsock.html">
+				<h3>WebSocket Room Sample</h3>
+				<p>接続IDの取得、ルーム作成/参加/退出、メッセージ送信を最小構成で確認できます。</p>
+				<span class="go">開く → /wsock.html</span>
+			</a>
+			<a class="card" href="/programing_document.html">
+				<h3>Programming Document</h3>
+				<p>RoomServerManager を使ったフロント実装手順、API、コールバック設計をまとめた技術資料です。</p>
+				<span class="go">開く → /programing_document.html</span>
+			</a>
+		</div>
+
+		<h2 class="section-title">ゲームで遊ぶ</h2>
+		<div class="grid">
+			<a class="card" href="/reversi.html">
+				<h3>Reversi</h3>
+				<p>ルーム同期付きのリバーシ。複数タブで同じルームに入り対戦できます。</p>
+				<span class="go">開く → /reversi.html</span>
+			</a>
+			<a class="card" href="/gomoku.html">
+				<h3>Gomoku</h3>
+				<p>五目並べのマルチプレイヤーサンプル。ルーム参加後に対局を開始します。</p>
+				<span class="go">開く → /gomoku.html</span>
+			</a>
+			<a class="card" href="/dots_and_boxes.html">
+				<h3>Dots and Boxes</h3>
+				<p>線を引いて箱を取る対戦ゲーム。ターン制同期のサンプルとして使えます。</p>
+				<span class="go">開く → /dots_and_boxes.html</span>
+			</a>
+			<a class="card" href="/shoot_game.html">
+				<h3>Shoot Game</h3>
+				<p>シューティング系のサンプルページ。WebSocket連携の挙動確認にも使えます。</p>
+				<span class="go">開く → /shoot_game.html</span>
+			</a>
+		</div>
+
+		<h2 class="section-title">使い方メモ</h2>
+		<div class="tips">
+			1. サーバ起動後にこのページを開く<br>
+			2. 2つ以上のタブで同じゲームページを開く<br>
+			3. 同じルームIDで join して通信/同期を確認する<br>
+			4. API検証は /wsock.html の room list / create / join / leave を利用する
+		</div>
+
+	</div>
+  <div id="site-footer"></div>
+  <script src="/js/common_layout.js"></script>
 </body>
 </html>

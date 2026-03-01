@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Room Frontend Programming Document</title>
+  <link rel="stylesheet" href="/css/common.css">
+  <style>
+    body {
+      background: #0b1220;
+    }
+    .wrap {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 24px 16px 48px;
+    }
+    h1 { margin: 0 0 12px; font-size: 30px; }
+    h2 {
+      margin-top: 28px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #334155;
+      font-size: 22px;
+    }
+    h3 { margin-top: 20px; font-size: 18px; }
+    .lead {
+      margin: 0;
+      color: #cbd5e1;
+      background: #111827;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 12px 14px;
+    }
+    .badge {
+      margin-top: 8px;
+      color: #bbf7d0;
+      border: 1px solid #16a34a;
+      background: rgba(22, 163, 74, 0.2);
+    }
+    .card {
+      border: 1px solid #334155;
+      background: #111827;
+    }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      background: #1f2937;
+      border-radius: 6px;
+      padding: 1px 6px;
+      color: #fcd34d;
+    }
+    pre {
+      overflow-x: auto;
+      background: #020617;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 12px;
+      margin: 10px 0;
+    }
+    pre code {
+      padding: 0;
+      border-radius: 0;
+      background: transparent;
+      color: #d1fae5;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid #334155;
+      padding: 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #1e293b; }
+    .ok { color: #86efac; }
+    .warn { color: #fdba74; }
+    .toc a {
+      color: #7dd3fc;
+      text-decoration: none;
+      margin-right: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div id="site-header"></div>
+  <div class="wrap">
+    <h1>ルーム機能フロント開発ドキュメント</h1>
+    <p class="lead">
+      この資料は <code>www/js/room.js</code> の <code>RoomServerManager</code> を使って、
+      フロントエンドからルーム機能を扱うための実装手順をまとめたものです。
+    </p>
+    <span class="badge">対象サンプル: wsock.html</span>
+    <span class="badge">API: /api/v1/room/*</span>
+    <span class="badge">WebSocket: ws://localhost:4444</span>
+
+    <div class="card toc">
+      <strong>目次:</strong>
+      <a href="#overview">1. 全体像</a>
+      <a href="#setup">2. 初期化</a>
+      <a href="#http">3. HTTP API</a>
+      <a href="#callbacks">4. コールバック</a>
+      <a href="#sample">5. 実装例</a>
+      <a href="#tips">6. 運用Tips</a>
+    </div>
+
+    <h2 id="overview">1. 全体像</h2>
+    <div class="card">
+      <ul>
+        <li>接続直後に UUID を送信し、サーバからの echo で <code>selfConnectionId</code> を確定します。</li>
+        <li>ルーム操作（create/list/join/leave）は HTTP API を使います。</li>
+        <li>ルーム内メッセージの配信は WebSocket で受け取ります。</li>
+        <li>ユーザーロジックはコールバックに集約し、画面側コードをシンプルに保てます。</li>
+      </ul>
+      <p class="small">WebSocket受信JSONの基本形: <code>{ id, type, message }</code></p>
+    </div>
+
+    <h2 id="setup">2. 初期化と接続</h2>
+    <h3>2.1 スクリプト読み込み</h3>
+    <pre><code>&lt;script src="/js/room.js"&gt;&lt;/script&gt;</code></pre>
+
+    <h3>2.2 インスタンス生成</h3>
+    <pre><code>const manager = new RoomServerManager({
+  httpBase: window.location.origin,
+  wsBase: (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host,
+  callbacks: {
+    onSelfConnectionId: ({ connectionId }) =&gt; {
+      console.log('self connection id:', connectionId);
+    },
+    onJoin: ({ connectionId }) =&gt; {
+      console.log('joined user:', connectionId);
+    },
+    onLeave: ({ connectionId }) =&gt; {
+      console.log('left user:', connectionId);
+    },
+    onHttpError: ({ error }) =&gt; {
+      console.error('http error:', error);
+    }
+  }
+});
+
+manager.connect();</code></pre>
+
+    <h3>2.3 主要な状態</h3>
+    <div class="card">
+      <ul>
+        <li><code>manager.selfUuid</code>: 自動ハンドシェイク用UUID</li>
+        <li><code>manager.selfConnectionId</code>: サーバから付与される接続ID</li>
+        <li><code>manager.currentJoinRoomId</code>: 現在参加中のルームID</li>
+        <li><code>manager.getState()</code>: 画面表示やデバッグ向け状態取得</li>
+      </ul>
+    </div>
+
+    <h2 id="http">3. ルームHTTP APIの使い方</h2>
+    <table>
+      <thead>
+        <tr><th>メソッド</th><th>HTTP</th><th>説明</th><th>戻り値</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>listRooms()</code></td>
+          <td>GET <code>/api/v1/room/list</code></td>
+          <td>ルーム一覧を取得</td>
+          <td>Promise&lt;JSON&gt;</td>
+        </tr>
+        <tr>
+          <td><code>createRoom(name)</code></td>
+          <td>POST <code>/api/v1/room/create</code></td>
+          <td>ルーム作成</td>
+          <td>Promise&lt;JSON&gt;</td>
+        </tr>
+        <tr>
+          <td><code>joinRoom(roomId, connectionId?)</code></td>
+          <td>POST <code>/api/v1/room/join</code></td>
+          <td>ルーム参加</td>
+          <td>Promise&lt;JSON&gt;</td>
+        </tr>
+        <tr>
+          <td><code>leaveRoom(roomId?, connectionId?)</code></td>
+          <td>POST <code>/api/v1/room/leave</code></td>
+          <td>ルーム退出</td>
+          <td>Promise&lt;JSON&gt;</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="card">
+      <h3>3.1 最小操作例</h3>
+      <pre><code>// ルーム作成
+const created = await manager.createRoom('test_room');
+
+// 参加（connectionId省略時は manager.selfConnectionId を使用）
+await manager.joinRoom(created.id);
+
+// 一覧
+const list = await manager.listRooms();
+console.log(list.list);
+
+// 退出
+await manager.leaveRoom();</code></pre>
+    </div>
+
+    <h2 id="callbacks">4. コールバック設計</h2>
+    <table>
+      <thead>
+        <tr><th>コールバック名</th><th>用途</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>onWsOpen</code> / <code>onWsClose</code> / <code>onWsError</code></td><td>WebSocketライフサイクル監視</td></tr>
+        <tr><td><code>onWsRawMessage</code></td><td>受信生データのロギング</td></tr>
+        <tr><td><code>onSelfConnectionId</code></td><td>自身の connection_id 確定タイミング</td></tr>
+        <tr><td><code>onMessage</code></td><td>type=message の処理</td></tr>
+        <tr><td><code>onJoin</code> / <code>onLeave</code></td><td>他ユーザーの入退出通知</td></tr>
+        <tr><td><code>onRoomCreate</code> / <code>onRoomList</code> / <code>onRoomJoin</code> / <code>onRoomLeave</code></td><td>HTTP API成功時の処理</td></tr>
+        <tr><td><code>onHttpError</code> / <code>onParseError</code> / <code>onCallbackError</code></td><td>例外系ハンドリング</td></tr>
+      </tbody>
+    </table>
+
+    <div class="card">
+      <h3>4.1 コールバック差し替え</h3>
+      <pre><code>manager.setCallback('onMessage', ({ message, connectionId }) =&gt; {
+  appendChatLine(connectionId + ': ' + message);
+});
+
+manager.setCallbacks({
+  onJoin: ({ connectionId }) =&gt; appendSystemLine(connectionId + ' joined'),
+  onLeave: ({ connectionId }) =&gt; appendSystemLine(connectionId + ' left')
+});</code></pre>
+    </div>
+
+    <h2 id="sample">5. wsock.html準拠の実装例</h2>
+    <pre><code>const manager = new RoomServerManager({
+  callbacks: {
+    onSelfConnectionId: ({ connectionId }) =&gt; {
+      selfConId = connectionId;
+    },
+    onJoin: ({ connectionId }) =&gt; {
+      if (connectionId !== selfConId) {
+        manager.send('hello ' + connectionId + ' my con id is ' + selfConId);
+      }
+    }
+  }
+});
+
+manager.connect();
+
+async function createAndJoin(roomName) {
+  const created = await manager.createRoom(roomName);
+  await manager.joinRoom(created.id);
+}</code></pre>
+
+    <h2 id="tips">6. 開発・運用Tips</h2>
+    <div class="card">
+      <ul>
+        <li><span class="warn">関数名衝突に注意</span>: 要素idと同名関数を作るとブラウザで上書きされる場合があります。</li>
+        <li><span class="ok">接続ID確定前のjoinを避ける</span>: <code>onSelfConnectionId</code> 後にルーム参加するのが安全です。</li>
+        <li><span class="ok">UI更新はコールバックに集約</span>: 通信層と画面層の責務を分離しやすくなります。</li>
+        <li><span class="warn">HTTPエラーの可視化</span>: <code>onHttpError</code> で status と responseText をログ出力してください。</li>
+      </ul>
+    </div>
+
+    <h2>7. 関連ページ</h2>
+    <div class="card">
+      <ul>
+        <li><a href="/index.html">トップページ</a></li>
+        <li><a href="/wsock.html">WebSocket Room Sample</a></li>
+        <li><a href="/reversi.html">Reversi</a> / <a href="/gomoku.html">Gomoku</a> / <a href="/dots_and_boxes.html">Dots and Boxes</a></li>
+      </ul>
+    </div>
+
+  </div>
+  <div id="site-footer"></div>
+  <script src="/js/common_layout.js"></script>
+</body>
+</html>
