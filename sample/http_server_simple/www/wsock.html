@@ -5,6 +5,7 @@
 <meta http-equiv="Content-Style-Type" content="text/css">
 <meta http-equiv="Content-Script-Type" content="text/javascript">
 <title>ws sample</title>
+<script type="text/javascript" src="/js/room.js"></script>
 <script type="text/javascript">
 var ws_socket = null;
 var self_uuid = '';
@@ -12,125 +13,118 @@ var self_con_id = '';
 var current_join_room_id = '';
 var http_base = window.location.origin;
 var ws_base = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host;
+var room_manager = null;
 window.onload=function()
 {
-	ws_socket = new WebSocket(ws_base);
-	ws_socket.addEventListener('open', function (event) {
-		self_uuid = Math.random().toString(36).slice(-8);
-		ws_socket.send(self_uuid);
-	});
-	ws_socket.addEventListener('message', function (event) {
-    	console.log('recv : ', event.data);
-		try{
-			let json = JSON.parse(event.data);
-			if(json.id !== undefined && json.type !== undefined && json.message !== undefined)
-			{
-				let con_id = json.id;
-				if(json.type === 'message')
-				{
-					// echo back
-					if(json.message === self_uuid){
-						self_con_id = con_id;
-					}
-				} else if(json.type === 'join'){
-					// join other user
-					if(con_id !== self_con_id)
-					{
-						console.log('join : ', con_id);
-						// send hello message
-						ws_socket.send('hello ' + con_id + ' my con id is ' + self_con_id);
-					}
-				} else if(json.type === 'leave'){
-					// leave other user
-					console.log('leave : ', con_id);
+	room_manager = new RoomServerManager({
+		httpBase: http_base,
+		wsBase: ws_base,
+		callbacks: {
+			onWsOpen: function() {
+				ws_socket = room_manager.wsSocket;
+				self_uuid = room_manager.selfUuid;
+			},
+			onWsRawMessage: function(payload) {
+				console.log('recv : ', payload.data);
+			},
+			onSelfConnectionId: function(payload) {
+				self_con_id = payload.connectionId;
+			},
+			onJoin: function(payload) {
+				if (payload.connectionId !== self_con_id) {
+					console.log('join : ', payload.connectionId);
+					room_manager.send('hello ' + payload.connectionId + ' my con id is ' + self_con_id);
 				}
+			},
+			onLeave: function(payload) {
+				console.log('leave : ', payload.connectionId);
+			},
+			onWsClose: function() {
+				console.log('ws closed');
+				current_join_room_id = '';
+			},
+			onParseError: function(payload) {
+				console.log('error : ', payload.error);
+			},
+			onHttpError: function(payload) {
+				console.log('http error : ', payload.error);
+			},
+			onCallbackError: function(payload) {
+				console.log('callback error : ', payload.error);
 			}
-		}catch(e){
-			console.log('error : ', e);
 		}
 	});
-	ws_socket.addEventListener('close', function (event) {
-		console.log('ws closed');
-		current_join_room_id = '';
-	});
+
+	ws_socket = room_manager.connect();
 }
 function room_list(con_id)
 {
-	let xhr = new XMLHttpRequest();
-	xhr.open('GET', http_base + '/api/v1/room/list', true);
-	xhr.onreadystatechange = function() {
-		if (xhr.readyState === 4) {
-			if (xhr.status === 200) {
-				console.log('room list response : ', xhr.responseText);
-				let json = JSON.parse(xhr.responseText);
-				let is_join = false;
-				if(json.list !== undefined)
+	if (!room_manager) return;
+	room_manager.listRooms()
+		.then(function(json) {
+			console.log('room list response : ', JSON.stringify(json));
+			if(json.list !== undefined)
+			{
+				let room_list_div = document.getElementById('room_list');
+				let room_join_id = '';
+				room_list_div.innerHTML = '';
+				for(let i=0; i<json.list.length; i++)
 				{
-					let room_list_div = document.getElementById('room_list');
-					let room_join_id = '';
-					room_list_div.innerHTML = '';
-					for(let i=0; i<json.list.length; i++)
-					{
-						let room_id = json.list[i].id;
-						room_list_div.innerHTML += 'Room ID: ' + room_id + '<br>';
-						room_join_id = room_id;
-					}
-					let room_join_id_input = document.getElementById('join_room_id');
-					room_join_id_input.value = room_join_id;
+					let room_id = json.list[i].id;
+					room_list_div.innerHTML += 'Room ID: ' + room_id + '<br>';
+					room_join_id = room_id;
 				}
+				let room_join_id_input = document.getElementById('join_room_id');
+				room_join_id_input.value = room_join_id;
 			}
-		}
-	};
-	xhr.send();
+		})
+		.catch(function(error) {
+			console.log('room list error : ', error);
+		});
 }
 function room_create(room_name, con_id)
 {
-	let xhr = new XMLHttpRequest();
-	xhr.open('POST', http_base + '/api/v1/room/create', true);
-	xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-	xhr.onreadystatechange = function() {
-		if (xhr.readyState === 4) {
-			if (xhr.status === 200) {
-				console.log('room create response : ', xhr.responseText);
-				let json = JSON.parse(xhr.responseText);
-				let room_id = json.id;
-				console.log('created room id : ', room_id);
-				let room_join_id_input = document.getElementById('join_room_id');
-				room_join_id_input.value = room_id;
-			}
-		}
-	};
-	xhr.send('name=' + room_name);
+	if (!room_manager) return;
+	room_manager.createRoom(room_name)
+		.then(function(json) {
+			console.log('room create response : ', JSON.stringify(json));
+			let room_id = json.id;
+			console.log('created room id : ', room_id);
+			let room_join_id_input = document.getElementById('join_room_id');
+			room_join_id_input.value = room_id;
+		})
+		.catch(function(error) {
+			console.log('room create error : ', error);
+		});
 }
 function room_join(room_id,con_id)
 {
-	let xhr = new XMLHttpRequest();
-	xhr.open('POST', http_base + '/api/v1/room/join', true);
-	xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-	xhr.onreadystatechange = function() {
-		if (xhr.readyState === 4) {
-			if (xhr.status === 200) {
-				console.log('room join response : ', xhr.responseText);
-				current_join_room_id = room_id;
-			}
-		}
-	};
-	xhr.send('room_id=' + room_id + '&connection_id=' + con_id);
+	if (!room_manager) return;
+	room_manager.joinRoom(room_id, con_id)
+		.then(function(json) {
+			console.log('room join response : ', JSON.stringify(json));
+			current_join_room_id = room_id;
+		})
+		.catch(function(error) {
+			console.log('room join error : ', error);
+		});
 }
 function room_leave(room_id,con_id)
 {
-	let xhr = new XMLHttpRequest();
-	xhr.open('POST', http_base + '/api/v1/room/leave', true);
-	xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-	xhr.onreadystatechange = function() {
-		if (xhr.readyState === 4) {
-			if (xhr.status === 200) {
-				console.log('room leave response : ', xhr.responseText);
-				current_join_room_id = '';
-			}
-		}
-	};
-	xhr.send('room_id=' + room_id + '&connection_id=' + con_id);
+	if (!room_manager) return;
+	room_manager.leaveRoom(room_id, con_id)
+		.then(function(json) {
+			console.log('room leave response : ', JSON.stringify(json));
+			current_join_room_id = '';
+		})
+		.catch(function(error) {
+			console.log('room leave error : ', error);
+		});
+}
+function send_ws_message()
+{
+	if (!room_manager) return;
+	room_manager.send(document.getElementById('send_message').value);
 }
 </script>
 </head>
@@ -138,7 +132,7 @@ function room_leave(room_id,con_id)
 	<button onclick="room_list(self_con_id)">room list</button>
 	<form id="send_message_form">
 		Message: <input type="text" id="send_message" value="hello server">
-		<button type="button" onclick="ws_socket.send(document.getElementById('send_message').value)">send</button>
+		<button type="button" onclick="send_ws_message()">send</button>
 	</form>
 	<form id="room_create_form">
 		Room ID: <input type="text" id="room_id" value="test_room">
