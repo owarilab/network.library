@@ -315,6 +315,8 @@ var ws_socket = null;
 var self_uuid = '';
 var self_con_id = '';
 var current_join_room_id = '';
+var http_base = window.location.origin;
+var ws_base = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host;
 
 // Game state
 var gameState = {
@@ -358,7 +360,7 @@ window.onload = function() {
 };
 
 function initWebSocket() {
-  ws_socket = new WebSocket('ws://localhost:4444');
+  ws_socket = new WebSocket(ws_base);
   
   ws_socket.addEventListener('open', function(event) {
     self_uuid = Math.random().toString(36).slice(-8);
@@ -1123,7 +1125,7 @@ function createRoom() {
   if (!roomId) return;
   
   const xhr = new XMLHttpRequest();
-  xhr.open('POST', 'http://localhost:4444/api/v1/room/create', true);
+  xhr.open('POST', http_base + '/api/v1/room/create', true);
   xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
   xhr.onreadystatechange = function() {
     if (xhr.readyState === 4 && xhr.status === 200) {
@@ -1141,7 +1143,7 @@ function joinRoom() {
   if (!roomId || !self_con_id) return;
   
   const xhr = new XMLHttpRequest();
-  xhr.open('POST', 'http://localhost:4444/api/v1/room/join', true);
+  xhr.open('POST', http_base + '/api/v1/room/join', true);
   xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
   xhr.onreadystatechange = function() {
     if (xhr.readyState === 4 && xhr.status === 200) {
@@ -1171,7 +1173,7 @@ function leaveRoom() {
   if (!current_join_room_id || !self_con_id) return;
   
   const xhr = new XMLHttpRequest();
-  xhr.open('POST', 'http://localhost:4444/api/v1/room/leave', true);
+  xhr.open('POST', http_base + '/api/v1/room/leave', true);
   xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
   xhr.onreadystatechange = function() {
     if (xhr.readyState === 4 && xhr.status === 200) {
@@ -1192,7 +1194,7 @@ function leaveRoom() {
 
 function listRooms() {
   const xhr = new XMLHttpRequest();
-  xhr.open('GET', 'http://localhost:4444/api/v1/room/list', true);
+  xhr.open('GET', http_base + '/api/v1/room/list', true);
   xhr.onreadystatechange = function() {
     if (xhr.readyState === 4 && xhr.status === 200) {
       const json = JSON.parse(xhr.responseText);

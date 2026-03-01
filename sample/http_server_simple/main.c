@@ -31,13 +31,14 @@ int main( int argc, char *argv[], char *envp[] )
 		api_qs_memory_clean(&g_temporary_memory);
 	}
 	QS_SERVER_CONTEXT* context = 0;
-	int32_t max_connection = 100;
+	int32_t max_connection = 10;
 	if(0 > api_qs_server_init(&context,server_port,max_connection,QS_SERVER_TYPE_HTTP)){return -1;}
+	if(-1==api_qs_set_scheduler(context,QS_SCHEDULER_MODE_LOW)){return -1;}
 	if(-1==api_qs_server_create_router(context)){return -1;}
 	if(-1==api_qs_server_create_kvs(context,QS_KVS_MEMORY_TYPE_B1MB)){return -1;}
-	if(-1==api_qs_server_create_logger_access(context,"./access_log.txt")){return -1;}
-	if(-1==api_qs_server_create_logger_debug(context,"./debug_log.txt")){return -1;}
-	if(-1==api_qs_server_create_logger_error(context,"./error_log.txt")){return -1;}
+	//if(-1==api_qs_server_create_logger_access(context,"./access_log.txt")){return -1;}
+	//if(-1==api_qs_server_create_logger_debug(context,"./debug_log.txt")){return -1;}
+	//if(-1==api_qs_server_create_logger_error(context,"./error_log.txt")){return -1;}
 	api_qs_set_on_connect_event(context, on_connect );
 	api_qs_set_on_http_event(context, on_http_event );
 	api_qs_set_on_websocket_event(context, on_ws_event );
