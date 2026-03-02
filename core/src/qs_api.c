@@ -791,6 +791,14 @@ int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_conn
 	//qs_memory_info(main_memory_pool);
 	return 0;
 }
+void api_qs_server_memory_info(QS_SERVER_CONTEXT* context)
+{
+	if(NULL==context){
+		return;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	qs_memory_info(memory);
+}
 int api_qs_server_get_socket(QS_SERVER_CONTEXT* context)
 {
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
@@ -915,6 +923,17 @@ int api_qs_server_create_kvs(QS_SERVER_CONTEXT* context, int kvs_memory_type)
 		return -1;
 	}
 	return 0;
+}
+void api_qs_kvs_memory_info(QS_SERVER_CONTEXT* context)
+{
+	if(NULL==context){
+		return;
+	}
+	if(NULL==context->kvs_memory){
+		return;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->kvs_memory;
+	qs_memory_info(memory);
 }
 int api_qs_server_get_kvs(QS_SERVER_CONTEXT* context,QS_KVS_CONTEXT* kvs_context)
 {

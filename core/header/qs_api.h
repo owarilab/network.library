@@ -184,12 +184,14 @@ void api_qs_client_free(QS_CLIENT_CONTEXT* context);
 
 
 int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_connection, int32_t server_type);
+void api_qs_server_memory_info(QS_SERVER_CONTEXT* context);
 int api_qs_server_get_socket(QS_SERVER_CONTEXT* context);
 int api_qs_set_scheduler(QS_SERVER_CONTEXT* context, int32_t scheduler_mode);
 void api_qs_set_server_session_timeout(QS_SERVER_CONTEXT* context, int32_t timeout);
 int api_qs_server_create_router(QS_SERVER_CONTEXT* context);
 void api_qs_router_memory_info(QS_SERVER_CONTEXT* context);
 int api_qs_server_create_kvs(QS_SERVER_CONTEXT* context, int kvs_memory_type);
+void api_qs_kvs_memory_info(QS_SERVER_CONTEXT* context);
 int api_qs_server_get_kvs(QS_SERVER_CONTEXT* context,QS_KVS_CONTEXT* kvs_context);
 void api_qs_set_on_connect_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_connect );
 void api_qs_set_on_plain_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_plain_event );
