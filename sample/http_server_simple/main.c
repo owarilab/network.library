@@ -21,6 +21,7 @@ int main( int argc, char *argv[], char *envp[] )
 #endif
 	api_qs_memory_alloc(&g_temporary_memory,1024*1024*4);
 	int server_port = 8080;
+	int scheduler_mode = QS_SCHEDULER_MODE_LOW;
 	{
 		QS_SERVER_SCRIPT_CONTEXT script;
 		if(-1==api_qs_script_read_file(&g_temporary_memory, &script, "./server.conf")){return -1;}
@@ -28,12 +29,20 @@ int main( int argc, char *argv[], char *envp[] )
 		if(0!=api_qs_script_get_parameter(&script,"server_port")){
 			server_port = atoi(api_qs_script_get_parameter(&script,"server_port"));
 		}
+		if(0!=api_qs_script_get_parameter(&script,"scheduler_mode")){
+			const char* sm = api_qs_script_get_parameter(&script,"scheduler_mode");
+			if(!strcmp(sm,"high"))       scheduler_mode = QS_SCHEDULER_MODE_HIGH;
+			else if(!strcmp(sm,"middle")) scheduler_mode = QS_SCHEDULER_MODE_MIDDLE;
+			else                          scheduler_mode = QS_SCHEDULER_MODE_LOW;
+			printf("scheduler_mode = %s\n", sm);
+			printf("scheduler_mode = %d\n", scheduler_mode);
+		}
 		api_qs_memory_clean(&g_temporary_memory);
 	}
 	QS_SERVER_CONTEXT* context = 0;
 	int32_t max_connection = 10;
 	if(0 > api_qs_server_init(&context,server_port,max_connection,QS_SERVER_TYPE_HTTP)){return -1;}
-	if(-1==api_qs_set_scheduler(context,QS_SCHEDULER_MODE_LOW)){return -1;}
+	if(-1==api_qs_set_scheduler(context,scheduler_mode)){return -1;}
 	if(-1==api_qs_server_create_router(context)){return -1;}
 	if(-1==api_qs_server_create_kvs(context,QS_KVS_MEMORY_TYPE_B1MB)){return -1;}
 	//if(-1==api_qs_server_create_logger_access(context,"./access_log.txt")){return -1;}
