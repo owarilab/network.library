@@ -13,13 +13,25 @@ int on_ws_event(QS_EVENT_PARAMETER params);
 int on_close(QS_EVENT_PARAMETER params);
 
 QS_MEMORY_CONTEXT g_temporary_memory;
+QS_MEMORY_CONTEXT g_kvs_memory;
+QS_KVS_CONTEXT g_kvs;
 
 int main( int argc, char *argv[], char *envp[] )
 {
 #ifdef __WINDOWS__
 	SetConsoleOutputCP(CP_UTF8);
 #endif
-	api_qs_memory_alloc(&g_temporary_memory,1024*1024*4);
+	if(-1==api_qs_memory_alloc(&g_temporary_memory,1024*1024*4))
+	{
+		printf("api_qs_memory_alloc failed\n");
+		return -1;
+	}
+	if(-1==api_qs_memory_alloc(&g_kvs_memory, (size_t)(1024 * 1024) * (size_t)(256 + 16)))
+	{
+		printf("api_qs_memory_alloc failed\n");
+		return -1;
+	}
+	if(-1==api_qs_kvs_create_b256mb(&g_kvs_memory, &g_kvs)){return -1;}
 	int server_port = 8080;
 	int scheduler_mode = QS_SCHEDULER_MODE_LOW;
 	int32_t max_connection = 10;
@@ -120,12 +132,19 @@ int main( int argc, char *argv[], char *envp[] )
 		}
 	}
 
+	//api_qs_memory_info(&g_temporary_memory);
+	//api_qs_memory_info(&g_kvs_memory);
+	//api_qs_router_memory_info(context);
+	//api_qs_kvs_memory_info(context);
+	//api_qs_server_memory_info(context);
+
 	for(;;){
 		api_qs_update(context);
 		api_qs_sleep(context);
 	}
 	api_qs_free(context);
 	api_qs_memory_free(&g_temporary_memory);
+	api_qs_memory_free(&g_kvs_memory);
 	return 0;
 }
 
