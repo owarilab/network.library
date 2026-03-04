@@ -10,10 +10,69 @@
 - `src/` : モジュール本体と Makefile
 - `third_party/` : 外部依存（例: llama.cpp）
 
+## CUDA Toolkit 導入( GPUを使う場合 )
+
+1) 事前確認
+
+```bash
+nvidia-smi
+nvcc --version
+```
+
+2) CUDA 公式 APT リポジトリを追加
+
+```bash
+sudo apt-get update
+sudo apt-get install -y wget gnupg ca-certificates
+wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
+sudo dpkg -i cuda-keyring_1.1-1_all.deb
+sudo apt-get update
+```
+
+3) Toolkit をインストール（Driver 置き換えを避けるため `cuda-toolkit` を使用）
+
+```bash
+sudo apt-get install -y cuda-toolkit
+```
+
+4) シェル環境変数を反映
+
+```bash
+echo 'export PATH=/usr/local/cuda/bin:$PATH' >> ~/.bashrc
+echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH' >> ~/.bashrc
+source ~/.bashrc
+```
+
 ## llama.cpp の配置
 
 推奨: `llm/third_party/llama.cpp/` に配置（git submodule でも OK）。
 詳細は `llm/third_party/README.md` を参照してください。
+
+## stable-diffusion.cpp の導入
+
+`stable-diffusion.cpp` を使ったプラグインを追加する場合は、まず `llm/third_party/stable-diffusion.cpp/` に配置します。
+
+### install
+
+```bash
+git clone --recursive https://github.com/leejet/stable-diffusion.cpp
+cd stable-diffusion.cpp
+
+mkdir -p build
+cd build
+
+cmake .. -DCMAKE_BUILD_TYPE=Release -DSD_CUDA=ON
+cmake --build . -j"$(nproc)"
+```
+
+### 動作確認
+
+```bash
+cd stable-diffusion.cpp
+mkdir models
+mkdir outputs
+```
+
 
 ## ビルド（Linux）
 
@@ -49,42 +108,11 @@ export QS_LLM_MODEL_PATH=/path/to/model.gguf
 export QS_LLM_MAX_TOKENS=128
 ```
 
-### Ubuntu 24.04 で NVIDIA GPU を使う（CUDA Toolkit 導入）
+### Ubuntu 24.04 で NVIDIA GPU を使う（CUDA Toolkit）
 
 `LLAMA_ENABLE=1` で GPU 実行するには、NVIDIA Driver に加えて CUDA Toolkit（`nvcc`）が必要です。
 
-1) 事前確認
-
-```bash
-nvidia-smi
-nvcc --version
-```
-
-2) CUDA 公式 APT リポジトリを追加
-
-```bash
-sudo apt-get update
-sudo apt-get install -y wget gnupg ca-certificates
-wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
-sudo dpkg -i cuda-keyring_1.1-1_all.deb
-sudo apt-get update
-```
-
-3) Toolkit をインストール（Driver 置き換えを避けるため `cuda-toolkit` を使用）
-
-```bash
-sudo apt-get install -y cuda-toolkit
-```
-
-4) シェル環境変数を反映
-
-```bash
-echo 'export PATH=/usr/local/cuda/bin:$PATH' >> ~/.bashrc
-echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH' >> ~/.bashrc
-source ~/.bashrc
-```
-
-5) GPU 有効でビルド
+1) GPU 有効でビルド
 
 ```bash
 cd llm/src
@@ -92,7 +120,7 @@ make clean
 make build LLAMA_ENABLE=1 LLAMA_CUDA=1
 ```
 
-6) 実行時に GPU オフロード層を指定
+2) 実行時に GPU オフロード層を指定
 
 ```bash
 export QS_LLM_MODEL_PATH=/path/to/model.gguf
