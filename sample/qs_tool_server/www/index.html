@@ -1,0 +1,40 @@
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=0">
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta http-equiv="Content-Style-Type" content="text/css">
+<meta http-equiv="Content-Script-Type" content="text/javascript">
+<title>Dot Editor</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="mainCanvas"></canvas>
+<script src="js/pixel_data.js"></script>
+<script src="js/util/pixel_data_converter.js"></script>
+<script src="js/app_data.js"></script>
+<script src="js/input.js"></script>
+<script src="js/ui/menu_constants.js"></script>
+<script src="js/ui/dropdown_menu.js"></script>
+<script src="js/ui/menu_bar.js"></script>
+<script src="js/ui/ui_window.js"></script>
+<script src="js/pixel_canvas.js"></script>
+<script src="js/ui/dialog/dialog_base.js"></script>
+<script src="js/ui/dialog/new_file_dialog.js"></script>
+<script src="js/ui/dialog/save_dialog.js"></script>
+<script src="js/ui/color_palette.js"></script>
+<script src="js/ui/color_palette_16.js"></script>
+<script src="js/ui/color_palette_window.js"></script>
+<script src="js/ui/tool_bar.js"></script>
+<script src="js/ui/tool_bar_window.js"></script>
+<script src="js/scene/scene.js"></script>
+<script src="js/scene_manager.js"></script>
+<script src="js/scene/editor_scene.js"></script>
+<script src="js/canvas_manager.js"></script>
+<script>
+window.addEventListener('DOMContentLoaded', () => {
+  window.canvasManager = new CanvasManager('mainCanvas');
+  window.canvasManager.sceneManager.change(new EditorScene());
+});
+</script>
+</body>
+</html>

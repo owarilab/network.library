@@ -1,0 +1,50 @@
+/**
+ * SceneManager
+ * 現在アクティブなシーンを保持し、CanvasManager のループから
+ * update / render を委譲されるクラス。
+ */
+class SceneManager {
+  /**
+   * @param {AppData} appData - シーン間で共有するアプリケーションデータ
+   * @param {Input}   input   - 入力管理オブジェクト
+   */
+  constructor(appData, input) {
+    /** @type {Scene|null} */
+    this.current = null;
+
+    /** @type {AppData} */
+    this.appData = appData;
+
+    /** @type {Input} */
+    this.input = input;
+  }
+
+  /**
+   * シーンを切り替える。
+   * 旧シーンの onLeave → input.clearAll() → 新シーンの onEnter を呼ぶ。
+   * @param {Scene} scene - 次のシーン
+   */
+  change(scene) {
+    if (this.current) {
+      this.current.onLeave(this.input, this.appData);
+    }
+    this.input.clearAll();
+    this.current = scene;
+    this.current.onEnter(this.input, this.appData);
+  }
+
+  /**
+   * @param {number} dt - 経過時間 (ms)
+   */
+  update(dt) {
+    this.current?.update(dt, this.appData);
+  }
+
+  /**
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {HTMLCanvasElement} canvas
+   */
+  render(ctx, canvas) {
+    this.current?.render(ctx, canvas, this.appData);
+  }
+}
