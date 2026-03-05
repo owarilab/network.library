@@ -31,6 +31,7 @@ class EditorScene extends Scene {
           ? PixelData.rgba(255, 255, 255, 255)
           : 0x00000000;
         this._appData.createPixelData(width, height, fillColor);
+        this._pixelCanvas.resetView();
         this._pixelCanvas.markDirty();
         console.log(`[EditorScene] new file: ${width}x${height} bg=${bgColor}`);
       },
@@ -93,6 +94,7 @@ class EditorScene extends Scene {
       PixelDataConverter.importFromFile(file)
         .then(pd => {
           this._appData.pixelData = pd;
+          this._pixelCanvas.resetView();
           this._pixelCanvas.markDirty();
           console.log(`[EditorScene] import: ${file.name} → ${pd.width}x${pd.height}`);
         })
@@ -118,6 +120,11 @@ class EditorScene extends Scene {
         } else {
           console.warn('[EditorScene] エクスポート: ファイルが作成されていません');
         }
+        return;
+      }
+      if (id === MenuConstants.VIEW_GRID) {
+        this._pixelCanvas.showGrid = !this._pixelCanvas.showGrid;
+        console.log('[EditorScene] grid:', this._pixelCanvas.showGrid);
         return;
       }
       // 今後: 他の id で分岐して各アクションを実装

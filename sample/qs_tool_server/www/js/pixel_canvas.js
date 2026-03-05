@@ -57,6 +57,12 @@ class PixelCanvas {
     this.panX = 0;
     this.panY = 0;
 
+    /**
+     * グリッド線を表示するかどうか
+     * @type {boolean}
+     */
+    this.showGrid = true;
+
     /** パン操作中フラグ */
     this._isPanning    = false;
     this._panStartX    = 0;
@@ -133,7 +139,7 @@ class PixelCanvas {
     ctx.restore();
 
     // ---- グリッド線 ----
-    if (this.scale >= PixelCanvas.GRID_THRESHOLD) {
+    if (this.showGrid && this.scale >= PixelCanvas.GRID_THRESHOLD) {
       this._drawGrid(ctx, pw, ph);
     }
 
@@ -283,6 +289,16 @@ class PixelCanvas {
   resetPan() {
     this.panX = 0;
     this.panY = 0;
+  }
+
+  /**
+   * パン・ズームをデフォルト状態にリセットする。
+   * ファイル読み込み・新規作成後に呼ぶ。
+   */
+  resetView() {
+    this.panX  = 0;
+    this.panY  = 0;
+    this.scale = 16;
   }
 
   // ----------------------------------------------------------------
