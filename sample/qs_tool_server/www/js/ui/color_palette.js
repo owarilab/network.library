@@ -42,6 +42,17 @@ class ColorPalette {
 
     /** render() 後に screen 座標で格納されるセル情報 */
     this._cells = [];
+
+    /** FG スウォッチ矩形 (render 後に設定) @type {{x:number,y:number,w:number,h:number}|null} */
+    this._fgSwatch = null;
+    /** BG スウォッチ矩形 (render 後に設定) @type {{x:number,y:number,w:number,h:number}|null} */
+    this._bgSwatch = null;
+
+    /**
+     * スウォッチクリック時のコールバック。
+     * @type {((target: 'fore' | 'back', appData: AppData) => void)|null}
+     */
+    this.onSwatchClick = null;
   }
 
   // ----------------------------------------------------------------
@@ -152,6 +163,10 @@ class ColorPalette {
     const bgX = startX + offset;
     const bgY = startY + offset;
 
+    // スウォッチ矩形を保持 (ヒットテスト用)
+    this._fgSwatch = { x: fgX, y: fgY, w: sw, h: sw };
+    this._bgSwatch = { x: bgX, y: bgY, w: sw, h: sw };
+
     // BG スウォッチ (奥)
     this._drawChecker(ctx, bgX, bgY, sw);
     ctx.fillStyle   = PixelData.toCssColor(appData.backColor);
@@ -212,6 +227,18 @@ class ColorPalette {
    * @returns {boolean} セルにヒットした場合 true
    */
   onMouseDown(e, appData) {
+    // スウォッチクリック判定 (カラーピッカー呼び出し)
+    if (e.button === 0 && this.onSwatchClick) {
+      if (this._fgSwatch && this._hitRect(e.x, e.y, this._fgSwatch)) {
+        this.onSwatchClick('fore', appData);
+        return true;
+      }
+      if (this._bgSwatch && this._hitRect(e.x, e.y, this._bgSwatch)) {
+        this.onSwatchClick('back', appData);
+        return true;
+      }
+    }
+
     const idx = this._hitTestCell(e.x, e.y);
     if (idx < 0) return false;
     const color = this.getColors()[idx];
@@ -221,6 +248,11 @@ class ColorPalette {
       appData.foreColor = color;
     }
     return true;
+  }
+
+  /** 矩形ヒットテスト */
+  _hitRect(x, y, r) {
+    return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
   }
 
   /**

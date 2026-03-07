@@ -41,6 +41,29 @@ class EditorScene extends Scene {
     /** カラーパレットウィンドウ @type {ColorPaletteWindow} */
     this._colorPaletteWin = new ColorPaletteWindow(new ColorPalette16());
 
+    /** カラーピッカーダイアログ @type {ColorPickerDialog} */
+    this._colorPickerDialog = new ColorPickerDialog(
+      (color) => {
+        if (!this._appData) return;
+        if (this._colorPickerTarget === 'back') {
+          this._appData.backColor = color;
+        } else {
+          this._appData.foreColor = color;
+        }
+        console.log(`[EditorScene] color picked: 0x${color.toString(16).padStart(8, '0')}`);
+      },
+      () => console.log('[EditorScene] color picker cancelled'),
+    );
+    /** @type {'fore' | 'back'} */
+    this._colorPickerTarget = 'fore';
+
+    // パレットのスウォッチクリックでカラーピッカーを開く
+    this._colorPaletteWin.getPalette().onSwatchClick = (target, appData) => {
+      this._colorPickerTarget = target;
+      const color = target === 'back' ? appData.backColor : appData.foreColor;
+      this._colorPickerDialog.showWithColor(color);
+    };
+
     /** ツールバーウィンドウ @type {ToolBarWindow} */
     this._toolBarWin = new ToolBarWindow();
 
@@ -142,6 +165,7 @@ class EditorScene extends Scene {
     this._onKeyDown = e => {
       if (this._newFileDialog.isVisible) { this._newFileDialog.onKeyDown(e); return; }
       if (this._saveDialog.isVisible)    { this._saveDialog.onKeyDown(e);    return; }
+      if (this._colorPickerDialog.isVisible) { this._colorPickerDialog.onKeyDown(e); return; }
       if (e.key === ' ') {
         e.preventDefault?.();
         if (!this._spaceDown) {
@@ -169,6 +193,7 @@ class EditorScene extends Scene {
     this._onMouseMove = e => {
       this._newFileDialog.onMouseMove(e);
       this._saveDialog.onMouseMove(e);
+      this._colorPickerDialog.onMouseMove(e);
       this._colorPaletteWin.onMouseMove(e, appData);
       this._toolBarWin.onMouseMove(e, appData);
       this._layerPanelWin.onMouseMove(e, appData);
@@ -185,6 +210,7 @@ class EditorScene extends Scene {
     this._onMouseDown = e => {
       if (this._newFileDialog.isVisible) { this._newFileDialog.onMouseDown(e); return; }
       if (this._saveDialog.isVisible)    { this._saveDialog.onMouseDown(e);    return; }
+      if (this._colorPickerDialog.isVisible) { this._colorPickerDialog.onMouseDown(e); return; }
       // メニューバー領域のクリックはピクセル操作に渡さない
       if (e.y < MenuBar.HEIGHT) {
         this._menuBar.onMouseDown(e);
@@ -213,6 +239,7 @@ class EditorScene extends Scene {
     this._onMouseUp = e => {
       if (this._newFileDialog.isVisible) { this._newFileDialog.onMouseUp(e); return; }
       if (this._saveDialog.isVisible)    { this._saveDialog.onMouseUp(e);    return; }
+      if (this._colorPickerDialog.isVisible) { this._colorPickerDialog.onMouseUp(e); return; }
       if (this._pixelCanvas._isPanning) {
         this._pixelCanvas.endPan();
         if (this._canvas) this._canvas.style.cursor = this._spaceDown ? 'grab' : '';
@@ -225,7 +252,7 @@ class EditorScene extends Scene {
       this._pixelCanvas.onMouseUp(e, appData);
     };
     this._onWheel = e => {
-      if (this._newFileDialog.isVisible) return;
+      if (this._newFileDialog.isVisible || this._saveDialog.isVisible || this._colorPickerDialog.isVisible) return;
       this._pixelCanvas.zoom(-e.deltaY, e.x, e.y);
     };
     this._onContextMenu = e => console.log('[EditorScene] contextmenu', e);
@@ -282,6 +309,7 @@ class EditorScene extends Scene {
     // ダイアログ（メニューバーより前、オーバーレイがメニューを覆う）
     this._newFileDialog.render(ctx, canvas);
     this._saveDialog.render(ctx, canvas);
+    this._colorPickerDialog.render(ctx, canvas);
 
     // メニューバーを最前面に描画
     this._menuBar.render(ctx, canvas);

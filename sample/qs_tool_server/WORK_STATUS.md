@@ -44,7 +44,9 @@ www/
         ├── ui_window.js            # UIWindow: ドラッグ可能ウィンドウ共通基底クラス
         └── dialog/
             ├── dialog_base.js      # DialogBase: モーダルダイアログ基底クラス
-            └── new_file_dialog.js  # NewFileDialog: 新規作成ダイアログ
+            ├── new_file_dialog.js   # NewFileDialog: 新規作成ダイアログ
+            ├── save_dialog.js       # SaveDialog: エクスポートダイアログ
+            └── color_picker_dialog.js # ColorPickerDialog: HSVカラーピッカーダイアログ
 ```
 
 ---
@@ -146,10 +148,12 @@ www/
 - [x] **ColorPaletteWindow** (`js/ui/color_palette_window.js`)
   - `UIWindow` 継承、任意の `ColorPalette` インスタンスをコンテンツとして包む
   - `setPalette(palette)` で実行時パレット切り替え可能
-- [ ] **カラーピッカーダイアログ** (`js/ui/dialog/color_picker_dialog.js`)
-  - HSV カラーホイールまたはスライダー
-  - RGB / Hex 入力欄
+- [x] **カラーピッカーダイアログ** (`js/ui/dialog/color_picker_dialog.js`)
+  - HSV カラーホイール (SV 領域 + Hue バー)
+  - RGB / A スピナー入力 + Hex (#RRGGBB) 入力
+  - 旧色 / 新色プレビュー表示
   - `DialogBase` を継承して実装
+  - パレットの FG/BG スウォッチクリックでダイアログを開く
 
 ---
 
@@ -274,7 +278,7 @@ pixel_data.js → pixel_data_converter.js → layer_data.js → app_data.js → 
 → menu_constants.js → dropdown_menu.js → menu_bar.js
 → ui_window.js
 → pixel_canvas.js
-→ dialog_base.js → new_file_dialog.js → save_dialog.js
+→ dialog_base.js → new_file_dialog.js → save_dialog.js → color_picker_dialog.js
 → color_palette.js → color_palette_16.js → color_palette_window.js
 → tool_bar.js → tool_bar_window.js
 → layer_panel.js → layer_panel_window.js
