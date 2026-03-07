@@ -1,6 +1,6 @@
 # ドットエディタ 作業状況
 
-最終更新: 2026-03-05 (7)
+最終更新: 2026-03-07 (8)
 
 ## 概要
 
@@ -21,7 +21,8 @@ www/
 │   └── style.css                   # body/canvas 全画面スタイル
 └── js/
     ├── pixel_data.js               # PixelData: Uint32Array ベースのピクセルデータ管理
-    ├── app_data.js                 # AppData: シーン間共有データコンテナ (foreColor/backColor 追加済み)
+    ├── layer_data.js               # LayerData: 複数 PixelData レイヤー管理・アルファ合成
+    ├── app_data.js                 # AppData: シーン間共有データコンテナ (LayerData 統合済)
     ├── input.js                    # Input: キーボード/マウス/タッチイベント一元管理
     ├── pixel_canvas.js             # PixelCanvas: PixelData描画・ズーム・パン
     ├── canvas_manager.js           # CanvasManager: RAFループ・各マネージャ生成
@@ -38,6 +39,8 @@ www/
         ├── color_palette_window.js # ColorPaletteWindow: UIWindow継承のパレットウィンドウ
         ├── tool_bar.js             # ToolBar: ツールボタンコンテンツクラス
         ├── tool_bar_window.js      # ToolBarWindow: UIWindow継承のツールバーウィンドウ
+        ├── layer_panel.js          # LayerPanel: レイヤー一覧コンテンツクラス
+        ├── layer_panel_window.js   # LayerPanelWindow: UIWindow継承のレイヤーパネル
         ├── ui_window.js            # UIWindow: ドラッグ可能ウィンドウ共通基底クラス
         └── dialog/
             ├── dialog_base.js      # DialogBase: モーダルダイアログ基底クラス
@@ -53,7 +56,7 @@ www/
 - [x] `CanvasManager`: 全画面 canvas、RAF 60fps ループ（ドリフト補正付き）、resize 対応
 - [x] `Scene` / `SceneManager`: シーン切り替え時ライフサイクル（onEnter/onLeave）、`input.clearAll()`
 - [x] `Input`: keyboard/mouse/touch イベント一元管理、canvas 相対座標正規化、wheel/contextmenu 既定動作抑止
-- [x] `AppData`: `PixelData` インスタンスを保持、`createPixelData()` デリゲート
+- [x] `AppData`: `LayerData` インスタンスを保持、`pixelData` getter でアクティブレイヤー返却、`createPixelData()` デリゲート
 
 ### データ層
 
@@ -216,9 +219,23 @@ www/
 
 #### レイヤー
 
-- [ ] **`LayerData`** クラス: 複数 `PixelData` を合成
-- [ ] **`LayerPanel`** UI: レイヤーの追加・削除・並び替え・表示/非表示・不透明度
-- [ ] `AppData.layers: LayerData[]` + `AppData.activeLayerIndex`
+- [x] **`LayerData`** クラス (`js/layer_data.js`): 複数 `PixelData` レイヤー管理・アルファ合成
+  - `init(w, h, fill)` で1レイヤー構成で初期化
+  - `addLayer()` / `removeLayer()` / `moveLayer()` レイヤー操作
+  - `toggleVisibility()` / `setOpacity()` 表示制御
+  - `composite()` ボトムアップ Porter-Duff "source over" アルファ合成、キャッシュ付き
+  - `markCompositeDirty()` で合成キャッシュ無効化
+- [x] **`LayerPanel`** UI (`js/ui/layer_panel.js`): レイヤー一覧コンテンツ
+  - 最前面が上の行表示、アクティブレイヤーハイライト
+  - 目アイコンで visibility トグル
+  - 下部ボタン: [＋追加] [−削除] [↑上へ] [↓下へ]
+  - `onChange` コールバックで外部に変更通知
+- [x] **`LayerPanelWindow`** (`js/ui/layer_panel_window.js`): UIWindow 継承
+  - 初回描画時に画面右寄せ配置
+- [x] **`AppData`** 改修: `layerData` プロパティ追加、`pixelData` を getter/setter 化（後方互換）
+- [x] **`EditorScene`** 統合: 合成画像描画、スポイトは合成結果から色取得、PNGエクスポートは合成結果
+- [ ] レイヤー不透明度スライダー UI
+- [ ] レイヤー名変更ダイアログ
 
 #### アニメーション
 
@@ -253,13 +270,14 @@ PixelData.rgba(r, g, b, a) でパック、PixelData.unpack(color) でアンパ�
 ### スクリプト読み込み順（index.html）
 
 ```
-pixel_data.js → pixel_data_converter.js → app_data.js → input.js
+pixel_data.js → pixel_data_converter.js → layer_data.js → app_data.js → input.js
 → menu_constants.js → dropdown_menu.js → menu_bar.js
 → ui_window.js
 → pixel_canvas.js
 → dialog_base.js → new_file_dialog.js → save_dialog.js
 → color_palette.js → color_palette_16.js → color_palette_window.js
 → tool_bar.js → tool_bar_window.js
+→ layer_panel.js → layer_panel_window.js
 → scene.js → scene_manager.js → editor_scene.js
 → canvas_manager.js
 → インラインスクリプト（起動）
@@ -269,7 +287,8 @@ pixel_data.js → pixel_data_converter.js → app_data.js → input.js
 
 ```
 CanvasManager
-  ├── AppData          ... PixelData + foreColor + backColor + activeTool を保持
+  ├── AppData          ... LayerData + foreColor + backColor + activeTool を保持
+  │     └── LayerData      ... 複数 PixelData レイヤー + アルファ合成
   ├── Input            ... DOM イベントを canvas 相対座標に変換して通知
   └── SceneManager
         └── EditorScene (active)
@@ -280,8 +299,10 @@ CanvasManager
               ├── SaveDialog
               ├── ToolBarWindow        ... UIWindow 継承・ドラッグ移動可能
               │     └── ToolBar            ... ツールボタンコンテンツ
-              └── ColorPaletteWindow   ... UIWindow 継承・ドラッグ移動可能
-                    └── ColorPalette16 ... ColorPalette 継承・16色コンテンツ
+              ├── ColorPaletteWindow   ... UIWindow 継承・ドラッグ移動可能
+              │     └── ColorPalette16 ... ColorPalette 継承・16色コンテンツ
+              └── LayerPanelWindow     ... UIWindow 継承・ドラッグ移動可能
+                    └── LayerPanel     ... レイヤー一覧コンテンツ
 ```
 
 ### UIWindow 継承パターン

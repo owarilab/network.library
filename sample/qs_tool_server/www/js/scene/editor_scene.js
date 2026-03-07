@@ -44,12 +44,20 @@ class EditorScene extends Scene {
     /** ツールバーウィンドウ @type {ToolBarWindow} */
     this._toolBarWin = new ToolBarWindow();
 
+    /** レイヤーパネルウィンドウ @type {LayerPanelWindow} */
+    this._layerPanelWin = new LayerPanelWindow();
+    this._layerPanelWin.onChange = () => {
+      this._pixelCanvas.markDirty();
+    };
+
     /** エクスポートダイアログ @type {SaveDialog} */
     this._saveDialog = new SaveDialog(
       (filename, format) => {
         if (!this._appData?.pixelData?.pixels) return;
         if (format === 'png') {
-          PixelDataConverter.exportAsPng(this._appData.pixelData, filename)
+          // PNG は全レイヤー合成結果をエクスポート
+          const composited = this._appData.layerData.composite();
+          PixelDataConverter.exportAsPng(composited, filename)
             .catch(err => console.error('[EditorScene] PNG エクスポートエラー:', err));
         } else {
           PixelDataConverter.exportAsJson(this._appData.pixelData, filename);
@@ -163,6 +171,7 @@ class EditorScene extends Scene {
       this._saveDialog.onMouseMove(e);
       this._colorPaletteWin.onMouseMove(e, appData);
       this._toolBarWin.onMouseMove(e, appData);
+      this._layerPanelWin.onMouseMove(e, appData);
       if (!this._newFileDialog.isVisible) {
         this._menuBar.onMouseMove(e);
         if (this._spaceDown) {
@@ -190,7 +199,8 @@ class EditorScene extends Scene {
       if (!this._menuBar.isOpen) {
         // UIWindow 群(ツールバーまたはパレット)が消費した場合はピクセル操作に渡さない
         const consumed = this._colorPaletteWin.onMouseDown(e, appData) ||
-                         this._toolBarWin.onMouseDown(e, appData);
+                         this._toolBarWin.onMouseDown(e, appData) ||
+                         this._layerPanelWin.onMouseDown(e, appData);
         if (consumed) {
           // ツール切り替え時はカーソルを更新
           this._updateToolCursor();
@@ -210,6 +220,7 @@ class EditorScene extends Scene {
       }
       this._colorPaletteWin.onMouseUp(e, appData);
       this._toolBarWin.onMouseUp(e, appData);
+      this._layerPanelWin.onMouseUp(e, appData);
       this._menuBar.onMouseUp(e);
       this._pixelCanvas.onMouseUp(e, appData);
     };
@@ -256,11 +267,14 @@ class EditorScene extends Scene {
     // canvas 参照を保持（カーソル変更に使用）
     this._canvas = canvas;
 
-    // ピクセルデータを画面中央に描画
-    this._pixelCanvas.render(ctx, canvas, appData.pixelData);
+    // 全レイヤーを合成してピクセルデータを画面中央に描画
+    this._pixelCanvas.render(ctx, canvas, appData.layerData.composite());
 
     // ツールバーウィンドウ
     this._toolBarWin.render(ctx, canvas, appData);
+
+    // レイヤーパネルウィンドウ
+    this._layerPanelWin.render(ctx, canvas, appData);
 
     // カラーパレットウィンドウ (ダイアログより前、ピクセルキャンバスの上)
     this._colorPaletteWin.render(ctx, canvas, appData);
@@ -292,11 +306,13 @@ class EditorScene extends Scene {
     switch (tool) {
       case 'pencil':
         appData.pixelData.setPixel(px, py, drawColor);
+        appData.layerData.markCompositeDirty();
         this._pixelCanvas.markDirty();
         break;
 
       case 'eraser':
         appData.pixelData.setPixel(px, py, 0x00000000);
+        appData.layerData.markCompositeDirty();
         this._pixelCanvas.markDirty();
         break;
 
@@ -304,14 +320,16 @@ class EditorScene extends Scene {
         // 塗りつぶしは mousedown のみ（ドラッグは不要）
         if (isDown) {
           this._floodFill(appData.pixelData, px, py, drawColor);
+          appData.layerData.markCompositeDirty();
           this._pixelCanvas.markDirty();
         }
         break;
 
       case 'eyedropper':
-        // mousedown のみで色を拾う
+        // mousedown のみで色を拾う（合成結果から色を拾う）
         if (isDown) {
-          const picked = appData.pixelData.getPixel(px, py);
+          const composited = appData.layerData.composite();
+          const picked = composited.getPixel(px, py);
           if (button === 2) appData.backColor  = picked;
           else              appData.foreColor  = picked;
         }
