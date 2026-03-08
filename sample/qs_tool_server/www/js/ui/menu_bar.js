@@ -30,12 +30,13 @@ class MenuBar {
       {
         label: 'ファイル',
         dropdown: new DropdownMenu([
-          { id: MenuConstants.FILE_NEW,     label: '新規作成'            },
-          { id: MenuConstants.FILE_OPEN,    label: '開く...'              },
+          { id: MenuConstants.FILE_NEW,          label: '新規作成'            },
+          { id: MenuConstants.FILE_NEW_TILESET,   label: '新規タイルセット作成' },
+          { id: MenuConstants.FILE_OPEN,          label: '開く...'              },
           { id: MenuConstants.SEPARATOR },
-          { id: MenuConstants.FILE_SAVE,    label: '保存'            },
+          { id: MenuConstants.FILE_SAVE,          label: '保存'            },
           { id: MenuConstants.SEPARATOR },
-          { id: MenuConstants.FILE_EXIT,    label: '終了'                },
+          { id: MenuConstants.FILE_EXIT,          label: '終了'                },
         ]),
       },
       {

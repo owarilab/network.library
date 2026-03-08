@@ -30,12 +30,31 @@ class EditorScene extends Scene {
         const fillColor = bgColor === 'white'
           ? PixelData.rgba(255, 255, 255, 255)
           : 0x00000000;
+        this._appData.editMode    = 'free';
+        this._appData.tilesetData = null;
         this._appData.createPixelData(width, height, fillColor);
         this._pixelCanvas.resetView();
         this._pixelCanvas.markDirty();
         console.log(`[EditorScene] new file: ${width}x${height} bg=${bgColor}`);
       },
       () => console.log('[EditorScene] new file dialog cancelled'),
+    );
+
+    /** タイルセット新規作成ダイアログ @type {NewTilesetDialog} */
+    this._newTilesetDialog = new NewTilesetDialog(
+      (chipW, chipH, cols, rows, bgColor) => {
+        if (!this._appData) return;
+        const fillColor = bgColor === 'white'
+          ? PixelData.rgba(255, 255, 255, 255)
+          : 0x00000000;
+        this._appData.tilesetData  = new TilesetData(chipW, chipH, cols, rows, fillColor);
+        this._appData.editMode     = 'tileset';
+        this._appData.selectedChip = { col: 0, row: 0 };
+        this._pixelCanvas.resetView();
+        this._pixelCanvas.markDirty();
+        console.log(`[EditorScene] new tileset: ${chipW}x${chipH} chip, ${cols}x${rows} grid, bg=${bgColor}`);
+      },
+      () => console.log('[EditorScene] new tileset dialog cancelled'),
     );
 
     /** カラーパレットウィンドウ @type {ColorPaletteWindow} */
@@ -124,6 +143,8 @@ class EditorScene extends Scene {
       this._fileInput.value = '';
       PixelDataConverter.importFromFile(file)
         .then(pd => {
+          this._appData.editMode    = 'free';
+          this._appData.tilesetData = null;
           this._appData.pixelData = pd;
           this._pixelCanvas.resetView();
           this._pixelCanvas.markDirty();
@@ -139,6 +160,10 @@ class EditorScene extends Scene {
       console.log('[EditorScene] menu selected:', id);
       if (id === MenuConstants.FILE_NEW) {
         this._newFileDialog.show();
+        return;
+      }
+      if (id === MenuConstants.FILE_NEW_TILESET) {
+        this._newTilesetDialog.show();
         return;
       }
       if (id === MenuConstants.FILE_OPEN) {
@@ -163,8 +188,9 @@ class EditorScene extends Scene {
 
     // --- キーボード ---
     this._onKeyDown = e => {
-      if (this._newFileDialog.isVisible) { this._newFileDialog.onKeyDown(e); return; }
-      if (this._saveDialog.isVisible)    { this._saveDialog.onKeyDown(e);    return; }
+      if (this._newFileDialog.isVisible)     { this._newFileDialog.onKeyDown(e);     return; }
+      if (this._newTilesetDialog.isVisible)  { this._newTilesetDialog.onKeyDown(e);  return; }
+      if (this._saveDialog.isVisible)        { this._saveDialog.onKeyDown(e);        return; }
       if (this._colorPickerDialog.isVisible) { this._colorPickerDialog.onKeyDown(e); return; }
       if (e.key === ' ') {
         e.preventDefault?.();
@@ -192,12 +218,13 @@ class EditorScene extends Scene {
     // --- マウス ---
     this._onMouseMove = e => {
       this._newFileDialog.onMouseMove(e);
+      this._newTilesetDialog.onMouseMove(e);
       this._saveDialog.onMouseMove(e);
       this._colorPickerDialog.onMouseMove(e);
       this._colorPaletteWin.onMouseMove(e, appData);
       this._toolBarWin.onMouseMove(e, appData);
       this._layerPanelWin.onMouseMove(e, appData);
-      if (!this._newFileDialog.isVisible) {
+      if (!this._newFileDialog.isVisible && !this._newTilesetDialog.isVisible) {
         this._menuBar.onMouseMove(e);
         if (this._spaceDown) {
           // パンモード: ドラッグ中なら位置を更新
@@ -208,8 +235,9 @@ class EditorScene extends Scene {
       }
     };
     this._onMouseDown = e => {
-      if (this._newFileDialog.isVisible) { this._newFileDialog.onMouseDown(e); return; }
-      if (this._saveDialog.isVisible)    { this._saveDialog.onMouseDown(e);    return; }
+      if (this._newFileDialog.isVisible)     { this._newFileDialog.onMouseDown(e);     return; }
+      if (this._newTilesetDialog.isVisible)  { this._newTilesetDialog.onMouseDown(e);  return; }
+      if (this._saveDialog.isVisible)        { this._saveDialog.onMouseDown(e);        return; }
       if (this._colorPickerDialog.isVisible) { this._colorPickerDialog.onMouseDown(e); return; }
       // メニューバー領域のクリックはピクセル操作に渡さない
       if (e.y < MenuBar.HEIGHT) {
@@ -237,8 +265,9 @@ class EditorScene extends Scene {
       this._menuBar.onMouseDown(e);
     };
     this._onMouseUp = e => {
-      if (this._newFileDialog.isVisible) { this._newFileDialog.onMouseUp(e); return; }
-      if (this._saveDialog.isVisible)    { this._saveDialog.onMouseUp(e);    return; }
+      if (this._newFileDialog.isVisible)     { this._newFileDialog.onMouseUp(e);     return; }
+      if (this._newTilesetDialog.isVisible)  { this._newTilesetDialog.onMouseUp(e);  return; }
+      if (this._saveDialog.isVisible)        { this._saveDialog.onMouseUp(e);        return; }
       if (this._colorPickerDialog.isVisible) { this._colorPickerDialog.onMouseUp(e); return; }
       if (this._pixelCanvas._isPanning) {
         this._pixelCanvas.endPan();
@@ -252,7 +281,7 @@ class EditorScene extends Scene {
       this._pixelCanvas.onMouseUp(e, appData);
     };
     this._onWheel = e => {
-      if (this._newFileDialog.isVisible || this._saveDialog.isVisible || this._colorPickerDialog.isVisible) return;
+      if (this._newFileDialog.isVisible || this._newTilesetDialog.isVisible || this._saveDialog.isVisible || this._colorPickerDialog.isVisible) return;
       this._pixelCanvas.zoom(-e.deltaY, e.x, e.y);
     };
     this._onContextMenu = e => console.log('[EditorScene] contextmenu', e);
@@ -308,6 +337,7 @@ class EditorScene extends Scene {
 
     // ダイアログ（メニューバーより前、オーバーレイがメニューを覆う）
     this._newFileDialog.render(ctx, canvas);
+    this._newTilesetDialog.render(ctx, canvas);
     this._saveDialog.render(ctx, canvas);
     this._colorPickerDialog.render(ctx, canvas);
 

@@ -3,11 +3,18 @@
  * シーン間で共有するアプリケーションデータを保持するクラス。
  * レイヤー管理は LayerData クラスに委譲し、
  * pixelData プロパティはアクティブレイヤーの PixelData を返す getter。
+ *
+ * タイルセットモード時は layerData getter が選択チップの LayerData を返すため、
+ * PixelCanvas / LayerPanel / ツール群は無改修で動作する。
  */
 class AppData {
   constructor() {
-    /** @type {LayerData} */
-    this.layerData = new LayerData();
+    /**
+     * free モード用の LayerData。
+     * layerData getter 経由でアクセスされる。
+     * @type {LayerData}
+     */
+    this._layerData = new LayerData();
 
     /**
      * 前景色 (描画色)。0xAARRGGBB 形式。
@@ -27,6 +34,42 @@ class AppData {
      * @type {string}
      */
     this.activeTool = 'pencil';
+
+    // ---- タイルセットモード用プロパティ ----
+
+    /**
+     * タイルセットデータ。tileset モード時のみ有効。
+     * @type {TilesetData|null}
+     */
+    this.tilesetData = null;
+
+    /**
+     * タイルセットモード時の選択中チップ位置。
+     * @type {{ col: number, row: number }}
+     */
+    this.selectedChip = { col: 0, row: 0 };
+
+    /**
+     * 編集モード。'free' = 従来のドット絵エディタ、'tileset' = タイルセットモード。
+     * @type {'free'|'tileset'}
+     */
+    this.editMode = 'free';
+  }
+
+  /**
+   * モードに応じた LayerData を返す。
+   * tileset モード: 選択中チップの LayerData
+   * free モード: 従来の _layerData
+   * → これにより PixelCanvas / LayerPanel / ツール群は無改修で動作する。
+   * @type {LayerData}
+   */
+  get layerData() {
+    if (this.editMode === 'tileset' && this.tilesetData) {
+      return this.tilesetData.getChipLayerData(
+        this.selectedChip.col, this.selectedChip.row
+      );
+    }
+    return this._layerData;
   }
 
   /**
@@ -41,11 +84,12 @@ class AppData {
   /**
    * pixelData を直接差し替える (インポート時の互換用)。
    * アクティブレイヤーの pixelData を入れ替え、LayerData のサイズも更新する。
+   * 常に free モードの _layerData に書き込む。
    * @param {PixelData} pd
    */
   set pixelData(pd) {
     if (!pd) return;
-    const ld = this.layerData;
+    const ld = this._layerData;
     ld.width  = pd.width;
     ld.height = pd.height;
     // インポート時は1レイヤーにリセット
@@ -62,11 +106,12 @@ class AppData {
 
   /**
    * レイヤーデータを指定サイズで初期化する（1レイヤー構成）。
+   * 常に free モードの _layerData を初期化する。
    * @param {number} width
    * @param {number} height
    * @param {number} [fillColor=0x00000000]
    */
   createPixelData(width, height, fillColor = 0x00000000) {
-    this.layerData.init(width, height, fillColor);
+    this._layerData.init(width, height, fillColor);
   }
 }
