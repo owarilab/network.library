@@ -122,14 +122,25 @@ class EditorScene extends Scene {
     /** エクスポートダイアログ @type {SaveDialog} */
     this._saveDialog = new SaveDialog(
       (filename, format) => {
-        if (!this._appData?.pixelData?.pixels) return;
+        if (!this._appData) return;
+        const isTileset = this._appData.editMode === 'tileset' && this._appData.tilesetData;
         if (format === 'png') {
-          // PNG は全レイヤー合成結果をエクスポート
-          const composited = this._appData.layerData.composite();
-          PixelDataConverter.exportAsPng(composited, filename)
-            .catch(err => console.error('[EditorScene] PNG エクスポートエラー:', err));
+          if (isTileset) {
+            // タイルセットモード: 全チップ合成PNG
+            PixelDataConverter.exportTilesetAsPng(this._appData.tilesetData, filename)
+              .catch(err => console.error('[EditorScene] tileset PNG エクスポートエラー:', err));
+          } else {
+            const composited = this._appData.layerData.composite();
+            PixelDataConverter.exportAsPng(composited, filename)
+              .catch(err => console.error('[EditorScene] PNG エクスポートエラー:', err));
+          }
         } else {
-          PixelDataConverter.exportAsJson(this._appData.pixelData, filename);
+          if (isTileset) {
+            // タイルセットモード: v2 JSON
+            PixelDataConverter.exportTilesetAsJson(this._appData.tilesetData, filename);
+          } else {
+            PixelDataConverter.exportAsJson(this._appData.pixelData, filename);
+          }
         }
         console.log(`[EditorScene] export: ${filename} (${format})`);
       },
@@ -148,8 +159,33 @@ class EditorScene extends Scene {
     /** render() で受け取った canvas を保持（カーソル変更に使用） */
     this._canvas = null;
 
+    /** タイルセットインポートダイアログ @type {ImportTilesetDialog} */
+    this._importTilesetDialog = new ImportTilesetDialog(
+      (chipW, chipH) => {
+        if (!this._appData || !this._pendingImportPd) return;
+        const td = PixelDataConverter.tilesetFromPixelData(this._pendingImportPd, chipW, chipH);
+        this._appData.tilesetData  = td;
+        this._appData.editMode     = 'tileset';
+        this._appData.selectedChip = { col: 0, row: 0 };
+        this._pixelCanvas.resetView();
+        this._pixelCanvas.markDirty();
+        this._pendingImportPd = null;
+        console.log(`[EditorScene] tileset imported: ${chipW}x${chipH} chip, ${td.columns}x${td.rows} grid`);
+      },
+      () => {
+        this._pendingImportPd = null;
+        console.log('[EditorScene] import tileset dialog cancelled');
+      },
+    );
+
+    /** PNG → タイルセット変換待ちの PixelData @type {PixelData|null} */
+    this._pendingImportPd = null;
+
     /** ファイル入力用の隠し <input type="file"> (onEnter で生成) */
     this._fileInput = null;
+
+    /** タイルセットインポート用の隠し <input type="file"> (onEnter で生成) */
+    this._tilesetFileInput = null;
   }
 
   /**
@@ -172,17 +208,68 @@ class EditorScene extends Scene {
       // 次回同一ファイルを選んでも change が発火されるようにリセット
       this._fileInput.value = '';
       PixelDataConverter.importFromFile(file)
-        .then(pd => {
-          this._appData.editMode    = 'free';
-          this._appData.tilesetData = null;
-          this._appData.pixelData = pd;
-          this._pixelCanvas.resetView();
-          this._pixelCanvas.markDirty();
-          console.log(`[EditorScene] import: ${file.name} → ${pd.width}x${pd.height}`);
+        .then(result => {
+          if (result instanceof TilesetData) {
+            // v2 タイルセット JSON
+            this._appData.tilesetData  = result;
+            this._appData.editMode     = 'tileset';
+            this._appData.selectedChip = { col: 0, row: 0 };
+            this._pixelCanvas.resetView();
+            this._pixelCanvas.markDirty();
+            console.log(`[EditorScene] tileset JSON imported: ${file.name}`);
+          } else {
+            // v1 従来形式 (PixelData)
+            this._appData.editMode    = 'free';
+            this._appData.tilesetData = null;
+            this._appData.pixelData = result;
+            this._pixelCanvas.resetView();
+            this._pixelCanvas.markDirty();
+            console.log(`[EditorScene] import: ${file.name} → ${result.width}x${result.height}`);
+          }
         })
         .catch(err => {
           console.error('[EditorScene] インポートエラー:', err.message);
         });
+    });
+
+    // --- タイルセットインポート用の隠し <input type="file"> を作成 ---
+    this._tilesetFileInput = document.createElement('input');
+    this._tilesetFileInput.type    = 'file';
+    this._tilesetFileInput.accept  = '.png,.json';
+    this._tilesetFileInput.style.display = 'none';
+    document.body.appendChild(this._tilesetFileInput);
+    this._tilesetFileInput.addEventListener('change', () => {
+      const file = this._tilesetFileInput.files?.[0];
+      if (!file) return;
+      this._tilesetFileInput.value = '';
+      const name = file.name.toLowerCase();
+      if (name.endsWith('.json')) {
+        // JSON の場合: v2 タイルセットとしてインポート試行
+        PixelDataConverter.importFromJson(file)
+          .then(result => {
+            if (result instanceof TilesetData) {
+              this._appData.tilesetData  = result;
+              this._appData.editMode     = 'tileset';
+              this._appData.selectedChip = { col: 0, row: 0 };
+              this._pixelCanvas.resetView();
+              this._pixelCanvas.markDirty();
+              console.log(`[EditorScene] tileset JSON opened: ${file.name}`);
+            } else {
+              // v1 JSON → チップサイズ指定ダイアログを表示
+              this._pendingImportPd = result;
+              this._importTilesetDialog.showWithImage(result.width, result.height);
+            }
+          })
+          .catch(err => console.error('[EditorScene] タイルセットインポートエラー:', err.message));
+      } else {
+        // PNG の場合: 読み込んでチップサイズ指定ダイアログを表示
+        PixelDataConverter.importFromPng(file)
+          .then(pd => {
+            this._pendingImportPd = pd;
+            this._importTilesetDialog.showWithImage(pd.width, pd.height);
+          })
+          .catch(err => console.error('[EditorScene] PNG読み込みエラー:', err.message));
+      }
     });
 
     // --- MenuBar 選択コールバック ---
@@ -200,12 +287,38 @@ class EditorScene extends Scene {
         this._fileInput.click();
         return;
       }
+      if (id === MenuConstants.FILE_OPEN_TILESET) {
+        this._tilesetFileInput.click();
+        return;
+      }
       if (id === MenuConstants.FILE_SAVE) {
-        if (this._appData?.pixelData?.pixels) {
+        if (this._appData?.editMode === 'tileset' && this._appData.tilesetData) {
+          this._saveDialog.show();
+        } else if (this._appData?.pixelData?.pixels) {
           this._saveDialog.show();
         } else {
           console.warn('[EditorScene] エクスポート: ファイルが作成されていません');
         }
+        return;
+      }
+      if (id === MenuConstants.FILE_EXPORT_TILESET) {
+        if (this._appData?.editMode !== 'tileset' || !this._appData.tilesetData) {
+          console.warn('[EditorScene] タイルセットモードではありません');
+          return;
+        }
+        PixelDataConverter.exportTilesetAsPng(this._appData.tilesetData)
+          .catch(err => console.error('[EditorScene] タイルセットPNGエクスポートエラー:', err));
+        return;
+      }
+      if (id === MenuConstants.FILE_EXPORT_CHIP) {
+        if (this._appData?.editMode !== 'tileset' || !this._appData.tilesetData) {
+          console.warn('[EditorScene] タイルセットモードではありません');
+          return;
+        }
+        const { col, row } = this._appData.selectedChip;
+        PixelDataConverter.exportChipAsPng(
+          this._appData.tilesetData, col, row, `chip_${col}_${row}.png`
+        ).catch(err => console.error('[EditorScene] チップPNGエクスポートエラー:', err));
         return;
       }
       if (id === MenuConstants.VIEW_GRID) {
@@ -310,10 +423,11 @@ class EditorScene extends Scene {
 
     // --- キーボード ---
     this._onKeyDown = e => {
-      if (this._newFileDialog.isVisible)     { this._newFileDialog.onKeyDown(e);     return; }
-      if (this._newTilesetDialog.isVisible)  { this._newTilesetDialog.onKeyDown(e);  return; }
-      if (this._saveDialog.isVisible)        { this._saveDialog.onKeyDown(e);        return; }
-      if (this._colorPickerDialog.isVisible) { this._colorPickerDialog.onKeyDown(e); return; }
+      if (this._newFileDialog.isVisible)        { this._newFileDialog.onKeyDown(e);        return; }
+      if (this._newTilesetDialog.isVisible)     { this._newTilesetDialog.onKeyDown(e);     return; }
+      if (this._importTilesetDialog.isVisible)  { this._importTilesetDialog.onKeyDown(e);  return; }
+      if (this._saveDialog.isVisible)           { this._saveDialog.onKeyDown(e);           return; }
+      if (this._colorPickerDialog.isVisible)    { this._colorPickerDialog.onKeyDown(e);    return; }
       if (e.key === ' ') {
         e.preventDefault?.();
         if (!this._spaceDown) {
@@ -341,6 +455,7 @@ class EditorScene extends Scene {
     this._onMouseMove = e => {
       this._newFileDialog.onMouseMove(e);
       this._newTilesetDialog.onMouseMove(e);
+      this._importTilesetDialog.onMouseMove(e);
       this._saveDialog.onMouseMove(e);
       this._colorPickerDialog.onMouseMove(e);
       this._colorPaletteWin.onMouseMove(e, appData);
@@ -348,7 +463,7 @@ class EditorScene extends Scene {
       this._layerPanelWin.onMouseMove(e, appData);
       this._chipPaletteWin.onMouseMove(e, appData);
       if (this._tilePreviewVisible) this._tilePreviewWin.onMouseMove(e, appData);
-      if (!this._newFileDialog.isVisible && !this._newTilesetDialog.isVisible) {
+      if (!this._newFileDialog.isVisible && !this._newTilesetDialog.isVisible && !this._importTilesetDialog.isVisible) {
         this._menuBar.onMouseMove(e);
         if (this._spaceDown) {
           // パンモード: ドラッグ中なら位置を更新
@@ -359,10 +474,11 @@ class EditorScene extends Scene {
       }
     };
     this._onMouseDown = e => {
-      if (this._newFileDialog.isVisible)     { this._newFileDialog.onMouseDown(e);     return; }
-      if (this._newTilesetDialog.isVisible)  { this._newTilesetDialog.onMouseDown(e);  return; }
-      if (this._saveDialog.isVisible)        { this._saveDialog.onMouseDown(e);        return; }
-      if (this._colorPickerDialog.isVisible) { this._colorPickerDialog.onMouseDown(e); return; }
+      if (this._newFileDialog.isVisible)        { this._newFileDialog.onMouseDown(e);        return; }
+      if (this._newTilesetDialog.isVisible)     { this._newTilesetDialog.onMouseDown(e);     return; }
+      if (this._importTilesetDialog.isVisible)  { this._importTilesetDialog.onMouseDown(e);  return; }
+      if (this._saveDialog.isVisible)           { this._saveDialog.onMouseDown(e);           return; }
+      if (this._colorPickerDialog.isVisible)    { this._colorPickerDialog.onMouseDown(e);    return; }
       // メニューバー領域のクリックはピクセル操作に渡さない
       if (e.y < MenuBar.HEIGHT) {
         this._menuBar.onMouseDown(e);
@@ -391,10 +507,11 @@ class EditorScene extends Scene {
       this._menuBar.onMouseDown(e);
     };
     this._onMouseUp = e => {
-      if (this._newFileDialog.isVisible)     { this._newFileDialog.onMouseUp(e);     return; }
-      if (this._newTilesetDialog.isVisible)  { this._newTilesetDialog.onMouseUp(e);  return; }
-      if (this._saveDialog.isVisible)        { this._saveDialog.onMouseUp(e);        return; }
-      if (this._colorPickerDialog.isVisible) { this._colorPickerDialog.onMouseUp(e); return; }
+      if (this._newFileDialog.isVisible)        { this._newFileDialog.onMouseUp(e);        return; }
+      if (this._newTilesetDialog.isVisible)     { this._newTilesetDialog.onMouseUp(e);     return; }
+      if (this._importTilesetDialog.isVisible)  { this._importTilesetDialog.onMouseUp(e);  return; }
+      if (this._saveDialog.isVisible)           { this._saveDialog.onMouseUp(e);           return; }
+      if (this._colorPickerDialog.isVisible)    { this._colorPickerDialog.onMouseUp(e);    return; }
       if (this._pixelCanvas._isPanning) {
         this._pixelCanvas.endPan();
         if (this._canvas) this._canvas.style.cursor = this._spaceDown ? 'grab' : '';
@@ -409,7 +526,7 @@ class EditorScene extends Scene {
       this._pixelCanvas.onMouseUp(e, appData);
     };
     this._onWheel = e => {
-      if (this._newFileDialog.isVisible || this._newTilesetDialog.isVisible || this._saveDialog.isVisible || this._colorPickerDialog.isVisible) return;
+      if (this._newFileDialog.isVisible || this._newTilesetDialog.isVisible || this._importTilesetDialog.isVisible || this._saveDialog.isVisible || this._colorPickerDialog.isVisible) return;
       this._pixelCanvas.zoom(-e.deltaY, e.x, e.y);
     };
     this._onContextMenu = e => console.log('[EditorScene] contextmenu', e);
@@ -474,6 +591,7 @@ class EditorScene extends Scene {
     // ダイアログ（メニューバーより前、オーバーレイがメニューを覆う）
     this._newFileDialog.render(ctx, canvas);
     this._newTilesetDialog.render(ctx, canvas);
+    this._importTilesetDialog.render(ctx, canvas);
     this._saveDialog.render(ctx, canvas);
     this._colorPickerDialog.render(ctx, canvas);
 

@@ -496,11 +496,11 @@ TilePreviewWindow extends UIWindow
 
 | # | 作業内容 | 対象ファイル | 進捗 |
 |---|----------|-------------|------|
-| 5-1 | タイルセットPNGエクスポート（合成→書き出し） | `js/util/pixel_data_converter.js` | 未着手 |
-| 5-2 | 個別チップPNGエクスポート | `js/util/pixel_data_converter.js` | 未着手 |
-| 5-3 | タイルセットJSON保存形式 v2 | `js/util/pixel_data_converter.js` | 未着手 |
-| 5-4 | 既存PNGからのタイルセット読み込みダイアログ | `js/ui/dialog/import_tileset_dialog.js` | 未着手 |
-| 5-5 | メニュー接続 | `js/scene/editor_scene.js` | 未着手 |
+| 5-1 | タイルセットPNGエクスポート（合成→書き出し） | `js/util/pixel_data_converter.js` | ✅ 完了 |
+| 5-2 | 個別チップPNGエクスポート | `js/util/pixel_data_converter.js` | ✅ 完了 |
+| 5-3 | タイルセットJSON保存形式 v2 | `js/util/pixel_data_converter.js` | ✅ 完了 |
+| 5-4 | 既存PNGからのタイルセット読み込みダイアログ | `js/ui/dialog/import_tileset_dialog.js` | ✅ 完了 |
+| 5-5 | メニュー接続 | `js/scene/editor_scene.js` | ✅ 完了 |
 
 ### Phase 6: 品質向上・追加機能（後回し可）
 

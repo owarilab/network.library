@@ -28,7 +28,10 @@ class MenuConstants {
   static VIEW_ZOOM_RESET  = 'view.zoom_reset';
 
   // ---- ファイル（タイルセット拡張） ----
-  static FILE_NEW_TILESET  = 'file.new_tileset';
+  static FILE_NEW_TILESET      = 'file.new_tileset';
+  static FILE_OPEN_TILESET     = 'file.open_tileset';
+  static FILE_EXPORT_TILESET   = 'file.export_tileset';
+  static FILE_EXPORT_CHIP      = 'file.export_chip';
 
   // ---- タイルセット ----
   static TILESET_COPY_CHIP   = 'tileset.copy_chip';

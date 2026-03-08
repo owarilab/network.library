@@ -196,6 +196,11 @@ class PixelDataConverter {
       reader.onload = (e) => {
         try {
           const obj = JSON.parse(e.target.result);
+          // v2 タイルセット形式の検出
+          if (obj.type === 'tileset' && obj.version >= 2) {
+            resolve(PixelDataConverter._parseTilesetJson(obj));
+            return;
+          }
           if (!obj.width || !obj.height || !obj.data) {
             reject(new Error('JSON ファイルのフォーマットが不正です'));
             return;
@@ -231,6 +236,175 @@ class PixelDataConverter {
       reader.onerror = () => reject(new Error('JSON ファイルの読み込みに失敗しました'));
       reader.readAsText(file);
     });
+  }
+
+  // ----------------------------------------------------------------
+  // タイルセット PNG エクスポート
+  // ----------------------------------------------------------------
+
+  /**
+   * TilesetData の全チップを合成した1枚のPNGとしてダウンロードする。
+   * @param {TilesetData} tilesetData
+   * @param {string} [filename='tileset.png']
+   * @returns {Promise<void>}
+   */
+  static async exportTilesetAsPng(tilesetData, filename = 'tileset.png') {
+    const composited = tilesetData.compositeAll();
+    await PixelDataConverter.exportAsPng(composited, filename);
+  }
+
+  /**
+   * 選択チップのみPNGとしてダウンロードする。
+   * @param {TilesetData} tilesetData
+   * @param {number} col
+   * @param {number} row
+   * @param {string} [filename='chip.png']
+   * @returns {Promise<void>}
+   */
+  static async exportChipAsPng(tilesetData, col, row, filename = 'chip.png') {
+    const chipPd = tilesetData.compositeChip(col, row);
+    if (!chipPd) throw new Error('チップ位置が不正です');
+    await PixelDataConverter.exportAsPng(chipPd, filename);
+  }
+
+  // ----------------------------------------------------------------
+  // タイルセット JSON v2
+  // ----------------------------------------------------------------
+
+  /**
+   * PixelData の Uint32Array バイト列を Base64 エンコードする。
+   * @param {PixelData} pixelData
+   * @returns {string}
+   */
+  static _encodePixelDataBase64(pixelData) {
+    const bytes = new Uint8Array(
+      pixelData.pixels.buffer,
+      pixelData.pixels.byteOffset,
+      pixelData.pixels.byteLength
+    );
+    let binary = '';
+    const CHUNK = 8192;
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+    }
+    return btoa(binary);
+  }
+
+  /**
+   * Base64 文字列から PixelData を復元する。
+   * @param {string} base64Str
+   * @param {number} width
+   * @param {number} height
+   * @returns {PixelData}
+   */
+  static _decodePixelDataBase64(base64Str, width, height) {
+    const binary = atob(base64Str);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const pd = new PixelData();
+    pd.createPixelData(width, height);
+    new Uint8Array(pd.pixels.buffer, pd.pixels.byteOffset, pd.pixels.byteLength)
+      .set(bytes);
+    return pd;
+  }
+
+  /**
+   * TilesetData を v2 JSON 文字列にシリアライズする。
+   * @param {TilesetData} tilesetData
+   * @returns {string}
+   */
+  static toTilesetJsonString(tilesetData) {
+    const chips = [];
+    for (let r = 0; r < tilesetData.rows; r++) {
+      for (let c = 0; c < tilesetData.columns; c++) {
+        const ld = tilesetData.chips[r][c];
+        const layersArr = ld.layers.map(layer => ({
+          name:    layer.name,
+          visible: layer.visible,
+          opacity: layer.opacity,
+          data:    PixelDataConverter._encodePixelDataBase64(layer.pixelData),
+        }));
+        chips.push({ col: c, row: r, layers: layersArr });
+      }
+    }
+    return JSON.stringify({
+      version:    2,
+      type:       'tileset',
+      chipWidth:  tilesetData.chipWidth,
+      chipHeight: tilesetData.chipHeight,
+      columns:    tilesetData.columns,
+      rows:       tilesetData.rows,
+      chips,
+    }, null, 2);
+  }
+
+  /**
+   * TilesetData を v2 JSON としてダウンロードする。
+   * @param {TilesetData} tilesetData
+   * @param {string} [filename='tileset.json']
+   */
+  static exportTilesetAsJson(tilesetData, filename = 'tileset.json') {
+    const json = PixelDataConverter.toTilesetJsonString(tilesetData);
+    const blob = new Blob([json], { type: 'application/json' });
+    PixelDataConverter._downloadBlob(filename, blob);
+  }
+
+  /**
+   * v2 タイルセット JSON オブジェクトを TilesetData に変換する。
+   * @param {Object} obj  パース済み JSON オブジェクト
+   * @returns {TilesetData}
+   */
+  static _parseTilesetJson(obj) {
+    const { chipWidth, chipHeight, columns, rows, chips } = obj;
+    const td = new TilesetData(chipWidth, chipHeight, columns, rows);
+    for (const chipObj of chips) {
+      const { col, row, layers } = chipObj;
+      if (row < 0 || row >= rows || col < 0 || col >= columns) continue;
+      if (!layers || layers.length === 0) continue;
+      const ld = td.chips[row][col];
+      ld.layers = layers.map(layerObj => ({
+        pixelData: PixelDataConverter._decodePixelDataBase64(
+          layerObj.data, chipWidth, chipHeight
+        ),
+        name:    layerObj.name || 'レイヤー 1',
+        visible: layerObj.visible !== false,
+        opacity: typeof layerObj.opacity === 'number' ? layerObj.opacity : 255,
+      }));
+      ld.activeIndex = 0;
+      ld._composite.createPixelData(chipWidth, chipHeight);
+      ld._compositeDirty = true;
+    }
+    return td;
+  }
+
+  /**
+   * 既存の PixelData をチップサイズで分割して TilesetData を生成する。
+   * PNG インポート時に使用する。
+   * @param {PixelData} pixelData  全体画像
+   * @param {number} chipW  チップ幅
+   * @param {number} chipH  チップ高さ
+   * @returns {TilesetData}
+   */
+  static tilesetFromPixelData(pixelData, chipW, chipH) {
+    const cols = Math.floor(pixelData.width / chipW);
+    const rows = Math.floor(pixelData.height / chipH);
+    const td = new TilesetData(chipW, chipH, cols, rows);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const layer = td.chips[r][c].layers[0];
+        const ox = c * chipW;
+        const oy = r * chipH;
+        for (let y = 0; y < chipH; y++) {
+          for (let x = 0; x < chipW; x++) {
+            layer.pixelData.setPixel(x, y, pixelData.getPixel(ox + x, oy + y));
+          }
+        }
+        td.chips[r][c].markCompositeDirty();
+      }
+    }
+    return td;
   }
 
   // ----------------------------------------------------------------
