@@ -215,26 +215,28 @@ class TilePreview {
     const sh = pixelData.height;
     if (sw === 0 || sh === 0) return;
 
-    // オフスクリーン canvas の生成 or サイズ変更
-    if (!this._offscreen || this._offscreen.width !== sw || this._offscreen.height !== sh) {
+    // オフスクリーン canvas の生成（初回のみ）
+    if (!this._offscreen) {
       this._offscreen = document.createElement('canvas');
-      this._offscreen.width  = sw;
-      this._offscreen.height = sh;
       this._offCtx = this._offscreen.getContext('2d');
     }
+    // Safari では putImageData 後の drawImage でテクスチャキャッシュが更新されないことがある。
+    // pixel_canvas.js と同様に毎回 width/height を代入してキャッシュを強制フラッシュする。
+    this._offscreen.width  = sw;
+    this._offscreen.height = sh;
 
     const imageData = this._offCtx.createImageData(sw, sh);
-    const buf    = new Uint8Array(imageData.data.buffer);
+    const data   = imageData.data;
     const pixels = pixelData.pixels;
 
     for (let i = 0; i < pixels.length; i++) {
       const c = pixels[i];
       // PixelData フォーマット: 0xAARRGGBB → ImageData: R, G, B, A
       const j = i * 4;
-      buf[j]     = (c >> 16) & 0xFF;  // R
-      buf[j + 1] = (c >> 8)  & 0xFF;  // G
-      buf[j + 2] =  c        & 0xFF;  // B
-      buf[j + 3] = (c >> 24) & 0xFF;  // A
+      data[j]     = (c >>> 16) & 0xFF;  // R
+      data[j + 1] = (c >>> 8)  & 0xFF;  // G
+      data[j + 2] =  c         & 0xFF;  // B
+      data[j + 3] = (c >>> 24) & 0xFF;  // A
     }
 
     this._offCtx.putImageData(imageData, 0, 0);
