@@ -87,6 +87,12 @@ class MenuBar {
           { id: MenuConstants.TILESET_TILE_PREVIEW,  label: 'タイルプレビュー表示' },
         ]),
       },
+      {
+        label: '生成',
+        dropdown: new DropdownMenu([
+          { id: MenuConstants.GENERATE_QUARTER_VIEW_TILE, label: 'クォータービュータイル...' },
+        ]),
+      },
     ];
 
     /** 各トップレベル項目の描画領域 (render で算出) */

@@ -340,13 +340,3 @@ ColorPaletteWindow extends UIWindow
 ```
 
 ---
-
-## 次のセッションで最初に着手すべき作業
-
-1. **Undo/Redo (コマンドパターン)** —— `js/command/` 下に `CommandBase` / `DrawCommand` / `FillCommand` を実装、`HistoryManager` を作成
-2. ~~**グリッド表示トグル** —— メニュー `VIEW_GRID` を `PixelCanvas` に接続~~ ✓ 完了
-3. ~~**ピクセルキャンバスのリセット** — インポート後にキャンバス中央配置へ引こむ（パン・ズームリセット）~~ ✓ 完了
-
-**優先度:低 — ツールID キーボードショートカット:**
-- `P` → pencil、`E` → eraser、`G` → fill、`I` → eyedropper
-- `EditorScene` の `_onKeyDown` に追加するだけで実現可能

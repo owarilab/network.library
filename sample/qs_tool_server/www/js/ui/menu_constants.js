@@ -47,4 +47,7 @@ class MenuConstants {
   static TILESET_REMOVE_ROW  = 'tileset.remove_row';
   static TILESET_REMOVE_COL  = 'tileset.remove_col';
   static TILESET_TILE_PREVIEW = 'tileset.tile_preview';
+
+  // ---- 生成 ----
+  static GENERATE_QUARTER_VIEW_TILE = 'generate.quarter_view_tile';
 }

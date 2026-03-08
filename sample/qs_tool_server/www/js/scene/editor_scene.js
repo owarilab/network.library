@@ -63,6 +63,12 @@ class EditorScene extends Scene {
     /** カラーピッカーダイアログ @type {ColorPickerDialog} */
     this._colorPickerDialog = new ColorPickerDialog(
       (color) => {
+        // クォータービュータイルダイアログのスウォッチ色変更時
+        if (this._quarterViewTileColorCallback) {
+          this._quarterViewTileColorCallback(color);
+          this._quarterViewTileColorCallback = null;
+          return;
+        }
         if (!this._appData) return;
         if (this._colorPickerTarget === 'back') {
           this._appData.backColor = color;
@@ -71,7 +77,10 @@ class EditorScene extends Scene {
         }
         console.log(`[EditorScene] color picked: 0x${color.toString(16).padStart(8, '0')}`);
       },
-      () => console.log('[EditorScene] color picker cancelled'),
+      () => {
+        this._quarterViewTileColorCallback = null;
+        console.log('[EditorScene] color picker cancelled');
+      },
     );
     /** @type {'fore' | 'back'} */
     this._colorPickerTarget = 'fore';
@@ -146,6 +155,19 @@ class EditorScene extends Scene {
       },
       () => console.log('[EditorScene] export cancelled'),
     );
+
+    /** クォータービュータイル生成ダイアログ @type {QuarterViewTileDialog} */
+    this._quarterViewTileDialog = new QuarterViewTileDialog(
+      (params) => this._onQuarterViewTileConfirm(params),
+      () => console.log('[EditorScene] quarter view tile dialog cancelled'),
+    );
+    // スウォッチクリック時: カラーピッカーを開く
+    this._quarterViewTileDialog.onColorSwatchClick = (currentColor, callback) => {
+      this._quarterViewTileColorCallback = callback;
+      this._colorPickerDialog.showWithColor(currentColor);
+    };
+    /** カラーピッカーから色を受け取るコールバック @type {((color:number) => void)|null} */
+    this._quarterViewTileColorCallback = null;
 
     /** チップ入れ替え用: 入れ替え元チップ座標 (null = 未選択) @type {{ col: number, row: number }|null} */
     this._swapSource = null;
@@ -466,16 +488,21 @@ class EditorScene extends Scene {
         return;
       }
 
-      // 今後: 他の id で分岐して各アクションを実装
+      // ---- 生成メニュー ----
+      if (id === MenuConstants.GENERATE_QUARTER_VIEW_TILE) {
+        this._quarterViewTileDialog.show();
+        return;
+      }
     };
 
     // --- キーボード ---
     this._onKeyDown = e => {
+      if (this._colorPickerDialog.isVisible)    { this._colorPickerDialog.onKeyDown(e);    return; }
+      if (this._quarterViewTileDialog.isVisible) { this._quarterViewTileDialog.onKeyDown(e); return; }
       if (this._newFileDialog.isVisible)        { this._newFileDialog.onKeyDown(e);        return; }
       if (this._newTilesetDialog.isVisible)     { this._newTilesetDialog.onKeyDown(e);     return; }
       if (this._importTilesetDialog.isVisible)  { this._importTilesetDialog.onKeyDown(e);  return; }
       if (this._saveDialog.isVisible)           { this._saveDialog.onKeyDown(e);           return; }
-      if (this._colorPickerDialog.isVisible)    { this._colorPickerDialog.onKeyDown(e);    return; }
       if (e.key === ' ') {
         e.preventDefault?.();
         if (!this._spaceDown) {
@@ -501,6 +528,7 @@ class EditorScene extends Scene {
 
     // --- マウス ---
     this._onMouseMove = e => {
+      this._quarterViewTileDialog.onMouseMove(e);
       this._newFileDialog.onMouseMove(e);
       this._newTilesetDialog.onMouseMove(e);
       this._importTilesetDialog.onMouseMove(e);
@@ -522,6 +550,7 @@ class EditorScene extends Scene {
       }
     };
     this._onMouseDown = e => {
+      if (this._quarterViewTileDialog.isVisible && !this._colorPickerDialog.isVisible) { this._quarterViewTileDialog.onMouseDown(e); return; }
       if (this._newFileDialog.isVisible)        { this._newFileDialog.onMouseDown(e);        return; }
       if (this._newTilesetDialog.isVisible)     { this._newTilesetDialog.onMouseDown(e);     return; }
       if (this._importTilesetDialog.isVisible)  { this._importTilesetDialog.onMouseDown(e);  return; }
@@ -555,6 +584,7 @@ class EditorScene extends Scene {
       this._menuBar.onMouseDown(e);
     };
     this._onMouseUp = e => {
+      if (this._quarterViewTileDialog.isVisible && !this._colorPickerDialog.isVisible) { this._quarterViewTileDialog.onMouseUp(e); return; }
       if (this._newFileDialog.isVisible)        { this._newFileDialog.onMouseUp(e);        return; }
       if (this._newTilesetDialog.isVisible)     { this._newTilesetDialog.onMouseUp(e);     return; }
       if (this._importTilesetDialog.isVisible)  { this._importTilesetDialog.onMouseUp(e);  return; }
@@ -574,7 +604,7 @@ class EditorScene extends Scene {
       this._pixelCanvas.onMouseUp(e, appData);
     };
     this._onWheel = e => {
-      if (this._newFileDialog.isVisible || this._newTilesetDialog.isVisible || this._importTilesetDialog.isVisible || this._saveDialog.isVisible || this._colorPickerDialog.isVisible) return;
+      if (this._quarterViewTileDialog.isVisible || this._newFileDialog.isVisible || this._newTilesetDialog.isVisible || this._importTilesetDialog.isVisible || this._saveDialog.isVisible || this._colorPickerDialog.isVisible) return;
       this._pixelCanvas.zoom(-e.deltaY, e.x, e.y);
     };
     this._onContextMenu = e => console.log('[EditorScene] contextmenu', e);
@@ -641,6 +671,7 @@ class EditorScene extends Scene {
     this._newTilesetDialog.render(ctx, canvas);
     this._importTilesetDialog.render(ctx, canvas);
     this._saveDialog.render(ctx, canvas);
+    this._quarterViewTileDialog.render(ctx, canvas);
     this._colorPickerDialog.render(ctx, canvas);
 
     // メニューバーを最前面に描画
@@ -733,6 +764,32 @@ class EditorScene extends Scene {
         }
       }
     }
+  }
+
+  /**
+   * クォータービュータイル生成確認コールバック
+   * @param {Object} params
+   */
+  _onQuarterViewTileConfirm(params) {
+    if (!this._appData) return;
+
+    if (params.target === 'overwrite') {
+      // 既存キャンバスのアクティブレイヤーに描画（サイズ変更なし）
+      QuarterViewTileGenerator.generate(params, this._appData.layerData);
+      this._appData.layerData.markCompositeDirty();
+      this._pixelCanvas.markDirty();
+    } else {
+      // 新規作成
+      const ld = QuarterViewTileGenerator.generate(params);
+      if (ld) {
+        this._appData.editMode    = 'free';
+        this._appData.tilesetData = null;
+        this._appData._layerData  = ld;
+        this._pixelCanvas.markDirty();
+        this._pixelCanvas.resetView();
+      }
+    }
+    console.log(`[EditorScene] quarter view tile generated: ${params.type} ${params.width}x${this._appData.layerData.height}`);
   }
 
   /**
