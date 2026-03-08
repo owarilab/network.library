@@ -327,6 +327,54 @@ class EditorScene extends Scene {
         return;
       }
 
+      // ---- 反転 ----
+      if (id === MenuConstants.EDIT_FLIP_H || id === MenuConstants.EDIT_FLIP_V) {
+        const isH = id === MenuConstants.EDIT_FLIP_H;
+        if (this._appData?.editMode === 'tileset' && this._appData.tilesetData) {
+          const { col, row } = this._appData.selectedChip;
+          const layerData = this._appData.tilesetData.getChipLayerData(col, row);
+          if (layerData) {
+            layerData.layers.forEach(layer => {
+              if (layer.pixelData) isH ? layer.pixelData.flipH() : layer.pixelData.flipV();
+            });
+            layerData.markCompositeDirty();
+            this._pixelCanvas.markDirty();
+          }
+        } else if (this._appData?.layerData) {
+          this._appData.layerData.layers.forEach(layer => {
+            if (layer.pixelData) isH ? layer.pixelData.flipH() : layer.pixelData.flipV();
+          });
+          this._appData.layerData.markCompositeDirty();
+          this._pixelCanvas.markDirty();
+        }
+        console.log(`[EditorScene] ${isH ? '左右' : '上下'}に反転`);
+        return;
+      }
+
+      // ---- 回転 ----
+      if (id === MenuConstants.EDIT_ROTATE_CW || id === MenuConstants.EDIT_ROTATE_CCW) {
+        const isCW = id === MenuConstants.EDIT_ROTATE_CW;
+        if (this._appData?.editMode === 'tileset' && this._appData.tilesetData) {
+          const { col, row } = this._appData.selectedChip;
+          const layerData = this._appData.tilesetData.getChipLayerData(col, row);
+          if (layerData) {
+            layerData.layers.forEach(layer => {
+              if (layer.pixelData) isCW ? layer.pixelData.rotate90CW() : layer.pixelData.rotate90CCW();
+            });
+            layerData.markCompositeDirty();
+            this._pixelCanvas.markDirty();
+          }
+        } else if (this._appData?.layerData) {
+          this._appData.layerData.layers.forEach(layer => {
+            if (layer.pixelData) isCW ? layer.pixelData.rotate90CW() : layer.pixelData.rotate90CCW();
+          });
+          this._appData.layerData.markCompositeDirty();
+          this._pixelCanvas.markDirty();
+        }
+        console.log(`[EditorScene] ${isCW ? '時計回り' : '反時計回り'}に90度回転`);
+        return;
+      }
+
       // ---- タイルセットメニュー ----
       if (id === MenuConstants.TILESET_COPY_CHIP) {
         if (this._appData.editMode !== 'tileset' || !this._appData.tilesetData) return;

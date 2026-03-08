@@ -67,6 +67,85 @@ class PixelData {
     this.pixels?.fill(color >>> 0);
   }
 
+  /**
+   * ピクセルデータを左右に反転する（水平反転）
+   */
+  flipH() {
+    if (!this.pixels) return;
+    const { width, height } = this;
+    for (let y = 0; y < height; y++) {
+      const row = y * width;
+      for (let x = 0; x < (width >> 1); x++) {
+        const l = row + x;
+        const r = row + (width - 1 - x);
+        const tmp = this.pixels[l];
+        this.pixels[l] = this.pixels[r];
+        this.pixels[r] = tmp;
+      }
+    }
+  }
+
+  /**
+   * ピクセルデータを上下に反転する（垂直反転）
+   */
+  flipV() {
+    if (!this.pixels) return;
+    const { width, height } = this;
+    for (let y = 0; y < (height >> 1); y++) {
+      const topRow    = y * width;
+      const bottomRow = (height - 1 - y) * width;
+      for (let x = 0; x < width; x++) {
+        const t = topRow + x;
+        const b = bottomRow + x;
+        const tmp = this.pixels[t];
+        this.pixels[t] = this.pixels[b];
+        this.pixels[b] = tmp;
+      }
+    }
+  }
+
+  /**
+   * ピクセルデータを時計回りに 90 度回転する。
+   * 縦横サイズが入れ替わる。
+   */
+  rotate90CW() {
+    if (!this.pixels) return;
+    const { width: w, height: h } = this;
+    const dst = new Uint32Array(w * h);
+    // src(sx, sy) → dst(h-1-sy, sx)  newW=h, newH=w
+    for (let sy = 0; sy < h; sy++) {
+      for (let sx = 0; sx < w; sx++) {
+        const dx = h - 1 - sy;
+        const dy = sx;
+        dst[dy * h + dx] = this.pixels[sy * w + sx];
+      }
+    }
+    this.pixels = dst;
+    this.width  = h;
+    this.height = w;
+  }
+
+  /**
+   * ピクセルデータを反時計回りに 90 度回転する。
+   * 縦横サイズが入れ替わる。
+   */
+  rotate90CCW() {
+    if (!this.pixels) return;
+    const { width: w, height: h } = this;
+    const dst = new Uint32Array(w * h);
+    // src(sx, sy) → dst(sy, w-1-sx)  newW=h, newH=w
+    for (let sy = 0; sy < h; sy++) {
+      for (let sx = 0; sx < w; sx++) {
+        const dx = sy;
+        const dy = w - 1 - sx;
+        dst[dy * h + dx] = this.pixels[sy * w + sx];
+      }
+    }
+    this.pixels = dst;
+    this.width  = h;
+    this.height = w;
+  }
+
   // ----------------------------------------------------------------
   // 色ユーティリティ (static)
   // ----------------------------------------------------------------

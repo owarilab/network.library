@@ -215,6 +215,17 @@ www/
   - ペースト: バッファをドラッグ配置
 - [ ] **EDIT_SELECT_ALL** の実装
 
+#### 反転
+
+- [x] **左右に反転** (`EDIT_FLIP_H`)
+  - `PixelData.flipH()`: 各行の左右ピクセルを swap して水平反転
+  - `EditScene` でメニュー `編集 > 左右に反転` と接続
+  - 通常モード（`layerData.layers` 全レイヤー対象）・タイルセットモード（選択チップ対象）両対応
+- [x] **上下に反転** (`EDIT_FLIP_V`)
+  - `PixelData.flipV()`: 上下行を swap して垂直反転
+  - `EditScene` でメニュー `編集 > 上下に反転` と接続
+  - 通常モード・タイルセットモード両対応
+
 #### 図形ツール
 
 - [ ] **直線ツール** (`js/tool/tool_line.js` / Bresenham アルゴリズム)

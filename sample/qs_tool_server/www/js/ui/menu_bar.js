@@ -53,6 +53,12 @@ class MenuBar {
           { id: MenuConstants.EDIT_PASTE,      label: '貼り付け' },
           { id: MenuConstants.SEPARATOR },
           { id: MenuConstants.EDIT_SELECT_ALL, label: 'すべて選択' },
+          { id: MenuConstants.SEPARATOR },
+          { id: MenuConstants.EDIT_FLIP_H,      label: '左右に反転'        },
+          { id: MenuConstants.EDIT_FLIP_V,      label: '上下に反転'        },
+          { id: MenuConstants.SEPARATOR },
+          { id: MenuConstants.EDIT_ROTATE_CW,   label: '時計回りに90度回転'  },
+          { id: MenuConstants.EDIT_ROTATE_CCW,  label: '反時計回りに90度回転' },
         ]),
       },
       {

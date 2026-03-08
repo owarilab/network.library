@@ -20,6 +20,10 @@ class MenuConstants {
   static EDIT_COPY       = 'edit.copy';
   static EDIT_PASTE      = 'edit.paste';
   static EDIT_SELECT_ALL = 'edit.select_all';
+  static EDIT_FLIP_H     = 'edit.flip_h';
+  static EDIT_FLIP_V     = 'edit.flip_v';
+  static EDIT_ROTATE_CW  = 'edit.rotate_cw';
+  static EDIT_ROTATE_CCW = 'edit.rotate_ccw';
 
   // ---- 表示 ----
   static VIEW_GRID        = 'view.grid';
