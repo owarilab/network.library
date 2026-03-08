@@ -486,9 +486,9 @@ TilePreviewWindow extends UIWindow
 
 | # | 作業内容 | 対象ファイル | 進捗 |
 |---|----------|-------------|------|
-| 4-1 | `TilePreview` コンテンツクラス新規作成 | `js/ui/tile_preview.js` | 未着手 |
-| 4-2 | `TilePreviewWindow` 新規作成 | `js/ui/tile_preview_window.js` | 未着手 |
-| 4-3 | プレビューサイズ切り替え | `js/ui/tile_preview.js` | 未着手 |
+| 4-1 | `TilePreview` コンテンツクラス新規作成 | `js/ui/tile_preview.js` | ✅ 完了 |
+| 4-2 | `TilePreviewWindow` 新規作成 | `js/ui/tile_preview_window.js` | ✅ 完了 |
+| 4-3 | プレビューサイズ切り替え | `js/ui/tile_preview.js` | ✅ 完了 |
 
 ### Phase 5: インポート・エクスポート拡張
 

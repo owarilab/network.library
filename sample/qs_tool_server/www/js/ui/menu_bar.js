@@ -74,6 +74,8 @@ class MenuBar {
           { id: MenuConstants.TILESET_PASTE_CHIP,   label: 'チップをペースト' },
           { id: MenuConstants.TILESET_CLEAR_CHIP,   label: 'チップをクリア'   },
           { id: MenuConstants.TILESET_SWAP_CHIP,    label: 'チップを入れ替え' },
+          { id: MenuConstants.SEPARATOR },
+          { id: MenuConstants.TILESET_TILE_PREVIEW,  label: 'タイルプレビュー表示' },
         ]),
       },
     ];

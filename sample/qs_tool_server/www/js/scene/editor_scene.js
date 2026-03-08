@@ -94,6 +94,11 @@ class EditorScene extends Scene {
 
     /** チップパレットウィンドウ @type {ChipPaletteWindow} */
     this._chipPaletteWin = new ChipPaletteWindow();
+
+    /** タイルプレビューウィンドウ @type {TilePreviewWindow} */
+    this._tilePreviewWin = new TilePreviewWindow();
+    /** タイルプレビュー表示フラグ */
+    this._tilePreviewVisible = true;
     this._chipPaletteWin.onChipSelect = (col, row) => {
       if (!this._appData) return;
       const prev = this._appData.selectedChip;
@@ -294,6 +299,12 @@ class EditorScene extends Scene {
         return;
       }
 
+      if (id === MenuConstants.TILESET_TILE_PREVIEW) {
+        this._tilePreviewVisible = !this._tilePreviewVisible;
+        console.log(`[EditorScene] tile preview: ${this._tilePreviewVisible ? 'show' : 'hide'}`);
+        return;
+      }
+
       // 今後: 他の id で分岐して各アクションを実装
     };
 
@@ -336,6 +347,7 @@ class EditorScene extends Scene {
       this._toolBarWin.onMouseMove(e, appData);
       this._layerPanelWin.onMouseMove(e, appData);
       this._chipPaletteWin.onMouseMove(e, appData);
+      if (this._tilePreviewVisible) this._tilePreviewWin.onMouseMove(e, appData);
       if (!this._newFileDialog.isVisible && !this._newTilesetDialog.isVisible) {
         this._menuBar.onMouseMove(e);
         if (this._spaceDown) {
@@ -365,6 +377,7 @@ class EditorScene extends Scene {
       if (!this._menuBar.isOpen) {
         // UIWindow 群(ツールバーまたはパレット)が消費した場合はピクセル操作に渡さない
         const consumed = this._chipPaletteWin.onMouseDown(e, appData) ||
+                         (this._tilePreviewVisible && this._tilePreviewWin.onMouseDown(e, appData)) ||
                          this._colorPaletteWin.onMouseDown(e, appData) ||
                          this._toolBarWin.onMouseDown(e, appData) ||
                          this._layerPanelWin.onMouseDown(e, appData);
@@ -391,6 +404,7 @@ class EditorScene extends Scene {
       this._toolBarWin.onMouseUp(e, appData);
       this._layerPanelWin.onMouseUp(e, appData);
       this._chipPaletteWin.onMouseUp(e, appData);
+      if (this._tilePreviewVisible) this._tilePreviewWin.onMouseUp(e, appData);
       this._menuBar.onMouseUp(e);
       this._pixelCanvas.onMouseUp(e, appData);
     };
@@ -448,6 +462,11 @@ class EditorScene extends Scene {
 
     // チップパレットウィンドウ (タイルセットモード時のみ表示)
     this._chipPaletteWin.render(ctx, canvas, appData);
+
+    // タイルプレビューウィンドウ (タイルセットモード時のみ表示)
+    if (this._tilePreviewVisible) {
+      this._tilePreviewWin.render(ctx, canvas, appData);
+    }
 
     // カラーパレットウィンドウ (ダイアログより前、ピクセルキャンバスの上)
     this._colorPaletteWin.render(ctx, canvas, appData);

@@ -39,4 +39,5 @@ class MenuConstants {
   static TILESET_ADD_COL     = 'tileset.add_col';
   static TILESET_REMOVE_ROW  = 'tileset.remove_row';
   static TILESET_REMOVE_COL  = 'tileset.remove_col';
+  static TILESET_TILE_PREVIEW = 'tileset.tile_preview';
 }
