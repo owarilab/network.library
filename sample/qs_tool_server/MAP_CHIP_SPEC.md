@@ -462,11 +462,11 @@ TilePreviewWindow extends UIWindow
 
 | # | 作業内容 | 対象ファイル | 進捗 |
 |---|----------|-------------|------|
-| 2-1 | `ChipPalette` コンテンツクラス新規作成 | `js/ui/chip_palette.js` | 未着手 |
-| 2-2 | `ChipPaletteWindow` 新規作成 | `js/ui/chip_palette_window.js` | 未着手 |
-| 2-3 | チップクリック選択の実装 | `js/scene/editor_scene.js` | 未着手 |
-| 2-4 | チップダブルクリックでフォーカスズーム | `js/scene/editor_scene.js` | 未着手 |
-| 2-5 | メインキャンバスでのチップ選択操作 | `js/scene/editor_scene.js` | 未着手 |
+| 2-1 | `ChipPalette` コンテンツクラス新規作成 | `js/ui/chip_palette.js` | ✅ 完了 |
+| 2-2 | `ChipPaletteWindow` 新規作成 | `js/ui/chip_palette_window.js` | ✅ 完了 |
+| 2-3 | チップクリック選択の実装 | `js/scene/editor_scene.js` | ✅ 完了 |
+| 2-4 | チップダブルクリックでフォーカスズーム | `js/scene/editor_scene.js` | ✅ 完了 |
+| 2-5 | メインキャンバスでのチップ選択操作 | `js/scene/editor_scene.js` | ✅ 完了 |
 
 ### Phase 3: チップ単位操作
 
