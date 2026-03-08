@@ -96,7 +96,13 @@ class EditorScene extends Scene {
     this._chipPaletteWin = new ChipPaletteWindow();
     this._chipPaletteWin.onChipSelect = (col, row) => {
       if (!this._appData) return;
+      const prev = this._appData.selectedChip;
+      const changed = prev.col !== col || prev.row !== row;
       this._appData.selectedChip = { col, row };
+      if (changed) {
+        // チップ切り替え時: パンをリセットして中央表示に戻す
+        this._pixelCanvas.resetPan();
+      }
       this._pixelCanvas.markDirty();
       console.log(`[EditorScene] chip selected: (${col}, ${row})`);
     };
@@ -124,6 +130,9 @@ class EditorScene extends Scene {
       },
       () => console.log('[EditorScene] export cancelled'),
     );
+
+    /** チップ入れ替え用: 入れ替え元チップ座標 (null = 未選択) @type {{ col: number, row: number }|null} */
+    this._swapSource = null;
 
     /** onEnter でセットされる共有データへの参照 */
     this._appData = null;
@@ -199,6 +208,92 @@ class EditorScene extends Scene {
         console.log('[EditorScene] grid:', this._pixelCanvas.showGrid);
         return;
       }
+
+      // ---- タイルセットメニュー ----
+      if (id === MenuConstants.TILESET_COPY_CHIP) {
+        if (this._appData.editMode !== 'tileset' || !this._appData.tilesetData) return;
+        const { col, row } = this._appData.selectedChip;
+        this._appData.chipClipboard = this._appData.tilesetData.cloneChipLayerData(col, row);
+        console.log(`[EditorScene] chip copied: (${col}, ${row})`);
+        return;
+      }
+      if (id === MenuConstants.TILESET_PASTE_CHIP) {
+        if (this._appData.editMode !== 'tileset' || !this._appData.tilesetData) return;
+        if (!this._appData.chipClipboard) {
+          console.warn('[EditorScene] チップクリップボードが空です');
+          return;
+        }
+        const { col, row } = this._appData.selectedChip;
+        const ok = this._appData.tilesetData.pasteChipLayerData(this._appData.chipClipboard, col, row);
+        if (ok) {
+          this._pixelCanvas.markDirty();
+          console.log(`[EditorScene] chip pasted: (${col}, ${row})`);
+        }
+        return;
+      }
+      if (id === MenuConstants.TILESET_CLEAR_CHIP) {
+        if (this._appData.editMode !== 'tileset' || !this._appData.tilesetData) return;
+        const { col, row } = this._appData.selectedChip;
+        this._appData.tilesetData.clearChip(col, row);
+        this._pixelCanvas.markDirty();
+        console.log(`[EditorScene] chip cleared: (${col}, ${row})`);
+        return;
+      }
+      if (id === MenuConstants.TILESET_SWAP_CHIP) {
+        if (this._appData.editMode !== 'tileset' || !this._appData.tilesetData) return;
+        const { col, row } = this._appData.selectedChip;
+        if (!this._swapSource) {
+          // 1回目: 入れ替え元を記録
+          this._swapSource = { col, row };
+          console.log(`[EditorScene] swap source set: (${col}, ${row}) — 別のチップを選択して再度実行`);
+        } else {
+          // 2回目: 入れ替え実行
+          this._appData.tilesetData.swapChips(this._swapSource.col, this._swapSource.row, col, row);
+          this._pixelCanvas.markDirty();
+          console.log(`[EditorScene] chips swapped: (${this._swapSource.col}, ${this._swapSource.row}) <-> (${col}, ${row})`);
+          this._swapSource = null;
+        }
+        return;
+      }
+      if (id === MenuConstants.TILESET_ADD_ROW) {
+        if (this._appData.editMode !== 'tileset' || !this._appData.tilesetData) return;
+        this._appData.tilesetData.addRow();
+        this._pixelCanvas.markDirty();
+        console.log(`[EditorScene] row added: now ${this._appData.tilesetData.rows} rows`);
+        return;
+      }
+      if (id === MenuConstants.TILESET_ADD_COL) {
+        if (this._appData.editMode !== 'tileset' || !this._appData.tilesetData) return;
+        this._appData.tilesetData.addColumn();
+        this._pixelCanvas.markDirty();
+        console.log(`[EditorScene] column added: now ${this._appData.tilesetData.columns} cols`);
+        return;
+      }
+      if (id === MenuConstants.TILESET_REMOVE_ROW) {
+        if (this._appData.editMode !== 'tileset' || !this._appData.tilesetData) return;
+        const td = this._appData.tilesetData;
+        td.removeRow();
+        // 選択チップが範囲外になった場合の補正
+        if (this._appData.selectedChip.row >= td.rows) {
+          this._appData.selectedChip.row = td.rows - 1;
+        }
+        this._pixelCanvas.markDirty();
+        console.log(`[EditorScene] row removed: now ${td.rows} rows`);
+        return;
+      }
+      if (id === MenuConstants.TILESET_REMOVE_COL) {
+        if (this._appData.editMode !== 'tileset' || !this._appData.tilesetData) return;
+        const td = this._appData.tilesetData;
+        td.removeColumn();
+        // 選択チップが範囲外になった場合の補正
+        if (this._appData.selectedChip.col >= td.columns) {
+          this._appData.selectedChip.col = td.columns - 1;
+        }
+        this._pixelCanvas.markDirty();
+        console.log(`[EditorScene] column removed: now ${td.columns} cols`);
+        return;
+      }
+
       // 今後: 他の id で分岐して各アクションを実装
     };
 

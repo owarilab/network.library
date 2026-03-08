@@ -29,4 +29,14 @@ class MenuConstants {
 
   // ---- ファイル（タイルセット拡張） ----
   static FILE_NEW_TILESET  = 'file.new_tileset';
+
+  // ---- タイルセット ----
+  static TILESET_COPY_CHIP   = 'tileset.copy_chip';
+  static TILESET_PASTE_CHIP  = 'tileset.paste_chip';
+  static TILESET_CLEAR_CHIP  = 'tileset.clear_chip';
+  static TILESET_SWAP_CHIP   = 'tileset.swap_chip';
+  static TILESET_ADD_ROW     = 'tileset.add_row';
+  static TILESET_ADD_COL     = 'tileset.add_col';
+  static TILESET_REMOVE_ROW  = 'tileset.remove_row';
+  static TILESET_REMOVE_COL  = 'tileset.remove_col';
 }

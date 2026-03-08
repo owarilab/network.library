@@ -62,6 +62,20 @@ class MenuBar {
           { id: MenuConstants.VIEW_ZOOM_RESET, label: '等倍 (リセット)' },
         ]),
       },
+      {
+        label: 'タイルセット',
+        dropdown: new DropdownMenu([
+          { id: MenuConstants.TILESET_ADD_ROW,     label: '行を追加'     },
+          { id: MenuConstants.TILESET_ADD_COL,      label: '列を追加'     },
+          { id: MenuConstants.TILESET_REMOVE_ROW,   label: '行を削除'     },
+          { id: MenuConstants.TILESET_REMOVE_COL,    label: '列を削除'     },
+          { id: MenuConstants.SEPARATOR },
+          { id: MenuConstants.TILESET_COPY_CHIP,    label: 'チップをコピー'   },
+          { id: MenuConstants.TILESET_PASTE_CHIP,   label: 'チップをペースト' },
+          { id: MenuConstants.TILESET_CLEAR_CHIP,   label: 'チップをクリア'   },
+          { id: MenuConstants.TILESET_SWAP_CHIP,    label: 'チップを入れ替え' },
+        ]),
+      },
     ];
 
     /** 各トップレベル項目の描画領域 (render で算出) */

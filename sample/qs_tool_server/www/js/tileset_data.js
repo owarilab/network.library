@@ -152,6 +152,64 @@ class TilesetData {
     this.chips[row2][col2] = tmp;
   }
 
+  /**
+   * 指定チップの LayerData をディープコピーして返す（クリップボード用）。
+   * @param {number} col
+   * @param {number} row
+   * @returns {LayerData|null}
+   */
+  cloneChipLayerData(col, row) {
+    const src = this.getChipLayerData(col, row);
+    if (!src) return null;
+    const ld = new LayerData();
+    ld.width  = this.chipWidth;
+    ld.height = this.chipHeight;
+    ld.layers = src.layers.map(layer => {
+      const pd = new PixelData();
+      pd.createPixelData(this.chipWidth, this.chipHeight);
+      pd.pixels.set(layer.pixelData.pixels);
+      return {
+        pixelData: pd,
+        name:      layer.name,
+        visible:   layer.visible,
+        opacity:   layer.opacity,
+      };
+    });
+    ld.activeIndex = src.activeIndex;
+    ld._composite.createPixelData(this.chipWidth, this.chipHeight);
+    ld._compositeDirty = true;
+    return ld;
+  }
+
+  /**
+   * クリップボード（外部 LayerData）の内容を指定チップに貼り付ける。
+   * チップサイズが一致する場合のみ動作する。
+   * @param {LayerData} srcLayerData  貼り付け元の LayerData
+   * @param {number} dstCol
+   * @param {number} dstRow
+   * @returns {boolean} 貼り付けできたか
+   */
+  pasteChipLayerData(srcLayerData, dstCol, dstRow) {
+    if (!srcLayerData) return false;
+    if (srcLayerData.width !== this.chipWidth || srcLayerData.height !== this.chipHeight) return false;
+    const dst = this.getChipLayerData(dstCol, dstRow);
+    if (!dst) return false;
+    dst.layers = srcLayerData.layers.map(layer => {
+      const pd = new PixelData();
+      pd.createPixelData(this.chipWidth, this.chipHeight);
+      pd.pixels.set(layer.pixelData.pixels);
+      return {
+        pixelData: pd,
+        name:      layer.name,
+        visible:   layer.visible,
+        opacity:   layer.opacity,
+      };
+    });
+    dst.activeIndex = srcLayerData.activeIndex;
+    dst.markCompositeDirty();
+    return true;
+  }
+
   // ----------------------------------------------------------------
   // タイルセット構造変更
   // ----------------------------------------------------------------

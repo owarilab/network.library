@@ -54,6 +54,12 @@ class AppData {
      * @type {'free'|'tileset'}
      */
     this.editMode = 'free';
+
+    /**
+     * チップクリップボード。コピーしたチップの LayerData ディープコピーを保持する。
+     * @type {LayerData|null}
+     */
+    this.chipClipboard = null;
   }
 
   /**

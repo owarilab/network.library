@@ -474,11 +474,11 @@ TilePreviewWindow extends UIWindow
 
 | # | 作業内容 | 対象ファイル | 進捗 |
 |---|----------|-------------|------|
-| 3-1 | `TilesetData` にチップ操作メソッド実装 | `js/tileset_data.js` | 未着手 |
-| 3-2 | チップクリップボード（AppData にバッファ追加） | `js/app_data.js` | 未着手 |
-| 3-3 | タイルセットメニュー追加 | `js/ui/menu_constants.js`, `js/ui/menu_bar.js` | 未着手 |
-| 3-4 | メニューコマンド接続 | `js/scene/editor_scene.js` | 未着手 |
-| 3-5 | チップ選択切り替え時のビューリセット処理 | `js/scene/editor_scene.js` | 未着手 |
+| 3-1 | `TilesetData` にチップ操作メソッド実装 | `js/tileset_data.js` | ✅ 完了 |
+| 3-2 | チップクリップボード（AppData にバッファ追加） | `js/app_data.js` | ✅ 完了 |
+| 3-3 | タイルセットメニュー追加 | `js/ui/menu_constants.js`, `js/ui/menu_bar.js` | ✅ 完了 |
+| 3-4 | メニューコマンド接続 | `js/scene/editor_scene.js` | ✅ 完了 |
+| 3-5 | チップ選択切り替え時のビューリセット処理 | `js/scene/editor_scene.js` | ✅ 完了 |
 
 ### Phase 4: タイルプレビュー
 
