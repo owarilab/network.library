@@ -30,6 +30,7 @@ class MenuConstants {
   static VIEW_ZOOM_IN     = 'view.zoom_in';
   static VIEW_ZOOM_OUT    = 'view.zoom_out';
   static VIEW_ZOOM_RESET  = 'view.zoom_reset';
+  static VIEW_PASS_FLAGS  = 'view.pass_flags';
 
   // ---- ファイル（タイルセット拡張） ----
   static FILE_NEW_TILESET      = 'file.new_tileset';

@@ -53,6 +53,18 @@ class ColorPalette {
      * @type {((target: 'fore' | 'back', appData: AppData) => void)|null}
      */
     this.onSwatchClick = null;
+
+    /**
+     * セルダブルクリック時のコールバック。
+     * インデックス0（透明色）ではコールバックを呼ばない。
+     * @type {((index: number, currentColor: number, applyFn: (newColor: number) => void) => void)|null}
+     */
+    this.onCellDoubleClick = null;
+
+    /** ダブルクリック判定用: 最終クリック時刻 */
+    this._lastClickTime = 0;
+    /** ダブルクリック判定用: 最終クリックセルインデックス */
+    this._lastClickIndex = -1;
   }
 
   // ----------------------------------------------------------------
@@ -241,7 +253,30 @@ class ColorPalette {
 
     const idx = this._hitTestCell(e.x, e.y);
     if (idx < 0) return false;
-    const color = this.getColors()[idx];
+    const colors = this.getColors();
+    const color  = colors[idx];
+
+    // ダブルクリック判定（左クリックのみ）
+    if (e.button === 0 && this.onCellDoubleClick) {
+      const now = Date.now();
+      if (idx === this._lastClickIndex && (now - this._lastClickTime) < 400) {
+        // ダブルクリック成立
+        this._lastClickTime  = 0;
+        this._lastClickIndex = -1;
+        if (idx !== 0) {
+          const self = this;
+          this.onCellDoubleClick(idx, color, (newColor) => {
+            if (typeof self.setColor === 'function') {
+              self.setColor(idx, newColor);
+            }
+          });
+        }
+        return true;
+      }
+      this._lastClickTime  = now;
+      this._lastClickIndex = idx;
+    }
+
     if (e.button === 2) {
       appData.backColor = color;
     } else {

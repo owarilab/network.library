@@ -17,7 +17,7 @@
  */
 class SaveDialog extends DialogBase {
   static DIALOG_W = 380;
-  static DIALOG_H = 200;
+  static DIALOG_H = 240;
 
   /** ファイル名に使えない文字 (Windows/Unix 共通で安全な範囲) */
   static FORBIDDEN_CHARS = /[\\/:*?"<>|]/;
@@ -26,21 +26,21 @@ class SaveDialog extends DialogBase {
   static MAX_FILENAME_LEN = 80;
 
   /**
-   * @param {(filename: string, format: 'png' | 'json') => void} onConfirm
+   * @param {(filename: string, format: 'png' | 'json' | 'qts') => void} onConfirm
    * @param {() => void} [onCancel]
    */
   constructor(onConfirm, onCancel = () => {}) {
     super('エクスポート', SaveDialog.DIALOG_W, SaveDialog.DIALOG_H);
 
-    /** @type {(filename: string, format: 'png' | 'json') => void} */
+    /** @type {(filename: string, format: 'png' | 'json' | 'qts') => void} */
     this.onConfirm = onConfirm;
     /** @type {() => void} */
     this.onCancel  = onCancel;
 
     /** 現在のファイル名ベース (拡張子なし) @type {string} */
     this._filename = 'pixel_art';
-    /** エクスポート形式 @type {'png' | 'json'} */
-    this._format   = 'png';
+    /** エクスポート形式 @type {'png' | 'json' | 'qts'} */
+    this._format   = 'qts';
 
     /** ファイル名フィールドにフォーカスがあるか @type {boolean} */
     this._filenameFocused = false;
@@ -111,12 +111,14 @@ class SaveDialog extends DialogBase {
     label('形式:', bx + PAD, y + 11);
 
     const radioX   = bx + PAD + 48;
-    const radioGap = 100;
+    const radioGap = 80;
 
-    const fmtPngR  = { x: radioX,           y, w: 70, h: 22 };
-    const fmtJsonR = { x: radioX + radioGap, y, w: 80, h: 22 };
+    const fmtPngR  = { x: radioX,               y, w: 70, h: 22 };
+    const fmtJsonR = { x: radioX + radioGap,     y, w: 80, h: 22 };
+    const fmtQtsR  = { x: radioX + radioGap * 2, y, w: 80, h: 22 };
     this._rects.fmtPng  = fmtPngR;
     this._rects.fmtJson = fmtJsonR;
+    this._rects.fmtQts  = fmtQtsR;
 
     this._drawRadio(ctx, fmtPngR.x,  fmtPngR.y,  'PNG',
                     this._format === 'png',
@@ -124,16 +126,22 @@ class SaveDialog extends DialogBase {
     this._drawRadio(ctx, fmtJsonR.x, fmtJsonR.y, 'JSON',
                     this._format === 'json',
                     this._hover  === 'fmtJson');
+    this._drawRadio(ctx, fmtQtsR.x,  fmtQtsR.y,  'QTS',
+                    this._format === 'qts',
+                    this._hover  === 'fmtQts');
 
-    // 現在の拡張子を補足表示
-    const ext = this._format === 'png' ? '.png' : '.json';
+    y += 22 + 6;
+
+    // 現在のファイル名+拡張子を次の行に表示
+    const extMap = { png: '.png', json: '.json', qts: '.qts' };
+    const ext = extMap[this._format] || '.png';
     ctx.fillStyle    = '#888888';
     ctx.font         = '11px sans-serif';
     ctx.textBaseline = 'middle';
-    ctx.fillText(`→ ${this._filename}${ext}`, fmtJsonR.x + fmtJsonR.w + 14, y + 11);
+    ctx.fillText(`→ ${this._filename}${ext}`, bx + PAD + LABEL_COL_W, y + 6);
     ctx.textBaseline = 'alphabetic';
 
-    y += 22 + 16;
+    y += 16;
 
     // =====================================================
     // 区切り線
@@ -191,6 +199,7 @@ class SaveDialog extends DialogBase {
     }
     if (key === 'fmtPng')  { this._format = 'png';  this._commitFilename(); return; }
     if (key === 'fmtJson') { this._format = 'json'; this._commitFilename(); return; }
+    if (key === 'fmtQts')  { this._format = 'qts';  this._commitFilename(); return; }
     if (key === 'btnCancel') { this._cancel(); return; }
     if (key === 'btnOK')     { this._confirm(); return; }
   }
@@ -249,7 +258,8 @@ class SaveDialog extends DialogBase {
   _confirm() {
     this._commitFilename();
     const name = (this._filename.trim() || 'pixel_art');
-    const ext  = this._format === 'png' ? '.png' : '.json';
+    const extMap = { png: '.png', json: '.json', qts: '.qts' };
+    const ext  = extMap[this._format] || '.png';
     this.hide();
     this.onConfirm(name + ext, this._format);
   }

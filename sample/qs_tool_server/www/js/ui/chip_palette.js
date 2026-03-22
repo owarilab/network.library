@@ -41,6 +41,8 @@ class ChipPalette {
     this.onChipSelect = null;
     /** @type {((col: number, row: number) => void)|null} */
     this.onChipDoubleClick = null;
+    /** @type {((col: number, row: number, screenX: number, screenY: number) => void)|null} */
+    this.onChipContextMenu = null;
 
     // ---- ダブルクリック検出 ----
     this._lastClickTime = 0;
@@ -120,6 +122,22 @@ class ChipPalette {
         const chipPd = td.compositeChip(c, r);
         if (chipPd) {
           this._drawPixelDataScaled(ctx, chipPd, cx, cy, CELL_SIZE, CELL_SIZE);
+        }
+
+        // 通過フラグ表示（× マーク = 通過不可）
+        if (appData.showPassFlags !== false &&
+            td.passFlags && td.passFlags[r] && td.passFlags[r][c] === false) {
+          ctx.save();
+          ctx.strokeStyle = 'rgba(255, 60, 60, 0.7)';
+          ctx.lineWidth = 2;
+          const m = 4; // マージン
+          ctx.beginPath();
+          ctx.moveTo(cx + m, cy + m);
+          ctx.lineTo(cx + CELL_SIZE - m, cy + CELL_SIZE - m);
+          ctx.moveTo(cx + CELL_SIZE - m, cy + m);
+          ctx.lineTo(cx + m, cy + CELL_SIZE - m);
+          ctx.stroke();
+          ctx.restore();
         }
 
         // 枠線
@@ -276,6 +294,23 @@ class ChipPalette {
       }
     }
 
+    return false;
+  }
+
+  /**
+   * 右クリック（コンテキストメニュー）。ヒットしたチップの座標をコールバックに渡す。
+   * @param {{x: number, y: number}} e
+   * @param {AppData} appData
+   * @returns {boolean} true = consumed
+   */
+  onContextMenu(e, appData) {
+    for (const cell of this._cells) {
+      if (e.x >= cell.x && e.x < cell.x + cell.w &&
+          e.y >= cell.y && e.y < cell.y + cell.h) {
+        this.onChipContextMenu?.(cell.col, cell.row, e.x, e.y);
+        return true;
+      }
+    }
     return false;
   }
 }

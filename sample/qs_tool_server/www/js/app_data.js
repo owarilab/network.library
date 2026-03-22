@@ -60,6 +60,19 @@ class AppData {
      * @type {LayerData|null}
      */
     this.chipClipboard = null;
+
+    /**
+     * 編集可能カラーパレット（32色）。
+     * EditorScene.onEnter() で EditablePalette32 インスタンスが設定される。
+     * @type {EditablePalette32|null}
+     */
+    this.palette = null;
+
+    /**
+     * 通過フラグの表示切替。true = チップパレット上に通過フラグを表示する。
+     * @type {boolean}
+     */
+    this.showPassFlags = true;
   }
 
   /**

@@ -29,12 +29,20 @@ class TilesetData {
      */
     this.chips = [];
 
+    /**
+     * passFlags[row][col] = チップ単位の通過フラグ（true = 通過可能）
+     * @type {boolean[][]}
+     */
+    this.passFlags = [];
+
     for (let r = 0; r < rows; r++) {
       this.chips[r] = [];
+      this.passFlags[r] = [];
       for (let c = 0; c < cols; c++) {
         const ld = new LayerData();
         ld.init(chipW, chipH, fillColor);
         this.chips[r][c] = ld;
+        this.passFlags[r][c] = true; // デフォルト: 通過可能
       }
     }
   }

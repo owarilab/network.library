@@ -65,6 +65,7 @@ class MenuBar {
         label: '表示',
         dropdown: new DropdownMenu([
           { id: MenuConstants.VIEW_GRID,       label: 'グリッド表示' },
+          { id: MenuConstants.VIEW_PASS_FLAGS,  label: '通過フラグ表示' },
           { id: MenuConstants.SEPARATOR },
           { id: MenuConstants.VIEW_ZOOM_IN,    label: '拡大'       },
           { id: MenuConstants.VIEW_ZOOM_OUT,   label: '縮小'       },

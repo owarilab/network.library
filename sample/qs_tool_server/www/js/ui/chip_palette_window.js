@@ -43,6 +43,14 @@ class ChipPaletteWindow extends UIWindow {
     this._palette.onChipDoubleClick = fn;
   }
 
+  /**
+   * チップ右クリック時のコールバックを設定する。
+   * @param {(col: number, row: number, screenX: number, screenY: number) => void} fn
+   */
+  set onChipContextMenu(fn) {
+    this._palette.onChipContextMenu = fn;
+  }
+
   // ----------------------------------------------------------------
   // UIWindow override
   // ----------------------------------------------------------------
@@ -106,5 +114,17 @@ class ChipPaletteWindow extends UIWindow {
   onMouseMove(e, appData) {
     if (!appData || appData.editMode !== 'tileset' || !appData.tilesetData) return;
     super.onMouseMove(e, appData);
+  }
+
+  /**
+   * 右クリック。タイルセットモード時 + ウィンドウ内ならチップパレットに委譲。
+   * @param {{x: number, y: number}} e
+   * @param {AppData} appData
+   * @returns {boolean}
+   */
+  onContextMenu(e, appData) {
+    if (!appData || appData.editMode !== 'tileset' || !appData.tilesetData) return false;
+    if (!this.containsPoint(e.x, e.y)) return false;
+    return this._palette.onContextMenu(e, appData);
   }
 }

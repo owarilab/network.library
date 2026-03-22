@@ -136,6 +136,9 @@ class PixelDataConverter {
     if (name.endsWith('.json')) {
       return PixelDataConverter.importFromJson(file);
     }
+    if (name.endsWith('.qts')) {
+      return PixelDataConverter.importFromQts(file);
+    }
     return Promise.reject(new Error(`未対応のファイル形式です: ${file.name}`));
   }
 
@@ -405,6 +408,271 @@ class PixelDataConverter {
       }
     }
     return td;
+  }
+
+  // ----------------------------------------------------------------
+  // QTS バイナリフォーマット (.qts)
+  // ----------------------------------------------------------------
+
+  // ---- 1バイトピクセル操作 ----
+
+  /** カラーID取得 (0〜31) */
+  static PIXEL_COLOR_ID(b) { return b & 0x1F; }
+  /** 通過フラグ取得 (0 or 1) */
+  static PIXEL_PASSABLE(b) { return (b >> 7) & 0x01; }
+  /** バイト生成 */
+  static PIXEL_MAKE(colorId, passable = 0, reserved = 0) {
+    return ((passable & 1) << 7) | ((reserved & 3) << 5) | (colorId & 0x1F);
+  }
+
+  /**
+   * ARGB32 ピクセルを最近傍パレットインデックスに量子化する。
+   * @param {number}   argb32     0xAARRGGBB
+   * @param {number[]} palette    EditablePalette32.getColors() の結果（32要素）
+   * @param {number}   [passable=0] 通過フラグ
+   * @returns {number} 0〜255 の1バイト
+   */
+  static quantizePixel(argb32, palette, passable = 0) {
+    if (((argb32 >>> 24) & 0xFF) === 0) return PixelDataConverter.PIXEL_MAKE(0, 0, 0);
+
+    const r = (argb32 >>> 16) & 0xFF;
+    const g = (argb32 >>>  8) & 0xFF;
+    const b =  argb32         & 0xFF;
+
+    let bestId   = 1;
+    let bestDist = Infinity;
+    for (let i = 1; i < palette.length; i++) {
+      if (((palette[i] >>> 24) & 0xFF) === 0) continue;
+      const pr = (palette[i] >>> 16) & 0xFF;
+      const pg = (palette[i] >>>  8) & 0xFF;
+      const pb =  palette[i]         & 0xFF;
+      const d  = (r - pr) ** 2 + (g - pg) ** 2 + (b - pb) ** 2;
+      if (d < bestDist) { bestDist = d; bestId = i; }
+    }
+    return PixelDataConverter.PIXEL_MAKE(bestId, passable);
+  }
+
+  /**
+   * 1バイトピクセルを ARGB32 に展開する。
+   * @param {number}   byte     1バイトピクセル値
+   * @param {number[]} palette  EditablePalette32.getColors() の結果
+   * @returns {number} 0xAARRGGBB
+   */
+  static expandPixel(byte, palette) {
+    const colorId = PixelDataConverter.PIXEL_COLOR_ID(byte);
+    if (colorId === 0) return 0x00000000;
+    const c = palette[colorId];
+    if (!c || ((c >>> 24) & 0xFF) === 0) return 0x00000000;
+    return (c & 0x00FFFFFF) | 0xFF000000;
+  }
+
+  // ---- QTS エクスポート ----
+
+  /**
+   * TilesetData + パレットを .qts バイナリとしてダウンロードする。
+   * @param {TilesetData}       tilesetData
+   * @param {EditablePalette32} palette
+   * @param {string}            [filename='tileset.qts']
+   */
+  static exportTilesetAsQts(tilesetData, palette, filename = 'tileset.qts') {
+    const { chipWidth, chipHeight, columns, rows } = tilesetData;
+    const paletteColors = palette.getColors();
+    const encoder = new TextEncoder();
+
+    // --- バッファサイズを事前計算 ---
+    let totalSize = 8 + 8 + 129; // ヘッダ + メタ + パレット
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < columns; c++) {
+        const ld = tilesetData.chips[r][c];
+        totalSize += 1; // レイヤー数
+        for (const layer of ld.layers) {
+          const nameBytes = encoder.encode(layer.name || '');
+          totalSize += 2 + nameBytes.byteLength + 1 + 1; // L + name + visible + opacity
+          totalSize += chipWidth * chipHeight; // ピクセルデータ
+        }
+      }
+    }
+
+    const buffer = new ArrayBuffer(totalSize);
+    const bytes  = new Uint8Array(buffer);
+    const view   = new DataView(buffer);
+    let pos = 0;
+
+    // --- ファイルヘッダ (8バイト) ---
+    bytes[pos++] = 0x51; // 'Q'
+    bytes[pos++] = 0x53; // 'S'
+    bytes[pos++] = 0x54; // 'T'
+    bytes[pos++] = 0x53; // 'S'
+    bytes[pos++] = 0x01; // メジャーバージョン
+    bytes[pos++] = 0x00; // マイナーバージョン
+    bytes[pos++] = 0x00; // 予約
+    bytes[pos++] = 0x00; // 予約
+
+    // --- タイルセットメタ情報 (8バイト, uint16 LE) ---
+    view.setUint16(pos, chipWidth,  true); pos += 2;
+    view.setUint16(pos, chipHeight, true); pos += 2;
+    view.setUint16(pos, columns,    true); pos += 2;
+    view.setUint16(pos, rows,       true); pos += 2;
+
+    // --- パレットブロック (129バイト) ---
+    bytes[pos++] = paletteColors.length; // 有効色数 N
+    for (let i = 0; i < 32; i++) {
+      const c = i < paletteColors.length ? paletteColors[i] : 0;
+      bytes[pos++] = (c >>> 16) & 0xFF; // R
+      bytes[pos++] = (c >>>  8) & 0xFF; // G
+      bytes[pos++] =  c         & 0xFF; // B
+      bytes[pos++] = (c >>> 24) & 0xFF; // A
+    }
+
+    // --- チップブロック (row-major) ---
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < columns; c++) {
+        const ld = tilesetData.chips[r][c];
+        bytes[pos++] = ld.layers.length; // レイヤー数
+
+        for (const layer of ld.layers) {
+          // レイヤーメタ
+          const nameBytes = encoder.encode(layer.name || '');
+          view.setUint16(pos, nameBytes.byteLength, true); pos += 2;
+          bytes.set(nameBytes, pos); pos += nameBytes.byteLength;
+          bytes[pos++] = layer.visible ? 1 : 0;
+          bytes[pos++] = layer.opacity & 0xFF;
+
+          // ピクセルデータ (量子化)
+          const pd = layer.pixelData;
+          const passable = (tilesetData.passFlags && tilesetData.passFlags[r] &&
+                            tilesetData.passFlags[r][c] !== false) ? 1 : 0;
+          for (let y = 0; y < chipHeight; y++) {
+            for (let x = 0; x < chipWidth; x++) {
+              bytes[pos++] = PixelDataConverter.quantizePixel(
+                pd.getPixel(x, y), paletteColors, passable
+              );
+            }
+          }
+        }
+      }
+    }
+
+    const blob = new Blob([buffer], { type: 'application/octet-stream' });
+    PixelDataConverter._downloadBlob(filename, blob);
+  }
+
+  // ---- QTS インポート ----
+
+  /**
+   * .qts ファイルを読み込んで TilesetData + EditablePalette32 を返す。
+   * @param {File} file
+   * @returns {Promise<{ tilesetData: TilesetData, palette: EditablePalette32 }>}
+   */
+  static importFromQts(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const buffer = e.target.result;
+          const bytes  = new Uint8Array(buffer);
+          const view   = new DataView(buffer);
+          let pos = 0;
+
+          // --- ファイルヘッダ検証 ---
+          if (bytes.length < 8 + 8 + 129) {
+            reject(new Error('ファイルサイズが不正です')); return;
+          }
+          if (bytes[0] !== 0x51 || bytes[1] !== 0x53 ||
+              bytes[2] !== 0x54 || bytes[3] !== 0x53) {
+            reject(new Error('マジックナンバーが不正です (QSTS でない)')); return;
+          }
+          pos = 8; // ヘッダスキップ
+
+          // --- タイルセットメタ情報 ---
+          const chipWidth  = view.getUint16(pos, true); pos += 2;
+          const chipHeight = view.getUint16(pos, true); pos += 2;
+          const columns    = view.getUint16(pos, true); pos += 2;
+          const rows       = view.getUint16(pos, true); pos += 2;
+
+          if (chipWidth === 0 || chipHeight === 0 || columns === 0 || rows === 0) {
+            reject(new Error('タイルセットメタ情報が不正です')); return;
+          }
+
+          // --- パレットブロック ---
+          const paletteN = bytes[pos++];
+          const palette  = new EditablePalette32();
+          const paletteColors = [];
+          for (let i = 0; i < 32; i++) {
+            const r = bytes[pos++];
+            const g = bytes[pos++];
+            const b = bytes[pos++];
+            const a = bytes[pos++];
+            const color = PixelData.rgba(r, g, b, a);
+            paletteColors.push(color);
+            if (i > 0 && i < paletteN) {
+              palette.setColor(i, color);
+            }
+          }
+
+          // --- チップブロック ---
+          const decoder = new TextDecoder();
+          const td = new TilesetData(chipWidth, chipHeight, columns, rows);
+
+          for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < columns; c++) {
+              if (pos >= bytes.length) {
+                reject(new Error('ファイルが途中で終了しています')); return;
+              }
+              const layerCount = bytes[pos++];
+              const layers = [];
+              let chipPassable = true; // 通過フラグ（最初のレイヤーのピクセルから判定）
+
+              for (let li = 0; li < layerCount; li++) {
+                // レイヤーメタ
+                const nameLen = view.getUint16(pos, true); pos += 2;
+                const name = nameLen > 0
+                  ? decoder.decode(bytes.subarray(pos, pos + nameLen))
+                  : '';
+                pos += nameLen;
+                const visible = bytes[pos++] === 1;
+                const opacity = bytes[pos++];
+
+                // ピクセルデータ (展開)
+                const pd = new PixelData();
+                pd.createPixelData(chipWidth, chipHeight);
+                let foundPassFlag = false;
+                for (let y = 0; y < chipHeight; y++) {
+                  for (let x = 0; x < chipWidth; x++) {
+                    const byteVal = bytes[pos++];
+                    pd.setPixel(x, y,
+                      PixelDataConverter.expandPixel(byteVal, paletteColors)
+                    );
+                    // 最初のレイヤーの最初の非透明ピクセルから通過フラグを取得
+                    if (li === 0 && !foundPassFlag && PixelDataConverter.PIXEL_COLOR_ID(byteVal) !== 0) {
+                      chipPassable = PixelDataConverter.PIXEL_PASSABLE(byteVal) === 1;
+                      foundPassFlag = true;
+                    }
+                  }
+                }
+
+                layers.push({ pixelData: pd, name, visible, opacity });
+              }
+
+              if (layers.length > 0) {
+                const ld = td.chips[r][c];
+                ld.layers = layers;
+                ld.activeIndex = 0;
+                ld._composite.createPixelData(chipWidth, chipHeight);
+                ld._compositeDirty = true;
+              }
+              td.passFlags[r][c] = chipPassable;
+            }
+          }
+
+          resolve({ tilesetData: td, palette });
+        } catch (err) {
+          reject(new Error(`QTS 解析エラー: ${err.message}`));
+        }
+      };
+      reader.onerror = () => reject(new Error('QTS ファイルの読み込みに失敗しました'));
+      reader.readAsArrayBuffer(file);
+    });
   }
 
   // ----------------------------------------------------------------

@@ -57,12 +57,20 @@ class EditorScene extends Scene {
       () => console.log('[EditorScene] new tileset dialog cancelled'),
     );
 
-    /** カラーパレットウィンドウ @type {ColorPaletteWindow} */
-    this._colorPaletteWin = new ColorPaletteWindow(new ColorPalette16());
+    /** カラーパレットウィンドウ (EditablePalette32 コンテンツ) @type {ColorPaletteWindow} */
+    this._colorPaletteWin = new ColorPaletteWindow(new EditablePalette32());
 
     /** カラーピッカーダイアログ @type {ColorPickerDialog} */
     this._colorPickerDialog = new ColorPickerDialog(
       (color) => {
+        // パレットセル編集時
+        if (this._paletteEditCallback) {
+          this._paletteEditCallback(color);
+          this._paletteEditCallback = null;
+          // 選択中の前景色もパレット編集結果に更新
+          if (this._appData) this._appData.foreColor = color;
+          return;
+        }
         // クォータービュータイルダイアログのスウォッチ色変更時
         if (this._quarterViewTileColorCallback) {
           this._quarterViewTileColorCallback(color);
@@ -78,6 +86,7 @@ class EditorScene extends Scene {
         console.log(`[EditorScene] color picked: 0x${color.toString(16).padStart(8, '0')}`);
       },
       () => {
+        this._paletteEditCallback = null;
         this._quarterViewTileColorCallback = null;
         console.log('[EditorScene] color picker cancelled');
       },
@@ -85,11 +94,23 @@ class EditorScene extends Scene {
     /** @type {'fore' | 'back'} */
     this._colorPickerTarget = 'fore';
 
+    /** パレット色編集用コールバック @type {((color: number) => void)|null} */
+    this._paletteEditCallback = null;
+
     // パレットのスウォッチクリックでカラーピッカーを開く
     this._colorPaletteWin.getPalette().onSwatchClick = (target, appData) => {
       this._colorPickerTarget = target;
       const color = target === 'back' ? appData.backColor : appData.foreColor;
       this._colorPickerDialog.showWithColor(color);
+    };
+
+    // パレットセルのダブルクリックでカラーピッカーを開いてパレット色を編集
+    this._colorPaletteWin.getPalette().onCellDoubleClick = (index, currentColor, applyFn) => {
+      this._paletteEditCallback = applyFn;
+      // 透明色（A=0）の場合はアルファ255の黒で開く（ユーザーが色を選びやすくするため）
+      const a = (currentColor >>> 24) & 0xFF;
+      const initColor = a === 0 ? PixelData.rgba(0, 0, 0, 255) : currentColor;
+      this._colorPickerDialog.showWithColor(initColor);
     };
 
     /** ツールバーウィンドウ @type {ToolBarWindow} */
@@ -127,6 +148,16 @@ class EditorScene extends Scene {
       this._pixelCanvas.markDirty();
       console.log(`[EditorScene] chip double-clicked (focus): (${col}, ${row})`);
     };
+    this._chipPaletteWin.onChipContextMenu = (col, row, screenX, screenY) => {
+      if (!this._appData || !this._appData.tilesetData) return;
+      if (!this._appData.showPassFlags) return;
+      const td = this._appData.tilesetData;
+      if (row < 0 || row >= td.rows || col < 0 || col >= td.columns) return;
+      // 通過フラグをトグル
+      td.passFlags[row][col] = !td.passFlags[row][col];
+      const state = td.passFlags[row][col] ? 'ON (通過可能)' : 'OFF (通過不可)';
+      console.log(`[EditorScene] chip (${col}, ${row}) 通過フラグ: ${state}`);
+    };
 
     /** エクスポートダイアログ @type {SaveDialog} */
     this._saveDialog = new SaveDialog(
@@ -142,6 +173,14 @@ class EditorScene extends Scene {
             const composited = this._appData.layerData.composite();
             PixelDataConverter.exportAsPng(composited, filename)
               .catch(err => console.error('[EditorScene] PNG エクスポートエラー:', err));
+          }
+        } else if (format === 'qts') {
+          if (isTileset && this._appData.palette) {
+            PixelDataConverter.exportTilesetAsQts(
+              this._appData.tilesetData, this._appData.palette, filename
+            );
+          } else {
+            console.warn('[EditorScene] QTS エクスポートはタイルセットモード専用です');
           }
         } else {
           if (isTileset) {
@@ -218,10 +257,13 @@ class EditorScene extends Scene {
   onEnter(input, appData) {
     this._appData = appData;
 
+    // パレットを AppData に登録
+    appData.palette = this._colorPaletteWin.getPalette();
+
     // --- 隠し <input type="file"> を作成 ---
     this._fileInput = document.createElement('input');
     this._fileInput.type    = 'file';
-    this._fileInput.accept  = '.png,.json';
+    this._fileInput.accept  = '.png,.json,.qts';
     this._fileInput.style.display = 'none';
     document.body.appendChild(this._fileInput);
     this._fileInput.addEventListener('change', () => {
@@ -231,7 +273,24 @@ class EditorScene extends Scene {
       this._fileInput.value = '';
       PixelDataConverter.importFromFile(file)
         .then(result => {
-          if (result instanceof TilesetData) {
+          if (result && result.tilesetData && result.palette) {
+            // .qts インポート結果
+            this._appData.tilesetData  = result.tilesetData;
+            this._appData.editMode     = 'tileset';
+            this._appData.selectedChip = { col: 0, row: 0 };
+            // パレットを復元
+            const paletteWin = this._colorPaletteWin.getPalette();
+            if (paletteWin instanceof EditablePalette32) {
+              const importedColors = result.palette.getColors();
+              for (let i = 1; i < importedColors.length; i++) {
+                paletteWin.setColor(i, importedColors[i]);
+              }
+            }
+            this._appData.palette = this._colorPaletteWin.getPalette();
+            this._pixelCanvas.resetView();
+            this._pixelCanvas.markDirty();
+            console.log(`[EditorScene] QTS imported: ${file.name}`);
+          } else if (result instanceof TilesetData) {
             // v2 タイルセット JSON
             this._appData.tilesetData  = result;
             this._appData.editMode     = 'tileset';
@@ -257,7 +316,7 @@ class EditorScene extends Scene {
     // --- タイルセットインポート用の隠し <input type="file"> を作成 ---
     this._tilesetFileInput = document.createElement('input');
     this._tilesetFileInput.type    = 'file';
-    this._tilesetFileInput.accept  = '.png,.json';
+    this._tilesetFileInput.accept  = '.png,.json,.qts';
     this._tilesetFileInput.style.display = 'none';
     document.body.appendChild(this._tilesetFileInput);
     this._tilesetFileInput.addEventListener('change', () => {
@@ -265,7 +324,28 @@ class EditorScene extends Scene {
       if (!file) return;
       this._tilesetFileInput.value = '';
       const name = file.name.toLowerCase();
-      if (name.endsWith('.json')) {
+      if (name.endsWith('.qts')) {
+        // QTS の場合: バイナリタイルセットとしてインポート
+        PixelDataConverter.importFromQts(file)
+          .then(result => {
+            this._appData.tilesetData  = result.tilesetData;
+            this._appData.editMode     = 'tileset';
+            this._appData.selectedChip = { col: 0, row: 0 };
+            // パレットを復元
+            const paletteWin = this._colorPaletteWin.getPalette();
+            if (paletteWin instanceof EditablePalette32) {
+              const importedColors = result.palette.getColors();
+              for (let i = 1; i < importedColors.length; i++) {
+                paletteWin.setColor(i, importedColors[i]);
+              }
+            }
+            this._appData.palette = this._colorPaletteWin.getPalette();
+            this._pixelCanvas.resetView();
+            this._pixelCanvas.markDirty();
+            console.log(`[EditorScene] QTS tileset opened: ${file.name}`);
+          })
+          .catch(err => console.error('[EditorScene] QTS読み込みエラー:', err.message));
+      } else if (name.endsWith('.json')) {
         // JSON の場合: v2 タイルセットとしてインポート試行
         PixelDataConverter.importFromJson(file)
           .then(result => {
@@ -488,6 +568,12 @@ class EditorScene extends Scene {
         return;
       }
 
+      if (id === MenuConstants.VIEW_PASS_FLAGS) {
+        this._appData.showPassFlags = !this._appData.showPassFlags;
+        console.log(`[EditorScene] pass flags display: ${this._appData.showPassFlags ? 'show' : 'hide'}`);
+        return;
+      }
+
       // ---- 生成メニュー ----
       if (id === MenuConstants.GENERATE_QUARTER_VIEW_TILE) {
         this._quarterViewTileDialog.show();
@@ -607,7 +693,9 @@ class EditorScene extends Scene {
       if (this._quarterViewTileDialog.isVisible || this._newFileDialog.isVisible || this._newTilesetDialog.isVisible || this._importTilesetDialog.isVisible || this._saveDialog.isVisible || this._colorPickerDialog.isVisible) return;
       this._pixelCanvas.zoom(-e.deltaY, e.x, e.y);
     };
-    this._onContextMenu = e => console.log('[EditorScene] contextmenu', e);
+    this._onContextMenu = e => {
+      this._chipPaletteWin.onContextMenu(e, appData);
+    };
     input.on('mousemove',   this._onMouseMove);
     input.on('mousedown',   this._onMouseDown);
     input.on('mouseup',     this._onMouseUp);
