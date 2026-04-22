@@ -93,6 +93,9 @@ class PixelCanvas {
     this.onPixelMove = null;
     /** @type {((px:number,py:number,button:number,appData:AppData)=>void)|null} */
     this.onPixelUp   = null;
+
+    /** マーチングアリ用の dash offset */
+    this._selectionDashOffset = 0;
   }
 
   // ----------------------------------------------------------------
@@ -103,11 +106,12 @@ class PixelCanvas {
    * ピクセルデータを画面中央に描画する。
    * EditorScene.render() から毎フレーム呼ぶ。
    *
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {HTMLCanvasElement}       canvas
-   * @param {PixelData}               pixelData
+  * @param {CanvasRenderingContext2D} ctx
+  * @param {HTMLCanvasElement}       canvas
+  * @param {PixelData}               pixelData
+  * @param {AppData}                 [appData]
    */
-  render(ctx, canvas, pixelData) {
+  render(ctx, canvas, pixelData, appData = null) {
     if (!pixelData || !pixelData.pixels) return;
 
     const { width: pw, height: ph } = pixelData;
@@ -143,11 +147,101 @@ class PixelCanvas {
       this._drawGrid(ctx, pw, ph);
     }
 
+    if (appData?.hasFloatingSelection?.()) {
+      this._drawFloatingSelection(ctx, appData.selection.floating);
+    }
+
+    if (appData?.hasSelection?.()) {
+      this._drawSelection(ctx, appData.selection);
+    }
+
     // ---- 枠線 ----
     ctx.save();
     ctx.strokeStyle = PixelCanvas.BORDER_COLOR;
     ctx.lineWidth   = 1;
     ctx.strokeRect(this.offsetX - 0.5, this.offsetY - 0.5, drawW + 1, drawH + 1);
+    ctx.restore();
+  }
+
+  /**
+   * 選択矩形をオーバーレイ描画する。
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {{ x:number, y:number, w:number, h:number }} selection
+   */
+  _drawSelection(ctx, selection) {
+    const x = this.offsetX + selection.x * this.scale;
+    const y = this.offsetY + selection.y * this.scale;
+    const w = selection.w * this.scale;
+    const h = selection.h * this.scale;
+
+    this._selectionDashOffset = (this._selectionDashOffset + 1) % 8;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(80, 160, 255, 0.12)';
+    ctx.fillRect(x, y, w, h);
+
+    ctx.setLineDash([4, 4]);
+    ctx.lineDashOffset = -this._selectionDashOffset;
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#ffffff';
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+
+    ctx.lineDashOffset = 4 - this._selectionDashOffset;
+    ctx.strokeStyle = '#000000';
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  /**
+   * 浮動選択のピクセル内容をプレビュー描画する。
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {{ pixelData: PixelData, dstX: number, dstY: number, width: number, height: number }} floating
+   */
+  _drawFloatingSelection(ctx, floating) {
+    if (!floating?.pixelData?.pixels) return;
+    const x = this.offsetX + floating.dstX * this.scale;
+    const y = this.offsetY + floating.dstY * this.scale;
+    this._drawPixelDataOverlay(ctx, floating.pixelData, x, y, 0.92);
+  }
+
+  /**
+   * 任意の PixelData を拡大表示で重ね描きする。
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {PixelData} pixelData
+   * @param {number} x
+   * @param {number} y
+   * @param {number} alpha
+   */
+  _drawPixelDataOverlay(ctx, pixelData, x, y, alpha = 1) {
+    const overlayCanvas = document.createElement('canvas');
+    const overlayCtx = overlayCanvas.getContext('2d');
+    overlayCanvas.width = pixelData.width;
+    overlayCanvas.height = pixelData.height;
+
+    const imgData = overlayCtx.createImageData(pixelData.width, pixelData.height);
+    const buf = imgData.data;
+
+    for (let i = 0; i < pixelData.pixels.length; i++) {
+      const c = pixelData.pixels[i];
+      const j = i * 4;
+      buf[j] = (c >>> 16) & 0xff;
+      buf[j + 1] = (c >>> 8) & 0xff;
+      buf[j + 2] = c & 0xff;
+      buf[j + 3] = (c >>> 24) & 0xff;
+    }
+    overlayCtx.putImageData(imgData, 0, 0);
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(
+      overlayCanvas,
+      x,
+      y,
+      pixelData.width * this.scale,
+      pixelData.height * this.scale,
+    );
     ctx.restore();
   }
 

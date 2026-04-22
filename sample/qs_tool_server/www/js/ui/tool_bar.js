@@ -5,7 +5,7 @@
  * 与えられた (x, y) を起点にツールボタンを縦並びで描画する。
  *
  * activeTool ID:
- *   'pencil' | 'eraser' | 'fill' | 'eyedropper'
+ *   'pencil' | 'eraser' | 'fill' | 'eyedropper' | 'selectRect'
  *
  * 使い方 (ToolBarWindow 経由が推奨):
  *   const size = toolBar.getContentSize();
@@ -20,6 +20,7 @@ class ToolBar {
     { id: 'eraser',     label: 'E', title: '消しゴム'     },
     { id: 'fill',       label: 'F', title: '塗りつぶし'   },
     { id: 'eyedropper', label: 'I', title: 'スポイト'     },
+    { id: 'selectRect', label: 'S', title: '矩形選択'     },
   ];
 
   // ---- レイアウト定数 ----
@@ -265,6 +266,21 @@ class ToolBar {
         // キャップ
         ctx.fillStyle = active ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.2)';
         ctx.fillRect(-w * 0.12, -h * 0.48, w * 0.24, h * 0.14);
+        break;
+      }
+      case 'selectRect': {
+        ctx.translate(cx, cy);
+        const left = -w * 0.35;
+        const top = -h * 0.35;
+        const rectW = w * 0.70;
+        const rectH = h * 0.70;
+        ctx.setLineDash([3, 2]);
+        ctx.strokeRect(left, top, rectW, rectH);
+        ctx.setLineDash([]);
+        ctx.fillRect(left - 1, top - 1, 2, 2);
+        ctx.fillRect(left + rectW - 1, top - 1, 2, 2);
+        ctx.fillRect(left - 1, top + rectH - 1, 2, 2);
+        ctx.fillRect(left + rectW - 1, top + rectH - 1, 2, 2);
         break;
       }
     }

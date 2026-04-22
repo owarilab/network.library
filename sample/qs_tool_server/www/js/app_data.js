@@ -30,7 +30,7 @@ class AppData {
 
     /**
      * 現在選択中のツール ID。
-     * 'pencil' | 'eraser' | 'fill' | 'eyedropper'
+    * 'pencil' | 'eraser' | 'fill' | 'eyedropper' | 'selectRect'
      * @type {string}
      */
     this.activeTool = 'pencil';
@@ -73,6 +73,26 @@ class AppData {
      * @type {boolean}
      */
     this.showPassFlags = true;
+
+    /**
+     * 現在の選択範囲。
+     * @type {{ active: boolean, x: number, y: number, w: number, h: number, mode: string, floating: object|null }}
+     */
+    this.selection = {
+      active: false,
+      x: 0,
+      y: 0,
+      w: 0,
+      h: 0,
+      mode: 'rect',
+      floating: null,
+    };
+
+    /**
+     * 将来のコピー/貼り付け用選択クリップボード。
+     * @type {{ pixelData: PixelData, width: number, height: number }|null}
+     */
+    this.selectionClipboard = null;
   }
 
   /**
@@ -132,5 +152,58 @@ class AppData {
    */
   createPixelData(width, height, fillColor = 0x00000000) {
     this._layerData.init(width, height, fillColor);
+    this.clearSelection();
+  }
+
+  /** 選択範囲を解除する。 */
+  clearSelection() {
+    this.selection.active = false;
+    this.selection.x = 0;
+    this.selection.y = 0;
+    this.selection.w = 0;
+    this.selection.h = 0;
+    this.selection.mode = 'rect';
+    this.selection.floating = null;
+  }
+
+  /**
+   * 矩形選択を設定する。サイズが 0 以下なら選択解除する。
+   * @param {number} x
+   * @param {number} y
+   * @param {number} w
+   * @param {number} h
+   */
+  setSelectionRect(x, y, w, h) {
+    const nx = x | 0;
+    const ny = y | 0;
+    const nw = w | 0;
+    const nh = h | 0;
+    if (nw <= 0 || nh <= 0) {
+      this.clearSelection();
+      return;
+    }
+    this.selection.active = true;
+    this.selection.x = nx;
+    this.selection.y = ny;
+    this.selection.w = nw;
+    this.selection.h = nh;
+    this.selection.mode = 'rect';
+    this.selection.floating = null;
+  }
+
+  /**
+   * 選択範囲が存在するか返す。
+   * @returns {boolean}
+   */
+  hasSelection() {
+    return this.selection.active && this.selection.w > 0 && this.selection.h > 0;
+  }
+
+  /**
+   * 浮動選択が存在するか返す。
+   * @returns {boolean}
+   */
+  hasFloatingSelection() {
+    return !!this.selection.floating;
   }
 }

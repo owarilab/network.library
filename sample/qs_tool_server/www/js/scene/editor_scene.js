@@ -20,8 +20,18 @@ class EditorScene extends Scene {
       this._applyTool(px, py, button, appData, false);
     };
     this._pixelCanvas.onPixelUp = (px, py, button, appData) => {
+      this._onPixelToolUp(px, py, button, appData);
       console.log(`[EditorScene] pixel up (${px}, ${py}) button=${button}`);
     };
+
+    /** 選択ツールドラッグ状態 @type {{ startX: number, startY: number, lastX: number, lastY: number }|null} */
+    this._selectionDrag = null;
+
+    /** 浮動選択ドラッグ状態 @type {{ offsetX: number, offsetY: number }|null} */
+    this._floatingDrag = null;
+
+    /** 通常選択のドラッグ開始待機状態 @type {{ offsetX: number, offsetY: number }|null} */
+    this._selectionMovePrimed = null;
 
     /** @type {NewFileDialog} */
     this._newFileDialog = new NewFileDialog(
@@ -32,6 +42,7 @@ class EditorScene extends Scene {
           : 0x00000000;
         this._appData.editMode    = 'free';
         this._appData.tilesetData = null;
+        this._appData.clearSelection();
         this._appData.createPixelData(width, height, fillColor);
         this._pixelCanvas.resetView();
         this._pixelCanvas.markDirty();
@@ -50,6 +61,7 @@ class EditorScene extends Scene {
         this._appData.tilesetData  = new TilesetData(chipW, chipH, cols, rows, fillColor);
         this._appData.editMode     = 'tileset';
         this._appData.selectedChip = { col: 0, row: 0 };
+        this._appData.clearSelection();
         this._pixelCanvas.resetView();
         this._pixelCanvas.markDirty();
         console.log(`[EditorScene] new tileset: ${chipW}x${chipH} chip, ${cols}x${rows} grid, bg=${bgColor}`);
@@ -138,12 +150,14 @@ class EditorScene extends Scene {
         // チップ切り替え時: パンをリセットして中央表示に戻す
         this._pixelCanvas.resetPan();
       }
+      this._appData.clearSelection();
       this._pixelCanvas.markDirty();
       console.log(`[EditorScene] chip selected: (${col}, ${row})`);
     };
     this._chipPaletteWin.onChipDoubleClick = (col, row) => {
       if (!this._appData) return;
       this._appData.selectedChip = { col, row };
+      this._appData.clearSelection();
       this._pixelCanvas.resetView();
       this._pixelCanvas.markDirty();
       console.log(`[EditorScene] chip double-clicked (focus): (${col}, ${row})`);
@@ -278,6 +292,7 @@ class EditorScene extends Scene {
             this._appData.tilesetData  = result.tilesetData;
             this._appData.editMode     = 'tileset';
             this._appData.selectedChip = { col: 0, row: 0 };
+            this._appData.clearSelection();
             // パレットを復元
             const paletteWin = this._colorPaletteWin.getPalette();
             if (paletteWin instanceof EditablePalette32) {
@@ -295,6 +310,7 @@ class EditorScene extends Scene {
             this._appData.tilesetData  = result;
             this._appData.editMode     = 'tileset';
             this._appData.selectedChip = { col: 0, row: 0 };
+            this._appData.clearSelection();
             this._pixelCanvas.resetView();
             this._pixelCanvas.markDirty();
             console.log(`[EditorScene] tileset JSON imported: ${file.name}`);
@@ -303,6 +319,7 @@ class EditorScene extends Scene {
             this._appData.editMode    = 'free';
             this._appData.tilesetData = null;
             this._appData.pixelData = result;
+            this._appData.clearSelection();
             this._pixelCanvas.resetView();
             this._pixelCanvas.markDirty();
             console.log(`[EditorScene] import: ${file.name} → ${result.width}x${result.height}`);
@@ -331,6 +348,7 @@ class EditorScene extends Scene {
             this._appData.tilesetData  = result.tilesetData;
             this._appData.editMode     = 'tileset';
             this._appData.selectedChip = { col: 0, row: 0 };
+            this._appData.clearSelection();
             // パレットを復元
             const paletteWin = this._colorPaletteWin.getPalette();
             if (paletteWin instanceof EditablePalette32) {
@@ -353,6 +371,7 @@ class EditorScene extends Scene {
               this._appData.tilesetData  = result;
               this._appData.editMode     = 'tileset';
               this._appData.selectedChip = { col: 0, row: 0 };
+              this._appData.clearSelection();
               this._pixelCanvas.resetView();
               this._pixelCanvas.markDirty();
               console.log(`[EditorScene] tileset JSON opened: ${file.name}`);
@@ -429,9 +448,31 @@ class EditorScene extends Scene {
         return;
       }
 
+      if (id === MenuConstants.EDIT_SELECT_ALL) {
+        this._selectAll();
+        return;
+      }
+      if (id === MenuConstants.EDIT_COPY) {
+        this._copySelectionToClipboard(false);
+        return;
+      }
+      if (id === MenuConstants.EDIT_CUT) {
+        this._copySelectionToClipboard(true);
+        return;
+      }
+      if (id === MenuConstants.EDIT_PASTE) {
+        this._pasteSelectionClipboard();
+        return;
+      }
+
       // ---- 反転 ----
       if (id === MenuConstants.EDIT_FLIP_H || id === MenuConstants.EDIT_FLIP_V) {
         const isH = id === MenuConstants.EDIT_FLIP_H;
+        if (this._appData?.hasFloatingSelection?.()) {
+          this._transformFloatingSelection(this._appData, isH ? 'flipH' : 'flipV');
+          console.log(`[EditorScene] floating selection ${isH ? 'flipH' : 'flipV'}`);
+          return;
+        }
         if (this._appData?.editMode === 'tileset' && this._appData.tilesetData) {
           const { col, row } = this._appData.selectedChip;
           const layerData = this._appData.tilesetData.getChipLayerData(col, row);
@@ -456,6 +497,11 @@ class EditorScene extends Scene {
       // ---- 回転 ----
       if (id === MenuConstants.EDIT_ROTATE_CW || id === MenuConstants.EDIT_ROTATE_CCW) {
         const isCW = id === MenuConstants.EDIT_ROTATE_CW;
+        if (this._appData?.hasFloatingSelection?.()) {
+          this._transformFloatingSelection(this._appData, isCW ? 'rotate90CW' : 'rotate90CCW');
+          console.log(`[EditorScene] floating selection ${isCW ? 'rotate90CW' : 'rotate90CCW'}`);
+          return;
+        }
         if (this._appData?.editMode === 'tileset' && this._appData.tilesetData) {
           const { col, row } = this._appData.selectedChip;
           const layerData = this._appData.tilesetData.getChipLayerData(col, row);
@@ -583,18 +629,62 @@ class EditorScene extends Scene {
 
     // --- キーボード ---
     this._onKeyDown = e => {
+      const key = e.key;
+      const code = e.code;
+      const raw = e.raw;
+
       if (this._colorPickerDialog.isVisible)    { this._colorPickerDialog.onKeyDown(e);    return; }
       if (this._quarterViewTileDialog.isVisible) { this._quarterViewTileDialog.onKeyDown(e); return; }
       if (this._newFileDialog.isVisible)        { this._newFileDialog.onKeyDown(e);        return; }
       if (this._newTilesetDialog.isVisible)     { this._newTilesetDialog.onKeyDown(e);     return; }
       if (this._importTilesetDialog.isVisible)  { this._importTilesetDialog.onKeyDown(e);  return; }
       if (this._saveDialog.isVisible)           { this._saveDialog.onKeyDown(e);           return; }
-      if (e.key === ' ') {
-        e.preventDefault?.();
+      if (key === ' ') {
+        raw?.preventDefault?.();
         if (!this._spaceDown) {
           this._spaceDown = true;
           if (this._canvas) this._canvas.style.cursor = 'grab';
         }
+        return;
+      }
+      if ((e.ctrl || e.meta) && (key === 'a' || key === 'A')) {
+        raw?.preventDefault?.();
+        this._selectAll();
+        return;
+      }
+      if ((e.ctrl || e.meta) && (key === 'c' || key === 'C')) {
+        raw?.preventDefault?.();
+        this._copySelectionToClipboard(false);
+        return;
+      }
+      if ((e.ctrl || e.meta) && (key === 'x' || key === 'X')) {
+        raw?.preventDefault?.();
+        this._copySelectionToClipboard(true);
+        return;
+      }
+      if ((e.ctrl || e.meta) && (key === 'v' || key === 'V')) {
+        raw?.preventDefault?.();
+        this._pasteSelectionClipboard();
+        return;
+      }
+      if (key === 'Enter' || code === 'Enter' || code === 'NumpadEnter') {
+        if (this._appData?.hasFloatingSelection?.()) {
+          raw?.preventDefault?.();
+          this._commitFloatingSelection(this._appData);
+        }
+        return;
+      }
+      if (key === 'Escape' || key === 'Esc' || code === 'Escape') {
+        raw?.preventDefault?.();
+        if (this._appData?.hasFloatingSelection?.()) {
+          this._cancelFloatingSelection(this._appData);
+        } else {
+          this._appData?.clearSelection();
+        }
+        this._selectionDrag = null;
+        this._floatingDrag = null;
+        this._selectionMovePrimed = null;
+        this._pixelCanvas.markDirty();
         return;
       }
       console.log('[EditorScene] keydown', e);
@@ -735,7 +825,7 @@ class EditorScene extends Scene {
     this._canvas = canvas;
 
     // 全レイヤーを合成してピクセルデータを画面中央に描画
-    this._pixelCanvas.render(ctx, canvas, appData.layerData.composite());
+    this._pixelCanvas.render(ctx, canvas, appData.layerData.composite(), appData);
 
     // ツールバーウィンドウ
     this._toolBarWin.render(ctx, canvas, appData);
@@ -779,10 +869,18 @@ class EditorScene extends Scene {
    * @param {boolean} isDown    mousedown なら true、mousemove なら false
    */
   _applyTool(px, py, button, appData, isDown) {
+    if (appData.hasFloatingSelection?.() && appData.activeTool !== 'selectRect') {
+      this._commitFloatingSelection(appData);
+    }
+
     const tool      = appData.activeTool;
     const drawColor = button === 2 ? appData.backColor : appData.foreColor;
 
     switch (tool) {
+      case 'selectRect':
+        this._applySelectionTool(px, py, appData, isDown);
+        break;
+
       case 'pencil':
         appData.pixelData.setPixel(px, py, drawColor);
         appData.layerData.markCompositeDirty();
@@ -814,6 +912,409 @@ class EditorScene extends Scene {
         }
         break;
     }
+  }
+
+  /**
+   * 矩形選択ツールを適用する。
+   * @param {number} px
+   * @param {number} py
+   * @param {AppData} appData
+   * @param {boolean} isDown
+   */
+  _applySelectionTool(px, py, appData, isDown) {
+    if (isDown) {
+      if (appData.hasFloatingSelection()) {
+        if (this._isPointInSelection(px, py, appData.selection)) {
+          this._floatingDrag = {
+            offsetX: px - appData.selection.x,
+            offsetY: py - appData.selection.y,
+          };
+          return;
+        }
+        this._commitFloatingSelection(appData);
+      }
+
+      if (appData.hasSelection() && this._isPointInSelection(px, py, appData.selection)) {
+        this._selectionMovePrimed = {
+          offsetX: px - appData.selection.x,
+          offsetY: py - appData.selection.y,
+        };
+        this._selectionDrag = null;
+        return;
+      }
+
+      this._selectionDrag = {
+        startX: px,
+        startY: py,
+        lastX: px,
+        lastY: py,
+      };
+      this._selectionMovePrimed = null;
+    } else if (this._selectionMovePrimed && appData.hasSelection()) {
+      if (!this._liftSelectionToFloating(appData)) {
+        this._selectionMovePrimed = null;
+        return;
+      }
+      this._floatingDrag = {
+        offsetX: this._selectionMovePrimed.offsetX,
+        offsetY: this._selectionMovePrimed.offsetY,
+      };
+      this._selectionMovePrimed = null;
+
+      const nx = px - this._floatingDrag.offsetX;
+      const ny = py - this._floatingDrag.offsetY;
+      const floating = appData.selection.floating;
+      floating.dstX = nx;
+      floating.dstY = ny;
+      appData.selection.x = nx;
+      appData.selection.y = ny;
+      appData.selection.w = floating.width;
+      appData.selection.h = floating.height;
+      appData.layerData.markCompositeDirty();
+      this._pixelCanvas.markDirty();
+      return;
+    } else if (this._floatingDrag && appData.hasFloatingSelection()) {
+      const nx = px - this._floatingDrag.offsetX;
+      const ny = py - this._floatingDrag.offsetY;
+      const floating = appData.selection.floating;
+      floating.dstX = nx;
+      floating.dstY = ny;
+      appData.selection.x = nx;
+      appData.selection.y = ny;
+      appData.selection.w = floating.width;
+      appData.selection.h = floating.height;
+      this._pixelCanvas.markDirty();
+      return;
+    } else if (this._selectionDrag) {
+      this._selectionDrag.lastX = px;
+      this._selectionDrag.lastY = py;
+    } else {
+      return;
+    }
+
+    const rect = this._makeSelectionRect(
+      this._selectionDrag.startX,
+      this._selectionDrag.startY,
+      this._selectionDrag.lastX,
+      this._selectionDrag.lastY,
+    );
+    appData.setSelectionRect(rect.x, rect.y, rect.w, rect.h);
+    this._pixelCanvas.markDirty();
+  }
+
+  /**
+   * ピクセルキャンバス上でのツール mouseup を処理する。
+   * @param {number} px
+   * @param {number} py
+   * @param {number} button
+   * @param {AppData} appData
+   */
+  _onPixelToolUp(px, py, button, appData) {
+    if (appData.activeTool !== 'selectRect' || button !== 0) return;
+
+    if (this._selectionMovePrimed) {
+      this._selectionMovePrimed = null;
+      this._pixelCanvas.markDirty();
+      return;
+    }
+
+    if (this._floatingDrag) {
+      this._floatingDrag = null;
+      this._pixelCanvas.markDirty();
+      return;
+    }
+
+    if (!this._selectionDrag) return;
+
+    this._selectionDrag.lastX = px;
+    this._selectionDrag.lastY = py;
+    const rect = this._makeSelectionRect(
+      this._selectionDrag.startX,
+      this._selectionDrag.startY,
+      this._selectionDrag.lastX,
+      this._selectionDrag.lastY,
+    );
+    appData.setSelectionRect(rect.x, rect.y, rect.w, rect.h);
+    this._selectionDrag = null;
+    this._pixelCanvas.markDirty();
+  }
+
+  /**
+   * ドラッグ座標から選択矩形を生成する。
+   * @param {number} startX
+   * @param {number} startY
+   * @param {number} endX
+   * @param {number} endY
+   * @returns {{ x:number, y:number, w:number, h:number }}
+   */
+  _makeSelectionRect(startX, startY, endX, endY) {
+    const x = Math.min(startX, endX);
+    const y = Math.min(startY, endY);
+    const w = Math.abs(endX - startX) + 1;
+    const h = Math.abs(endY - startY) + 1;
+    return { x, y, w, h };
+  }
+
+  /** 画像全体を選択する。 */
+  _selectAll() {
+    if (!this._appData?.pixelData) return;
+    if (this._appData.hasFloatingSelection()) {
+      this._commitFloatingSelection(this._appData);
+    }
+    this._appData.setSelectionRect(
+      0,
+      0,
+      this._appData.pixelData.width,
+      this._appData.pixelData.height,
+    );
+    this._selectionDrag = null;
+    this._pixelCanvas.markDirty();
+  }
+
+  /**
+   * 現在の選択範囲をクリップボードへコピーする。
+   * cut=true の場合はコピー後に選択範囲を消去する。
+   * @param {boolean} cut
+   */
+  _copySelectionToClipboard(cut) {
+    if (this._appData?.hasFloatingSelection?.()) {
+      this._commitFloatingSelection(this._appData);
+    }
+
+    if (!this._appData?.hasSelection?.() || !this._appData.pixelData) {
+      console.warn('[EditorScene] 選択範囲がありません');
+      return;
+    }
+
+    const sel = this._appData.selection;
+    const clipPixelData = this._copyRectFromPixelData(this._appData.pixelData, sel.x, sel.y, sel.w, sel.h);
+    this._appData.selectionClipboard = {
+      pixelData: clipPixelData,
+      width: clipPixelData.width,
+      height: clipPixelData.height,
+    };
+
+    if (cut) {
+      this._clearRect(this._appData.pixelData, sel.x, sel.y, sel.w, sel.h);
+      this._appData.layerData.markCompositeDirty();
+      this._beginFloatingSelection(this._appData, clipPixelData, sel.x, sel.y, true);
+      this._pixelCanvas.markDirty();
+      console.log(`[EditorScene] selection cut: (${sel.x}, ${sel.y}) ${sel.w}x${sel.h}`);
+      return;
+    }
+
+    console.log(`[EditorScene] selection copied: (${sel.x}, ${sel.y}) ${sel.w}x${sel.h}`);
+  }
+
+  /** 現在の選択クリップボードを貼り付ける。 */
+  _pasteSelectionClipboard() {
+    if (!this._appData?.selectionClipboard?.pixelData || !this._appData.pixelData) {
+      console.warn('[EditorScene] 選択クリップボードが空です');
+      return;
+    }
+
+    if (this._appData.hasFloatingSelection()) {
+      this._commitFloatingSelection(this._appData);
+    }
+
+    const clipboard = this._appData.selectionClipboard;
+    const baseX = this._appData.hasSelection() ? this._appData.selection.x : 0;
+    const baseY = this._appData.hasSelection() ? this._appData.selection.y : 0;
+    this._beginFloatingSelection(this._appData, clipboard.pixelData, baseX, baseY, false);
+    this._pixelCanvas.markDirty();
+    console.log(`[EditorScene] selection pasted as floating: (${baseX}, ${baseY}) ${clipboard.width}x${clipboard.height}`);
+  }
+
+  /**
+   * 浮動選択を開始する。
+   * @param {AppData} appData
+   * @param {PixelData} pixelData
+   * @param {number} x
+   * @param {number} y
+   * @param {boolean} cut
+   */
+  _beginFloatingSelection(appData, pixelData, x, y, cut) {
+    const floatingPixelData = this._copyRectFromPixelData(pixelData, 0, 0, pixelData.width, pixelData.height);
+    appData.selection.active = true;
+    appData.selection.x = x;
+    appData.selection.y = y;
+    appData.selection.w = floatingPixelData.width;
+    appData.selection.h = floatingPixelData.height;
+    appData.selection.mode = 'rect';
+    appData.selection.floating = {
+      pixelData: floatingPixelData,
+      srcX: x,
+      srcY: y,
+      dstX: x,
+      dstY: y,
+      width: floatingPixelData.width,
+      height: floatingPixelData.height,
+      cut,
+    };
+  }
+
+  /**
+   * 現在の通常選択を浮動選択へ持ち上げる。
+   * @param {AppData} appData
+   * @returns {boolean}
+   */
+  _liftSelectionToFloating(appData) {
+    if (!appData.hasSelection() || !appData.pixelData) return false;
+
+    const sel = appData.selection;
+    const clipPixelData = this._copyRectFromPixelData(appData.pixelData, sel.x, sel.y, sel.w, sel.h);
+    this._clearRect(appData.pixelData, sel.x, sel.y, sel.w, sel.h);
+    appData.layerData.markCompositeDirty();
+    this._beginFloatingSelection(appData, clipPixelData, sel.x, sel.y, true);
+    return true;
+  }
+
+  /**
+   * 浮動選択を現在位置へ確定する。
+   * @param {AppData} appData
+   */
+  _commitFloatingSelection(appData) {
+    const floating = appData.selection.floating;
+    if (!floating?.pixelData || !appData.pixelData) return;
+
+    const pasted = this._blitPixelData(appData.pixelData, floating.pixelData, floating.dstX, floating.dstY);
+    appData.selection.floating = null;
+    appData.clearSelection();
+    if (pasted.w > 0 && pasted.h > 0) {
+      appData.setSelectionRect(pasted.x, pasted.y, pasted.w, pasted.h);
+      appData.clearSelection();
+    }
+    appData.layerData.markCompositeDirty();
+    this._selectionDrag = null;
+    this._floatingDrag = null;
+    this._selectionMovePrimed = null;
+    this._pixelCanvas.markDirty();
+  }
+
+  /**
+   * 浮動選択を取り消す。cut 由来なら元位置に戻す。
+   * @param {AppData} appData
+   */
+  _cancelFloatingSelection(appData) {
+    const floating = appData.selection.floating;
+    if (!floating?.pixelData || !appData.pixelData) {
+      appData.clearSelection();
+      return;
+    }
+
+    if (floating.cut) {
+      this._blitPixelData(appData.pixelData, floating.pixelData, floating.srcX, floating.srcY);
+      appData.selection.floating = null;
+      appData.clearSelection();
+      appData.layerData.markCompositeDirty();
+    } else {
+      appData.clearSelection();
+    }
+    this._selectionDrag = null;
+    this._floatingDrag = null;
+    this._selectionMovePrimed = null;
+    this._pixelCanvas.markDirty();
+  }
+
+  /**
+   * 浮動選択の内容を変形する。
+   * @param {AppData} appData
+   * @param {'flipH'|'flipV'|'rotate90CW'|'rotate90CCW'} operation
+   */
+  _transformFloatingSelection(appData, operation) {
+    const floating = appData.selection.floating;
+    const pixelData = floating?.pixelData;
+    if (!pixelData || typeof pixelData[operation] !== 'function') return;
+
+    pixelData[operation]();
+
+    floating.width = pixelData.width;
+    floating.height = pixelData.height;
+    appData.selection.x = floating.dstX;
+    appData.selection.y = floating.dstY;
+    appData.selection.w = floating.width;
+    appData.selection.h = floating.height;
+    this._pixelCanvas.markDirty();
+  }
+
+  /**
+   * 座標が選択矩形内か判定する。
+   * @param {number} px
+   * @param {number} py
+   * @param {{ x:number, y:number, w:number, h:number }} selection
+   * @returns {boolean}
+   */
+  _isPointInSelection(px, py, selection) {
+    return px >= selection.x && px < selection.x + selection.w &&
+      py >= selection.y && py < selection.y + selection.h;
+  }
+
+  /**
+   * PixelData の矩形領域をコピーする。
+   * @param {PixelData} source
+   * @param {number} x
+   * @param {number} y
+   * @param {number} w
+   * @param {number} h
+   * @returns {PixelData}
+   */
+  _copyRectFromPixelData(source, x, y, w, h) {
+    const result = new PixelData();
+    result.createPixelData(w, h, 0x00000000);
+
+    for (let iy = 0; iy < h; iy++) {
+      for (let ix = 0; ix < w; ix++) {
+        result.setPixel(ix, iy, source.getPixel(x + ix, y + iy));
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * PixelData 上の矩形領域を透明でクリアする。
+   * @param {PixelData} pixelData
+   * @param {number} x
+   * @param {number} y
+   * @param {number} w
+   * @param {number} h
+   */
+  _clearRect(pixelData, x, y, w, h) {
+    for (let iy = 0; iy < h; iy++) {
+      for (let ix = 0; ix < w; ix++) {
+        pixelData.setPixel(x + ix, y + iy, 0x00000000);
+      }
+    }
+  }
+
+  /**
+   * src の内容を dst に貼り付け、実際に貼れた矩形を返す。
+   * @param {PixelData} dst
+   * @param {PixelData} src
+   * @param {number} dstX
+   * @param {number} dstY
+   * @returns {{ x:number, y:number, w:number, h:number }}
+   */
+  _blitPixelData(dst, src, dstX, dstY) {
+    const startX = Math.max(0, dstX);
+    const startY = Math.max(0, dstY);
+    const endX = Math.min(dst.width, dstX + src.width);
+    const endY = Math.min(dst.height, dstY + src.height);
+
+    for (let y = startY; y < endY; y++) {
+      for (let x = startX; x < endX; x++) {
+        const sx = x - dstX;
+        const sy = y - dstY;
+        dst.setPixel(x, y, src.getPixel(sx, sy));
+      }
+    }
+
+    return {
+      x: startX,
+      y: startY,
+      w: Math.max(0, endX - startX),
+      h: Math.max(0, endY - startY),
+    };
   }
 
   /**
