@@ -11,12 +11,13 @@
  */
 class LayerPanel {
   // ---- レイアウト定数 ----
-  static WIDTH    = 160;
+  static WIDTH    = 184;
   static ROW_H    = 26;
   static BTN_H    = 24;
-  static BTN_W    = 30;
+  static BTN_W    = 24;
   static PADDING  = 4;
   static EYE_W    = 22;
+  static LOCK_W   = 22;
   /** 最大表示レイヤー数（スクロールは未実装、これ以上は見切れる） */
   static MAX_ROWS = 12;
 
@@ -32,6 +33,8 @@ class LayerPanel {
   static BORDER_ACTIVE  = '#7ab0ff';
   static EYE_ON         = '#e0e0e0';
   static EYE_OFF        = '#555555';
+  static LOCK_ON        = '#f1c96b';
+  static LOCK_OFF       = '#666666';
 
   constructor() {
     /** ホバー中の行インデックス (-1 = なし) */
@@ -88,11 +91,11 @@ class LayerPanel {
    * @param {AppData} appData
    */
   render(ctx, x, y, appData) {
-    const { WIDTH, ROW_H, BTN_H, BTN_W, PADDING, EYE_W,
+      const { WIDTH, ROW_H, BTN_H, BTN_W, PADDING, EYE_W, LOCK_W,
             BG_ROW, BG_ROW_ACTIVE, BG_ROW_HOVER,
             BG_BTN, BG_BTN_HOVER,
             TEXT_COLOR, TEXT_DIM, TEXT_FONT,
-            BORDER_ACTIVE, EYE_ON, EYE_OFF } = LayerPanel;
+        BORDER_ACTIVE, EYE_ON, EYE_OFF, LOCK_ON, LOCK_OFF } = LayerPanel;
 
     this._renderX = x;
     this._renderY = y;
@@ -130,13 +133,18 @@ class LayerPanel {
       ctx.fillStyle = layer.visible ? EYE_ON : EYE_OFF;
       this._drawEyeIcon(ctx, eyeX + EYE_W / 2, ry + ROW_H / 2, layer.visible);
 
+      // ロックアイコン
+      const lockX = x + 4 + EYE_W;
+      this._drawLockIcon(ctx, lockX + LOCK_W / 2, ry + ROW_H / 2, !!layer.locked);
+
       // レイヤー名
       ctx.font         = TEXT_FONT;
-      ctx.fillStyle    = layer.visible ? TEXT_COLOR : TEXT_DIM;
+      if (layer.locked) ctx.fillStyle = layer.visible ? LOCK_ON : TEXT_DIM;
+      else ctx.fillStyle = layer.visible ? TEXT_COLOR : TEXT_DIM;
       ctx.textAlign    = 'left';
       ctx.textBaseline = 'middle';
-      const nameX = x + EYE_W + 8;
-      const maxNameW = WIDTH - EYE_W - 12;
+      const nameX = x + EYE_W + LOCK_W + 8;
+      const maxNameW = WIDTH - EYE_W - LOCK_W - 12;
       ctx.save();
       ctx.beginPath();
       ctx.rect(nameX, ry, maxNameW, ROW_H);
@@ -162,6 +170,8 @@ class LayerPanel {
       { id: 'remove', label: '−',  title: '削除' },
       { id: 'up',     label: '↑',  title: '上へ' },
       { id: 'down',   label: '↓',  title: '下へ' },
+      { id: 'duplicate', label: 'D', title: '複製' },
+      { id: 'merge',  label: 'M',  title: '結合' },
     ];
     const gap    = 4;
     const totalW = btns.length * BTN_W + (btns.length - 1) * gap;
@@ -229,6 +239,31 @@ class LayerPanel {
     ctx.restore();
   }
 
+  /**
+   * 鍵アイコンを描画する。
+   */
+  _drawLockIcon(ctx, cx, cy, locked) {
+    ctx.save();
+    ctx.lineWidth = 1.2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = locked ? LayerPanel.LOCK_ON : LayerPanel.LOCK_OFF;
+    ctx.fillStyle = locked ? LayerPanel.LOCK_ON : LayerPanel.LOCK_OFF;
+
+    if (locked) {
+      ctx.beginPath();
+      ctx.arc(cx, cy - 4, 4, Math.PI, 0);
+      ctx.stroke();
+      ctx.fillRect(cx - 5, cy - 1, 10, 8);
+    } else {
+      ctx.beginPath();
+      ctx.arc(cx - 1, cy - 4, 4, Math.PI * 0.95, Math.PI * 1.9);
+      ctx.stroke();
+      ctx.strokeRect(cx - 5, cy - 1, 10, 8);
+    }
+    ctx.restore();
+  }
+
   // ----------------------------------------------------------------
   // イベント
   // ----------------------------------------------------------------
@@ -280,9 +315,12 @@ class LayerPanel {
           ld.toggleVisibility(r.layerIndex);
           ld.markCompositeDirty();
           this._lastClickLayer = -1;
+        } else if (e.x < r.x + LayerPanel.EYE_W + LayerPanel.LOCK_W + 4) {
+          ld.toggleLocked(r.layerIndex);
+          this._lastClickLayer = -1;
         } else {
           // 名前領域のダブルクリック → インライン編集開始
-          const nameX = r.x + LayerPanel.EYE_W + 8;
+          const nameX = r.x + LayerPanel.EYE_W + LayerPanel.LOCK_W + 8;
           if (e.x >= nameX &&
               r.layerIndex === this._lastClickLayer &&
               now - this._lastClickTime < this._dblClickThresh) {
@@ -327,6 +365,18 @@ class LayerPanel {
               ld.markCompositeDirty();
             }
             break;
+          case 'duplicate':
+            if (ld.activeIndex >= 0) {
+              ld.duplicateLayer(ld.activeIndex);
+              ld.markCompositeDirty();
+            }
+            break;
+          case 'merge':
+            if (ld.activeIndex > 0) {
+              ld.mergeLayerDown(ld.activeIndex);
+              ld.markCompositeDirty();
+            }
+            break;
         }
         this.onChange?.();
         return true;
@@ -357,8 +407,8 @@ class LayerPanel {
 
     this._editingIndex = row.layerIndex;
 
-    const nameX = row.x + LayerPanel.EYE_W + 8;
-    const nameW = LayerPanel.WIDTH - LayerPanel.EYE_W - 12;
+    const nameX = row.x + LayerPanel.EYE_W + LayerPanel.LOCK_W + 8;
+    const nameW = LayerPanel.WIDTH - LayerPanel.EYE_W - LayerPanel.LOCK_W - 12;
 
     // canvas 要素を取得
     const canvas = document.getElementById('mainCanvas');
@@ -418,9 +468,9 @@ class LayerPanel {
     if (this._editingIndex < 0 || !this._editInput) return;
 
     const newName = this._editInput.value.trim();
-    const layer   = appData.layerData.layers[this._editingIndex];
-    if (layer && newName.length > 0) {
-      layer.name = newName;
+    const ld = appData.layerData;
+    if (newName.length > 0) {
+      ld.renameLayer(this._editingIndex, newName);
     }
 
     this._removeEditInput();

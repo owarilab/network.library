@@ -1,6 +1,6 @@
 # ドットエディタ 作業状況
 
-最終更新: 2026-04-22 (10)
+最終更新: 2026-04-23 (11)
 
 ## 概要
 
@@ -273,19 +273,31 @@ www/
   - `init(w, h, fill)` で1レイヤー構成で初期化
   - `addLayer()` / `removeLayer()` / `moveLayer()` レイヤー操作
   - `toggleVisibility()` / `setOpacity()` 表示制御
+  - `renameLayer()` / `setLocked()` / `toggleLocked()` / `canEditLayer()` を追加
+  - `duplicateLayer()` / `mergeLayerDown()` を追加
+  - `locked` フィールドをレイヤーエントリへ追加
   - `composite()` ボトムアップ Porter-Duff "source over" アルファ合成、キャッシュ付き
   - `markCompositeDirty()` で合成キャッシュ無効化
 - [x] **`LayerPanel`** UI (`js/ui/layer_panel.js`): レイヤー一覧コンテンツ
   - 最前面が上の行表示、アクティブレイヤーハイライト
   - 目アイコンで visibility トグル
-  - 下部ボタン: [＋追加] [−削除] [↑上へ] [↓下へ]
+  - 鍵アイコンで lock/unlock 切り替え
+  - レイヤー名のインライン編集
+  - 下部ボタン: [＋追加] [−削除] [↑上へ] [↓下へ] [D複製] [M結合]
   - `onChange` コールバックで外部に変更通知
 - [x] **`LayerPanelWindow`** (`js/ui/layer_panel_window.js`): UIWindow 継承
   - 初回描画時に画面右寄せ配置
 - [x] **`AppData`** 改修: `layerData` プロパティ追加、`pixelData` を getter/setter 化（後方互換）
 - [x] **`EditorScene`** 統合: 合成画像描画、スポイトは合成結果から色取得、PNGエクスポートは合成結果
+  - ロック中レイヤーへの描画、消去、塗りつぶし、切り取り、浮動選択確定を禁止
+  - 反転、回転はロックされていないレイヤーにのみ適用
+- [x] レイヤー名変更（インライン編集経由）
+- [x] レイヤーロック
+- [x] レイヤー複製
+- [x] レイヤー結合（下レイヤーへ結合）
+- [x] `locked` の JSON 保存/読込と tileset clone/paste 系への伝播
 - [ ] レイヤー不透明度スライダー UI
-- [ ] レイヤー名変更ダイアログ
+- [ ] 不透明度の視覚UI改善（数値表示 / スライダー）
 
 #### アニメーション
 

@@ -327,6 +327,7 @@ class PixelDataConverter {
           name:    layer.name,
           visible: layer.visible,
           opacity: layer.opacity,
+          locked:  !!layer.locked,
           data:    PixelDataConverter._encodePixelDataBase64(layer.pixelData),
         }));
         chips.push({ col: c, row: r, layers: layersArr });
@@ -374,6 +375,7 @@ class PixelDataConverter {
         name:    layerObj.name || 'レイヤー 1',
         visible: layerObj.visible !== false,
         opacity: typeof layerObj.opacity === 'number' ? layerObj.opacity : 255,
+        locked:  layerObj.locked === true,
       }));
       ld.activeIndex = 0;
       ld._composite.createPixelData(chipWidth, chipHeight);
@@ -651,7 +653,7 @@ class PixelDataConverter {
                   }
                 }
 
-                layers.push({ pixelData: pd, name, visible, opacity });
+                layers.push({ pixelData: pd, name, visible, opacity, locked: false });
               }
 
               if (layers.length > 0) {

@@ -91,19 +91,19 @@ class QuarterViewTileGenerator {
       const pdRight = new PixelData();
       pdRight.createPixelData(W, H, 0x00000000);
       QuarterViewTileGenerator._drawPolygon(pdRight, rightVerts, params.rightColor, params.outlineColor);
-      ld.layers.push({ pixelData: pdRight, name: '右面', visible: true, opacity: 255 });
+      ld.layers.push({ pixelData: pdRight, name: '右面', visible: true, opacity: 255, locked: false });
 
       // 左面レイヤー
       const pdLeft = new PixelData();
       pdLeft.createPixelData(W, H, 0x00000000);
       QuarterViewTileGenerator._drawPolygon(pdLeft, leftVerts, params.leftColor, params.outlineColor);
-      ld.layers.push({ pixelData: pdLeft, name: '左面', visible: true, opacity: 255 });
+      ld.layers.push({ pixelData: pdLeft, name: '左面', visible: true, opacity: 255, locked: false });
 
       // 上面レイヤー
       const pdTop = new PixelData();
       pdTop.createPixelData(W, H, 0x00000000);
       QuarterViewTileGenerator._drawPolygon(pdTop, topVerts, params.topColor, params.outlineColor);
-      ld.layers.push({ pixelData: pdTop, name: '上面', visible: true, opacity: 255 });
+      ld.layers.push({ pixelData: pdTop, name: '上面', visible: true, opacity: 255, locked: false });
 
       ld.activeIndex = 2; // 上面を選択状態に
 
@@ -118,7 +118,7 @@ class QuarterViewTileGenerator {
       const pdTop = new PixelData();
       pdTop.createPixelData(W, H, 0x00000000);
       QuarterViewTileGenerator._drawPolygon(pdTop, topVerts, params.topColor, params.outlineColor);
-      ld.layers.push({ pixelData: pdTop, name: '上面', visible: true, opacity: 255 });
+      ld.layers.push({ pixelData: pdTop, name: '上面', visible: true, opacity: 255, locked: false });
 
       ld.activeIndex = 0;
 

@@ -139,6 +139,7 @@ class TilesetData {
         name:      layer.name,
         visible:   layer.visible,
         opacity:   layer.opacity,
+        locked:    !!layer.locked,
       };
     });
     dst.activeIndex = src.activeIndex;
@@ -181,6 +182,7 @@ class TilesetData {
         name:      layer.name,
         visible:   layer.visible,
         opacity:   layer.opacity,
+        locked:    !!layer.locked,
       };
     });
     ld.activeIndex = src.activeIndex;
@@ -211,6 +213,7 @@ class TilesetData {
         name:      layer.name,
         visible:   layer.visible,
         opacity:   layer.opacity,
+        locked:    !!layer.locked,
       };
     });
     dst.activeIndex = srcLayerData.activeIndex;

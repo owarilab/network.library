@@ -469,24 +469,16 @@ class EditorScene extends Scene {
       if (id === MenuConstants.EDIT_FLIP_H || id === MenuConstants.EDIT_FLIP_V) {
         const isH = id === MenuConstants.EDIT_FLIP_H;
         if (this._appData?.hasFloatingSelection?.()) {
+          if (!this._canModifyActiveLayer(this._appData, '浮動選択の反転')) return;
           this._transformFloatingSelection(this._appData, isH ? 'flipH' : 'flipV');
           console.log(`[EditorScene] floating selection ${isH ? 'flipH' : 'flipV'}`);
           return;
         }
-        if (this._appData?.editMode === 'tileset' && this._appData.tilesetData) {
-          const { col, row } = this._appData.selectedChip;
-          const layerData = this._appData.tilesetData.getChipLayerData(col, row);
-          if (layerData) {
-            layerData.layers.forEach(layer => {
-              if (layer.pixelData) isH ? layer.pixelData.flipH() : layer.pixelData.flipV();
-            });
-            layerData.markCompositeDirty();
-            this._pixelCanvas.markDirty();
-          }
-        } else if (this._appData?.layerData) {
-          this._appData.layerData.layers.forEach(layer => {
+        if (this._appData?.layerData) {
+          const changed = this._applyToUnlockedLayers(this._appData.layerData, layer => {
             if (layer.pixelData) isH ? layer.pixelData.flipH() : layer.pixelData.flipV();
           });
+          if (!changed) return;
           this._appData.layerData.markCompositeDirty();
           this._pixelCanvas.markDirty();
         }
@@ -498,24 +490,16 @@ class EditorScene extends Scene {
       if (id === MenuConstants.EDIT_ROTATE_CW || id === MenuConstants.EDIT_ROTATE_CCW) {
         const isCW = id === MenuConstants.EDIT_ROTATE_CW;
         if (this._appData?.hasFloatingSelection?.()) {
+          if (!this._canModifyActiveLayer(this._appData, '浮動選択の回転')) return;
           this._transformFloatingSelection(this._appData, isCW ? 'rotate90CW' : 'rotate90CCW');
           console.log(`[EditorScene] floating selection ${isCW ? 'rotate90CW' : 'rotate90CCW'}`);
           return;
         }
-        if (this._appData?.editMode === 'tileset' && this._appData.tilesetData) {
-          const { col, row } = this._appData.selectedChip;
-          const layerData = this._appData.tilesetData.getChipLayerData(col, row);
-          if (layerData) {
-            layerData.layers.forEach(layer => {
-              if (layer.pixelData) isCW ? layer.pixelData.rotate90CW() : layer.pixelData.rotate90CCW();
-            });
-            layerData.markCompositeDirty();
-            this._pixelCanvas.markDirty();
-          }
-        } else if (this._appData?.layerData) {
-          this._appData.layerData.layers.forEach(layer => {
+        if (this._appData?.layerData) {
+          const changed = this._applyToUnlockedLayers(this._appData.layerData, layer => {
             if (layer.pixelData) isCW ? layer.pixelData.rotate90CW() : layer.pixelData.rotate90CCW();
           });
+          if (!changed) return;
           this._appData.layerData.markCompositeDirty();
           this._pixelCanvas.markDirty();
         }
@@ -870,6 +854,7 @@ class EditorScene extends Scene {
    */
   _applyTool(px, py, button, appData, isDown) {
     if (appData.hasFloatingSelection?.() && appData.activeTool !== 'selectRect') {
+      if (!this._canModifyActiveLayer(appData, '浮動選択の確定')) return;
       this._commitFloatingSelection(appData);
     }
 
@@ -882,12 +867,14 @@ class EditorScene extends Scene {
         break;
 
       case 'pencil':
+        if (!this._canModifyActiveLayer(appData, '描画')) return;
         appData.pixelData.setPixel(px, py, drawColor);
         appData.layerData.markCompositeDirty();
         this._pixelCanvas.markDirty();
         break;
 
       case 'eraser':
+        if (!this._canModifyActiveLayer(appData, '消去')) return;
         appData.pixelData.setPixel(px, py, 0x00000000);
         appData.layerData.markCompositeDirty();
         this._pixelCanvas.markDirty();
@@ -896,6 +883,7 @@ class EditorScene extends Scene {
       case 'fill':
         // 塗りつぶしは mousedown のみ（ドラッグは不要）
         if (isDown) {
+          if (!this._canModifyActiveLayer(appData, '塗りつぶし')) return;
           this._floodFill(appData.pixelData, px, py, drawColor);
           appData.layerData.markCompositeDirty();
           this._pixelCanvas.markDirty();
@@ -931,6 +919,7 @@ class EditorScene extends Scene {
           };
           return;
         }
+        if (!this._canModifyActiveLayer(appData, '浮動選択の確定')) return;
         this._commitFloatingSelection(appData);
       }
 
@@ -951,6 +940,10 @@ class EditorScene extends Scene {
       };
       this._selectionMovePrimed = null;
     } else if (this._selectionMovePrimed && appData.hasSelection()) {
+      if (!this._canModifyActiveLayer(appData, '選択範囲の移動')) {
+        this._selectionMovePrimed = null;
+        return;
+      }
       if (!this._liftSelectionToFloating(appData)) {
         this._selectionMovePrimed = null;
         return;
@@ -1078,6 +1071,7 @@ class EditorScene extends Scene {
    */
   _copySelectionToClipboard(cut) {
     if (this._appData?.hasFloatingSelection?.()) {
+      if (!this._canModifyActiveLayer(this._appData, '浮動選択の確定')) return;
       this._commitFloatingSelection(this._appData);
     }
 
@@ -1095,6 +1089,7 @@ class EditorScene extends Scene {
     };
 
     if (cut) {
+      if (!this._canModifyActiveLayer(this._appData, '切り取り')) return;
       this._clearRect(this._appData.pixelData, sel.x, sel.y, sel.w, sel.h);
       this._appData.layerData.markCompositeDirty();
       this._beginFloatingSelection(this._appData, clipPixelData, sel.x, sel.y, true);
@@ -1160,6 +1155,7 @@ class EditorScene extends Scene {
    */
   _liftSelectionToFloating(appData) {
     if (!appData.hasSelection() || !appData.pixelData) return false;
+    if (!this._canModifyActiveLayer(appData, '選択範囲の持ち上げ')) return false;
 
     const sel = appData.selection;
     const clipPixelData = this._copyRectFromPixelData(appData.pixelData, sel.x, sel.y, sel.w, sel.h);
@@ -1176,6 +1172,7 @@ class EditorScene extends Scene {
   _commitFloatingSelection(appData) {
     const floating = appData.selection.floating;
     if (!floating?.pixelData || !appData.pixelData) return;
+    if (!this._canModifyActiveLayer(appData, '浮動選択の確定')) return;
 
     const pasted = this._blitPixelData(appData.pixelData, floating.pixelData, floating.dstX, floating.dstY);
     appData.selection.floating = null;
@@ -1315,6 +1312,39 @@ class EditorScene extends Scene {
       w: Math.max(0, endX - startX),
       h: Math.max(0, endY - startY),
     };
+  }
+
+  /**
+   * アクティブレイヤーが編集可能か判定し、不可なら警告する。
+   * @param {AppData} appData
+   * @param {string} actionLabel
+   * @returns {boolean}
+   */
+  _canModifyActiveLayer(appData, actionLabel) {
+    const layerData = appData?.layerData;
+    if (!layerData) return false;
+    if (layerData.canEditLayer()) return true;
+    console.warn(`[EditorScene] ${actionLabel}はロックされたレイヤーでは実行できません`);
+    return false;
+  }
+
+  /**
+   * ロックされていないレイヤーにのみ処理を適用する。
+   * @param {LayerData} layerData
+   * @param {(layer: {pixelData: PixelData, name: string, visible: boolean, opacity: number, locked: boolean}) => void} fn
+   * @returns {boolean}
+   */
+  _applyToUnlockedLayers(layerData, fn) {
+    let changed = false;
+    for (const layer of layerData.layers) {
+      if (layer.locked) continue;
+      fn(layer);
+      changed = true;
+    }
+    if (!changed) {
+      console.warn('[EditorScene] ロックされていないレイヤーがありません');
+    }
+    return changed;
   }
 
   /**

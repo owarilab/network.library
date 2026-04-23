@@ -137,6 +137,7 @@ class AppData {
       name:      'レイヤー 1',
       visible:   true,
       opacity:   255,
+      locked:    false,
     }];
     ld.activeIndex = 0;
     ld._composite.createPixelData(pd.width, pd.height);
