@@ -17,6 +17,12 @@ class AppData {
     this._layerData = new LayerData();
 
     /**
+     * Undo / Redo の履歴管理。
+     * @type {HistoryManager}
+     */
+    this.history = new HistoryManager(100);
+
+    /**
      * 前景色 (描画色)。0xAARRGGBB 形式。
      * @type {number}
      */
@@ -93,6 +99,139 @@ class AppData {
      * @type {{ pixelData: PixelData, width: number, height: number }|null}
      */
     this.selectionClipboard = null;
+  }
+
+  /**
+   * 現在の編集対象コンテキストを返す。
+   * コマンドが対象モードやチップ位置を保存する時に使う。
+   * @returns {{ mode: 'free'|'tileset', chip: { col: number, row: number }|null, layerIndex: number }}
+   */
+  getActiveEditTargetContext() {
+    return {
+      mode: this.editMode,
+      chip: this.editMode === 'tileset'
+        ? { col: this.selectedChip.col, row: this.selectedChip.row }
+        : null,
+      layerIndex: this.layerData.activeIndex,
+    };
+  }
+
+  /**
+   * 編集状態のスナップショットを返す。
+   * @returns {{
+   *   layerData: LayerData,
+   *   tilesetData: TilesetData|null,
+   *   editMode: 'free'|'tileset',
+   *   selectedChip: { col: number, row: number },
+   *   selection: { active: boolean, x: number, y: number, w: number, h: number, mode: string, floating: object|null },
+   * }}
+   */
+  createEditStateSnapshot() {
+    return {
+      layerData: this._cloneLayerData(this._layerData),
+      tilesetData: this.tilesetData ? this._cloneTilesetData(this.tilesetData) : null,
+      editMode: this.editMode,
+      selectedChip: { col: this.selectedChip.col, row: this.selectedChip.row },
+      selection: this._cloneSelection(this.selection),
+    };
+  }
+
+  /**
+   * 編集状態のスナップショットを適用する。
+   * @param {{
+   *   layerData: LayerData,
+   *   tilesetData: TilesetData|null,
+   *   editMode: 'free'|'tileset',
+   *   selectedChip: { col: number, row: number },
+   *   selection: { active: boolean, x: number, y: number, w: number, h: number, mode: string, floating: object|null },
+   * }} snapshot
+   * @returns {boolean}
+   */
+  applyEditStateSnapshot(snapshot) {
+    if (!snapshot?.layerData) return false;
+
+    this._layerData = this._cloneLayerData(snapshot.layerData);
+    this.tilesetData = snapshot.tilesetData ? this._cloneTilesetData(snapshot.tilesetData) : null;
+    this.editMode = snapshot.editMode === 'tileset' ? 'tileset' : 'free';
+    this.selectedChip = {
+      col: snapshot.selectedChip?.col | 0,
+      row: snapshot.selectedChip?.row | 0,
+    };
+    this.selection = this._cloneSelection(snapshot.selection);
+    return true;
+  }
+
+  /**
+   * @param {PixelData} src
+   * @returns {PixelData}
+   */
+  _clonePixelData(src) {
+    const pd = new PixelData();
+    pd.createPixelData(src.width, src.height);
+    pd.pixels.set(src.pixels);
+    return pd;
+  }
+
+  /**
+   * @param {LayerData} src
+   * @returns {LayerData}
+   */
+  _cloneLayerData(src) {
+    const ld = new LayerData();
+    ld.width = src.width;
+    ld.height = src.height;
+    ld.layers = src.layers.map(layer => ({
+      pixelData: this._clonePixelData(layer.pixelData),
+      name: layer.name,
+      visible: layer.visible,
+      opacity: layer.opacity,
+      locked: !!layer.locked,
+    }));
+    ld.activeIndex = src.activeIndex;
+    ld._composite.createPixelData(ld.width, ld.height);
+    ld.markCompositeDirty();
+    return ld;
+  }
+
+  /**
+   * @param {TilesetData} src
+   * @returns {TilesetData}
+   */
+  _cloneTilesetData(src) {
+    const td = new TilesetData(src.chipWidth, src.chipHeight, src.columns, src.rows, 0x00000000);
+    td.passFlags = src.passFlags.map(row => row.slice());
+    for (let row = 0; row < src.rows; row++) {
+      for (let col = 0; col < src.columns; col++) {
+        td.chips[row][col] = this._cloneLayerData(src.chips[row][col]);
+      }
+    }
+    return td;
+  }
+
+  /**
+   * @param {{ active: boolean, x: number, y: number, w: number, h: number, mode: string, floating: object|null }} selection
+   * @returns {{ active: boolean, x: number, y: number, w: number, h: number, mode: string, floating: object|null }}
+   */
+  _cloneSelection(selection) {
+    const floating = selection?.floating;
+    return {
+      active: !!selection?.active,
+      x: selection?.x | 0,
+      y: selection?.y | 0,
+      w: selection?.w | 0,
+      h: selection?.h | 0,
+      mode: typeof selection?.mode === 'string' ? selection.mode : 'rect',
+      floating: floating ? {
+        pixelData: floating.pixelData ? this._clonePixelData(floating.pixelData) : null,
+        srcX: floating.srcX | 0,
+        srcY: floating.srcY | 0,
+        dstX: floating.dstX | 0,
+        dstY: floating.dstY | 0,
+        width: floating.width | 0,
+        height: floating.height | 0,
+        cut: !!floating.cut,
+      } : null,
+    };
   }
 
   /**

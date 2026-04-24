@@ -176,17 +176,40 @@ www/
 
 #### Undo / Redo
 
-- [ ] **コマンドパターン** (`js/command/`)
+- [x] **コマンドパターン土台** (`js/command/`)
   - `CommandBase`: `execute() / undo()` インターフェース
-  - `DrawCommand`: 描画操作1ストローク分のピクセル変更を保持
-  - `FillCommand`: 塗りつぶし操作
-  - `NewFileCommand`: 新規作成操作
-- [ ] **HistoryManager** (`js/history_manager.js`)
-  - `push(command)` → `command.execute()` して履歴スタックに積む
-  - `undo()` / `redo()` の実装
-  - 最大履歴数の制限（例: 100ステップ）
-- [ ] メニュー `EDIT_UNDO / EDIT_REDO` を `HistoryManager` に接続
-- [ ] `Ctrl+Z` / `Ctrl+Y`（または `Ctrl+Shift+Z`）のキーボードショートカット
+  - `PixelStrokeCommand`: 描画操作1ストローク分のピクセル変更を保持
+  - `FloodFillCommand`: 塗りつぶし操作
+- [x] **HistoryManager** (`js/history_manager.js`)
+  - `execute(command)` / `undo()` / `redo()` / `clear()` の最小実装
+  - `canUndo()` / `canRedo()` / `getUndoLabel()` / `getRedoLabel()` を追加
+  - `_isApplying` による履歴適用中ガード
+- [x] `AppData.history` と `index.html` の読み込み順を接続
+- [x] メニュー `EDIT_UNDO / EDIT_REDO` を `HistoryManager` に接続
+- [x] `Ctrl+Z` / `Ctrl+Y`（または `Ctrl+Shift+Z`）のキーボードショートカット
+- [x] **ペンシル / 消しゴムの Undo / Redo**
+  - 1ストロークを 1 コマンドとして履歴化
+  - free モード / tileset モードで同じ履歴基盤を利用
+- [x] **塗りつぶしの Undo / Redo**
+  - `_floodFill()` を変更集合返却へ変更
+  - `FloodFillCommand` 経由で履歴化
+- [x] ブラウザ上で `pencil / eraser / fill` の Undo / Redo 挙動を確認
+- [x] **TransformCommand** (`js/command/transform_command.js`)
+  - 左右反転 / 上下反転 / 回転の履歴化
+  - 通常レイヤー変形のみ履歴対応、浮動選択変形は未対応
+- [x] ブラウザ上で `flip / rotate` の Undo / Redo 挙動を確認
+- [x] **NewFileCommand** (`js/command/new_file_command.js`)
+  - 通常新規作成の履歴化
+  - `AppData` の編集状態スナップショットで undo/redo を復元
+- [x] ブラウザ上で `new file` の Undo / Redo 挙動を確認
+- [x] **LayerPanel のコマンド経由化** (`js/command/layer_command.js` + `js/ui/layer_panel.js`)
+  - `Add/Remove/Move/ToggleVisibility/ToggleLocked/Rename/Duplicate/MergeLayerDown` を追加
+  - `LayerPanel` の直接更新を `appData.history.execute(...)` 経由へ置換
+  - ブラウザ上で `add/remove/move/visible/lock/rename/duplicate/merge` の Undo / Redo 挙動を確認
+- [x] **Layer opacity UI** (`js/ui/layer_panel.js` + `SetLayerOpacityCommand`)
+  - LayerPanel 下部詳細欄に `Opacity: xx%` と横スライダーを追加
+  - ドラッグ中は即時プレビューし、mouse up で 1 つの履歴へ統合
+  - ブラウザ上で opacity ドラッグの preview と 1 履歴 undo/redo を確認
 
 #### ズーム改善
 

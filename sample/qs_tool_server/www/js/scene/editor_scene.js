@@ -24,6 +24,9 @@ class EditorScene extends Scene {
       console.log(`[EditorScene] pixel up (${px}, ${py}) button=${button}`);
     };
 
+    /** 描画中ストローク状態 @type {{ mode: 'free'|'tileset', chip: { col:number, row:number }|null, layerIndex: number, label: string, changes: Array<{ x: number, y: number, before: number, after: number }>, indexMap: Record<string, number> }|null} */
+    this._currentStroke = null;
+
     /** 選択ツールドラッグ状態 @type {{ startX: number, startY: number, lastX: number, lastY: number }|null} */
     this._selectionDrag = null;
 
@@ -40,10 +43,12 @@ class EditorScene extends Scene {
         const fillColor = bgColor === 'white'
           ? PixelData.rgba(255, 255, 255, 255)
           : 0x00000000;
-        this._appData.editMode    = 'free';
-        this._appData.tilesetData = null;
-        this._appData.clearSelection();
-        this._appData.createPixelData(width, height, fillColor);
+        this._appData.history.execute(new NewFileCommand({
+          width,
+          height,
+          fillColor,
+          label: 'newFile',
+        }), this._appData);
         this._pixelCanvas.resetView();
         this._pixelCanvas.markDirty();
         console.log(`[EditorScene] new file: ${width}x${height} bg=${bgColor}`);
@@ -448,6 +453,21 @@ class EditorScene extends Scene {
         return;
       }
 
+      if (id === MenuConstants.EDIT_UNDO) {
+        if (this._appData?.history?.undo(this._appData)) {
+          this._pixelCanvas.markDirty();
+          console.log('[EditorScene] undo');
+        }
+        return;
+      }
+      if (id === MenuConstants.EDIT_REDO) {
+        if (this._appData?.history?.redo(this._appData)) {
+          this._pixelCanvas.markDirty();
+          console.log('[EditorScene] redo');
+        }
+        return;
+      }
+
       if (id === MenuConstants.EDIT_SELECT_ALL) {
         this._selectAll();
         return;
@@ -475,11 +495,18 @@ class EditorScene extends Scene {
           return;
         }
         if (this._appData?.layerData) {
-          const changed = this._applyToUnlockedLayers(this._appData.layerData, layer => {
-            if (layer.pixelData) isH ? layer.pixelData.flipH() : layer.pixelData.flipV();
-          });
+          const layerIndices = this._getUnlockedLayerIndices(this._appData.layerData);
+          if (layerIndices.length === 0) {
+            console.warn('[EditorScene] ロックされていないレイヤーがありません');
+            return;
+          }
+          const changed = this._appData.history.execute(new TransformCommand({
+            ...this._appData.getActiveEditTargetContext(),
+            layerIndices,
+            kind: isH ? 'flipH' : 'flipV',
+            label: isH ? 'flipH' : 'flipV',
+          }), this._appData);
           if (!changed) return;
-          this._appData.layerData.markCompositeDirty();
           this._pixelCanvas.markDirty();
         }
         console.log(`[EditorScene] ${isH ? '左右' : '上下'}に反転`);
@@ -496,11 +523,18 @@ class EditorScene extends Scene {
           return;
         }
         if (this._appData?.layerData) {
-          const changed = this._applyToUnlockedLayers(this._appData.layerData, layer => {
-            if (layer.pixelData) isCW ? layer.pixelData.rotate90CW() : layer.pixelData.rotate90CCW();
-          });
+          const layerIndices = this._getUnlockedLayerIndices(this._appData.layerData);
+          if (layerIndices.length === 0) {
+            console.warn('[EditorScene] ロックされていないレイヤーがありません');
+            return;
+          }
+          const changed = this._appData.history.execute(new TransformCommand({
+            ...this._appData.getActiveEditTargetContext(),
+            layerIndices,
+            kind: isCW ? 'rotate90CW' : 'rotate90CCW',
+            label: isCW ? 'rotate90CW' : 'rotate90CCW',
+          }), this._appData);
           if (!changed) return;
-          this._appData.layerData.markCompositeDirty();
           this._pixelCanvas.markDirty();
         }
         console.log(`[EditorScene] ${isCW ? '時計回り' : '反時計回り'}に90度回転`);
@@ -628,6 +662,25 @@ class EditorScene extends Scene {
         if (!this._spaceDown) {
           this._spaceDown = true;
           if (this._canvas) this._canvas.style.cursor = 'grab';
+        }
+        return;
+      }
+      if ((e.ctrl || e.meta) && !e.shift && (key === 'z' || key === 'Z')) {
+        raw?.preventDefault?.();
+        if (this._appData?.history?.undo(this._appData)) {
+          this._pixelCanvas.markDirty();
+          console.log('[EditorScene] undo');
+        }
+        return;
+      }
+      if ((e.ctrl || e.meta) && (
+        ((key === 'z' || key === 'Z') && e.shift) ||
+        key === 'y' || key === 'Y'
+      )) {
+        raw?.preventDefault?.();
+        if (this._appData?.history?.redo(this._appData)) {
+          this._pixelCanvas.markDirty();
+          console.log('[EditorScene] redo');
         }
         return;
       }
@@ -868,24 +921,28 @@ class EditorScene extends Scene {
 
       case 'pencil':
         if (!this._canModifyActiveLayer(appData, '描画')) return;
-        appData.pixelData.setPixel(px, py, drawColor);
-        appData.layerData.markCompositeDirty();
-        this._pixelCanvas.markDirty();
+        if (isDown) this._beginStroke(appData, 'draw');
+        this._setPixelWithRecord(appData, px, py, drawColor);
         break;
 
       case 'eraser':
         if (!this._canModifyActiveLayer(appData, '消去')) return;
-        appData.pixelData.setPixel(px, py, 0x00000000);
-        appData.layerData.markCompositeDirty();
-        this._pixelCanvas.markDirty();
+        if (isDown) this._beginStroke(appData, 'erase');
+        this._setPixelWithRecord(appData, px, py, 0x00000000);
         break;
 
       case 'fill':
         // 塗りつぶしは mousedown のみ（ドラッグは不要）
         if (isDown) {
           if (!this._canModifyActiveLayer(appData, '塗りつぶし')) return;
-          this._floodFill(appData.pixelData, px, py, drawColor);
-          appData.layerData.markCompositeDirty();
+          const changes = this._floodFill(appData.pixelData, px, py, drawColor);
+          if (!changes || changes.length === 0) return;
+
+          appData.history.execute(new FloodFillCommand({
+            ...appData.getActiveEditTargetContext(),
+            changes,
+            label: 'fill',
+          }), appData);
           this._pixelCanvas.markDirty();
         }
         break;
@@ -1003,6 +1060,11 @@ class EditorScene extends Scene {
    * @param {AppData} appData
    */
   _onPixelToolUp(px, py, button, appData) {
+    if (appData.activeTool === 'pencil' || appData.activeTool === 'eraser') {
+      this._commitCurrentStroke(appData);
+      return;
+    }
+
     if (appData.activeTool !== 'selectRect' || button !== 0) return;
 
     if (this._selectionMovePrimed) {
@@ -1030,6 +1092,76 @@ class EditorScene extends Scene {
     appData.setSelectionRect(rect.x, rect.y, rect.w, rect.h);
     this._selectionDrag = null;
     this._pixelCanvas.markDirty();
+  }
+
+  /**
+   * 現在の描画対象をストローク開始状態にする。
+   * @param {AppData} appData
+   * @param {string} label
+   */
+  _beginStroke(appData, label) {
+    const context = appData.getActiveEditTargetContext();
+    this._currentStroke = {
+      mode: context.mode,
+      chip: context.chip,
+      layerIndex: context.layerIndex,
+      label,
+      changes: [],
+      indexMap: Object.create(null),
+    };
+  }
+
+  /**
+   * ピクセル変更を現在ストロークへ記録しつつ適用する。
+   * @param {AppData} appData
+   * @param {number} px
+   * @param {number} py
+   * @param {number} color
+   * @returns {boolean}
+   */
+  _setPixelWithRecord(appData, px, py, color) {
+    if (!this._currentStroke) return false;
+
+    const key = `${px},${py}`;
+    const index = this._currentStroke.indexMap[key];
+    const pixelData = appData.pixelData;
+
+    if (index === undefined) {
+      const before = pixelData.getPixel(px, py);
+      if (before === color) return false;
+
+      this._currentStroke.indexMap[key] = this._currentStroke.changes.length;
+      this._currentStroke.changes.push({ x: px, y: py, before, after: color >>> 0 });
+    } else {
+      const change = this._currentStroke.changes[index];
+      if (!change || change.after === (color >>> 0)) return false;
+      change.after = color >>> 0;
+    }
+
+    pixelData.setPixel(px, py, color >>> 0);
+    appData.layerData.markCompositeDirty();
+    this._pixelCanvas.markDirty();
+    return true;
+  }
+
+  /**
+   * 記録済みストロークを履歴へ積む。
+   * @param {AppData} appData
+   */
+  _commitCurrentStroke(appData) {
+    if (!this._currentStroke) return;
+
+    const stroke = this._currentStroke;
+    this._currentStroke = null;
+    if (stroke.changes.length === 0) return;
+
+    appData.history.execute(new PixelStrokeCommand({
+      mode: stroke.mode,
+      chip: stroke.chip,
+      layerIndex: stroke.layerIndex,
+      changes: stroke.changes,
+      label: stroke.label,
+    }), appData);
   }
 
   /**
@@ -1348,27 +1480,44 @@ class EditorScene extends Scene {
   }
 
   /**
+   * ロックされていないレイヤーのインデックス一覧を返す。
+   * @param {LayerData} layerData
+   * @returns {number[]}
+   */
+  _getUnlockedLayerIndices(layerData) {
+    const indices = [];
+    for (let index = 0; index < layerData.layers.length; index++) {
+      if (!layerData.layers[index].locked) {
+        indices.push(index);
+      }
+    }
+    return indices;
+  }
+
+  /**
    * BFS フラッドフィル (Flood Fill)。
    * @param {PixelData} pixelData
    * @param {number}    startX
    * @param {number}    startY
    * @param {number}    fillColor  0xAARRGGBB
+   * @returns {Array<{ x: number, y: number, before: number, after: number }>}
    */
   _floodFill(pixelData, startX, startY, fillColor) {
     const target = pixelData.getPixel(startX, startY);
-    if (target === fillColor) return;  // 塗り替え不要
+    if (target === fillColor) return [];  // 塗り替え不要
 
     const w       = pixelData.width;
     const h       = pixelData.height;
     const visited = new Uint8Array(w * h);
     const queue   = [startX + startY * w];
+    const changes = [];
     visited[startX + startY * w] = 1;
 
     while (queue.length > 0) {
       const idx = queue.pop();  // pop() は shift() より高速
       const x   = idx % w;
       const y   = (idx / w) | 0;
-      pixelData.setPixel(x, y, fillColor);
+      changes.push({ x, y, before: target, after: fillColor >>> 0 });
 
       const neighbors = [
         x + 1 < w ? idx + 1 : -1,
@@ -1383,6 +1532,8 @@ class EditorScene extends Scene {
         }
       }
     }
+
+    return changes;
   }
 
   /**

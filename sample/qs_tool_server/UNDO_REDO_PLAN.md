@@ -1,6 +1,6 @@
 # Undo / Redo 実装計画書
 
-最終更新: 2026-04-22
+最終更新: 2026-04-24
 
 ## 1. 目的
 
@@ -17,25 +17,41 @@
 
 ## 2. 現状整理
 
-現状の編集は `EditorScene` から直接データへ書き込んでいる。
+現状は、Phase 1 の主要機能に加えて、Phase 2 の LayerPanel 経路を実装済みである。
 
-主な更新経路:
+実装済み:
 
-1. ピクセル描画
-   - `EditorScene._applyTool()` から `appData.pixelData.setPixel()` を直接呼ぶ
-2. 塗りつぶし
-   - `EditorScene._floodFill()` が `PixelData` を直接更新する
-3. レイヤー操作
-   - `LayerPanel` から `LayerData.addLayer()/removeLayer()/moveLayer()/toggleVisibility()` を直接呼ぶ
-4. 画像変形
-   - `PixelData.flipH()/flipV()/rotate90CW()/rotate90CCW()` を直接呼ぶ
-5. タイルセット操作
-   - `TilesetData.clearChip()/swapChips()/pasteChipLayerData()/addRow()/addColumn()/removeRow()/removeColumn()` を直接呼ぶ
-6. 通過フラグ
-   - `tilesetData.passFlags[row][col]` を直接トグルしている
+1. `HistoryManager` / `CommandBase`
+2. `AppData.history` と履歴関連スクリプトの読み込み順
+3. メニュー `EDIT_UNDO / EDIT_REDO`
+4. `Ctrl+Z` / `Ctrl+Shift+Z` / `Ctrl+Y`
+5. ペンシル / 消しゴムの 1 ストローク履歴化
+6. 塗りつぶしの履歴化
+7. 通常レイヤーへの反転 / 回転の履歴化
+8. 通常新規作成の履歴化
 
-このため、Undo / Redo を入れるには、
-「直接更新」を「コマンド経由更新」に段階的に置き換える必要がある。
+確認済み:
+
+1. `pencil / eraser / fill` の Undo / Redo
+2. `flip / rotate` の Undo / Redo
+3. `new file` の Undo / Redo
+4. `LayerPanel` 経由の `add/remove/move/visible/lock/rename/duplicate/merge` の Undo / Redo
+5. `LayerPanel` の opacity スライダー変更の Undo / Redo
+
+未対応:
+
+1. タイルセット新規作成
+2. タイルセット操作
+3. 通過フラグ
+4. 浮動選択系の履歴統合
+
+まだ直接更新が残っている経路:
+
+1. `TilesetData.clearChip()/swapChips()/pasteChipLayerData()/addRow()/addColumn()/removeRow()/removeColumn()`
+2. `tilesetData.passFlags[row][col]` の直接トグル
+3. 浮動選択の持ち上げ / 移動 / 確定 / キャンセル / 変形
+
+したがって、以後の作業は「残っている直接更新経路をコマンド経由へ置き換える」ことに集中すればよい。
 
 ---
 
@@ -101,8 +117,16 @@ mousedown から mouseup までを1コマンドとして扱う。
 2. レイヤー削除
 3. レイヤー順変更
 4. レイヤー表示/非表示
-5. レイヤー名変更
-6. レイヤー不透明度変更
+5. レイヤーロック切替
+6. レイヤー名変更
+7. レイヤー不透明度変更
+8. レイヤー複製
+9. レイヤー結合
+
+確認状況:
+
+1. LayerPanel 経由の各操作と opacity スライダーの Undo / Redo は確認済み
+2. Phase 2 の実装対象は完了
 
 ### Phase 3: タイルセット操作
 
@@ -120,11 +144,18 @@ mousedown から mouseup までを1コマンドとして扱う。
 
 将来の対象:
 
-1. 選択範囲移動
-2. 一括編集
-3. オートタイル生成
-4. 斜め見下ろし生成
-5. パレット編集
+1. 浮動選択の履歴統合
+2. 選択範囲移動
+3. 一括編集
+4. オートタイル生成
+5. 斜め見下ろし生成
+6. パレット編集
+
+補足:
+
+1. 矩形選択、コピー、切り取り、貼り付け、浮動選択の移動と変形はすでに実装済み
+2. ただし Undo / Redo の観点ではまだ未整理で、直接更新経路が残っている
+3. 初回実装ではこの範囲を後回しにする方が安全
 
 ---
 
@@ -251,8 +282,11 @@ class CommandBase {
 2. `RemoveLayerCommand`
 3. `MoveLayerCommand`
 4. `ToggleLayerVisibilityCommand`
-5. `RenameLayerCommand`
-6. `SetLayerOpacityCommand`
+5. `ToggleLayerLockedCommand`
+6. `RenameLayerCommand`
+7. `SetLayerOpacityCommand`
+8. `DuplicateLayerCommand`
+9. `MergeLayerDownCommand`
 
 ### 5.8 `TilesetCommand` 系
 
@@ -339,6 +373,12 @@ getActiveEditTargetContext() {
 
 ## 8. `EditorScene` への組み込み方針
 
+注意:
+
+1. 現在の `EditorScene` には選択ツール、浮動選択の確定、変形処理も入っている
+2. 初回導入ではまず通常描画系のみを履歴対応し、浮動選択は現状維持にする
+3. 浮動選択を同時に扱うと、描画コマンドと選択コマンドの境界が曖昧になりやすい
+
 ### 8.1 描画ストロークの開始 / 終了を管理する
 
 `EditorScene` に編集中ストロークを持たせる。
@@ -390,6 +430,9 @@ Undo 導入後は「変更記録付き適用」へ変える。
 2. `appData.history.execute(new RemoveLayerCommand(...), appData)`
 3. `appData.history.execute(new MoveLayerCommand(...), appData)`
 4. `appData.history.execute(new ToggleLayerVisibilityCommand(...), appData)`
+5. `appData.history.execute(new ToggleLayerLockedCommand(...), appData)`
+6. `appData.history.execute(new DuplicateLayerCommand(...), appData)`
+7. `appData.history.execute(new MergeLayerDownCommand(...), appData)`
 
 インライン編集によるレイヤー名変更も確定時にコマンド化する。
 
@@ -434,6 +477,11 @@ if (id === MenuConstants.EDIT_REDO) {
 ```
 
 ### 11.2 キーボードショートカット
+
+現状:
+
+1. `Ctrl+A / Ctrl+C / Ctrl+X / Ctrl+V` は実装済み
+2. Undo / Redo 系のみ未実装
 
 対応候補:
 
@@ -497,6 +545,185 @@ if (id === MenuConstants.EDIT_REDO) {
 完了条件:
 
 1. 反転 / 回転 / 新規作成の undo が可能
+2. 浮動選択への反転 / 回転はこの段階では対象外でもよい
+
+### Phase 1 の具体的な実装順
+
+Step 1〜4 を、そのまま作業へ落とせる粒度に分解すると次の順になる。
+
+#### Task 1: 履歴基盤ファイルを追加する
+
+状態:
+
+1. 完了
+
+対象ファイル:
+
+1. `www/js/history_manager.js`
+2. `www/js/command/command_base.js`
+
+作業内容:
+
+1. `HistoryManager.execute()/undo()/redo()/clear()` の最小実装を作る
+2. `canUndo()/canRedo()/getUndoLabel()/getRedoLabel()` を入れる
+3. `_isApplying` を持たせ、undo/redo 中の二重 push を防ぐ土台を作る
+
+完了条件:
+
+1. ダミーコマンドで `execute → undo → redo` が成立する
+2. まだ実編集コマンドがなくても API が固定できる
+
+#### Task 2: `AppData` と読み込み順へ履歴基盤を接続する
+
+状態:
+
+1. 完了
+
+対象ファイル:
+
+1. `www/js/app_data.js`
+2. `www/index.html`
+
+作業内容:
+
+1. `AppData` に `history = new HistoryManager(100)` を追加する
+2. 必要ならアクティブ対象取得ヘルパーを追加する
+3. `index.html` に履歴関連スクリプトを依存順で追加する
+
+完了条件:
+
+1. `EditorScene` から `appData.history` を参照できる
+2. ブラウザ起動時に読み込みエラーが出ない
+
+#### Task 3: Undo / Redo の配線だけ先に通す
+
+状態:
+
+1. 完了
+2. 空履歴での基本挙動は確認済み
+
+対象ファイル:
+
+1. `www/js/scene/editor_scene.js`
+
+作業内容:
+
+1. メニュー `EDIT_UNDO / EDIT_REDO` を `appData.history` に接続する
+2. `Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y` を追加する
+3. 実コマンド未導入でも空履歴で安全に動くようにする
+
+完了条件:
+
+1. UI 経路は先に固定できる
+2. 空履歴で押しても壊れない
+
+#### Task 4: 描画ストロークの記録器を入れる
+
+状態:
+
+1. 完了
+2. ペンシル / 消しゴムの 1 ストローク 1 Undo は実装済み
+
+対象ファイル:
+
+1. `www/js/command/pixel_stroke_command.js`
+2. `www/js/scene/editor_scene.js`
+
+作業内容:
+
+1. 1ストローク中の変更ピクセルを集める builder 相当の内部構造を決める
+2. 同一ピクセルの `before` は最初の1回だけ保持する
+3. `onPixelDown/onPixelMove/onPixelUp` の流れでコマンド確定する
+4. まずペンシルと消しゴムだけを履歴対応する
+
+完了条件:
+
+1. 長いドラッグ描画が1回の undo で戻る
+2. free / tileset の通常描画で同じ処理が使える
+
+#### Task 5: 塗りつぶしを差分記録へ寄せる
+
+状態:
+
+1. 完了
+2. pencil / eraser / fill の Undo / Redo はブラウザ上で挙動確認済み
+
+対象ファイル:
+
+1. `www/js/command/flood_fill_command.js`
+2. `www/js/scene/editor_scene.js`
+
+作業内容:
+
+1. `_floodFill()` を「直接変更だけする関数」から「変更集合を記録できる関数」へ変える
+2. 実装は `PixelStrokeCommand` と変更集合を共有できる形に寄せる
+3. fill の mousedown 1回を 1 コマンドにする
+
+完了条件:
+
+1. 塗りつぶし1回が1回で戻る
+2. 既存の塗りつぶし結果と視覚的な挙動が変わらない
+
+#### Task 6: 変形操作をスナップショットで包む
+
+状態:
+
+1. 完了
+2. 通常レイヤー変形の Undo / Redo はブラウザ上で挙動確認済み
+
+対象ファイル:
+
+1. `www/js/command/transform_command.js`
+2. `www/js/scene/editor_scene.js`
+
+作業内容:
+
+1. 左右反転、上下反転、時計回り回転、反時計回り回転を `TransformCommand` 化する
+2. 初回は通常レイヤー変形のみ対象とし、浮動選択変形は対象外のままにする
+3. 変形前後の対象レイヤースナップショットを保存する
+
+完了条件:
+
+1. 変形系メニューが undo/redo 可能になる
+2. 対象外の浮動選択変形と混線しない
+
+#### Task 7: 新規作成をコマンド化する
+
+状態:
+
+1. 完了
+2. 通常新規作成の Undo / Redo はブラウザ上で挙動確認済み
+
+対象ファイル:
+
+1. `www/js/command/new_file_command.js`
+2. `www/js/scene/editor_scene.js`
+
+作業内容:
+
+1. 通常新規作成を `NewFileCommand` 化する
+2. 必要な before/after を最小スナップショットで保存する
+3. タイルセット新規作成は Phase 1 で入れるか、Phase 3 へ寄せるかを実装時に明示する
+
+完了条件:
+
+1. 新規作成直後に元へ戻せる
+2. ビューリセットや選択解除も undo/redo 後に破綻しない
+
+#### Task 8: Phase 1 の手動確認を固定する
+
+確認順:
+
+1. ペンシルを長く描く
+2. Undo / Redo をメニューで確認する
+3. Undo / Redo をショートカットで確認する
+4. 消しゴム、塗りつぶし、反転、回転、新規作成を同じ順で確認する
+5. free モード確認後、tileset モードの通常描画でも同じ確認を行う
+
+完了条件:
+
+1. Phase 1 対象操作に対して戻る / やり直すが一貫して動く
+2. 対象外の浮動選択操作で履歴破損が起きない
 
 ### Step 5: レイヤー操作
 
@@ -507,7 +734,8 @@ if (id === MenuConstants.EDIT_REDO) {
 
 完了条件:
 
-1. レイヤー追加 / 削除 / 並び替え / 可視切替が戻せる
+1. レイヤー追加 / 削除 / 並び替え / 可視切替 / ロック切替が戻せる
+2. 可能なら複製 / 結合も同じ履歴基盤へ乗る
 
 ### Step 6: タイルセット操作
 
@@ -534,6 +762,13 @@ if (id === MenuConstants.EDIT_REDO) {
 
 ### 13.2 手動確認項目
 
+現時点の確認状況:
+
+1. ペンシル、消しゴム、塗りつぶしの Undo / Redo は確認済み
+2. 反転、回転、新規作成の Undo / Redo は確認済み
+3. レイヤー操作と opacity スライダーの Undo / Redo は確認済み
+4. 浮動選択変形、タイルセット操作は未確認
+
 1. ペンシルを長く引いて1回で取り消せる
 2. 消しゴムストロークが1回で戻せる
 3. 塗りつぶしが戻せる
@@ -543,6 +778,7 @@ if (id === MenuConstants.EDIT_REDO) {
 7. 行追加 / 列追加 / 行削除 / 列削除が戻せる
 8. 通過フラグ変更が戻せる
 9. free モードと tileset モードで同じ履歴基盤が動く
+10. 選択ツール実装済み環境でも Undo 非対応範囲が誤作動しない
 
 ---
 
@@ -573,6 +809,7 @@ if (id === MenuConstants.EDIT_REDO) {
 
 1. 直接更新箇所を grep で洗い出す
 2. 「編集操作は必ず command 経由」というルールを決める
+3. 選択ツール系は初回対象外なら明示して混在を避ける
 
 ### 14.3 タイルセット構造変更時の参照ずれ
 
@@ -599,21 +836,30 @@ if (id === MenuConstants.EDIT_REDO) {
 3. `PixelStrokeCommand`
 4. `FloodFillCommand`
 5. `TransformCommand`
-6. `EditorScene` の `EDIT_UNDO / EDIT_REDO`
-7. `Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y`
+6. `NewFileCommand`
+7. `EditorScene` の `EDIT_UNDO / EDIT_REDO`
+8. `Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y`
 
 この段階では次を後回しにする。
 
 1. レイヤー操作
 2. タイルセット構造変更
 3. 通過フラグ
-4. パレット編集
+4. 浮動選択の移動 / 確定 / 変形
+5. パレット編集
 
 理由:
 
 1. まず日常編集の大部分を戻せるようにする
 2. 既存コードへの影響範囲を抑える
 3. コマンド基盤の妥当性を先に検証できる
+4. 選択ツール系は状態遷移が多く、初回導入で同時に扱うと切り分けが難しい
+
+補足:
+
+1. `NewFileCommand` は Phase 1 完了条件に含まれるため、最初の実装範囲にも含める
+2. tileset モードの通常描画は Phase 1 から同じ履歴基盤で扱う
+3. 浮動選択は「未対応」ではなく「別フェーズへ延期」として明記する
 
 ---
 
@@ -625,6 +871,7 @@ Undo / Redo 完了後の最低ラインは次の状態。
 2. 反転、回転、新規作成が戻せる
 3. メニューとショートカットの両方で操作できる
 4. free モード / tileset モードの両方で破綻しない
-5. 今後の選択ツール、一括編集の基盤として再利用できる
+5. 選択ツール未対応範囲がある場合でも、対象外であることが設計上明確になっている
+6. 今後の選択ツール、一括編集の基盤として再利用できる
 
 この機能は単体でも価値が高いが、今後のすべての編集強化の基礎になる。

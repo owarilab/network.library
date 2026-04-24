@@ -15,9 +15,12 @@ class LayerPanel {
   static ROW_H    = 26;
   static BTN_H    = 24;
   static BTN_W    = 24;
+  static DETAIL_H = 34;
   static PADDING  = 4;
   static EYE_W    = 22;
   static LOCK_W   = 22;
+  static SLIDER_H = 8;
+  static SLIDER_KNOB_R = 6;
   /** 最大表示レイヤー数（スクロールは未実装、これ以上は見切れる） */
   static MAX_ROWS = 12;
 
@@ -35,6 +38,10 @@ class LayerPanel {
   static EYE_OFF        = '#555555';
   static LOCK_ON        = '#f1c96b';
   static LOCK_OFF       = '#666666';
+  static DETAIL_LABEL   = '#c8c8c8';
+  static SLIDER_TRACK   = 'rgba(80,80,80,0.9)';
+  static SLIDER_FILL    = '#7ab0ff';
+  static SLIDER_KNOB    = '#f3f6fb';
 
   constructor() {
     /** ホバー中の行インデックス (-1 = なし) */
@@ -60,6 +67,11 @@ class LayerPanel {
     this._editInput   = null;
     /** 編集中のレイヤーインデックス (-1 = なし) */
     this._editingIndex = -1;
+
+    /** 不透明度スライダー領域 */
+    this._opacityRect = null;
+    /** ドラッグ中の不透明度変更状態 */
+    this._opacityDrag = null;
   }
 
   // ----------------------------------------------------------------
@@ -71,12 +83,12 @@ class LayerPanel {
    * @returns {{ w: number, h: number }}
    */
   getContentSize(appData) {
-    const { WIDTH, ROW_H, BTN_H, PADDING } = LayerPanel;
+    const { WIDTH, ROW_H, BTN_H, DETAIL_H, PADDING } = LayerPanel;
     const count = appData ? appData.layerData.layers.length : 1;
     const rows  = Math.min(count, LayerPanel.MAX_ROWS);
     return {
       w: WIDTH,
-      h: PADDING + rows * ROW_H + PADDING + BTN_H + PADDING,
+      h: PADDING + rows * ROW_H + PADDING + BTN_H + PADDING + DETAIL_H + PADDING,
     };
   }
 
@@ -91,16 +103,19 @@ class LayerPanel {
    * @param {AppData} appData
    */
   render(ctx, x, y, appData) {
-      const { WIDTH, ROW_H, BTN_H, BTN_W, PADDING, EYE_W, LOCK_W,
+      const { WIDTH, ROW_H, BTN_H, BTN_W, DETAIL_H, PADDING, EYE_W, LOCK_W,
             BG_ROW, BG_ROW_ACTIVE, BG_ROW_HOVER,
             BG_BTN, BG_BTN_HOVER,
             TEXT_COLOR, TEXT_DIM, TEXT_FONT,
-        BORDER_ACTIVE, EYE_ON, EYE_OFF, LOCK_ON, LOCK_OFF } = LayerPanel;
+        BORDER_ACTIVE, EYE_ON, EYE_OFF, LOCK_ON, LOCK_OFF,
+        DETAIL_LABEL, SLIDER_TRACK, SLIDER_FILL, SLIDER_KNOB,
+        SLIDER_H, SLIDER_KNOB_R } = LayerPanel;
 
     this._renderX = x;
     this._renderY = y;
     this._rows    = [];
     this._btns    = [];
+    this._opacityRect = null;
 
     const ld = appData.layerData;
 
@@ -201,6 +216,60 @@ class LayerPanel {
       ctx.fillText(btn.label, bx + BTN_W / 2, btnY + BTN_H / 2);
       ctx.restore();
     }
+
+    // ---- 下部詳細欄: opacity ----
+    const detailY = btnY + BTN_H + PADDING;
+    const activeLayer = ld.layers[ld.activeIndex] || null;
+    const opacity = activeLayer ? (activeLayer.opacity | 0) : 255;
+    const opacityPct = Math.round(opacity * 100 / 255);
+    const sliderX = x + 12;
+    const sliderW = WIDTH - 24;
+    const sliderY = detailY + 18;
+
+    ctx.save();
+    ctx.font = TEXT_FONT;
+    ctx.fillStyle = DETAIL_LABEL;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`Opacity: ${opacityPct}%`, x + 8, detailY + 8);
+
+    ctx.fillStyle = SLIDER_TRACK;
+    if (ctx.roundRect) {
+      ctx.beginPath();
+      ctx.roundRect(sliderX, sliderY, sliderW, SLIDER_H, 4);
+      ctx.fill();
+    } else {
+      ctx.fillRect(sliderX, sliderY, sliderW, SLIDER_H);
+    }
+
+    const fillW = Math.max(0, Math.min(sliderW, Math.round(sliderW * opacity / 255)));
+    ctx.fillStyle = SLIDER_FILL;
+    if (fillW > 0) {
+      if (ctx.roundRect) {
+        ctx.beginPath();
+        ctx.roundRect(sliderX, sliderY, fillW, SLIDER_H, 4);
+        ctx.fill();
+      } else {
+        ctx.fillRect(sliderX, sliderY, fillW, SLIDER_H);
+      }
+    }
+
+    const knobX = sliderX + Math.round(sliderW * opacity / 255);
+    ctx.fillStyle = SLIDER_KNOB;
+    ctx.beginPath();
+    ctx.arc(knobX, sliderY + SLIDER_H / 2, SLIDER_KNOB_R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    this._opacityRect = {
+      x: sliderX,
+      y: sliderY - 6,
+      w: sliderW,
+      h: DETAIL_H - 10,
+      sliderY,
+      sliderW,
+      index: ld.activeIndex,
+    };
   }
 
   /**
@@ -271,7 +340,11 @@ class LayerPanel {
   /**
    * @param {{x: number, y: number}} e  コンテンツ座標ではなくスクリーン座標
    */
-  onMouseMove(e) {
+  onMouseMove(e, appData) {
+    if (this._opacityDrag && appData) {
+      this._updateOpacityDrag(e.x, appData);
+    }
+
     this._hoverRow = -1;
     this._hoverBtn = null;
 
@@ -294,6 +367,14 @@ class LayerPanel {
   }
 
   /**
+   * @param {{x: number, y: number}} e
+   * @param {AppData} appData
+   */
+  onMouseUp(e, appData) {
+    this._finishOpacityDrag(appData);
+  }
+
+  /**
    * @param {{x: number, y: number, button: number}} e
    * @param {AppData} appData
    * @returns {boolean} true = consumed
@@ -305,18 +386,40 @@ class LayerPanel {
     }
 
     const ld  = appData.layerData;
+    const target = appData.getActiveEditTargetContext();
     const now = Date.now();
+
+    if (this._opacityRect && this._containsPoint(this._opacityRect, e.x, e.y)) {
+      const layer = ld.layers[ld.activeIndex];
+      if (!layer) return false;
+      this._opacityDrag = {
+        index: ld.activeIndex,
+        beforeOpacity: layer.opacity | 0,
+        lastOpacity: layer.opacity | 0,
+        mode: target.mode,
+        chip: target.chip,
+      };
+      this._updateOpacityDrag(e.x, appData);
+      return true;
+    }
 
     // ---- 行クリック ----
     for (const r of this._rows) {
       if (e.x >= r.x && e.x < r.x + r.w && e.y >= r.y && e.y < r.y + r.h) {
         // 目アイコン領域 (先頭 EYE_W + 4 px)
         if (e.x < r.x + LayerPanel.EYE_W + 4) {
-          ld.toggleVisibility(r.layerIndex);
-          ld.markCompositeDirty();
+          appData.history.execute(new ToggleLayerVisibilityCommand({
+            mode: target.mode,
+            chip: target.chip,
+            index: r.layerIndex,
+          }), appData);
           this._lastClickLayer = -1;
         } else if (e.x < r.x + LayerPanel.EYE_W + LayerPanel.LOCK_W + 4) {
-          ld.toggleLocked(r.layerIndex);
+          appData.history.execute(new ToggleLayerLockedCommand({
+            mode: target.mode,
+            chip: target.chip,
+            index: r.layerIndex,
+          }), appData);
           this._lastClickLayer = -1;
         } else {
           // 名前領域のダブルクリック → インライン編集開始
@@ -344,37 +447,56 @@ class LayerPanel {
       if (e.x >= b.x && e.x < b.x + b.w && e.y >= b.y && e.y < b.y + b.h) {
         switch (b.id) {
           case 'add':
-            ld.addLayer();
-            ld.markCompositeDirty();
+            appData.history.execute(new AddLayerCommand({
+              mode: target.mode,
+              chip: target.chip,
+            }), appData);
             break;
           case 'remove':
-            ld.removeLayer(ld.activeIndex);
-            ld.markCompositeDirty();
+            appData.history.execute(new RemoveLayerCommand({
+              mode: target.mode,
+              chip: target.chip,
+              index: ld.activeIndex,
+            }), appData);
             break;
           case 'up':
             // 「上へ」= 配列上では index + 1 (前面へ)
             if (ld.activeIndex < ld.layers.length - 1) {
-              ld.moveLayer(ld.activeIndex, ld.activeIndex + 1);
-              ld.markCompositeDirty();
+              appData.history.execute(new MoveLayerCommand({
+                mode: target.mode,
+                chip: target.chip,
+                from: ld.activeIndex,
+                to: ld.activeIndex + 1,
+              }), appData);
             }
             break;
           case 'down':
             // 「下へ」= 配列上では index - 1 (背面へ)
             if (ld.activeIndex > 0) {
-              ld.moveLayer(ld.activeIndex, ld.activeIndex - 1);
-              ld.markCompositeDirty();
+              appData.history.execute(new MoveLayerCommand({
+                mode: target.mode,
+                chip: target.chip,
+                from: ld.activeIndex,
+                to: ld.activeIndex - 1,
+              }), appData);
             }
             break;
           case 'duplicate':
             if (ld.activeIndex >= 0) {
-              ld.duplicateLayer(ld.activeIndex);
-              ld.markCompositeDirty();
+              appData.history.execute(new DuplicateLayerCommand({
+                mode: target.mode,
+                chip: target.chip,
+                index: ld.activeIndex,
+              }), appData);
             }
             break;
           case 'merge':
             if (ld.activeIndex > 0) {
-              ld.mergeLayerDown(ld.activeIndex);
-              ld.markCompositeDirty();
+              appData.history.execute(new MergeLayerDownCommand({
+                mode: target.mode,
+                chip: target.chip,
+                index: ld.activeIndex,
+              }), appData);
             }
             break;
         }
@@ -384,6 +506,54 @@ class LayerPanel {
     }
 
     return false;
+  }
+
+  /**
+   * @param {number} mouseX
+   * @param {AppData} appData
+   */
+  _updateOpacityDrag(mouseX, appData) {
+    if (!this._opacityDrag || !this._opacityRect) return;
+    const rect = this._opacityRect;
+    const ratio = rect.w > 0 ? (mouseX - rect.x) / rect.w : 0;
+    const opacity = Math.max(0, Math.min(255, Math.round(Math.max(0, Math.min(1, ratio)) * 255)));
+    if (opacity === this._opacityDrag.lastOpacity) return;
+
+    const layer = appData.layerData.layers[this._opacityDrag.index];
+    if (!layer) return;
+    appData.layerData.setOpacity(this._opacityDrag.index, opacity);
+    this._opacityDrag.lastOpacity = opacity;
+    this.onChange?.();
+  }
+
+  /**
+   * @param {AppData} appData
+   */
+  _finishOpacityDrag(appData) {
+    if (!this._opacityDrag) return;
+
+    const drag = this._opacityDrag;
+    this._opacityDrag = null;
+    if (drag.beforeOpacity === drag.lastOpacity) return;
+
+    appData.history.execute(new SetLayerOpacityCommand({
+      mode: drag.mode,
+      chip: drag.chip,
+      index: drag.index,
+      beforeOpacity: drag.beforeOpacity,
+      opacity: drag.lastOpacity,
+    }), appData);
+    this.onChange?.();
+  }
+
+  /**
+   * @param {{x: number, y: number, w: number, h: number}} rect
+   * @param {number} x
+   * @param {number} y
+   * @returns {boolean}
+   */
+  _containsPoint(rect, x, y) {
+    return x >= rect.x && x < rect.x + rect.w && y >= rect.y && y < rect.y + rect.h;
   }
 
   // ----------------------------------------------------------------
@@ -468,9 +638,14 @@ class LayerPanel {
     if (this._editingIndex < 0 || !this._editInput) return;
 
     const newName = this._editInput.value.trim();
-    const ld = appData.layerData;
     if (newName.length > 0) {
-      ld.renameLayer(this._editingIndex, newName);
+      const target = appData.getActiveEditTargetContext();
+      appData.history.execute(new RenameLayerCommand({
+        mode: target.mode,
+        chip: target.chip,
+        index: this._editingIndex,
+        newName,
+      }), appData);
     }
 
     this._removeEditInput();

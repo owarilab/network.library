@@ -47,12 +47,17 @@ class LayerPanelWindow extends UIWindow {
 
   /** @override */
   onContentMouseMove(e, appData) {
-    this._panel.onMouseMove(e);
+    this._panel.onMouseMove(e, appData);
   }
 
   /** @override */
   onContentMouseDown(e, appData) {
     return this._panel.onMouseDown(e, appData);
+  }
+
+  /** @override */
+  onContentMouseUp(e, appData) {
+    this._panel.onMouseUp(e, appData);
   }
 
   /**
