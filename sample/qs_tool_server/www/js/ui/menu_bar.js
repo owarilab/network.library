@@ -135,6 +135,8 @@ class MenuBar {
 
     ctx.save();
     ctx.font = FONT;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
 
     // ---- バー背景 ----
     ctx.fillStyle = COLOR_BG;

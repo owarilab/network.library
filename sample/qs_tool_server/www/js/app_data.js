@@ -10,6 +10,24 @@
 class AppData {
   constructor() {
     /**
+     * シーン遷移に使う SceneManager 参照。
+     * @type {SceneManager|null}
+     */
+    this.sceneManager = null;
+
+    /**
+     * 現在開いているプロジェクト。
+     * @type {ProjectData|null}
+     */
+    this.currentProject = null;
+
+    /**
+     * 現在開いているプロジェクトのセッション情報。
+     * @type {ProjectSession|null}
+     */
+    this.projectSession = null;
+
+    /**
      * free モード用の LayerData。
      * layerData getter 経由でアクセスされる。
      * @type {LayerData}
@@ -102,6 +120,100 @@ class AppData {
   }
 
   /**
+   * 現在のプロジェクトとセッションを設定する。
+   * セッションが未指定なら project から新規作成する。
+   * @param {ProjectData|null} project
+   * @param {ProjectSession|null} [session=null]
+   * @returns {ProjectSession|null}
+   */
+  setCurrentProject(project, session = null) {
+    this.currentProject = project || null;
+    if (!project) {
+      this.projectSession = null;
+      return null;
+    }
+
+    const nextSession = session || ProjectSession.createForProject(project);
+    this.projectSession = nextSession;
+    this.applyProjectSessionEditorState();
+    return this.projectSession;
+  }
+
+  /**
+   * 現在のセッションへ AppData 上の編集状態を反映する。
+   * @returns {boolean}
+   */
+  syncEditorStateToProjectSession() {
+    if (!this.projectSession) return false;
+    this.projectSession.applyEditorState({
+      activeTool: this.activeTool,
+      foreColor: this.foreColor,
+      backColor: this.backColor,
+      editMode: this.editMode,
+      selectedChip: {
+        col: this.selectedChip.col,
+        row: this.selectedChip.row,
+      },
+    });
+    return true;
+  }
+
+  /**
+   * 現在のセッションから AppData 上の編集状態を反映する。
+   * @returns {boolean}
+   */
+  applyProjectSessionEditorState() {
+    if (!this.projectSession) return false;
+    const editorState = this.projectSession.editorState || {};
+    if (typeof editorState.activeTool === 'string' && editorState.activeTool) {
+      this.activeTool = editorState.activeTool;
+    }
+    if (Number.isInteger(editorState.foreColor)) {
+      this.foreColor = editorState.foreColor;
+    }
+    if (Number.isInteger(editorState.backColor)) {
+      this.backColor = editorState.backColor;
+    }
+    this.editMode = editorState.editMode === 'tileset' ? 'tileset' : 'free';
+    this.selectedChip = {
+      col: editorState.selectedChip?.col | 0,
+      row: editorState.selectedChip?.row | 0,
+    };
+    return true;
+  }
+
+  /**
+   * 現在のセッションが指すアセットを取得する。
+   * @returns {object|null}
+   */
+  getActiveProjectAsset() {
+    if (!this.currentProject || !this.projectSession) return null;
+    return this.currentProject.getAssetByRef(this.projectSession.activeDocumentRef);
+  }
+
+  /**
+   * 現在シーン識別子をセッションへ反映する。
+   * @param {string} sceneId
+   * @returns {boolean}
+   */
+  setCurrentSceneId(sceneId) {
+    if (!this.projectSession) return false;
+    this.projectSession.setCurrentScene(sceneId);
+    return true;
+  }
+
+  /**
+   * SceneManager 経由でシーン遷移する。
+   * @param {Scene} scene
+   * @returns {boolean}
+   */
+  changeScene(scene) {
+    if (!this.sceneManager) return false;
+    this.sceneManager.change(scene);
+    return true;
+  }
+
+  /**
    * 現在の編集対象コンテキストを返す。
    * コマンドが対象モードやチップ位置を保存する時に使う。
    * @returns {{ mode: 'free'|'tileset', chip: { col: number, row: number }|null, layerIndex: number }}
@@ -158,6 +270,7 @@ class AppData {
       row: snapshot.selectedChip?.row | 0,
     };
     this.selection = this._cloneSelection(snapshot.selection);
+    this.syncEditorStateToProjectSession();
     return true;
   }
 
@@ -293,6 +406,7 @@ class AppData {
   createPixelData(width, height, fillColor = 0x00000000) {
     this._layerData.init(width, height, fillColor);
     this.clearSelection();
+    this.syncEditorStateToProjectSession();
   }
 
   /** 選択範囲を解除する。 */

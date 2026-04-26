@@ -31,6 +31,7 @@ class CanvasManager {
 
     /** @type {SceneManager} */
     this.sceneManager = new SceneManager(this.appData, this.input);
+    this.appData.sceneManager = this.sceneManager;
 
     // ウィンドウリサイズに追従する
     this._onResize = this._onResize.bind(this);

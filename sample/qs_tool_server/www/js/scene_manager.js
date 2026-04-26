@@ -30,7 +30,18 @@ class SceneManager {
     }
     this.input.clearAll();
     this.current = scene;
+    this.appData.setCurrentSceneId(this._resolveSceneId(scene));
     this.current.onEnter(this.input, this.appData);
+  }
+
+  /**
+   * シーンインスタンスからセッション保存用の識別子を解決する。
+   * @param {Scene} scene
+   * @returns {string}
+   */
+  _resolveSceneId(scene) {
+    const ctorName = scene?.constructor?.name;
+    return typeof ctorName === 'string' && ctorName ? ctorName : 'unknown_scene';
   }
 
   /**

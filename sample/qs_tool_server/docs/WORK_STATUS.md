@@ -1,6 +1,6 @@
 # ドットエディタ 作業状況
 
-最終更新: 2026-04-26 (12)
+最終更新: 2026-04-26 (14)
 
 ## 概要
 
@@ -22,6 +22,7 @@ docs/
   ├── FEATURE_ROADMAP.md           # 今後の機能ロードマップ
   ├── LAYER_OPERATIONS_PLAN.md     # レイヤー操作拡張の計画
   ├── MAP_CHIP_SPEC.md             # マップチップエディタ仕様書
+  ├── PROJECT_SCENE_FLOW_PLAN.md   # タイトル/プロジェクトトップ/遷移基盤の計画
   ├── SELECTION_TOOL_PLAN.md       # 選択ツール実装計画
   ├── SPEC_quarter_view_tile.md    # クォータービュータイル生成仕様書
   └── UNDO_REDO_PLAN.md            # Undo / Redo 実装計画
@@ -39,9 +40,14 @@ www/
     ├── pixel_canvas.js             # PixelCanvas: PixelData描画・ズーム・パン
     ├── canvas_manager.js           # CanvasManager: RAFループ・各マネージャ生成
     ├── scene_manager.js            # SceneManager: アクティブシーン管理・切り替え
+    ├── project/
+    │   ├── project_data.js         # ProjectData: 保存対象のプロジェクト最小ルート
+    │   └── project_session.js      # ProjectSession: シーン間の一時編集状態
     ├── scene/
     │   ├── scene.js                # Scene: 基底クラス
-    │   └── editor_scene.js         # EditorScene: メインシーン（描画・メニュー操作）
+    │   ├── title_scene.js          # TitleScene: 起動時の入口
+    │   ├── project_top_scene.js    # ProjectTopScene: プロジェクト単位のハブ
+    │   └── editor_scene.js         # EditorScene: ドット絵エディタシーン
     ├── ui/
         ├── menu_constants.js       # MenuConstants: メニューID定数
         ├── menu_bar.js             # MenuBar: メニューバー描画
@@ -72,9 +78,28 @@ www/
         └── quarter_view_tile_generator.js # 斜め見下ろしタイル生成
 ```
 
-      関連仕様:
+関連仕様:
 
-      - [クォータービュータイル自動生成 仕様書](specs/SPEC_quarter_view_tile.md)
+- [クォータービュータイル自動生成 仕様書](specs/SPEC_quarter_view_tile.md)
+- [プロジェクト管理・シーン遷移基盤 計画書](specs/PROJECT_SCENE_FLOW_PLAN.md)
+
+---
+
+## 次フェーズ計画
+
+次の実装フェーズでは、単一のドット絵エディタ構成から、
+プロジェクトを起点に複数シーンへ遷移する構成へ移行する。
+
+追加予定の中核要素:
+
+- `TitleScene`: 起動直後の入口。新規プロジェクト作成、ロードを担当
+- `ProjectTopScene`: プロジェクト単位のホーム。各派生シーンへの遷移ハブ
+- `Project` 概念: ドット絵、タイルセット、将来のマップなどを束ねる管理単位
+- シーン間コンテキスト受け渡し基盤: `Project` を中心にデータを引き継ぐ
+
+詳細計画:
+
+- [プロジェクト管理・シーン遷移基盤 計画書](specs/PROJECT_SCENE_FLOW_PLAN.md)
 
 ---
 
@@ -84,8 +109,28 @@ www/
 
 - [x] `CanvasManager`: 全画面 canvas、RAF 60fps ループ（ドリフト補正付き）、resize 対応
 - [x] `Scene` / `SceneManager`: シーン切り替え時ライフサイクル（onEnter/onLeave）、`input.clearAll()`
+  - シーン名を `ProjectSession.currentScene` に反映する最小連携を追加
 - [x] `Input`: keyboard/mouse/touch イベント一元管理、canvas 相対座標正規化、wheel/contextmenu 既定動作抑止
 - [x] `AppData`: `LayerData` インスタンスを保持、`pixelData` getter でアクティブレイヤー返却、`createPixelData()` デリゲート
+  - `currentProject` / `projectSession` / `sceneManager` を追加
+  - `ProjectSession` への編集状態同期 API を追加
+- [x] `TitleScene` / `ProjectTopScene` の最小導線
+  - 起動時は `TitleScene` へ入り、`New Project` から `ProjectTopScene` へ遷移
+  - `ProjectTopScene` から `EditorScene` を開くハブ導線を追加
+- [x] シーン切り替え直後の canvas 文字描画状態の補正
+  - `MenuBar` 描画で `textAlign` / `textBaseline` を明示初期化
+
+### プロジェクト基盤
+
+- [x] `ProjectData`:
+  - `id / version / name / createdAt / updatedAt`
+  - `assets.pixelDocuments / tilesets / maps`
+  - `settings.defaultChipWidth / defaultChipHeight`
+  - `addPixelDocument()` / `addTileset()` / `addMap()` / `getAssetByRef()`
+- [x] `ProjectSession`:
+  - `projectId / dirty / currentScene`
+  - `activeDocumentRef`
+  - `editorState` (`activeTool / foreColor / backColor / editMode / selectedChip`)
 
 ### データ層
 
@@ -141,6 +186,26 @@ www/
 ## TODO リスト
 
 ### 優先度: 高（基本描画機能の完成）
+
+#### 次フェーズ基盤
+
+- [x] **タイトルシーン追加** (`js/scene/title_scene.js`)
+  - 起動時の入口を `EditorScene` から分離
+  - 新規プロジェクト作成導線を配置
+  - ロード導線はプレースホルダ
+- [x] **プロジェクトトップシーン追加** (`js/scene/project_top_scene.js`)
+  - ドット絵エディタや今後の派生シーンへの遷移ハブ
+  - `Map Editor` はプレースホルダ表示
+- [x] **Project / ProjectSession 導入** (`js/project/`)
+  - シーン間で共有する編集対象と、一時状態を分離して管理
+  - `AppData` と最小同期を接続済み
+- [x] **EditorScene のプロジェクト配下化（最小）**
+  - 既存ドット絵エディタをプロジェクト起点の1機能として接続
+  - `ProjectTopScene` 経由で `EditorScene` を開く構成へ変更
+  - 詳細計画: [PROJECT_SCENE_FLOW_PLAN.md](specs/PROJECT_SCENE_FLOW_PLAN.md)
+- [ ] **Project ロード / 保存導線**
+  - `TitleScene` の `Load Project` は未実装
+  - プロジェクト永続化形式は今後の作業
 
 #### ツール系
 
