@@ -1,6 +1,6 @@
 # ドットエディタ 作業状況
 
-最終更新: 2026-04-23 (11)
+最終更新: 2026-04-26 (12)
 
 ## 概要
 
@@ -15,6 +15,17 @@
 ## ファイル構成
 
 ```
+docs/
+├── WORK_STATUS.md                 # 現在の実装状況
+└── specs/
+  ├── BINARY_FORMAT_PLAN.md        # QTS バイナリ形式の実装計画
+  ├── FEATURE_ROADMAP.md           # 今後の機能ロードマップ
+  ├── LAYER_OPERATIONS_PLAN.md     # レイヤー操作拡張の計画
+  ├── MAP_CHIP_SPEC.md             # マップチップエディタ仕様書
+  ├── SELECTION_TOOL_PLAN.md       # 選択ツール実装計画
+  ├── SPEC_quarter_view_tile.md    # クォータービュータイル生成仕様書
+  └── UNDO_REDO_PLAN.md            # Undo / Redo 実装計画
+
 www/
 ├── index.html                      # エントリーポイント・スクリプト読み込み順管理
 ├── css/
@@ -60,6 +71,10 @@ www/
         ├── pixel_data_converter.js # PNG/JSON/QTS 変換
         └── quarter_view_tile_generator.js # 斜め見下ろしタイル生成
 ```
+
+      関連仕様:
+
+      - [クォータービュータイル自動生成 仕様書](specs/SPEC_quarter_view_tile.md)
 
 ---
 
@@ -169,6 +184,8 @@ www/
   - 旧色 / 新色プレビュー表示
   - `DialogBase` を継承して実装
   - パレットの FG/BG スウォッチクリックでダイアログを開く
+- [x] **EditablePalette32** (`js/ui/editable_palette_32.js`)
+  - 32色編集パレットとして tileset/workflow 向けに利用可能
 
 ---
 
@@ -210,6 +227,10 @@ www/
   - LayerPanel 下部詳細欄に `Opacity: xx%` と横スライダーを追加
   - ドラッグ中は即時プレビューし、mouse up で 1 つの履歴へ統合
   - ブラウザ上で opacity ドラッグの preview と 1 履歴 undo/redo を確認
+- [ ] **タイルセット操作の Undo / Redo 統合**
+  - `clearChip / pasteChipLayerData / swapChips / addRow / addColumn / removeRow / removeColumn` は未コマンド化
+  - 通過フラグ `passFlags[row][col]` も直接更新経路が残っている
+  - 選択ツールと同様、既存履歴基盤へ寄せるのが次段階
 
 #### ズーム改善
 
@@ -217,6 +238,7 @@ www/
   - 公式: `panX -= (centerX - canvas.width/2) * (newScale - oldScale) / oldScale` 系の計算
 - [ ] メニュー `VIEW_ZOOM_IN / VIEW_ZOOM_OUT` を `pixelCanvas.zoom()` に接続
 - [ ] メニュー `VIEW_ZOOM_RESET` を `pixelCanvas.resetPan()` + スケール初期化に接続
+  - ホイールズーム自体は実装済みだが、メニュー項目は未接続
 - [ ] ステータスバーに現在の倍率を表示
 
 #### ファイル入出力
@@ -239,6 +261,24 @@ www/
   - 1バイトピクセル（ColorID + passable）で量子化保存
 - [ ] **通常ドット絵(JSON v1)のメタ情報拡張**
 
+#### タイルセットモード
+
+- [x] `AppData` に `editMode` / `tilesetData` / `selectedChip` / `chipClipboard` / `palette` / `showPassFlags` を追加
+- [x] **`TilesetData`** を実装
+  - チップ単位 `LayerData` 管理（`chips[row][col]`）
+  - 通過フラグ配列 `passFlags[row][col]`
+  - `clearChip / copyChip / swapChips / cloneChipLayerData / pasteChipLayerData`
+  - `addRow / addColumn / removeRow / removeColumn / resize`
+- [x] **`EditorScene` へのタイルセット統合**
+  - 新規/読込: `FILE_NEW_TILESET` / `FILE_OPEN_TILESET`
+  - 出力: `FILE_EXPORT_TILESET`(PNG) / `FILE_EXPORT_CHIP`(PNG)
+  - チップ操作: `TILESET_COPY_CHIP / PASTE_CHIP / CLEAR_CHIP / SWAP_CHIP`
+  - 構造変更: `TILESET_ADD_ROW/COL / REMOVE_ROW/COL`
+  - 表示: `TILESET_TILE_PREVIEW` / `VIEW_PASS_FLAGS`
+- [x] **タイルセット編集メニュー拡張**
+  - `EDIT_ROTATE_CW` / `EDIT_ROTATE_CCW` は通常モード・タイルセットモード両対応
+  - `EDIT_FLIP_H` / `EDIT_FLIP_V` は両モード対応済み
+
 #### グリッド・表示設定
 
 - [x] メニュー `VIEW_GRID` でグリッド線表示/非表示トグル
@@ -253,6 +293,18 @@ www/
 ---
 
 ### 優先度: 低（拡張機能）
+
+#### タイルセット関連 UI
+
+- [x] **ChipPalette / ChipPaletteWindow**
+  - チップ一覧表示、選択、右クリック操作に対応
+- [x] **TilePreview / TilePreviewWindow**
+  - 選択チップの 3x3 / 5x5 繰り返し表示
+- [x] **NewTilesetDialog / ImportTilesetDialog**
+  - 新規タイルセット作成、画像からのタイルセット変換設定を実装
+- [x] **QuarterViewTileDialog**
+  - `Generate > Quarter View Tile` メニューから起動可能
+  - 仕様書: [SPEC_quarter_view_tile.md](specs/SPEC_quarter_view_tile.md)
 
 #### 選択ツールとクリップボード
 
@@ -319,8 +371,11 @@ www/
 - [x] レイヤー複製
 - [x] レイヤー結合（下レイヤーへ結合）
 - [x] `locked` の JSON 保存/読込と tileset clone/paste 系への伝播
-- [ ] レイヤー不透明度スライダー UI
-- [ ] 不透明度の視覚UI改善（数値表示 / スライダー）
+- [x] レイヤー不透明度スライダー UI
+  - 下部詳細欄に `Opacity: xx%` 表示とスライダーを実装
+  - ドラッグ中プレビュー、mouse up 時に 1 履歴へ統合
+- [ ] 不透明度の視覚UI改善
+  - 微調整用の UI 磨き込みや表示密度の改善は余地あり
 
 #### アニメーション
 
@@ -338,65 +393,6 @@ www/
 - [ ] **ツールキーボードショートカット** (`EditorScene._onKeyDown` に追加)
   - `P` → pencil / `E` → eraser / `G` → fill / `I` → eyedropper
   - ショートカットキー一覧を設定ダイアログに表示
-
----
-
-## 2026-03-22 追記（コード反映済み）
-
-### タイルセットモード
-
-- [x] `AppData` に `editMode` / `tilesetData` / `selectedChip` / `chipClipboard` / `palette` / `showPassFlags` を追加
-- [x] `TilesetData` を実装
-  - チップ単位 `LayerData` 管理（`chips[row][col]`）
-  - 通過フラグ配列 `passFlags[row][col]`
-  - `clearChip / copyChip / swapChips / cloneChipLayerData / pasteChipLayerData`
-  - `addRow / addColumn / removeRow / removeColumn / resize`
-- [x] `EditorScene` にタイルセットメニュー処理を統合
-  - 新規/読込: `FILE_NEW_TILESET` / `FILE_OPEN_TILESET`
-  - 出力: `FILE_EXPORT_TILESET`(PNG) / `FILE_EXPORT_CHIP`(PNG)
-  - チップ操作: `TILESET_COPY_CHIP / PASTE_CHIP / CLEAR_CHIP / SWAP_CHIP`
-  - 構造変更: `TILESET_ADD_ROW/COL / REMOVE_ROW/COL`
-  - 表示: `TILESET_TILE_PREVIEW` / `VIEW_PASS_FLAGS`
-- [x] 編集メニュー拡張
-  - `EDIT_ROTATE_CW` / `EDIT_ROTATE_CCW`（通常モード・タイルセットモード両対応）
-  - `EDIT_FLIP_H` / `EDIT_FLIP_V` は両モード対応済み
-
-### UI 拡張
-
-- [x] `EditablePalette32`（32色編集パレット）
-- [x] `ChipPalette` / `ChipPaletteWindow`（チップ一覧、選択・右クリック）
-- [x] `TilePreview` / `TilePreviewWindow`（選択チップの 3x3 / 5x5 繰り返し表示）
-- [x] `NewTilesetDialog` / `ImportTilesetDialog` / `QuarterViewTileDialog`
-- [x] `Generate > Quarter View Tile` メニュー接続
-
----
-
-## 2026-04-22 追記（選択ツール実装進捗）
-
-### 選択ツール Phase 1-4
-
-- [x] Phase 1: 矩形選択
-  - 矩形ドラッグで選択範囲を作成
-  - `Ctrl+A` / `EDIT_SELECT_ALL` で全選択
-  - `Escape` で選択解除
-- [x] Phase 2: コピー / 切り取り / 貼り付け
-  - `Ctrl+C / Ctrl+X / Ctrl+V` と編集メニューに接続
-  - 選択内容は `selectionClipboard` に `PixelData` として保持
-- [x] Phase 3: 浮動選択移動
-  - カット / 貼り付け後は浮動選択として表示
-  - `selectRect` ツールでドラッグ移動
-  - `Enter` で確定、`Escape` で取消
-  - 通常選択からのドラッグ開始でも浮動選択へ移行可能
-- [x] Phase 4: 選択範囲変形
-  - 浮動選択に対して左右反転 / 上下反転 / 90度回転を適用
-  - 変形後は `selection.w/h` と `floating.width/height` を同期
-
-### 未着手 / 残課題
-
-- [ ] Undo / Redo と選択ツールの統合
-- [ ] 選択操作のクラス分離 (`tool_select_rect.js` など)
-- [ ] 浮動選択プレビューの描画キャッシュ化
-- [ ] 複数チップ選択・一括編集への拡張
 
 ---
 

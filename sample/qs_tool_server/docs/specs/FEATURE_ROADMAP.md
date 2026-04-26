@@ -24,7 +24,7 @@
 
 詳細計画:
 
-1. [Undo / Redo 実装計画書](sample/qs_tool_server/UNDO_REDO_PLAN.md)
+1. [Undo / Redo 実装計画書](UNDO_REDO_PLAN.md)
 
 必要な内容:
 
@@ -39,7 +39,7 @@
 
 詳細計画:
 
-1. [選択ツール 実装計画書](sample/qs_tool_server/SELECTION_TOOL_PLAN.md)
+1. [選択ツール 実装計画書](SELECTION_TOOL_PLAN.md)
 
 必要な内容:
 
@@ -67,7 +67,7 @@
 
 詳細計画:
 
-1. [レイヤー操作 実装計画書](sample/qs_tool_server/LAYER_OPERATIONS_PLAN.md)
+1. [レイヤー操作 実装計画書](LAYER_OPERATIONS_PLAN.md)
 
 必要な内容:
 

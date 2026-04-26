@@ -7,7 +7,7 @@
 `sample/qs_tool_server` のレイヤー機能を、
 「最低限レイヤーがある状態」から「実務で使える状態」まで引き上げる。
 
-今回の対象は `FEATURE_ROADMAP.md` の次の5項目。
+今回の対象は `docs/specs/FEATURE_ROADMAP.md` の次の5項目。
 
 1. レイヤー名変更
 2. 不透明度スライダー
