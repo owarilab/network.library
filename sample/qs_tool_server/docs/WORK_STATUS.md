@@ -1,6 +1,6 @@
 # ドットエディタ 作業状況
 
-最終更新: 2026-04-26 (16)
+最終更新: 2026-04-26 (18)
 
 ## 概要
 
@@ -118,6 +118,9 @@ www/
 - [x] `TitleScene` / `ProjectTopScene` の最小導線
   - 起動時は `TitleScene` へ入り、`New Project` から `ProjectTopScene` へ遷移
   - `ProjectTopScene` から `EditorScene` を開くハブ導線を追加
+  - `TitleScene` から `.qsproj` のロード、`ProjectTopScene` から `.qsproj` の保存を追加
+  - `EditorScene` の `File > Exit` から `ProjectTopScene` へ戻る導線を追加
+  - `ProjectTopScene` に既存 asset 一覧表示と選択オープン導線を追加
 - [x] シーン切り替え直後の canvas 文字描画状態の補正
   - `MenuBar` 描画で `textAlign` / `textBaseline` を明示初期化
 
@@ -132,6 +135,9 @@ www/
   - `projectId / dirty / currentScene`
   - `activeDocumentRef`
   - `editorState` (`activeTool / foreColor / backColor / editMode / selectedChip`)
+- [x] `ProjectSerializer`:
+  - `.qsproj` JSON 形式で `ProjectData + ProjectSession` を保存/復元
+  - 画像アセット本体は `qts-base64` 埋め込みで保持
 
 ### データ層
 
@@ -204,9 +210,11 @@ www/
   - 既存ドット絵エディタをプロジェクト起点の1機能として接続
   - `ProjectTopScene` 経由で `EditorScene` を開く構成へ変更
   - 詳細計画: [PROJECT_SCENE_FLOW_PLAN.md](specs/PROJECT_SCENE_FLOW_PLAN.md)
-- [ ] **Project ロード / 保存導線**
-  - `TitleScene` の `Load Project` は未実装
-  - プロジェクト永続化形式は今後の作業
+- [x] **Project ロード / 保存導線**
+  - `TitleScene` の `Load Project` で `.qsproj` 読込
+  - `ProjectTopScene` の `Save Project` で `.qsproj` 書き出し
+  - `EditorScene` 入退場時に active asset を project へ同期
+  - `ProjectTopScene` の asset 一覧から復元済み asset を選択して確認可能
 
 #### ツール系
 
@@ -328,6 +336,7 @@ www/
   - 通常ドット絵は `1x1` タイルセットとして `.qts` 保存可能
   - `1x1` `.qts` 読込時は free mode の多レイヤー画像として復元
   - `SaveDialog` に free mode / tileset mode 別の QTS 説明文を追加
+  - `EditorScene` で開いた `.qts` は current project の asset として追加・管理
   - 1バイトピクセル（ColorID + passable）で量子化保存
   - 仕様書: [BINARY_FORMAT_PLAN.md](specs/BINARY_FORMAT_PLAN.md)
 - [ ] **通常ドット絵(JSON v1)のメタ情報拡張**

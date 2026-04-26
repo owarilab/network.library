@@ -413,6 +413,53 @@ class AppData {
   }
 
   /**
+   * tileset モード用の TilesetData を直接差し替える。
+   * @param {TilesetData} tilesetData
+   * @param {{ col?: number, row?: number }} [selectedChip]
+   * @returns {boolean}
+   */
+  setTilesetData(tilesetData, selectedChip = null) {
+    if (!tilesetData) return false;
+    this.tilesetData = this._cloneTilesetData(tilesetData);
+    this.editMode = 'tileset';
+    this.selectedChip = {
+      col: selectedChip?.col | 0,
+      row: selectedChip?.row | 0,
+    };
+    this.clearSelection();
+    this.syncEditorStateToProjectSession();
+    return true;
+  }
+
+  /**
+   * 現在編集中のアセットへ AppData の状態を保存する。
+   * @returns {boolean}
+   */
+  saveActiveProjectAssetState() {
+    const asset = this.getActiveProjectAsset();
+    if (!asset || !this.currentProject) return false;
+
+    if (asset.type === 'pixelDocument') {
+      asset.width = this._layerData.width;
+      asset.height = this._layerData.height;
+      asset.layerData = this._cloneLayerData(this._layerData);
+    } else if (asset.type === 'tileset' && this.tilesetData) {
+      asset.chipWidth = this.tilesetData.chipWidth;
+      asset.chipHeight = this.tilesetData.chipHeight;
+      asset.columns = this.tilesetData.columns;
+      asset.rows = this.tilesetData.rows;
+      asset.tilesetData = this._cloneTilesetData(this.tilesetData);
+    } else {
+      return false;
+    }
+
+    asset.palette = this.palette?.clone?.() || null;
+    this.currentProject.touch();
+    this.projectSession?.markDirty();
+    return true;
+  }
+
+  /**
    * レイヤーデータを指定サイズで初期化する（1レイヤー構成）。
    * 常に free モードの _layerData を初期化する。
    * @param {number} width

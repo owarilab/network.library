@@ -409,6 +409,35 @@ class PixelDataConverter {
   }
 
   /**
+   * ArrayBuffer を Base64 文字列へ変換する。
+   * @param {ArrayBuffer} buffer
+   * @returns {string}
+   */
+  static arrayBufferToBase64(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    const chunkSize = 8192;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+    }
+    return btoa(binary);
+  }
+
+  /**
+   * Base64 文字列を ArrayBuffer に戻す。
+   * @param {string} base64
+   * @returns {ArrayBuffer}
+   */
+  static base64ToArrayBuffer(base64) {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+  }
+
+  /**
    * 1x1 の TilesetData から単体画像用 LayerData を復元する。
    * @param {TilesetData} tilesetData
    * @returns {LayerData}
@@ -565,7 +594,7 @@ class PixelDataConverter {
    * @param {EditablePalette32} palette
    * @param {string}            [filename='tileset.qts']
    */
-  static exportTilesetAsQts(tilesetData, palette, filename = 'tileset.qts') {
+  static createQtsArrayBuffer(tilesetData, palette) {
     const { chipWidth, chipHeight, columns, rows } = tilesetData;
     const paletteColors = palette.getColors();
     const encoder = new TextEncoder();
@@ -644,6 +673,17 @@ class PixelDataConverter {
       }
     }
 
+    return buffer;
+  }
+
+  /**
+   * TilesetData + パレットを .qts バイナリとしてダウンロードする。
+   * @param {TilesetData}       tilesetData
+   * @param {EditablePalette32} palette
+   * @param {string}            [filename='tileset.qts']
+   */
+  static exportTilesetAsQts(tilesetData, palette, filename = 'tileset.qts') {
+    const buffer = PixelDataConverter.createQtsArrayBuffer(tilesetData, palette);
     const blob = new Blob([buffer], { type: 'application/octet-stream' });
     PixelDataConverter._downloadBlob(filename, blob);
   }
@@ -655,108 +695,101 @@ class PixelDataConverter {
    * @param {File} file
    * @returns {Promise<{ tilesetData: TilesetData, palette: EditablePalette32 }>}
    */
+  static parseQtsArrayBuffer(buffer) {
+    const bytes  = new Uint8Array(buffer);
+    const view   = new DataView(buffer);
+    let pos = 0;
+
+    if (bytes.length < 8 + 8 + 129) {
+      throw new Error('ファイルサイズが不正です');
+    }
+    if (bytes[0] !== 0x51 || bytes[1] !== 0x53 ||
+        bytes[2] !== 0x54 || bytes[3] !== 0x53) {
+      throw new Error('マジックナンバーが不正です (QSTS でない)');
+    }
+    pos = 8;
+
+    const chipWidth  = view.getUint16(pos, true); pos += 2;
+    const chipHeight = view.getUint16(pos, true); pos += 2;
+    const columns    = view.getUint16(pos, true); pos += 2;
+    const rows       = view.getUint16(pos, true); pos += 2;
+    if (chipWidth === 0 || chipHeight === 0 || columns === 0 || rows === 0) {
+      throw new Error('タイルセットメタ情報が不正です');
+    }
+
+    const paletteN = bytes[pos++];
+    const palette = new EditablePalette32();
+    const paletteColors = [];
+    for (let i = 0; i < 32; i++) {
+      const r = bytes[pos++];
+      const g = bytes[pos++];
+      const b = bytes[pos++];
+      const a = bytes[pos++];
+      const color = PixelData.rgba(r, g, b, a);
+      paletteColors.push(color);
+      if (i > 0 && i < paletteN) {
+        palette.setColor(i, color);
+      }
+    }
+
+    const decoder = new TextDecoder();
+    const td = new TilesetData(chipWidth, chipHeight, columns, rows);
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < columns; c++) {
+        if (pos >= bytes.length) {
+          throw new Error('ファイルが途中で終了しています');
+        }
+        const layerCount = bytes[pos++];
+        const layers = [];
+        let chipPassable = true;
+
+        for (let li = 0; li < layerCount; li++) {
+          const nameLen = view.getUint16(pos, true); pos += 2;
+          const name = nameLen > 0
+            ? decoder.decode(bytes.subarray(pos, pos + nameLen))
+            : '';
+          pos += nameLen;
+          const visible = bytes[pos++] === 1;
+          const opacity = bytes[pos++];
+
+          const pd = new PixelData();
+          pd.createPixelData(chipWidth, chipHeight);
+          let foundPassFlag = false;
+          for (let y = 0; y < chipHeight; y++) {
+            for (let x = 0; x < chipWidth; x++) {
+              const byteVal = bytes[pos++];
+              pd.setPixel(x, y, PixelDataConverter.expandPixel(byteVal, paletteColors));
+              if (li === 0 && !foundPassFlag && PixelDataConverter.PIXEL_COLOR_ID(byteVal) !== 0) {
+                chipPassable = PixelDataConverter.PIXEL_PASSABLE(byteVal) === 1;
+                foundPassFlag = true;
+              }
+            }
+          }
+
+          layers.push({ pixelData: pd, name, visible, opacity, locked: false });
+        }
+
+        if (layers.length > 0) {
+          const ld = td.chips[r][c];
+          ld.layers = layers;
+          ld.activeIndex = 0;
+          ld._composite.createPixelData(chipWidth, chipHeight);
+          ld._compositeDirty = true;
+        }
+        td.passFlags[r][c] = chipPassable;
+      }
+    }
+
+    return { tilesetData: td, palette };
+  }
+
   static importFromQts(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
-          const buffer = e.target.result;
-          const bytes  = new Uint8Array(buffer);
-          const view   = new DataView(buffer);
-          let pos = 0;
-
-          // --- ファイルヘッダ検証 ---
-          if (bytes.length < 8 + 8 + 129) {
-            reject(new Error('ファイルサイズが不正です')); return;
-          }
-          if (bytes[0] !== 0x51 || bytes[1] !== 0x53 ||
-              bytes[2] !== 0x54 || bytes[3] !== 0x53) {
-            reject(new Error('マジックナンバーが不正です (QSTS でない)')); return;
-          }
-          pos = 8; // ヘッダスキップ
-
-          // --- タイルセットメタ情報 ---
-          const chipWidth  = view.getUint16(pos, true); pos += 2;
-          const chipHeight = view.getUint16(pos, true); pos += 2;
-          const columns    = view.getUint16(pos, true); pos += 2;
-          const rows       = view.getUint16(pos, true); pos += 2;
-
-          if (chipWidth === 0 || chipHeight === 0 || columns === 0 || rows === 0) {
-            reject(new Error('タイルセットメタ情報が不正です')); return;
-          }
-
-          // --- パレットブロック ---
-          const paletteN = bytes[pos++];
-          const palette  = new EditablePalette32();
-          const paletteColors = [];
-          for (let i = 0; i < 32; i++) {
-            const r = bytes[pos++];
-            const g = bytes[pos++];
-            const b = bytes[pos++];
-            const a = bytes[pos++];
-            const color = PixelData.rgba(r, g, b, a);
-            paletteColors.push(color);
-            if (i > 0 && i < paletteN) {
-              palette.setColor(i, color);
-            }
-          }
-
-          // --- チップブロック ---
-          const decoder = new TextDecoder();
-          const td = new TilesetData(chipWidth, chipHeight, columns, rows);
-
-          for (let r = 0; r < rows; r++) {
-            for (let c = 0; c < columns; c++) {
-              if (pos >= bytes.length) {
-                reject(new Error('ファイルが途中で終了しています')); return;
-              }
-              const layerCount = bytes[pos++];
-              const layers = [];
-              let chipPassable = true; // 通過フラグ（最初のレイヤーのピクセルから判定）
-
-              for (let li = 0; li < layerCount; li++) {
-                // レイヤーメタ
-                const nameLen = view.getUint16(pos, true); pos += 2;
-                const name = nameLen > 0
-                  ? decoder.decode(bytes.subarray(pos, pos + nameLen))
-                  : '';
-                pos += nameLen;
-                const visible = bytes[pos++] === 1;
-                const opacity = bytes[pos++];
-
-                // ピクセルデータ (展開)
-                const pd = new PixelData();
-                pd.createPixelData(chipWidth, chipHeight);
-                let foundPassFlag = false;
-                for (let y = 0; y < chipHeight; y++) {
-                  for (let x = 0; x < chipWidth; x++) {
-                    const byteVal = bytes[pos++];
-                    pd.setPixel(x, y,
-                      PixelDataConverter.expandPixel(byteVal, paletteColors)
-                    );
-                    // 最初のレイヤーの最初の非透明ピクセルから通過フラグを取得
-                    if (li === 0 && !foundPassFlag && PixelDataConverter.PIXEL_COLOR_ID(byteVal) !== 0) {
-                      chipPassable = PixelDataConverter.PIXEL_PASSABLE(byteVal) === 1;
-                      foundPassFlag = true;
-                    }
-                  }
-                }
-
-                layers.push({ pixelData: pd, name, visible, opacity, locked: false });
-              }
-
-              if (layers.length > 0) {
-                const ld = td.chips[r][c];
-                ld.layers = layers;
-                ld.activeIndex = 0;
-                ld._composite.createPixelData(chipWidth, chipHeight);
-                ld._compositeDirty = true;
-              }
-              td.passFlags[r][c] = chipPassable;
-            }
-          }
-
-          resolve({ tilesetData: td, palette });
+          resolve(PixelDataConverter.parseQtsArrayBuffer(e.target.result));
         } catch (err) {
           reject(new Error(`QTS 解析エラー: ${err.message}`));
         }

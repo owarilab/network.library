@@ -282,6 +282,7 @@ class EditorScene extends Scene {
 
     // パレットを AppData に登録
     appData.palette = this._colorPaletteWin.getPalette();
+    this._restoreActiveProjectAsset(appData);
 
     // --- 隠し <input type="file"> を作成 ---
     this._fileInput = document.createElement('input');
@@ -312,12 +313,14 @@ class EditorScene extends Scene {
               this._appData.editMode = 'free';
               this._appData.tilesetData = null;
               this._appData.setLayerData(layerData);
+              this._registerImportedPixelDocument(file.name, layerData, this._appData.palette);
               console.log(`[EditorScene] single-chip QTS imported as free mode: ${file.name}`);
             } else {
               this._appData.tilesetData  = result.tilesetData;
               this._appData.editMode     = 'tileset';
               this._appData.selectedChip = { col: 0, row: 0 };
               this._appData.clearSelection();
+              this._registerImportedTileset(file.name, result.tilesetData, this._appData.palette);
               console.log(`[EditorScene] QTS imported: ${file.name}`);
             }
 
@@ -376,6 +379,7 @@ class EditorScene extends Scene {
               }
             }
             this._appData.palette = this._colorPaletteWin.getPalette();
+            this._registerImportedTileset(file.name, result.tilesetData, this._appData.palette);
             this._pixelCanvas.resetView();
             this._pixelCanvas.markDirty();
             console.log(`[EditorScene] QTS tileset opened: ${file.name}`);
@@ -440,6 +444,12 @@ class EditorScene extends Scene {
         } else {
           console.warn('[EditorScene] エクスポート: ファイルが作成されていません');
         }
+        return;
+      }
+      if (id === MenuConstants.FILE_EXIT) {
+        this._appData?.saveActiveProjectAssetState();
+        this._appData?.syncEditorStateToProjectSession();
+        this._appData?.changeScene(new ProjectTopScene());
         return;
       }
       if (id === MenuConstants.FILE_EXPORT_TILESET) {
@@ -853,6 +863,92 @@ class EditorScene extends Scene {
     input.on('touchend',    this._onTouchEnd);
     input.on('touchmove',   this._onTouchMove);
     input.on('touchcancel', this._onTouchCancel);
+  }
+
+  onLeave(input, appData) {
+    appData?.saveActiveProjectAssetState();
+    appData?.syncEditorStateToProjectSession();
+
+    if (this._fileInput?.parentNode) {
+      this._fileInput.parentNode.removeChild(this._fileInput);
+    }
+    if (this._tilesetFileInput?.parentNode) {
+      this._tilesetFileInput.parentNode.removeChild(this._tilesetFileInput);
+    }
+    this._fileInput = null;
+    this._tilesetFileInput = null;
+  }
+
+  _restoreActiveProjectAsset(appData) {
+    const asset = appData.getActiveProjectAsset();
+    if (!asset) return;
+
+    const paletteWin = this._colorPaletteWin.getPalette();
+    if (paletteWin instanceof EditablePalette32) {
+      paletteWin.resetToDefaults();
+      const colors = asset.palette?.getColors?.() || null;
+      if (Array.isArray(colors)) {
+        for (let i = 1; i < Math.min(colors.length, 32); i++) {
+          paletteWin.setColor(i, colors[i]);
+        }
+      }
+    }
+    appData.palette = paletteWin;
+
+    if (asset.type === 'pixelDocument') {
+      appData.editMode = 'free';
+      appData.tilesetData = null;
+      if (asset.layerData) {
+        appData.setLayerData(asset.layerData);
+      } else {
+        appData.createPixelData(asset.width | 0 || 32, asset.height | 0 || 32, 0x00000000);
+      }
+      return;
+    }
+
+    if (asset.type === 'tileset' && asset.tilesetData) {
+      const selectedChip = appData.projectSession?.editorState?.selectedChip || { col: 0, row: 0 };
+      appData.setTilesetData(asset.tilesetData, selectedChip);
+    }
+  }
+
+  _registerImportedPixelDocument(filename, layerData, palette) {
+    if (!this._appData?.currentProject || !this._appData.projectSession || !layerData) return;
+
+    this._appData.saveActiveProjectAssetState();
+    const asset = this._appData.currentProject.addPixelDocument({
+      name: this._basenameWithoutExtension(filename, 'untitled'),
+      width: layerData.width,
+      height: layerData.height,
+      layerData,
+    });
+    asset.palette = palette?.clone?.() || null;
+    this._appData.projectSession.setActiveDocument('pixelDocument', asset.id);
+    this._appData.projectSession.markDirty();
+    this._appData.syncEditorStateToProjectSession();
+  }
+
+  _registerImportedTileset(filename, tilesetData, palette) {
+    if (!this._appData?.currentProject || !this._appData.projectSession || !tilesetData) return;
+
+    this._appData.saveActiveProjectAssetState();
+    const asset = this._appData.currentProject.addTileset({
+      name: this._basenameWithoutExtension(filename, 'tileset'),
+      chipWidth: tilesetData.chipWidth,
+      chipHeight: tilesetData.chipHeight,
+      columns: tilesetData.columns,
+      rows: tilesetData.rows,
+      tilesetData,
+    });
+    asset.palette = palette?.clone?.() || null;
+    this._appData.projectSession.setActiveDocument('tileset', asset.id);
+    this._appData.projectSession.markDirty();
+    this._appData.syncEditorStateToProjectSession();
+  }
+
+  _basenameWithoutExtension(filename, fallback) {
+    if (typeof filename !== 'string' || !filename.trim()) return fallback;
+    return filename.replace(/\.[^.]+$/, '').trim() || fallback;
   }
 
   /**

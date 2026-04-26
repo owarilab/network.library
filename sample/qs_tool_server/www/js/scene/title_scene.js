@@ -8,14 +8,17 @@ class TitleScene extends Scene {
     this._buttons = [];
     this._hoverIndex = -1;
     this._appData = null;
+    this._fileInput = null;
 
     this._onMouseMove = this._onMouseMove.bind(this);
     this._onMouseDown = this._onMouseDown.bind(this);
     this._onKeyDown = this._onKeyDown.bind(this);
+    this._onFileChange = this._onFileChange.bind(this);
   }
 
   onEnter(input, appData) {
     this._appData = appData;
+    this._ensureFileInput();
     input.on('mousemove', this._onMouseMove);
     input.on('mousedown', this._onMouseDown);
     input.on('keydown', this._onKeyDown);
@@ -23,6 +26,7 @@ class TitleScene extends Scene {
 
   onLeave() {
     this._hoverIndex = -1;
+    this._disposeFileInput();
   }
 
   render(ctx, canvas, appData) {
@@ -54,7 +58,7 @@ class TitleScene extends Scene {
 
     ctx.fillStyle = '#64748b';
     ctx.font = '13px sans-serif';
-    ctx.fillText('Enter: New Project / Continue, L: Load (placeholder)', centerX, canvas.height - 40);
+    ctx.fillText('Enter: New Project / Continue, L: Load Project', centerX, canvas.height - 40);
   }
 
   _buildButtons(canvas, appData) {
@@ -80,9 +84,8 @@ class TitleScene extends Scene {
     }
 
     buttons.push({
-      label: 'Load Project (TODO)',
-      action: null,
-      disabled: true,
+      label: 'Load Project',
+      action: () => this._openProjectPicker(),
       rect: { x, y: startY + ((buttonH + gap) * (buttons.length)), w: buttonW, h: buttonH },
     });
 
@@ -129,6 +132,10 @@ class TitleScene extends Scene {
     }
     if (e.key === 'n' || e.key === 'N') {
       this._createNewProject();
+      return;
+    }
+    if (e.key === 'l' || e.key === 'L') {
+      this._openProjectPicker();
     }
   }
 
@@ -147,6 +154,40 @@ class TitleScene extends Scene {
     this._appData.projectSession.clearDirty();
     this._appData.syncEditorStateToProjectSession();
     this._appData.changeScene(new ProjectTopScene());
+  }
+
+  _ensureFileInput() {
+    if (this._fileInput) return;
+    this._fileInput = document.createElement('input');
+    this._fileInput.type = 'file';
+    this._fileInput.accept = '.qsproj,.json';
+    this._fileInput.style.display = 'none';
+    this._fileInput.addEventListener('change', this._onFileChange);
+    document.body.appendChild(this._fileInput);
+  }
+
+  _disposeFileInput() {
+    if (!this._fileInput) return;
+    this._fileInput.removeEventListener('change', this._onFileChange);
+    if (this._fileInput.parentNode) this._fileInput.parentNode.removeChild(this._fileInput);
+    this._fileInput = null;
+  }
+
+  _openProjectPicker() {
+    this._fileInput?.click();
+  }
+
+  _onFileChange() {
+    const file = this._fileInput?.files?.[0];
+    if (!file || !this._appData) return;
+    this._fileInput.value = '';
+    ProjectSerializer.importFromFile(file)
+      .then(({ project, session }) => {
+        this._appData.setCurrentProject(project, session);
+        this._appData.changeScene(new ProjectTopScene());
+        console.log(`[TitleScene] project loaded: ${file.name}`);
+      })
+      .catch(err => console.error('[TitleScene] project load error:', err.message));
   }
 
   _inRect(x, y, rect) {
