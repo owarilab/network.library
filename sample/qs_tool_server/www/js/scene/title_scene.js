@@ -332,7 +332,7 @@ class TitleScene extends Scene {
     ctx.fillText(item.project.name || 'Untitled Project', x + 12, y + 18);
 
     const counts = item.project.assetCounts || {};
-    const summary = `Pixel ${counts.pixelDocuments | 0} / Tileset ${counts.tilesets | 0}`;
+    const summary = `Pixel ${counts.pixelDocuments | 0} / Tileset ${counts.tilesets | 0} / Map ${counts.maps | 0}`;
     ctx.fillStyle = '#94a3b8';
     ctx.font = '12px sans-serif';
     ctx.fillText(summary, x + 12, y + 38);

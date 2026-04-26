@@ -85,6 +85,7 @@ www/
 - [クォータービュータイル自動生成 仕様書](specs/SPEC_quarter_view_tile.md)
 - [プロジェクト管理・シーン遷移基盤 計画書](specs/PROJECT_SCENE_FLOW_PLAN.md)
 - [ブラウザ保存（IndexedDB）最小設計書](specs/BROWSER_STORAGE_PLAN.md)
+- [マップエディタシーン実装計画書](specs/MAP_EDITOR_SCENE_PLAN.md)
 
 ---
 
@@ -126,8 +127,16 @@ www/
   - `ProjectTopScene` に既存 asset 一覧表示と選択オープン導線を追加
   - `TitleScene` に browser project 一覧表示・削除導線を追加
   - `ProjectTopScene` の保存導線を browser 保存 / `.qsproj` export に分離
+- [x] `MapEditorScene` の雛形追加
+  - `ProjectTopScene` から map asset を開けるように変更
+  - `UIWindow` ベースの `MapViewWindow` / `MapTilesetWindow` / `MapInspectorWindow` を追加
+  - 既存 tileset を選んでマップセルへ配置できる最小編集を追加
+  - `map` アセットの project 保存フローを `AppData.saveActiveProjectAssetState()` に接続
+  - 最小メニュー UI を `MapEditorMenuBar` として分離し、`保存` / `戻る` / `グリッド表示` を追加
+  - メニューバーはウィンドウ群より前面で描画するように調整
 - [x] シーン切り替え直後の canvas 文字描画状態の補正
   - `MenuBar` 描画で `textAlign` / `textBaseline` を明示初期化
+- [x] `TitleScene` の Browser Projects 一覧に `map` 件数表示を追加
 
 ### プロジェクト基盤
 
@@ -207,7 +216,8 @@ www/
   - ロード導線はプレースホルダ
 - [x] **プロジェクトトップシーン追加** (`js/scene/project_top_scene.js`)
   - ドット絵エディタや今後の派生シーンへの遷移ハブ
-  - `Map Editor` はプレースホルダ表示
+  - `Map Editor` から `MapEditorScene` の雛形を開ける
+  - 2 列ボタン配置とショートカット表示を追加し、`Open Map Editor` 導線を見つけやすく調整
 - [x] **Project / ProjectSession 導入** (`js/project/`)
   - シーン間で共有する編集対象と、一時状態を分離して管理
   - `AppData` と最小同期を接続済み

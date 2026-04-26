@@ -117,6 +117,12 @@ class AppData {
      * @type {{ pixelData: PixelData, width: number, height: number }|null}
      */
     this.selectionClipboard = null;
+
+    /**
+     * マップエディタで編集中のマップデータ。
+     * @type {object|null}
+     */
+    this.mapData = null;
   }
 
   /**
@@ -130,6 +136,7 @@ class AppData {
     this.currentProject = project || null;
     if (!project) {
       this.projectSession = null;
+      this.mapData = null;
       return null;
     }
 
@@ -432,6 +439,55 @@ class AppData {
   }
 
   /**
+   * マップデータを作成する。
+   * @param {number} width
+   * @param {number} height
+   * @param {number} [tileWidth]
+   * @param {number} [tileHeight]
+   * @param {string|null} [tilesetId=null]
+   * @returns {object}
+   */
+  createMapData(width, height, tileWidth = 0, tileHeight = 0, tilesetId = null) {
+    const mapW = width | 0;
+    const mapH = height | 0;
+    const tw = tileWidth | 0 || this.currentProject?.settings?.defaultChipWidth | 0 || 16;
+    const th = tileHeight | 0 || this.currentProject?.settings?.defaultChipHeight | 0 || 16;
+    return this._cloneMapData({
+      version: 1,
+      width: mapW > 0 ? mapW : 24,
+      height: mapH > 0 ? mapH : 18,
+      tileWidth: tw > 0 ? tw : 16,
+      tileHeight: th > 0 ? th : 16,
+      tilesetId: typeof tilesetId === 'string' && tilesetId ? tilesetId : null,
+      selectedLayer: 0,
+      selectedTileRef: null,
+      cursor: { x: 0, y: 0 },
+      view: {
+        showGrid: true,
+        zoom: 2,
+      },
+      layers: [{
+        id: 'layer_ground',
+        name: 'Ground',
+        visible: true,
+        locked: false,
+        tiles: new Array((mapW > 0 ? mapW : 24) * (mapH > 0 ? mapH : 18)).fill(-1),
+      }],
+    });
+  }
+
+  /**
+   * マップデータを現在の編集状態へ適用する。
+   * @param {object|null} mapData
+   * @returns {boolean}
+   */
+  setMapData(mapData) {
+    if (!mapData) return false;
+    this.mapData = this._cloneMapData(mapData);
+    return true;
+  }
+
+  /**
    * 現在編集中のアセットへ AppData の状態を保存する。
    * @returns {boolean}
    */
@@ -449,6 +505,10 @@ class AppData {
       asset.columns = this.tilesetData.columns;
       asset.rows = this.tilesetData.rows;
       asset.tilesetData = this._cloneTilesetData(this.tilesetData);
+    } else if (asset.type === 'map' && this.mapData) {
+      asset.width = this.mapData.width | 0;
+      asset.height = this.mapData.height | 0;
+      asset.mapData = this._cloneMapData(this.mapData);
     } else {
       return false;
     }
@@ -514,6 +574,64 @@ class AppData {
    */
   hasSelection() {
     return this.selection.active && this.selection.w > 0 && this.selection.h > 0;
+  }
+
+  /**
+   * @param {object|null} src
+   * @returns {object}
+   */
+  _cloneMapData(src) {
+    const width = src?.width | 0 || 24;
+    const height = src?.height | 0 || 18;
+    const tileWidth = src?.tileWidth | 0 || this.currentProject?.settings?.defaultChipWidth | 0 || 16;
+    const tileHeight = src?.tileHeight | 0 || this.currentProject?.settings?.defaultChipHeight | 0 || 16;
+    const fallbackLayer = [{
+      id: 'layer_ground',
+      name: 'Ground',
+      visible: true,
+      locked: false,
+      tiles: new Array(width * height).fill(-1),
+    }];
+    const srcLayers = Array.isArray(src?.layers) && src.layers.length ? src.layers : fallbackLayer;
+    const layers = srcLayers.map((layer, index) => {
+      const tiles = Array.isArray(layer?.tiles) ? layer.tiles.slice(0, width * height) : [];
+      while (tiles.length < width * height) tiles.push(-1);
+      return {
+        id: typeof layer?.id === 'string' && layer.id ? layer.id : `layer_${index + 1}`,
+        name: typeof layer?.name === 'string' && layer.name ? layer.name : `Layer ${index + 1}`,
+        visible: layer?.visible !== false,
+        locked: !!layer?.locked,
+        tiles,
+      };
+    });
+    const selectedLayer = Math.max(0, Math.min((src?.selectedLayer | 0), layers.length - 1));
+    const selectedTileRef = src?.selectedTileRef ? {
+      tilesetId: typeof src.selectedTileRef.tilesetId === 'string' && src.selectedTileRef.tilesetId
+        ? src.selectedTileRef.tilesetId
+        : null,
+      col: src.selectedTileRef.col | 0,
+      row: src.selectedTileRef.row | 0,
+      index: src.selectedTileRef.index | 0,
+    } : null;
+    return {
+      version: src?.version | 0 || 1,
+      width,
+      height,
+      tileWidth,
+      tileHeight,
+      tilesetId: typeof src?.tilesetId === 'string' && src.tilesetId ? src.tilesetId : null,
+      selectedLayer,
+      selectedTileRef,
+      cursor: {
+        x: src?.cursor?.x | 0,
+        y: src?.cursor?.y | 0,
+      },
+      view: {
+        showGrid: src?.view?.showGrid !== false,
+        zoom: Math.max(1, src?.view?.zoom | 0 || 2),
+      },
+      layers,
+    };
   }
 
   /**

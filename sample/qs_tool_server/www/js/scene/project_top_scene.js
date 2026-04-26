@@ -48,12 +48,17 @@ class ProjectTopScene extends Scene {
     ctx.font = '15px sans-serif';
     const docCount = project ? project.assets.pixelDocuments.length : 0;
     const tilesetCount = project ? project.assets.tilesets.length : 0;
-    ctx.fillText(`Pixel Docs: ${docCount}  /  Tilesets: ${tilesetCount}`, centerX, topY + 34);
+    const mapCount = project ? project.assets.maps.length : 0;
+    ctx.fillText(`Pixel Docs: ${docCount}  /  Tilesets: ${tilesetCount}  /  Maps: ${mapCount}`, centerX, topY + 34);
+
+    ctx.fillStyle = '#64748b';
+    ctx.font = '13px sans-serif';
+    ctx.fillText('Shortcut: Enter opens active asset / M opens map editor', centerX, topY + 84);
 
     if (this._statusMessage) {
       ctx.fillStyle = this._statusTone === 'error' ? '#fca5a5' : '#93c5fd';
       ctx.font = '13px sans-serif';
-      ctx.fillText(this._statusMessage, centerX, topY + 58);
+      ctx.fillText(this._statusMessage, centerX, topY + 106);
     }
 
     this._buttons = this._buildButtons(canvas);
@@ -66,44 +71,55 @@ class ProjectTopScene extends Scene {
   }
 
   _buildButtons(canvas) {
-    const buttonW = 320;
+    const buttonW = canvas.width >= 860 ? 240 : Math.min(320, canvas.width - 48);
     const buttonH = 52;
-    const gap = 16;
-    const startY = Math.max(170, canvas.height * 0.34);
-    const x = ((canvas.width - buttonW) / 2) | 0;
-    return [
+    const gapX = 16;
+    const gapY = 16;
+    const startY = Math.max(186, canvas.height * 0.3);
+    const defs = [
       {
         label: 'Open Active Asset',
         action: () => this._openDotEditor(),
-        rect: { x, y: startY, w: buttonW, h: buttonH },
       },
       {
         label: 'Save To Browser',
         action: () => this._saveProject(),
-        rect: { x, y: startY + buttonH + gap, w: buttonW, h: buttonH },
       },
       {
         label: 'Save As (Browser)',
         action: () => this._saveProjectAs(),
-        rect: { x, y: startY + (buttonH + gap) * 2, w: buttonW, h: buttonH },
       },
       {
         label: 'Export .qsproj',
         action: () => this._exportProject(),
-        rect: { x, y: startY + (buttonH + gap) * 3, w: buttonW, h: buttonH },
       },
       {
-        label: 'Map Editor (Coming Soon)',
-        action: null,
-        disabled: true,
-        rect: { x, y: startY + (buttonH + gap) * 4, w: buttonW, h: buttonH },
+        label: 'Open Map Editor',
+        action: () => this._openMapEditor(),
       },
       {
         label: 'Back to Title',
         action: () => this._appData?.changeScene(new TitleScene()),
-        rect: { x, y: startY + (buttonH + gap) * 5, w: buttonW, h: buttonH },
       },
     ];
+
+    const columns = canvas.width >= 860 ? 2 : 1;
+    const totalW = columns * buttonW + Math.max(0, columns - 1) * gapX;
+    const startX = ((canvas.width - totalW) / 2) | 0;
+
+    return defs.map((button, index) => {
+      const col = index % columns;
+      const row = (index / columns) | 0;
+      return {
+        ...button,
+        rect: {
+          x: startX + col * (buttonW + gapX),
+          y: startY + row * (buttonH + gapY),
+          w: buttonW,
+          h: buttonH,
+        },
+      };
+    });
   }
 
   _drawButton(ctx, button, hovered) {
@@ -159,7 +175,11 @@ class ProjectTopScene extends Scene {
 
   _drawAssetItem(ctx, item, hovered, isActive) {
     const { x, y, w, h } = item.rect;
-    const accent = item.asset.type === 'tileset' ? '#f59e0b' : '#22c55e';
+    const accent = item.asset.type === 'tileset'
+      ? '#f59e0b'
+      : item.asset.type === 'map'
+        ? '#38bdf8'
+        : '#22c55e';
 
     ctx.fillStyle = hovered ? '#132238' : '#0f172a';
     ctx.strokeStyle = isActive ? accent : hovered ? '#64748b' : '#334155';
@@ -173,7 +193,15 @@ class ProjectTopScene extends Scene {
     ctx.font = 'bold 12px sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText(item.asset.type === 'tileset' ? 'TILESET' : 'PIXEL DOC', x + 14, y + 16);
+    ctx.fillText(
+      item.asset.type === 'tileset'
+        ? 'TILESET'
+        : item.asset.type === 'map'
+          ? 'MAP'
+          : 'PIXEL DOC',
+      x + 14,
+      y + 16,
+    );
 
     ctx.fillStyle = '#f8fafc';
     ctx.font = 'bold 16px sans-serif';
@@ -219,6 +247,7 @@ class ProjectTopScene extends Scene {
     return [
       ...(project.assets.pixelDocuments || []),
       ...(project.assets.tilesets || []),
+      ...(project.assets.maps || []),
     ];
   }
 
@@ -227,14 +256,22 @@ class ProjectTopScene extends Scene {
     if (asset.type === 'tileset') {
       return `${asset.columns | 0}x${asset.rows | 0} chips / ${asset.chipWidth | 0}x${asset.chipHeight | 0}px`;
     }
+    if (asset.type === 'map') {
+      return `${asset.width | 0}x${asset.height | 0} cells`;
+    }
     return `${asset.width | 0}x${asset.height | 0}px`;
   }
 
   _getAssetPanelRect(canvas) {
+    const buttonBottom = this._buttons.reduce((maxY, button) => {
+      const bottom = button.rect.y + button.rect.h;
+      return bottom > maxY ? bottom : maxY;
+    }, Math.max(240, canvas.height * 0.3));
+    const top = buttonBottom + 24;
     const w = Math.min(560, canvas.width - 48);
-    const h = Math.min(320, Math.max(160, canvas.height - 420));
+    const h = Math.min(320, Math.max(120, canvas.height - top - 28));
     const x = ((canvas.width - w) / 2) | 0;
-    const y = Math.max(390, canvas.height - h - 36);
+    const y = Math.min(Math.max(top, 390), canvas.height - h - 28);
     return { x, y, w, h };
   }
 
@@ -261,6 +298,10 @@ class ProjectTopScene extends Scene {
       this._openDotEditor();
       return;
     }
+    if (e.key === 'm' || e.key === 'M') {
+      this._openMapEditor();
+      return;
+    }
     if (e.key === 's' || e.key === 'S') {
       this._saveProject();
       return;
@@ -274,6 +315,10 @@ class ProjectTopScene extends Scene {
     if (!this._appData?.currentProject || !this._appData.projectSession) return;
 
     let asset = this._appData.getActiveProjectAsset();
+    if (asset) {
+      this._openAsset(asset);
+      return;
+    }
     if (!asset) {
       asset = this._appData.currentProject.assets.pixelDocuments[0] || null;
     }
@@ -293,10 +338,51 @@ class ProjectTopScene extends Scene {
     this._openAsset(asset);
   }
 
+  _openMapEditor() {
+    if (!this._appData?.currentProject || !this._appData.projectSession) return;
+
+    let asset = this._appData.getActiveProjectAsset();
+    if (!asset || asset.type !== 'map') {
+      asset = this._appData.currentProject.assets.maps[0] || null;
+    }
+
+    if (!asset) {
+      const defaultTileset = this._appData.currentProject.assets.tilesets[0] || null;
+      const mapData = this._appData.createMapData(
+        24,
+        18,
+        defaultTileset?.chipWidth | 0,
+        defaultTileset?.chipHeight | 0,
+        defaultTileset?.id || null,
+      );
+      if (defaultTileset) {
+        mapData.selectedTileRef = {
+          tilesetId: defaultTileset.id,
+          col: 0,
+          row: 0,
+          index: 0,
+        };
+      }
+      asset = this._appData.currentProject.addMap({
+        name: `map_${this._appData.currentProject.assets.maps.length + 1}`,
+        width: mapData.width,
+        height: mapData.height,
+        mapData,
+      });
+      this._appData.projectSession.markDirty();
+    }
+
+    this._openAsset(asset);
+  }
+
   _openAsset(asset) {
     if (!asset || !this._appData?.projectSession) return;
     this._appData.projectSession.setActiveDocument(asset.type, asset.id);
     this._appData.syncEditorStateToProjectSession();
+    if (asset.type === 'map') {
+      this._appData.changeScene(new MapEditorScene());
+      return;
+    }
     this._appData.changeScene(new EditorScene());
   }
 
