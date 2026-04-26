@@ -186,6 +186,7 @@ www/
   - パレットの FG/BG スウォッチクリックでダイアログを開く
 - [x] **EditablePalette32** (`js/ui/editable_palette_32.js`)
   - 32色編集パレットとして tileset/workflow 向けに利用可能
+  - 仕様書: [BINARY_FORMAT_PLAN.md](specs/BINARY_FORMAT_PLAN.md)
 
 ---
 
@@ -259,6 +260,7 @@ www/
 - [x] **QTS バイナリ保存/読込** (`.qts`)
   - `exportTilesetAsQts()` / `importFromQts()` 実装
   - 1バイトピクセル（ColorID + passable）で量子化保存
+  - 仕様書: [BINARY_FORMAT_PLAN.md](specs/BINARY_FORMAT_PLAN.md)
 - [ ] **通常ドット絵(JSON v1)のメタ情報拡張**
 
 #### タイルセットモード
@@ -269,6 +271,7 @@ www/
   - 通過フラグ配列 `passFlags[row][col]`
   - `clearChip / copyChip / swapChips / cloneChipLayerData / pasteChipLayerData`
   - `addRow / addColumn / removeRow / removeColumn / resize`
+  - 仕様書: [BINARY_FORMAT_PLAN.md](specs/BINARY_FORMAT_PLAN.md)
 - [x] **`EditorScene` へのタイルセット統合**
   - 新規/読込: `FILE_NEW_TILESET` / `FILE_OPEN_TILESET`
   - 出力: `FILE_EXPORT_TILESET`(PNG) / `FILE_EXPORT_CHIP`(PNG)
