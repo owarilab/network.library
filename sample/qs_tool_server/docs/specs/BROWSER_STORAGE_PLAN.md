@@ -197,8 +197,8 @@ key:
 ## 保存単位
 
 - `Save Project` は「現在開いている project.id に対する上書き保存」とする
-- 別 project として保存したい場合は、新しい `project.id` を持つ project を作る
-- 最小実装では `Save As` はまだ作らない
+- `Save As` は新しい `project.id` と asset id 群を再発行して別 project として保存する
+- `Save As` 実行後は新しく保存した project を current project として扱う
 
 ## project の識別子
 

@@ -83,20 +83,25 @@ class ProjectTopScene extends Scene {
         rect: { x, y: startY + buttonH + gap, w: buttonW, h: buttonH },
       },
       {
+        label: 'Save As (Browser)',
+        action: () => this._saveProjectAs(),
+        rect: { x, y: startY + (buttonH + gap) * 2, w: buttonW, h: buttonH },
+      },
+      {
         label: 'Export .qsproj',
         action: () => this._exportProject(),
-        rect: { x, y: startY + (buttonH + gap) * 2, w: buttonW, h: buttonH },
+        rect: { x, y: startY + (buttonH + gap) * 3, w: buttonW, h: buttonH },
       },
       {
         label: 'Map Editor (Coming Soon)',
         action: null,
         disabled: true,
-        rect: { x, y: startY + (buttonH + gap) * 3, w: buttonW, h: buttonH },
+        rect: { x, y: startY + (buttonH + gap) * 4, w: buttonW, h: buttonH },
       },
       {
         label: 'Back to Title',
         action: () => this._appData?.changeScene(new TitleScene()),
-        rect: { x, y: startY + (buttonH + gap) * 4, w: buttonW, h: buttonH },
+        rect: { x, y: startY + (buttonH + gap) * 5, w: buttonW, h: buttonH },
       },
     ];
   }
@@ -314,6 +319,39 @@ class ProjectTopScene extends Scene {
         this._statusTone = 'error';
         this._statusMessage = err?.message || 'Browser save failed';
         console.error('[ProjectTopScene] browser save error:', err?.message || err);
+      });
+  }
+
+  _saveProjectAs() {
+    if (!this._appData?.currentProject || !this._appData.projectSession) return;
+
+    const suggestedName = `${this._appData.currentProject.name || 'Project'} Copy`;
+    const nextName = window.prompt('Save As project name', suggestedName);
+    if (nextName == null) return;
+    if (!nextName.trim()) {
+      this._statusTone = 'error';
+      this._statusMessage = 'Project name is required';
+      return;
+    }
+
+    this._appData.saveActiveProjectAssetState();
+    this._appData.syncEditorStateToProjectSession();
+    ProjectBrowserStorage.saveProjectAs(
+      this._appData.currentProject,
+      this._appData.projectSession,
+      nextName,
+      this._appData.palette,
+    )
+      .then(({ project, session }) => {
+        this._appData.setCurrentProject(project, session);
+        this._statusTone = 'info';
+        this._statusMessage = `Saved As: ${project.name}`;
+        console.log(`[ProjectTopScene] project saved as: ${project.name}`);
+      })
+      .catch(err => {
+        this._statusTone = 'error';
+        this._statusMessage = err?.message || 'Save As failed';
+        console.error('[ProjectTopScene] browser save as error:', err?.message || err);
       });
   }
 

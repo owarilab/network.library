@@ -75,6 +75,14 @@ class ProjectBrowserStorage {
     return projectRecord.id;
   }
 
+  static async saveProjectAs(project, session, newProjectName, fallbackPalette = null) {
+    if (!project) throw new Error('ProjectData がありません');
+    const next = ProjectBrowserStorage._createSaveAsCopy(project, session, newProjectName, fallbackPalette);
+    await ProjectBrowserStorage.saveProject(next.project, next.session, fallbackPalette);
+    next.session.clearDirty();
+    return next;
+  }
+
   static async loadProject(projectId) {
     if (typeof projectId !== 'string' || !projectId.trim()) {
       throw new Error('projectId が不正です');
@@ -159,6 +167,43 @@ class ProjectBrowserStorage {
       ...(project.assets?.tilesets || []),
       ...(project.assets?.maps || []),
     ];
+  }
+
+  static _createSaveAsCopy(project, session, newProjectName, fallbackPalette) {
+    const cloned = ProjectSerializer.deserialize(
+      ProjectSerializer.serialize(project, session, fallbackPalette)
+    );
+    const nextProject = cloned.project;
+    const nextSession = cloned.session;
+    const now = Date.now();
+    const activeRef = nextSession.activeDocumentRef || { type: null, id: null };
+
+    nextProject.id = ProjectBrowserStorage._createId('proj');
+    nextProject.name = typeof newProjectName === 'string' && newProjectName.trim()
+      ? newProjectName.trim()
+      : `${project.name || 'Project'} Copy`;
+    nextProject.createdAt = now;
+    nextProject.updatedAt = now;
+
+    ProjectBrowserStorage._reassignAssetIds(nextProject.assets.pixelDocuments || [], 'px', activeRef);
+    ProjectBrowserStorage._reassignAssetIds(nextProject.assets.tilesets || [], 'ts', activeRef);
+    ProjectBrowserStorage._reassignAssetIds(nextProject.assets.maps || [], 'map', activeRef);
+
+    nextSession.projectId = nextProject.id;
+    nextSession.dirty = false;
+    nextSession.currentScene = nextSession.currentScene || 'ProjectTopScene';
+    return { project: nextProject, session: nextSession };
+  }
+
+  static _reassignAssetIds(assets, prefix, activeRef) {
+    for (let i = 0; i < assets.length; i++) {
+      const oldId = assets[i].id;
+      const newId = ProjectBrowserStorage._createId(prefix);
+      assets[i].id = newId;
+      if (activeRef?.id === oldId) {
+        activeRef.id = newId;
+      }
+    }
   }
 
   static _serializeProjectRecord(project, assets) {
@@ -402,5 +447,9 @@ class ProjectBrowserStorage {
 
   static _normalizeTimestamp(value, fallback = 0) {
     return Number.isFinite(value) && value > 0 ? Number(value) : fallback;
+  }
+
+  static _createId(prefix) {
+    return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
   }
 }

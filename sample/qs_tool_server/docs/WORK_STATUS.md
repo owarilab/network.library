@@ -1,6 +1,6 @@
 # ドットエディタ 作業状況
 
-最終更新: 2026-04-26 (19)
+最終更新: 2026-04-26 (21)
 
 ## 概要
 
@@ -356,8 +356,10 @@ www/
   - `ProjectBrowserStorage` を追加し、save/load/list/delete の最小実装を接続
   - `TitleScene` から browser project 一覧表示・読込・削除を実行可能
   - `ProjectTopScene` から browser 保存、`.qsproj` export を実行可能
+  - `ProjectTopScene` から `Save As (Browser)` で別 project として複製保存可能
   - browser 保存した project の asset / session 復元を確認済み
-  - 未対応: `Save As`、一覧のスクロール/ページング、recent projects の整備
+  - browser project の削除、`Save As` による複製保存を確認済み
+  - 未対応: 一覧のスクロール/ページング、recent projects の整備
 
 - [x] **新規作成 asset の project 追加**
   - `EditorScene` の `File > New` で作成した `pixelDocument` を current project に追加
