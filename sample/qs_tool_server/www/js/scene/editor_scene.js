@@ -43,12 +43,14 @@ class EditorScene extends Scene {
         const fillColor = bgColor === 'white'
           ? PixelData.rgba(255, 255, 255, 255)
           : 0x00000000;
+        this._appData.saveActiveProjectAssetState();
         this._appData.history.execute(new NewFileCommand({
           width,
           height,
           fillColor,
           label: 'newFile',
         }), this._appData);
+        this._createProjectPixelDocument(`untitled_${width}x${height}`);
         this._pixelCanvas.resetView();
         this._pixelCanvas.markDirty();
         console.log(`[EditorScene] new file: ${width}x${height} bg=${bgColor}`);
@@ -63,10 +65,12 @@ class EditorScene extends Scene {
         const fillColor = bgColor === 'white'
           ? PixelData.rgba(255, 255, 255, 255)
           : 0x00000000;
+        this._appData.saveActiveProjectAssetState();
         this._appData.tilesetData  = new TilesetData(chipW, chipH, cols, rows, fillColor);
         this._appData.editMode     = 'tileset';
         this._appData.selectedChip = { col: 0, row: 0 };
         this._appData.clearSelection();
+        this._createProjectTileset(`tileset_${chipW}x${chipH}_${cols}x${rows}`);
         this._pixelCanvas.resetView();
         this._pixelCanvas.markDirty();
         console.log(`[EditorScene] new tileset: ${chipW}x${chipH} chip, ${cols}x${rows} grid, bg=${bgColor}`);
@@ -924,6 +928,40 @@ class EditorScene extends Scene {
     });
     asset.palette = palette?.clone?.() || null;
     this._appData.projectSession.setActiveDocument('pixelDocument', asset.id);
+    this._appData.projectSession.markDirty();
+    this._appData.syncEditorStateToProjectSession();
+  }
+
+  _createProjectPixelDocument(name) {
+    if (!this._appData?.currentProject || !this._appData.projectSession) return;
+
+    const layerData = this._appData.createEditStateSnapshot().layerData;
+    const asset = this._appData.currentProject.addPixelDocument({
+      name: this._basenameWithoutExtension(name, 'untitled'),
+      width: layerData.width,
+      height: layerData.height,
+      layerData,
+    });
+    asset.palette = this._appData.palette?.clone?.() || null;
+    this._appData.projectSession.setActiveDocument('pixelDocument', asset.id);
+    this._appData.projectSession.markDirty();
+    this._appData.syncEditorStateToProjectSession();
+  }
+
+  _createProjectTileset(name) {
+    if (!this._appData?.currentProject || !this._appData.projectSession || !this._appData.tilesetData) return;
+
+    const tilesetData = this._appData.tilesetData;
+    const asset = this._appData.currentProject.addTileset({
+      name: this._basenameWithoutExtension(name, 'tileset'),
+      chipWidth: tilesetData.chipWidth,
+      chipHeight: tilesetData.chipHeight,
+      columns: tilesetData.columns,
+      rows: tilesetData.rows,
+      tilesetData,
+    });
+    asset.palette = this._appData.palette?.clone?.() || null;
+    this._appData.projectSession.setActiveDocument('tileset', asset.id);
     this._appData.projectSession.markDirty();
     this._appData.syncEditorStateToProjectSession();
   }

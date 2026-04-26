@@ -9,6 +9,12 @@ class TitleScene extends Scene {
     this._hoverIndex = -1;
     this._appData = null;
     this._fileInput = null;
+    this._browserProjects = [];
+    this._browserProjectItems = [];
+    this._hoverBrowserProjectIndex = -1;
+    this._hoverBrowserProjectDeleteIndex = -1;
+    this._statusMessage = '';
+    this._statusTone = 'muted';
 
     this._onMouseMove = this._onMouseMove.bind(this);
     this._onMouseDown = this._onMouseDown.bind(this);
@@ -19,6 +25,7 @@ class TitleScene extends Scene {
   onEnter(input, appData) {
     this._appData = appData;
     this._ensureFileInput();
+    this._refreshBrowserProjects();
     input.on('mousemove', this._onMouseMove);
     input.on('mousedown', this._onMouseDown);
     input.on('keydown', this._onKeyDown);
@@ -26,6 +33,8 @@ class TitleScene extends Scene {
 
   onLeave() {
     this._hoverIndex = -1;
+    this._hoverBrowserProjectIndex = -1;
+    this._hoverBrowserProjectDeleteIndex = -1;
     this._disposeFileInput();
   }
 
@@ -51,10 +60,19 @@ class TitleScene extends Scene {
     ctx.font = '15px sans-serif';
     ctx.fillText(`Current Project: ${projectName}`, centerX, topY + 78);
 
+    if (this._statusMessage) {
+      ctx.fillStyle = this._statusTone === 'error' ? '#fca5a5' : '#93c5fd';
+      ctx.font = '13px sans-serif';
+      ctx.fillText(this._statusMessage, centerX, topY + 104);
+    }
+
     this._buttons = this._buildButtons(canvas, appData);
     for (let index = 0; index < this._buttons.length; index++) {
       this._drawButton(ctx, this._buttons[index], index === this._hoverIndex);
     }
+
+    this._browserProjectItems = this._buildBrowserProjectItems(canvas);
+    this._drawBrowserProjectSection(ctx, canvas);
 
     ctx.fillStyle = '#64748b';
     ctx.font = '13px sans-serif';
@@ -89,6 +107,13 @@ class TitleScene extends Scene {
       rect: { x, y: startY + ((buttonH + gap) * (buttons.length)), w: buttonW, h: buttonH },
     });
 
+    buttons.push({
+      label: 'Open Browser Project',
+      action: null,
+      disabled: this._browserProjects.length === 0,
+      rect: { x, y: startY + ((buttonH + gap) * (buttons.length)), w: buttonW, h: buttonH },
+    });
+
     return buttons;
   }
 
@@ -112,13 +137,27 @@ class TitleScene extends Scene {
 
   _onMouseMove(e) {
     this._hoverIndex = this._buttons.findIndex(button => this._inRect(e.x, e.y, button.rect));
+    this._hoverBrowserProjectIndex = this._browserProjectItems.findIndex(item => this._inRect(e.x, e.y, item.rect));
+    this._hoverBrowserProjectDeleteIndex = this._browserProjectItems.findIndex(item => this._inRect(e.x, e.y, item.deleteRect));
   }
 
   _onMouseDown(e) {
     if (e.button !== 0) return;
     const button = this._buttons.find(item => this._inRect(e.x, e.y, item.rect));
-    if (!button || button.disabled || !button.action) return;
-    button.action();
+    if (button && !button.disabled && button.action) {
+      button.action();
+      return;
+    }
+
+    const deleteItem = this._browserProjectItems.find(item => this._inRect(e.x, e.y, item.deleteRect));
+    if (deleteItem) {
+      this._deleteBrowserProject(deleteItem.project.id, deleteItem.project.name);
+      return;
+    }
+
+    const browserItem = this._browserProjectItems.find(item => this._inRect(e.x, e.y, item.rect));
+    if (!browserItem) return;
+    this._openBrowserProject(browserItem.project.id);
   }
 
   _onKeyDown(e) {
@@ -188,6 +227,195 @@ class TitleScene extends Scene {
         console.log(`[TitleScene] project loaded: ${file.name}`);
       })
       .catch(err => console.error('[TitleScene] project load error:', err.message));
+  }
+
+  _refreshBrowserProjects() {
+    if (!ProjectBrowserStorage.isAvailable()) {
+      this._browserProjects = [];
+      this._statusTone = 'error';
+      this._statusMessage = 'IndexedDB unavailable';
+      return;
+    }
+
+    ProjectBrowserStorage.listProjects()
+      .then(rows => {
+        this._browserProjects = rows;
+        if (!rows.length) {
+          this._statusTone = 'muted';
+          this._statusMessage = '';
+          return;
+        }
+        this._statusTone = 'info';
+        this._statusMessage = `${rows.length} browser project(s) available`;
+      })
+      .catch(err => {
+        this._browserProjects = [];
+        this._statusTone = 'error';
+        this._statusMessage = err?.message || 'Browser projects load failed';
+        console.error('[TitleScene] browser project list error:', err?.message || err);
+      });
+  }
+
+  _buildBrowserProjectItems(canvas) {
+    const panel = this._getBrowserPanelRect(canvas);
+    const itemH = 56;
+    const itemGap = 10;
+    const topPad = 42;
+    const leftPad = 14;
+    const rightPad = 14;
+    const maxRows = Math.max(1, Math.floor((panel.h - topPad - 12 + itemGap) / (itemH + itemGap)));
+    const visible = this._browserProjects.slice(0, maxRows);
+    return visible.map((project, index) => ({
+      project,
+      rect: {
+        x: panel.x + leftPad,
+        y: panel.y + topPad + (itemH + itemGap) * index,
+        w: panel.w - leftPad - rightPad,
+        h: itemH,
+      },
+      deleteRect: {
+        x: panel.x + panel.w - rightPad - 72,
+        y: panel.y + topPad + (itemH + itemGap) * index + 12,
+        w: 60,
+        h: 24,
+      },
+    }));
+  }
+
+  _drawBrowserProjectSection(ctx, canvas) {
+    const panel = this._getBrowserPanelRect(canvas);
+    ctx.fillStyle = '#0f172a';
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(panel.x, panel.y, panel.w, panel.h, 14);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#e2e8f0';
+    ctx.font = 'bold 18px sans-serif';
+    ctx.fillText('Browser Projects', panel.x + 18, panel.y + 24);
+
+    if (!this._browserProjectItems.length) {
+      ctx.fillStyle = '#64748b';
+      ctx.font = '13px sans-serif';
+      ctx.fillText('No saved browser projects yet.', panel.x + 18, panel.y + 54);
+      return;
+    }
+
+    for (let i = 0; i < this._browserProjectItems.length; i++) {
+      this._drawBrowserProjectItem(
+        ctx,
+        this._browserProjectItems[i],
+        i === this._hoverBrowserProjectIndex,
+        i === this._hoverBrowserProjectDeleteIndex,
+      );
+    }
+  }
+
+  _drawBrowserProjectItem(ctx, item, hovered, deleteHovered) {
+    const { x, y, w, h } = item.rect;
+    ctx.fillStyle = hovered ? '#132238' : '#111827';
+    ctx.strokeStyle = hovered ? '#60a5fa' : '#334155';
+    ctx.lineWidth = hovered ? 2 : 1.5;
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 10);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.fillText(item.project.name || 'Untitled Project', x + 12, y + 18);
+
+    const counts = item.project.assetCounts || {};
+    const summary = `Pixel ${counts.pixelDocuments | 0} / Tileset ${counts.tilesets | 0}`;
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '12px sans-serif';
+    ctx.fillText(summary, x + 12, y + 38);
+
+    const dateLabel = this._formatTimestamp(item.project.updatedAt);
+    ctx.textAlign = 'right';
+    ctx.fillText(dateLabel, x + w - 12, y + 18);
+
+    const dr = item.deleteRect;
+    ctx.fillStyle = deleteHovered ? '#dc2626' : '#7f1d1d';
+    ctx.strokeStyle = deleteHovered ? '#fca5a5' : '#ef4444';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(dr.x, dr.y, dr.w, dr.h, 8);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fee2e2';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillText('Delete', dr.x + dr.w / 2, dr.y + dr.h / 2 + 1);
+  }
+
+  _openBrowserProject(projectId) {
+    if (!this._appData) return;
+    ProjectBrowserStorage.loadProject(projectId)
+      .then(({ project, session }) => {
+        this._appData.setCurrentProject(project, session);
+        window.localStorage?.setItem?.('qs_tool_server.lastOpenedProjectId', project.id);
+        this._appData.changeScene(new ProjectTopScene());
+        console.log(`[TitleScene] browser project loaded: ${project.name}`);
+      })
+      .catch(err => {
+        this._statusTone = 'error';
+        this._statusMessage = err?.message || 'Browser project load failed';
+        console.error('[TitleScene] browser project load error:', err?.message || err);
+      });
+  }
+
+  _deleteBrowserProject(projectId, projectName) {
+    const label = projectName || 'Untitled Project';
+    if (!window.confirm(`Delete browser project \"${label}\"?`)) return;
+
+    ProjectBrowserStorage.deleteProject(projectId)
+      .then(() => {
+        if (window.localStorage?.getItem?.('qs_tool_server.lastOpenedProjectId') === projectId) {
+          window.localStorage.removeItem('qs_tool_server.lastOpenedProjectId');
+        }
+        this._statusTone = 'info';
+        this._statusMessage = `Deleted browser project: ${label}`;
+        this._refreshBrowserProjects();
+        console.log(`[TitleScene] browser project deleted: ${label}`);
+      })
+      .catch(err => {
+        this._statusTone = 'error';
+        this._statusMessage = err?.message || 'Browser project delete failed';
+        console.error('[TitleScene] browser project delete error:', err?.message || err);
+      });
+  }
+
+  _getBrowserPanelRect(canvas) {
+    const w = Math.min(620, canvas.width - 48);
+    const h = Math.min(250, Math.max(140, canvas.height - 470));
+    const x = ((canvas.width - w) / 2) | 0;
+    const y = Math.max(430, canvas.height - h - 32);
+    return { x, y, w, h };
+  }
+
+  _formatTimestamp(timestamp) {
+    const value = Number(timestamp);
+    if (!value) return '-';
+    try {
+      const date = new Date(value);
+      const yyyy = date.getFullYear();
+      const mm = `${date.getMonth() + 1}`.padStart(2, '0');
+      const dd = `${date.getDate()}`.padStart(2, '0');
+      const hh = `${date.getHours()}`.padStart(2, '0');
+      const mi = `${date.getMinutes()}`.padStart(2, '0');
+      return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
+    } catch {
+      return '-';
+    }
   }
 
   _inRect(x, y, rect) {

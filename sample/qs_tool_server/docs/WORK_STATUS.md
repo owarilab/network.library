@@ -1,6 +1,6 @@
 # ドットエディタ 作業状況
 
-最終更新: 2026-04-26 (18)
+最終更新: 2026-04-26 (19)
 
 ## 概要
 
@@ -19,6 +19,7 @@ docs/
 ├── WORK_STATUS.md                 # 現在の実装状況
 └── specs/
   ├── BINARY_FORMAT_PLAN.md        # QTS バイナリ形式の実装計画
+  ├── BROWSER_STORAGE_PLAN.md      # IndexedDB を使ったブラウザ保存の最小設計
   ├── FEATURE_ROADMAP.md           # 今後の機能ロードマップ
   ├── LAYER_OPERATIONS_PLAN.md     # レイヤー操作拡張の計画
   ├── MAP_CHIP_SPEC.md             # マップチップエディタ仕様書
@@ -42,7 +43,8 @@ www/
     ├── scene_manager.js            # SceneManager: アクティブシーン管理・切り替え
     ├── project/
     │   ├── project_data.js         # ProjectData: 保存対象のプロジェクト最小ルート
-    │   └── project_session.js      # ProjectSession: シーン間の一時編集状態
+    │   ├── project_session.js      # ProjectSession: シーン間の一時編集状態
+    │   └── project_browser_storage.js # ProjectBrowserStorage: IndexedDB 保存層
     ├── scene/
     │   ├── scene.js                # Scene: 基底クラス
     │   ├── title_scene.js          # TitleScene: 起動時の入口
@@ -82,6 +84,7 @@ www/
 
 - [クォータービュータイル自動生成 仕様書](specs/SPEC_quarter_view_tile.md)
 - [プロジェクト管理・シーン遷移基盤 計画書](specs/PROJECT_SCENE_FLOW_PLAN.md)
+- [ブラウザ保存（IndexedDB）最小設計書](specs/BROWSER_STORAGE_PLAN.md)
 
 ---
 
@@ -121,6 +124,8 @@ www/
   - `TitleScene` から `.qsproj` のロード、`ProjectTopScene` から `.qsproj` の保存を追加
   - `EditorScene` の `File > Exit` から `ProjectTopScene` へ戻る導線を追加
   - `ProjectTopScene` に既存 asset 一覧表示と選択オープン導線を追加
+  - `TitleScene` に browser project 一覧表示・削除導線を追加
+  - `ProjectTopScene` の保存導線を browser 保存 / `.qsproj` export に分離
 - [x] シーン切り替え直後の canvas 文字描画状態の補正
   - `MenuBar` 描画で `textAlign` / `textBaseline` を明示初期化
 
@@ -212,7 +217,7 @@ www/
   - 詳細計画: [PROJECT_SCENE_FLOW_PLAN.md](specs/PROJECT_SCENE_FLOW_PLAN.md)
 - [x] **Project ロード / 保存導線**
   - `TitleScene` の `Load Project` で `.qsproj` 読込
-  - `ProjectTopScene` の `Save Project` で `.qsproj` 書き出し
+  - `ProjectTopScene` から browser 保存と `.qsproj` export を実行可能
   - `EditorScene` 入退場時に active asset を project へ同期
   - `ProjectTopScene` の asset 一覧から復元済み asset を選択して確認可能
 
@@ -340,6 +345,24 @@ www/
   - 1バイトピクセル（ColorID + passable）で量子化保存
   - 仕様書: [BINARY_FORMAT_PLAN.md](specs/BINARY_FORMAT_PLAN.md)
 - [ ] **通常ドット絵(JSON v1)のメタ情報拡張**
+
+#### プロジェクト永続化
+
+- [ ] **ブラウザ保存 (IndexedDB)**
+  - `.qsproj` の外部 import/export とは別に browser 内へ project を保存
+  - `IndexedDB` に `projects / project_sessions / assets` を分割保存
+  - asset 本体は `qts-base64` 文字列ではなく `ArrayBuffer` ベースで保持
+  - 最小設計: [BROWSER_STORAGE_PLAN.md](specs/BROWSER_STORAGE_PLAN.md)
+  - `ProjectBrowserStorage` を追加し、save/load/list/delete の最小実装を接続
+  - `TitleScene` から browser project 一覧表示・読込・削除を実行可能
+  - `ProjectTopScene` から browser 保存、`.qsproj` export を実行可能
+  - browser 保存した project の asset / session 復元を確認済み
+  - 未対応: `Save As`、一覧のスクロール/ページング、recent projects の整備
+
+- [x] **新規作成 asset の project 追加**
+  - `EditorScene` の `File > New` で作成した `pixelDocument` を current project に追加
+  - `EditorScene` の `File > New Tileset` で作成した `tileset` を current project に追加
+  - 新規作成前の active asset は project へ保存し、新規 asset を activeDocument に切替
 
 #### タイルセットモード
 

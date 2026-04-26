@@ -10,6 +10,8 @@ class ProjectTopScene extends Scene {
     this._assetItems = [];
     this._hoverAssetIndex = -1;
     this._appData = null;
+    this._statusMessage = '';
+    this._statusTone = 'muted';
 
     this._onMouseMove = this._onMouseMove.bind(this);
     this._onMouseDown = this._onMouseDown.bind(this);
@@ -48,6 +50,12 @@ class ProjectTopScene extends Scene {
     const tilesetCount = project ? project.assets.tilesets.length : 0;
     ctx.fillText(`Pixel Docs: ${docCount}  /  Tilesets: ${tilesetCount}`, centerX, topY + 34);
 
+    if (this._statusMessage) {
+      ctx.fillStyle = this._statusTone === 'error' ? '#fca5a5' : '#93c5fd';
+      ctx.font = '13px sans-serif';
+      ctx.fillText(this._statusMessage, centerX, topY + 58);
+    }
+
     this._buttons = this._buildButtons(canvas);
     for (let index = 0; index < this._buttons.length; index++) {
       this._drawButton(ctx, this._buttons[index], index === this._hoverIndex);
@@ -70,20 +78,25 @@ class ProjectTopScene extends Scene {
         rect: { x, y: startY, w: buttonW, h: buttonH },
       },
       {
-        label: 'Save Project',
+        label: 'Save To Browser',
         action: () => this._saveProject(),
         rect: { x, y: startY + buttonH + gap, w: buttonW, h: buttonH },
+      },
+      {
+        label: 'Export .qsproj',
+        action: () => this._exportProject(),
+        rect: { x, y: startY + (buttonH + gap) * 2, w: buttonW, h: buttonH },
       },
       {
         label: 'Map Editor (Coming Soon)',
         action: null,
         disabled: true,
-        rect: { x, y: startY + (buttonH + gap) * 2, w: buttonW, h: buttonH },
+        rect: { x, y: startY + (buttonH + gap) * 3, w: buttonW, h: buttonH },
       },
       {
         label: 'Back to Title',
         action: () => this._appData?.changeScene(new TitleScene()),
-        rect: { x, y: startY + (buttonH + gap) * 3, w: buttonW, h: buttonH },
+        rect: { x, y: startY + (buttonH + gap) * 4, w: buttonW, h: buttonH },
       },
     ];
   }
@@ -286,7 +299,28 @@ class ProjectTopScene extends Scene {
     if (!this._appData?.currentProject) return;
     this._appData.saveActiveProjectAssetState();
     this._appData.syncEditorStateToProjectSession();
-    this._appData.projectSession?.clearDirty();
+    ProjectBrowserStorage.saveProject(
+      this._appData.currentProject,
+      this._appData.projectSession,
+      this._appData.palette,
+    )
+      .then(() => {
+        this._appData.projectSession?.clearDirty();
+        this._statusTone = 'info';
+        this._statusMessage = 'Saved to browser storage';
+        console.log('[ProjectTopScene] project saved to browser storage');
+      })
+      .catch(err => {
+        this._statusTone = 'error';
+        this._statusMessage = err?.message || 'Browser save failed';
+        console.error('[ProjectTopScene] browser save error:', err?.message || err);
+      });
+  }
+
+  _exportProject() {
+    if (!this._appData?.currentProject) return;
+    this._appData.saveActiveProjectAssetState();
+    this._appData.syncEditorStateToProjectSession();
     const safeName = (this._appData.currentProject.name || 'project')
       .trim()
       .replace(/[\\/:*?"<>|]+/g, '_')
@@ -297,7 +331,9 @@ class ProjectTopScene extends Scene {
       `${safeName || 'project'}.qsproj`,
       this._appData.palette,
     );
-    console.log('[ProjectTopScene] project saved');
+    this._statusTone = 'info';
+    this._statusMessage = 'Exported .qsproj';
+    console.log('[ProjectTopScene] project exported as qsproj');
   }
 
   _inRect(x, y, rect) {

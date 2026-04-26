@@ -22,6 +22,7 @@
 
 - [docs/WORK_STATUS.md](docs/WORK_STATUS.md): 現在の進捗と作業状況
 - [docs/specs/](docs/specs/): 仕様書、計画書、ロードマップ
+- [docs/specs/BROWSER_STORAGE_PLAN.md](docs/specs/BROWSER_STORAGE_PLAN.md): IndexedDB を使ったブラウザ保存の最小設計
 
 ## ビルド方法
 
