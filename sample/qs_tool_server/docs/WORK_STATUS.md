@@ -134,6 +134,9 @@ www/
   - `map` アセットの project 保存フローを `AppData.saveActiveProjectAssetState()` に接続
   - 最小メニュー UI を `MapEditorMenuBar` として分離し、`保存` / `戻る` / `グリッド表示` を追加
   - メニューバーはウィンドウ群より前面で描画するように調整
+  - `MapResizeDialog` を追加し、`ファイル > マップサイズ変更...` からセル数の変更を可能にした
+  - `MapViewWindow` に viewport ベースの部分描画を導入し、wheel zoom / pan / inspector reset を追加
+  - visible range と pan clamp を調整し、大きいマップで端の欠けや空白が出にくいように補正
 - [x] シーン切り替え直後の canvas 文字描画状態の補正
   - `MenuBar` 描画で `textAlign` / `textBaseline` を明示初期化
 - [x] `TitleScene` の Browser Projects 一覧に `map` 件数表示を追加

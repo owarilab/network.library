@@ -4,6 +4,7 @@ class MapInspectorWindow extends UIWindow {
     this._scene = scene;
     this._hoverButton = '';
     this._gridButtonRect = null;
+    this._resetViewButtonRect = null;
     this._backButtonRect = null;
   }
 
@@ -12,7 +13,7 @@ class MapInspectorWindow extends UIWindow {
   }
 
   getContentSize() {
-    return { w: 300, h: 170 };
+    return { w: 300, h: 192 };
   }
 
   renderContent(ctx, cx, cy, cw, ch, appData) {
@@ -31,6 +32,7 @@ class MapInspectorWindow extends UIWindow {
       `Map: ${asset?.name || 'n/a'}`,
       `Map Size: ${mapData?.width | 0} x ${mapData?.height | 0} cells`,
       `Tile Size: ${mapData?.tileWidth | 0} x ${mapData?.tileHeight | 0}px`,
+      `Zoom: ${this._scene.getMapZoomLabel(appData)}  /  Pan: (${mapData?.view?.panX | 0}, ${mapData?.view?.panY | 0})`,
       `Cursor: (${cursor.x | 0}, ${cursor.y | 0})`,
       selectedTile
         ? `Paint Tile: #${selectedTile.index} (${selectedTile.col}, ${selectedTile.row})`
@@ -48,17 +50,24 @@ class MapInspectorWindow extends UIWindow {
 
     ctx.fillStyle = '#94a3b8';
     ctx.font = '12px sans-serif';
-    ctx.fillText('LMB: paint  /  RMB: clear  /  G: toggle grid  /  Esc: project top', cx + 12, cy + 138);
+    ctx.fillText('LMB: paint  /  RMB: clear  /  Wheel: zoom', cx + 12, cy + 156);
+    ctx.fillText('Space+Drag or MMB: pan  /  G: toggle grid  /  Esc: project top', cx + 12, cy + 172);
 
     this._gridButtonRect = { x: cx + 12, y: cy + ch - 34, w: 110, h: 22 };
+    this._resetViewButtonRect = { x: cx + 126, y: cy + ch - 34, w: 74, h: 22 };
     this._backButtonRect = { x: cx + cw - 106, y: cy + ch - 34, w: 94, h: 22 };
     this._drawButton(ctx, this._gridButtonRect, 'Toggle Grid', this._hoverButton === 'grid');
+    this._drawButton(ctx, this._resetViewButtonRect, 'Reset', this._hoverButton === 'reset');
     this._drawButton(ctx, this._backButtonRect, 'Back', this._hoverButton === 'back');
   }
 
   onContentMouseMove(e) {
     if (this._gridButtonRect && this._inRect(e.x, e.y, this._gridButtonRect)) {
       this._hoverButton = 'grid';
+      return;
+    }
+    if (this._resetViewButtonRect && this._inRect(e.x, e.y, this._resetViewButtonRect)) {
+      this._hoverButton = 'reset';
       return;
     }
     if (this._backButtonRect && this._inRect(e.x, e.y, this._backButtonRect)) {
@@ -71,6 +80,10 @@ class MapInspectorWindow extends UIWindow {
   onContentMouseDown(e, appData) {
     if (this._gridButtonRect && this._inRect(e.x, e.y, this._gridButtonRect)) {
       this._scene.toggleGrid(appData);
+      return true;
+    }
+    if (this._resetViewButtonRect && this._inRect(e.x, e.y, this._resetViewButtonRect)) {
+      this._scene.resetMapView(appData);
       return true;
     }
     if (this._backButtonRect && this._inRect(e.x, e.y, this._backButtonRect)) {

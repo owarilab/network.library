@@ -8,9 +8,15 @@ class MapEditorScene extends Scene {
     this._appData = null;
     this._statusMessage = 'Map editor scaffold';
     this._statusTone = 'muted';
+    this._spaceDown = false;
 
     this._menuBar = new MapEditorMenuBar();
     this._menuBar.onSelect = (id) => this._onMenuSelect(id);
+
+    this._mapResizeDialog = new MapResizeDialog(
+      (width, height) => this.resizeMap(width, height, this._appData),
+      () => this.setStatus('Map resize cancelled', 'muted'),
+    );
 
     this._mapViewWindow = new MapViewWindow(this);
     this._tilesetWindow = new MapTilesetWindow(this);
@@ -24,7 +30,9 @@ class MapEditorScene extends Scene {
     this._onMouseMove = this._onMouseMove.bind(this);
     this._onMouseDown = this._onMouseDown.bind(this);
     this._onMouseUp = this._onMouseUp.bind(this);
+    this._onWheel = this._onWheel.bind(this);
     this._onKeyDown = this._onKeyDown.bind(this);
+    this._onKeyUp = this._onKeyUp.bind(this);
   }
 
   onEnter(input, appData) {
@@ -33,7 +41,9 @@ class MapEditorScene extends Scene {
     input.on('mousemove', this._onMouseMove);
     input.on('mousedown', this._onMouseDown);
     input.on('mouseup', this._onMouseUp);
+    input.on('wheel', this._onWheel);
     input.on('keydown', this._onKeyDown);
+    input.on('keyup', this._onKeyUp);
   }
 
   onLeave(input, appData) {
@@ -61,6 +71,8 @@ class MapEditorScene extends Scene {
     for (const window of this._windows) {
       window.render(ctx, canvas, appData);
     }
+
+    this._mapResizeDialog.render(ctx, canvas);
 
     this._menuBar.render(ctx, canvas);
   }
@@ -144,6 +156,64 @@ class MapEditorScene extends Scene {
     return true;
   }
 
+  resizeMap(width, height, appData = this._appData) {
+    const mapData = appData?.mapData;
+    if (!mapData) return false;
+
+    const nextWidth = Math.max(1, Math.min(512, width | 0 || mapData.width | 0));
+    const nextHeight = Math.max(1, Math.min(512, height | 0 || mapData.height | 0));
+    const prevWidth = mapData.width | 0;
+    const prevHeight = mapData.height | 0;
+    if (nextWidth === prevWidth && nextHeight === prevHeight) {
+      this.setStatus('Map size unchanged', 'muted');
+      return false;
+    }
+
+    const layers = Array.isArray(mapData.layers) && mapData.layers.length
+      ? mapData.layers
+      : [{ id: 'layer_ground', name: 'Ground', visible: true, locked: false, tiles: [] }];
+    const copyWidth = Math.min(prevWidth, nextWidth);
+    const copyHeight = Math.min(prevHeight, nextHeight);
+
+    for (const layer of layers) {
+      const prevTiles = Array.isArray(layer.tiles) ? layer.tiles : [];
+      const nextTiles = new Array(nextWidth * nextHeight).fill(-1);
+      for (let row = 0; row < copyHeight; row++) {
+        for (let col = 0; col < copyWidth; col++) {
+          nextTiles[row * nextWidth + col] = prevTiles[row * prevWidth + col] ?? -1;
+        }
+      }
+      layer.tiles = nextTiles;
+    }
+
+    mapData.layers = layers;
+    mapData.width = nextWidth;
+    mapData.height = nextHeight;
+    mapData.cursor = {
+      x: Math.max(0, Math.min(nextWidth - 1, mapData.cursor?.x | 0)),
+      y: Math.max(0, Math.min(nextHeight - 1, mapData.cursor?.y | 0)),
+    };
+    this._mapViewWindow.clampView(appData);
+
+    appData.projectSession?.markDirty();
+    this.setStatus(`Map resized to ${nextWidth}x${nextHeight}`, 'info');
+    return true;
+  }
+
+  resetMapView(appData = this._appData) {
+    if (!this._mapViewWindow.resetView(appData)) return false;
+    this.setStatus('Map view reset', 'info');
+    return true;
+  }
+
+  getMapZoomLabel(appData = this._appData) {
+    return this._mapViewWindow.getZoomLabel(appData);
+  }
+
+  isPanModifierActive() {
+    return this._spaceDown;
+  }
+
   backToProjectTop(appData = this._appData) {
     appData?.saveActiveProjectAssetState();
     appData?.syncEditorStateToProjectSession();
@@ -198,6 +268,10 @@ class MapEditorScene extends Scene {
   }
 
   _onMouseMove(e) {
+    if (this._mapResizeDialog.isVisible) {
+      this._mapResizeDialog.onMouseMove(e);
+      return;
+    }
     this._menuBar.onMouseMove(e);
     if (this._menuBar.isOpen || this._menuBar.containsInteractivePoint(e.x, e.y)) return;
     for (const window of this._windows) {
@@ -206,6 +280,10 @@ class MapEditorScene extends Scene {
   }
 
   _onMouseDown(e) {
+    if (this._mapResizeDialog.isVisible) {
+      this._mapResizeDialog.onMouseDown(e);
+      return;
+    }
     if (this._menuBar.isOpen || this._menuBar.containsInteractivePoint(e.x, e.y)) {
       this._menuBar.onMouseDown(e);
       return;
@@ -219,6 +297,10 @@ class MapEditorScene extends Scene {
   }
 
   _onMouseUp(e) {
+    if (this._mapResizeDialog.isVisible) {
+      this._mapResizeDialog.onMouseUp(e);
+      return;
+    }
     this._menuBar.onMouseUp(e);
     for (const window of this._windows) {
       window.onMouseUp(e, this._appData);
@@ -226,12 +308,35 @@ class MapEditorScene extends Scene {
   }
 
   _onKeyDown(e) {
+    if (this._mapResizeDialog.isVisible) {
+      this._mapResizeDialog.onKeyDown(e);
+      return;
+    }
+    if (e.key === ' ' || e.code === 'Space') {
+      this._spaceDown = true;
+      return;
+    }
     if (e.key === 'Escape') {
       this.backToProjectTop(this._appData);
       return;
     }
     if (e.key === 'g' || e.key === 'G') {
       this.toggleGrid(this._appData);
+    }
+  }
+
+  _onKeyUp(e) {
+    if (e.key === ' ' || e.code === 'Space') {
+      this._spaceDown = false;
+    }
+  }
+
+  _onWheel(e) {
+    if (this._mapResizeDialog.isVisible) return;
+    if (this._menuBar.isOpen || this._menuBar.containsInteractivePoint(e.x, e.y)) return;
+    if (!this._mapViewWindow.containsViewportPoint(e.x, e.y)) return;
+    if (this._mapViewWindow.zoomAt(-e.deltaY, e.x, e.y, this._appData)) {
+      this.setStatus(`Zoom ${this.getMapZoomLabel(this._appData)}`, 'info');
     }
   }
 
@@ -252,6 +357,11 @@ class MapEditorScene extends Scene {
         .catch(err => {
           this.setStatus(err?.message || 'Browser save failed', 'error');
         });
+      return;
+    }
+
+    if (id === MenuConstants.FILE_MAP_RESIZE) {
+      this._mapResizeDialog.showWithSize(this._appData?.mapData?.width, this._appData?.mapData?.height);
       return;
     }
 

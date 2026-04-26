@@ -6,6 +6,7 @@ class MapEditorMenuBar extends MenuBar {
         label: 'ファイル',
         dropdown: new DropdownMenu([
           { id: MenuConstants.FILE_SAVE, label: '保存' },
+          { id: MenuConstants.FILE_MAP_RESIZE, label: 'マップサイズ変更...' },
           { id: MenuConstants.SEPARATOR },
           { id: MenuConstants.FILE_EXIT, label: 'プロジェクトトップへ戻る' },
         ]),

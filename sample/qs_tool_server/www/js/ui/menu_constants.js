@@ -12,6 +12,7 @@ class MenuConstants {
   static FILE_OPEN    = 'file.open';
   static FILE_SAVE    = 'file.save';
   static FILE_EXIT    = 'file.exit';
+  static FILE_MAP_RESIZE = 'file.map_resize';
 
   // ---- 編集 ----
   static EDIT_UNDO       = 'edit.undo';
