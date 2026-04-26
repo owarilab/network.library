@@ -397,6 +397,22 @@ class AppData {
   }
 
   /**
+   * free モード用の LayerData を直接差し替える。
+   * 主に多レイヤーの単体画像インポート復元に使用する。
+   * @param {LayerData} layerData
+   * @returns {boolean}
+   */
+  setLayerData(layerData) {
+    if (!layerData || !Array.isArray(layerData.layers) || layerData.layers.length === 0) {
+      return false;
+    }
+    this._layerData = this._cloneLayerData(layerData);
+    this.clearSelection();
+    this.syncEditorStateToProjectSession();
+    return true;
+  }
+
+  /**
    * レイヤーデータを指定サイズで初期化する（1レイヤー構成）。
    * 常に free モードの _layerData を初期化する。
    * @param {number} width

@@ -7,8 +7,9 @@ class SceneManager {
   /**
    * @param {AppData} appData - シーン間で共有するアプリケーションデータ
    * @param {Input}   input   - 入力管理オブジェクト
+   * @param {() => void} [onResize] - シーン切り替え直後に呼ぶリサイズ処理
    */
-  constructor(appData, input) {
+  constructor(appData, input, onResize = null) {
     /** @type {Scene|null} */
     this.current = null;
 
@@ -17,6 +18,9 @@ class SceneManager {
 
     /** @type {Input} */
     this.input = input;
+
+    /** @type {(() => void)|null} */
+    this.onResize = typeof onResize === 'function' ? onResize : null;
   }
 
   /**
@@ -32,6 +36,7 @@ class SceneManager {
     this.current = scene;
     this.appData.setCurrentSceneId(this._resolveSceneId(scene));
     this.current.onEnter(this.input, this.appData);
+    this.onResize?.();
   }
 
   /**

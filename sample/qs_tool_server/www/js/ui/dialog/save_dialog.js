@@ -42,6 +42,9 @@ class SaveDialog extends DialogBase {
     /** エクスポート形式 @type {'png' | 'json' | 'qts'} */
     this._format   = 'qts';
 
+    /** エクスポート対象コンテキスト @type {'free' | 'tileset'} */
+    this._exportContext = 'free';
+
     /** ファイル名フィールドにフォーカスがあるか @type {boolean} */
     this._filenameFocused = false;
     /** キーボード入力バッファ @type {string} */
@@ -142,6 +145,18 @@ class SaveDialog extends DialogBase {
     ctx.textBaseline = 'alphabetic';
 
     y += 16;
+
+    if (this._format === 'qts') {
+      ctx.fillStyle = '#666666';
+      ctx.font = '11px sans-serif';
+      ctx.textBaseline = 'middle';
+      const note = this._exportContext === 'free'
+        ? '通常ドット絵は 1x1 タイルセットとして保存されます'
+        : 'QTS はタイルセットとパレット情報を保存します';
+      ctx.fillText(note, bx + PAD + LABEL_COL_W, y + 6);
+      ctx.textBaseline = 'alphabetic';
+      y += 14;
+    }
 
     // =====================================================
     // 区切り線
@@ -252,6 +267,14 @@ class SaveDialog extends DialogBase {
     }
     this._filenameFocused = false;
     this._inputBuf        = '';
+  }
+
+  /**
+   * ダイアログ表示前にエクスポート対象コンテキストを設定する。
+   * @param {'free' | 'tileset'} context
+   */
+  setExportContext(context) {
+    this._exportContext = context === 'tileset' ? 'tileset' : 'free';
   }
 
   /** エクスポートボタン押下 */

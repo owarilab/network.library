@@ -198,8 +198,12 @@ class EditorScene extends Scene {
             PixelDataConverter.exportTilesetAsQts(
               this._appData.tilesetData, this._appData.palette, filename
             );
+          } else if (this._appData.palette) {
+            PixelDataConverter.exportLayerDataAsQts(
+              this._appData.layerData, this._appData.palette, filename
+            );
           } else {
-            console.warn('[EditorScene] QTS エクスポートはタイルセットモード専用です');
+            console.warn('[EditorScene] QTS エクスポートに必要なパレットがありません');
           }
         } else {
           if (isTileset) {
@@ -293,11 +297,6 @@ class EditorScene extends Scene {
       PixelDataConverter.importFromFile(file)
         .then(result => {
           if (result && result.tilesetData && result.palette) {
-            // .qts インポート結果
-            this._appData.tilesetData  = result.tilesetData;
-            this._appData.editMode     = 'tileset';
-            this._appData.selectedChip = { col: 0, row: 0 };
-            this._appData.clearSelection();
             // パレットを復元
             const paletteWin = this._colorPaletteWin.getPalette();
             if (paletteWin instanceof EditablePalette32) {
@@ -307,9 +306,23 @@ class EditorScene extends Scene {
               }
             }
             this._appData.palette = this._colorPaletteWin.getPalette();
+
+            if (result.tilesetData.columns === 1 && result.tilesetData.rows === 1) {
+              const layerData = PixelDataConverter.unwrapSingleChipTilesetToLayerData(result.tilesetData);
+              this._appData.editMode = 'free';
+              this._appData.tilesetData = null;
+              this._appData.setLayerData(layerData);
+              console.log(`[EditorScene] single-chip QTS imported as free mode: ${file.name}`);
+            } else {
+              this._appData.tilesetData  = result.tilesetData;
+              this._appData.editMode     = 'tileset';
+              this._appData.selectedChip = { col: 0, row: 0 };
+              this._appData.clearSelection();
+              console.log(`[EditorScene] QTS imported: ${file.name}`);
+            }
+
             this._pixelCanvas.resetView();
             this._pixelCanvas.markDirty();
-            console.log(`[EditorScene] QTS imported: ${file.name}`);
           } else if (result instanceof TilesetData) {
             // v2 タイルセット JSON
             this._appData.tilesetData  = result;
@@ -419,8 +432,10 @@ class EditorScene extends Scene {
       }
       if (id === MenuConstants.FILE_SAVE) {
         if (this._appData?.editMode === 'tileset' && this._appData.tilesetData) {
+          this._saveDialog.setExportContext('tileset');
           this._saveDialog.show();
         } else if (this._appData?.pixelData?.pixels) {
+          this._saveDialog.setExportContext('free');
           this._saveDialog.show();
         } else {
           console.warn('[EditorScene] エクスポート: ファイルが作成されていません');

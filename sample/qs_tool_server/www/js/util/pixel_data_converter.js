@@ -356,6 +356,95 @@ class PixelDataConverter {
   }
 
   /**
+   * LayerData を 1x1 の TilesetData に包んで返す。
+   * 通常ドット絵を既存の QTS 出力経路へ流すために使用する。
+   * @param {LayerData} layerData
+   * @returns {TilesetData}
+   */
+  static wrapLayerDataAsSingleChipTileset(layerData) {
+    if (!layerData || !Array.isArray(layerData.layers) || layerData.layers.length === 0) {
+      throw new Error('LayerData が空です');
+    }
+
+    const width = layerData.width | 0;
+    const height = layerData.height | 0;
+    if (width <= 0 || height <= 0) {
+      throw new Error('LayerData のサイズが不正です');
+    }
+
+    const td = new TilesetData(width, height, 1, 1, 0x00000000);
+    const copiedLayers = layerData.layers.map(layer => {
+      const pixelData = new PixelData();
+      pixelData.createPixelData(width, height);
+      pixelData.pixels.set(layer.pixelData.pixels);
+      return {
+        pixelData,
+        name: layer.name || 'レイヤー 1',
+        visible: layer.visible !== false,
+        opacity: typeof layer.opacity === 'number' ? layer.opacity : 255,
+        locked: !!layer.locked,
+      };
+    });
+
+    const chipLayerData = td.chips[0][0];
+    chipLayerData.layers = copiedLayers;
+    chipLayerData.width = width;
+    chipLayerData.height = height;
+    chipLayerData.activeIndex = Math.max(0, Math.min(layerData.activeIndex | 0, copiedLayers.length - 1));
+    chipLayerData._composite.createPixelData(width, height);
+    chipLayerData._compositeDirty = true;
+    td.passFlags[0][0] = true;
+    return td;
+  }
+
+  /**
+   * LayerData + パレットを 1x1 QTS としてダウンロードする。
+   * @param {LayerData}         layerData
+   * @param {EditablePalette32} palette
+   * @param {string}            [filename='pixel_art.qts']
+   */
+  static exportLayerDataAsQts(layerData, palette, filename = 'pixel_art.qts') {
+    const tilesetData = PixelDataConverter.wrapLayerDataAsSingleChipTileset(layerData);
+    PixelDataConverter.exportTilesetAsQts(tilesetData, palette, filename);
+  }
+
+  /**
+   * 1x1 の TilesetData から単体画像用 LayerData を復元する。
+   * @param {TilesetData} tilesetData
+   * @returns {LayerData}
+   */
+  static unwrapSingleChipTilesetToLayerData(tilesetData) {
+    if (!tilesetData || tilesetData.columns !== 1 || tilesetData.rows !== 1) {
+      throw new Error('1x1 の TilesetData ではありません');
+    }
+
+    const src = tilesetData.chips[0][0];
+    if (!src || !Array.isArray(src.layers) || src.layers.length === 0) {
+      throw new Error('チップの LayerData が空です');
+    }
+
+    const ld = new LayerData();
+    ld.width = tilesetData.chipWidth;
+    ld.height = tilesetData.chipHeight;
+    ld.layers = src.layers.map(layer => {
+      const pixelData = new PixelData();
+      pixelData.createPixelData(ld.width, ld.height);
+      pixelData.pixels.set(layer.pixelData.pixels);
+      return {
+        pixelData,
+        name: layer.name || 'レイヤー 1',
+        visible: layer.visible !== false,
+        opacity: typeof layer.opacity === 'number' ? layer.opacity : 255,
+        locked: !!layer.locked,
+      };
+    });
+    ld.activeIndex = Math.max(0, Math.min(src.activeIndex | 0, ld.layers.length - 1));
+    ld._composite.createPixelData(ld.width, ld.height);
+    ld._compositeDirty = true;
+    return ld;
+  }
+
+  /**
    * v2 タイルセット JSON オブジェクトを TilesetData に変換する。
    * @param {Object} obj  パース済み JSON オブジェクト
    * @returns {TilesetData}

@@ -29,13 +29,13 @@ class CanvasManager {
     /** 入力管理 @type {Input} */
     this.input = new Input(this.canvas);
 
-    /** @type {SceneManager} */
-    this.sceneManager = new SceneManager(this.appData, this.input);
-    this.appData.sceneManager = this.sceneManager;
-
     // ウィンドウリサイズに追従する
     this._onResize = this._onResize.bind(this);
     window.addEventListener('resize', this._onResize);
+
+    /** @type {SceneManager} */
+    this.sceneManager = new SceneManager(this.appData, this.input, () => this.handleResize());
+    this.appData.sceneManager = this.sceneManager;
 
     // 初期サイズを設定してからループ開始
     this._fitToWindow();
@@ -51,6 +51,11 @@ class CanvasManager {
   /** リサイズイベントハンドラ */
   _onResize() {
     this._fitToWindow();
+  }
+
+  /** 外部から明示的にリサイズ処理を走らせる */
+  handleResize() {
+    this._onResize();
   }
 
   /** requestAnimationFrame ループの1ステップ */

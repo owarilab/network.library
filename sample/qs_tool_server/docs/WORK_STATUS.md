@@ -1,6 +1,6 @@
 # ドットエディタ 作業状況
 
-最終更新: 2026-04-26 (14)
+最終更新: 2026-04-26 (16)
 
 ## 概要
 
@@ -110,6 +110,7 @@ www/
 - [x] `CanvasManager`: 全画面 canvas、RAF 60fps ループ（ドリフト補正付き）、resize 対応
 - [x] `Scene` / `SceneManager`: シーン切り替え時ライフサイクル（onEnter/onLeave）、`input.clearAll()`
   - シーン名を `ProjectSession.currentScene` に反映する最小連携を追加
+  - シーン切り替え直後に resize 処理を再実行して表示崩れを抑制
 - [x] `Input`: keyboard/mouse/touch イベント一元管理、canvas 相対座標正規化、wheel/contextmenu 既定動作抑止
 - [x] `AppData`: `LayerData` インスタンスを保持、`pixelData` getter でアクティブレイヤー返却、`createPixelData()` デリゲート
   - `currentProject` / `projectSession` / `sceneManager` を追加
@@ -324,6 +325,9 @@ www/
   - 形式: `{ version: 2, type: "tileset", chipWidth, chipHeight, columns, rows, chips[] }`
 - [x] **QTS バイナリ保存/読込** (`.qts`)
   - `exportTilesetAsQts()` / `importFromQts()` 実装
+  - 通常ドット絵は `1x1` タイルセットとして `.qts` 保存可能
+  - `1x1` `.qts` 読込時は free mode の多レイヤー画像として復元
+  - `SaveDialog` に free mode / tileset mode 別の QTS 説明文を追加
   - 1バイトピクセル（ColorID + passable）で量子化保存
   - 仕様書: [BINARY_FORMAT_PLAN.md](specs/BINARY_FORMAT_PLAN.md)
 - [ ] **通常ドット絵(JSON v1)のメタ情報拡張**
