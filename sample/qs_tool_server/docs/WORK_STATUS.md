@@ -26,6 +26,7 @@ docs/
   ├── PROJECT_SCENE_FLOW_PLAN.md   # タイトル/プロジェクトトップ/遷移基盤の計画
   ├── PLAY_UNIT_DESIGN.md          # PlayUnit / PlayObject / Component 設計書
   ├── PLAY_UNIT_IMPLEMENTATION_PLAN.md # PlayUnit 実装計画書
+  ├── TEXT_COMPONENT_JSON_EXAMPLES.md # Text component 用 JSON テンプレート集
   ├── SELECTION_TOOL_PLAN.md       # 選択ツール実装計画
   ├── SPEC_quarter_view_tile.md    # クォータービュータイル生成仕様書
   └── UNDO_REDO_PLAN.md            # Undo / Redo 実装計画
@@ -88,6 +89,7 @@ www/
 - [プロジェクト管理・シーン遷移基盤 計画書](specs/PROJECT_SCENE_FLOW_PLAN.md)
 - [PlayUnit 設計書](specs/PLAY_UNIT_DESIGN.md)
 - [PlayUnit 実装計画書](specs/PLAY_UNIT_IMPLEMENTATION_PLAN.md)
+- [Text component JSON 例集](specs/TEXT_COMPONENT_JSON_EXAMPLES.md)
 - [ブラウザ保存（IndexedDB）最小設計書](specs/BROWSER_STORAGE_PLAN.md)
 - [マップエディタシーン実装計画書](specs/MAP_EDITOR_SCENE_PLAN.md)
 

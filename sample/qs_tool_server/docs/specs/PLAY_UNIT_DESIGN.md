@@ -258,7 +258,27 @@
 }
 ```
 
-## 5. Collider
+## 5. Text
+
+テキスト表示用の最小 component。
+
+```js
+{
+  type: 'Text',
+  enabled: true,
+  data: {
+    text: 'Hello World',
+    font: '24px sans-serif',
+    color: '#ffffff'
+  }
+}
+```
+
+最小の runtime 確認では、`Transform` と `Text` を同一 object に付与し、
+`Transform.data.x`, `Transform.data.y` を描画座標、
+`Text.data.text`, `Text.data.font`, `Text.data.color` を描画設定として扱う。
+
+## 6. Collider
 
 当たり判定または判定用サイズ。
 

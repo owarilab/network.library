@@ -352,15 +352,13 @@ class ProjectBrowserStorage {
   static _deserializeAssetRecord(record) {
     if (!record) return null;
     if (record.type === 'playUnit') {
-      const objects = Array.isArray(record.storage?.data?.objects)
-        ? record.storage.data.objects.map(objectData => PlayObjectData.from(objectData))
-        : [];
-      return {
+      const playUnit = PlayUnitData.from({
         id: record.id,
-        type: 'playUnit',
         name: record.name || 'play_unit',
-        objects,
-      };
+        objects: Array.isArray(record.storage?.data?.objects) ? record.storage.data.objects : [],
+      });
+      playUnit.type = 'playUnit';
+      return playUnit;
     }
 
     if (record.type === 'map') {

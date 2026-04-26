@@ -315,14 +315,12 @@ class ProjectSerializer {
       height: map.height | 0 || 32,
       mapData: map.mapData || null,
     }));
-    project.assets.playUnits = (obj.assets?.playUnits || []).map(playUnit => ({
-      id: typeof playUnit.id === 'string' && playUnit.id ? playUnit.id : PlayUnitData.createId('pu'),
-      type: 'playUnit',
-      name: typeof playUnit.name === 'string' && playUnit.name.trim() ? playUnit.name.trim() : 'play_unit',
-      objects: Array.isArray(playUnit.objects)
-        ? playUnit.objects.map(objectData => PlayObjectData.from(objectData))
-        : [],
-    }));
+    project.assets.playUnits = (obj.assets?.playUnits || []).map(playUnit => {
+      const normalized = PlayUnitData.from(playUnit);
+      normalized.type = 'playUnit';
+      normalized.name = typeof normalized.name === 'string' && normalized.name.trim() ? normalized.name.trim() : 'play_unit';
+      return normalized;
+    });
     return project;
   }
 

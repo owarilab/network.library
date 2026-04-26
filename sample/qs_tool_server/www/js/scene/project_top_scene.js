@@ -60,7 +60,7 @@ class ProjectTopScene extends Scene {
 
     ctx.fillStyle = '#64748b';
     ctx.font = '13px sans-serif';
-    ctx.fillText('Shortcut: Enter opens active asset / M opens map editor / P opens PlayUnit editor', centerX, topY + 84);
+    ctx.fillText('Shortcut: Enter opens active asset / M opens map editor / P opens PlayUnit editor / T opens play test', centerX, topY + 84);
 
     if (this._statusMessage) {
       ctx.fillStyle = this._statusTone === 'error' ? '#fca5a5' : '#93c5fd';
@@ -107,6 +107,10 @@ class ProjectTopScene extends Scene {
       {
         label: 'Open PlayUnit Editor',
         action: () => this._openPlayUnitEditor(),
+      },
+      {
+        label: 'Open Play Test',
+        action: () => this._openPlayTest(),
       },
       {
         label: 'Back to Title',
@@ -351,6 +355,10 @@ class ProjectTopScene extends Scene {
       this._openPlayUnitEditor();
       return;
     }
+    if (e.key === 't' || e.key === 'T') {
+      this._openPlayTest();
+      return;
+    }
     if (e.key === 's' || e.key === 'S') {
       this._saveProject();
       return;
@@ -459,6 +467,25 @@ class ProjectTopScene extends Scene {
     }
 
     this._openAsset(asset);
+  }
+
+  _openPlayTest() {
+    if (!this._appData?.currentProject || !this._appData.projectSession) return;
+
+    let asset = this._appData.getActiveProjectAsset();
+    if (!asset || asset.type !== 'playUnit') {
+      asset = this._appData.currentProject.assets.playUnits[0] || null;
+    }
+
+    if (!asset) {
+      this._statusTone = 'error';
+      this._statusMessage = 'No PlayUnit available for play test';
+      return;
+    }
+
+    this._appData.projectSession.setActiveDocument('playUnit', asset.id);
+    this._appData.syncEditorStateToProjectSession();
+    this._appData.changeScene(new PlayTestScene());
   }
 
   _saveProject() {

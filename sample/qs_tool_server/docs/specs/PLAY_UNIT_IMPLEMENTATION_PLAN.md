@@ -1,6 +1,6 @@
 # PlayUnit 実装計画書
 
-最終更新: 2026-04-26
+最終更新: 2026-04-27
 
 ## 目的
 
@@ -55,14 +55,16 @@
 - Phase 3 完了: `.qsproj` serializer と browser 保存層に `playUnits` の保存 / 復元を実装済み
 - Phase 4 完了: `ProjectTopScene` から `PlayUnit` の作成、選択、オープン導線を実装済み
 - Phase 5 完了: `PlayUnitEditorScene` の雛形を追加し、選択中 `PlayUnit` の最小表示を実装済み
+- Phase 6 実装進行: object の追加 / 削除 / 改名、component の追加 / 削除、component parameter の最小 JSON 編集、object / component 一覧スクロールを実装済み
+- Phase 6 実装進行: `Text` component の最小編集項目として `text`, `font`, `color`, `alpha`, `align`, `baseline`, `wrap`, `maxWidth`, `lineHeight`, `strokeColor`, `strokeWidth`, `backgroundColor`, `padding` を扱える状態まで拡張済み
+- Phase 7 実装進行: `PlayUnitRuntime` と `PlayTestScene` を追加し、`Transform + Text` の最小 preview 描画を実装済み
 - 周辺 UI 調整として、`Project Assets` と `Browser Projects` の一覧スクロールと表示調整を実装済み
 
 ### 未実装
 
-- Phase 6: object の追加 / 削除 / 改名 UI
-- Phase 6: `Transform` / `Tilemap` / `PlaySettings` / `Trigger` の最小 component 追加 UI
-- Phase 7: `PlayUnitRuntime` の最小設計と runtime 変換 API
-- Phase 7: PlayTest 接続用の stub と runtime 側参照解決
+- Phase 7: `Tilemap` component の参照解決
+- Phase 7: `Trigger` component の最小評価
+- Phase 7: `PlaySettings` の camera 反映など preview 範囲の拡張
 
 ---
 
@@ -130,7 +132,7 @@
 
 - `PlayUnitData` を 1 つ生成できる
 - 空の `PlayObjectData` を追加できる
-- `Tilemap` / `PlaySettings` / `Trigger` component をデータとして保持できる
+- `Tilemap` / `PlaySettings` / `Text` / `Trigger` component をデータとして保持できる
 
 ### このフェーズで作るもの
 
@@ -273,12 +275,20 @@
 2. object 名変更を可能にする
 3. object 削除を可能にする
 4. `Transform` component の追加を可能にする
-5. `Tilemap` / `PlaySettings` / `Trigger` の追加を可能にする
+5. `Tilemap` / `PlaySettings` / `Text` / `Trigger` の追加を可能にする
+6. component parameter の最小 JSON 編集を可能にする
+7. `Text` component は runtime 確認用の表示系 parameter を先行して扱えるようにする
 
 ### 完了条件
 
 - object を追加 / 削除 / リネームできる
 - 最小 component を object に付与できる
+- runtime 確認に必要な parameter を JSON で編集できる
+
+### Phase 6 補足
+
+- `Text` component の最小 runtime 確認対象は `text`, `font`, `color`, `alpha`, `align`, `baseline`, `wrap`, `maxWidth`, `lineHeight`, `strokeColor`, `strokeWidth`, `backgroundColor`, `padding` とする
+- 専用 inspector はまだ作らず、当面は JSON 編集で値を調整する
 
 ### 依存
 
@@ -300,11 +310,18 @@
 3. `Tilemap` component の参照解決方法を定義する
 4. `Trigger` component の最小評価方法を定義する
 5. `PlayTestScene` 接続用の stub を追加する
+6. 最初の preview 対象を `Transform + Text` に限定して描画確認できるようにする
 
 ### 完了条件
 
 - `PlayUnitRuntime` の雛形ができる
 - 最小 `PlayUnit` を runtime へ渡せる
+
+### Phase 7 補足
+
+- 最初の preview は `Transform + Text` のみを対象とする
+- `Text` preview では `align`, `baseline`, `wrap`, `maxWidth`, `lineHeight`, `strokeColor`, `strokeWidth`, `backgroundColor`, `padding`, `alpha` を扱う
+- `Tilemap`, `Trigger`, camera 反映はこの後続タスクで広げる
 
 ### このフェーズではやらないこと
 
@@ -359,10 +376,12 @@
 
 - object の追加 / 削除 / 改名ができる
 - component の最小追加ができる
+- component parameter を JSON で編集して `Text` の表示確認ができる
 
 ### Phase 7
 
 - runtime 変換 API が最小 `PlayUnit` を受け取れる
+- `Transform + Text` を PlayTest 上で preview 表示できる
 
 ---
 

@@ -226,15 +226,11 @@ class ProjectData {
    * @returns {object}
    */
   _normalizePlayUnit(playUnit) {
-    const normalized = playUnit?.objects instanceof Array
-      ? playUnit.objects.map((objectData) => PlayObjectData.from(objectData))
-      : [];
-    return {
-      id: this._normalizeId(playUnit.id, 'pu'),
-      type: 'playUnit',
-      name: this._normalizeName(playUnit.name, 'play_unit'),
-      objects: normalized,
-    };
+    const normalized = PlayUnitData.from(playUnit);
+    normalized.id = this._normalizeId(normalized.id, 'pu');
+    normalized.type = 'playUnit';
+    normalized.name = this._normalizeName(normalized.name, 'play_unit');
+    return normalized;
   }
 
   /**

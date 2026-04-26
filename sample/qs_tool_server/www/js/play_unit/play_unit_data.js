@@ -25,6 +25,23 @@ class PlayUnitData {
   }
 
   /**
+   * 既存データから PlayUnitData を生成する。
+   * @param {Partial<PlayUnitData>|null} [src=null]
+   * @returns {PlayUnitData}
+   */
+  static from(src = null) {
+    const playUnit = new PlayUnitData();
+    playUnit.id = typeof src?.id === 'string' && src.id.trim()
+      ? src.id.trim()
+      : PlayUnitData.createId('pu');
+    playUnit.name = PlayUnitData.normalizeName(src?.name, 'PlayUnit');
+    playUnit.objects = Array.isArray(src?.objects)
+      ? src.objects.map((objectData) => PlayObjectData.from(objectData))
+      : [];
+    return playUnit;
+  }
+
+  /**
    * object を追加する。
    * @param {Partial<PlayObjectData>|null} [objectData=null]
    * @returns {PlayObjectData}
