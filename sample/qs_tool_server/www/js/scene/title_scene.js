@@ -11,6 +11,9 @@ class TitleScene extends Scene {
     this._fileInput = null;
     this._browserProjects = [];
     this._browserProjectItems = [];
+    this._browserPanelRect = null;
+    this._browserProjectScrollOffset = 0;
+    this._browserProjectVisibleRows = 0;
     this._hoverBrowserProjectIndex = -1;
     this._hoverBrowserProjectDeleteIndex = -1;
     this._statusMessage = '';
@@ -18,6 +21,7 @@ class TitleScene extends Scene {
 
     this._onMouseMove = this._onMouseMove.bind(this);
     this._onMouseDown = this._onMouseDown.bind(this);
+    this._onWheel = this._onWheel.bind(this);
     this._onKeyDown = this._onKeyDown.bind(this);
     this._onFileChange = this._onFileChange.bind(this);
   }
@@ -28,6 +32,7 @@ class TitleScene extends Scene {
     this._refreshBrowserProjects();
     input.on('mousemove', this._onMouseMove);
     input.on('mousedown', this._onMouseDown);
+    input.on('wheel', this._onWheel);
     input.on('keydown', this._onKeyDown);
   }
 
@@ -35,6 +40,7 @@ class TitleScene extends Scene {
     this._hoverIndex = -1;
     this._hoverBrowserProjectIndex = -1;
     this._hoverBrowserProjectDeleteIndex = -1;
+    this._browserPanelRect = null;
     this._disposeFileInput();
   }
 
@@ -160,6 +166,23 @@ class TitleScene extends Scene {
     this._openBrowserProject(browserItem.project.id);
   }
 
+  _onWheel(e) {
+    if (!this._browserPanelRect || !this._inRect(e.x, e.y, this._browserPanelRect)) return;
+    const maxOffset = this._getMaxBrowserProjectScrollOffset(this._browserProjects.length, this._browserProjectVisibleRows);
+    if (maxOffset <= 0) return;
+
+    const nextOffset = e.deltaY > 0
+      ? Math.min(maxOffset, this._browserProjectScrollOffset + 1)
+      : e.deltaY < 0
+        ? Math.max(0, this._browserProjectScrollOffset - 1)
+        : this._browserProjectScrollOffset;
+
+    if (nextOffset === this._browserProjectScrollOffset) return;
+    this._browserProjectScrollOffset = nextOffset;
+    this._hoverBrowserProjectIndex = -1;
+    this._hoverBrowserProjectDeleteIndex = -1;
+  }
+
   _onKeyDown(e) {
     if (e.key === 'Enter') {
       if (this._appData?.currentProject) {
@@ -232,6 +255,7 @@ class TitleScene extends Scene {
   _refreshBrowserProjects() {
     if (!ProjectBrowserStorage.isAvailable()) {
       this._browserProjects = [];
+      this._browserProjectScrollOffset = 0;
       this._statusTone = 'error';
       this._statusMessage = 'IndexedDB unavailable';
       return;
@@ -240,6 +264,7 @@ class TitleScene extends Scene {
     ProjectBrowserStorage.listProjects()
       .then(rows => {
         this._browserProjects = rows;
+        if (!rows.length) this._browserProjectScrollOffset = 0;
         if (!rows.length) {
           this._statusTone = 'muted';
           this._statusMessage = '';
@@ -250,6 +275,7 @@ class TitleScene extends Scene {
       })
       .catch(err => {
         this._browserProjects = [];
+        this._browserProjectScrollOffset = 0;
         this._statusTone = 'error';
         this._statusMessage = err?.message || 'Browser projects load failed';
         console.error('[TitleScene] browser project list error:', err?.message || err);
@@ -258,13 +284,19 @@ class TitleScene extends Scene {
 
   _buildBrowserProjectItems(canvas) {
     const panel = this._getBrowserPanelRect(canvas);
+    this._browserPanelRect = panel;
     const itemH = 56;
     const itemGap = 10;
-    const topPad = 42;
+    const topPad = 64;
     const leftPad = 14;
     const rightPad = 14;
     const maxRows = Math.max(1, Math.floor((panel.h - topPad - 12 + itemGap) / (itemH + itemGap)));
-    const visible = this._browserProjects.slice(0, maxRows);
+    this._browserProjectVisibleRows = maxRows;
+    const maxOffset = this._getMaxBrowserProjectScrollOffset(this._browserProjects.length, maxRows);
+    if (this._browserProjectScrollOffset > maxOffset) {
+      this._browserProjectScrollOffset = maxOffset;
+    }
+    const visible = this._browserProjects.slice(this._browserProjectScrollOffset, this._browserProjectScrollOffset + maxRows);
     return visible.map((project, index) => ({
       project,
       rect: {
@@ -305,6 +337,10 @@ class TitleScene extends Scene {
       return;
     }
 
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '13px sans-serif';
+    ctx.fillText(`Wheel: scroll list (${Math.min(this._browserProjects.length, this._browserProjectVisibleRows)}/${this._browserProjects.length})`, panel.x + 18, panel.y + 54);
+
     for (let i = 0; i < this._browserProjectItems.length; i++) {
       this._drawBrowserProjectItem(
         ctx,
@@ -332,16 +368,16 @@ class TitleScene extends Scene {
     ctx.fillText(item.project.name || 'Untitled Project', x + 12, y + 18);
 
     const counts = item.project.assetCounts || {};
-    const summary = `Pixel ${counts.pixelDocuments | 0} / Tileset ${counts.tilesets | 0} / Map ${counts.maps | 0}`;
+    const summary = `Pixel ${counts.pixelDocuments | 0} / Tileset ${counts.tilesets | 0} / Map ${counts.maps | 0} / PlayUnit ${counts.playUnits | 0}`;
     ctx.fillStyle = '#94a3b8';
     ctx.font = '12px sans-serif';
     ctx.fillText(summary, x + 12, y + 38);
 
+    const dr = item.deleteRect;
     const dateLabel = this._formatTimestamp(item.project.updatedAt);
     ctx.textAlign = 'right';
-    ctx.fillText(dateLabel, x + w - 12, y + 18);
+    ctx.fillText(dateLabel, dr.x - 10, y + 18);
 
-    const dr = item.deleteRect;
     ctx.fillStyle = deleteHovered ? '#dc2626' : '#7f1d1d';
     ctx.strokeStyle = deleteHovered ? '#fca5a5' : '#ef4444';
     ctx.lineWidth = 1.5;
@@ -396,7 +432,7 @@ class TitleScene extends Scene {
 
   _getBrowserPanelRect(canvas) {
     const w = Math.min(620, canvas.width - 48);
-    const h = Math.min(250, Math.max(140, canvas.height - 470));
+    const h = Math.min(280, Math.max(140, canvas.height - 440));
     const x = ((canvas.width - w) / 2) | 0;
     const y = Math.max(430, canvas.height - h - 32);
     return { x, y, w, h };
@@ -416,6 +452,10 @@ class TitleScene extends Scene {
     } catch {
       return '-';
     }
+  }
+
+  _getMaxBrowserProjectScrollOffset(projectCount, visibleRows) {
+    return Math.max(0, projectCount - Math.max(1, visibleRows | 0));
   }
 
   _inRect(x, y, rect) {

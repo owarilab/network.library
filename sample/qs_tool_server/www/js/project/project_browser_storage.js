@@ -133,6 +133,7 @@ class ProjectBrowserStorage {
           pixelDocuments: row.assetCounts?.pixelDocuments | 0,
           tilesets: row.assetCounts?.tilesets | 0,
           maps: row.assetCounts?.maps | 0,
+          playUnits: row.assetCounts?.playUnits | 0,
         },
       }))
       .sort((a, b) => b.updatedAt - a.updatedAt);
@@ -166,6 +167,7 @@ class ProjectBrowserStorage {
       ...(project.assets?.pixelDocuments || []),
       ...(project.assets?.tilesets || []),
       ...(project.assets?.maps || []),
+      ...(project.assets?.playUnits || []),
     ];
   }
 
@@ -188,6 +190,7 @@ class ProjectBrowserStorage {
     ProjectBrowserStorage._reassignAssetIds(nextProject.assets.pixelDocuments || [], 'px', activeRef);
     ProjectBrowserStorage._reassignAssetIds(nextProject.assets.tilesets || [], 'ts', activeRef);
     ProjectBrowserStorage._reassignAssetIds(nextProject.assets.maps || [], 'map', activeRef);
+    ProjectBrowserStorage._reassignAssetIds(nextProject.assets.playUnits || [], 'pu', activeRef);
 
     nextSession.projectId = nextProject.id;
     nextSession.dirty = false;
@@ -230,6 +233,7 @@ class ProjectBrowserStorage {
         pixelDocuments: (project.assets?.pixelDocuments || []).length,
         tilesets: (project.assets?.tilesets || []).length,
         maps: (project.assets?.maps || []).length,
+        playUnits: (project.assets?.playUnits || []).length,
       },
     };
   }
@@ -241,6 +245,19 @@ class ProjectBrowserStorage {
   }
 
   static _serializeAssetRecord(asset, projectId, fallbackPalette) {
+    if (asset.type === 'playUnit') {
+      return {
+        id: asset.id,
+        projectId,
+        type: 'playUnit',
+        name: asset.name,
+        updatedAt: Date.now(),
+        payloadVersion: 1,
+        storage: { codec: 'json', data: { objects: Array.isArray(asset.objects) ? asset.objects : [] } },
+        meta: {},
+      };
+    }
+
     if (asset.type === 'map') {
       return {
         id: asset.id,
@@ -316,12 +333,14 @@ class ProjectBrowserStorage {
     project.assets.pixelDocuments = [];
     project.assets.tilesets = [];
     project.assets.maps = [];
+    project.assets.playUnits = [];
     for (let i = 0; i < assetRecords.length; i++) {
       const asset = ProjectBrowserStorage._deserializeAssetRecord(assetRecords[i]);
       if (!asset) continue;
       if (asset.type === 'pixelDocument') project.assets.pixelDocuments.push(asset);
       else if (asset.type === 'tileset') project.assets.tilesets.push(asset);
       else if (asset.type === 'map') project.assets.maps.push(asset);
+      else if (asset.type === 'playUnit') project.assets.playUnits.push(asset);
     }
     return project;
   }
@@ -332,6 +351,18 @@ class ProjectBrowserStorage {
 
   static _deserializeAssetRecord(record) {
     if (!record) return null;
+    if (record.type === 'playUnit') {
+      const objects = Array.isArray(record.storage?.data?.objects)
+        ? record.storage.data.objects.map(objectData => PlayObjectData.from(objectData))
+        : [];
+      return {
+        id: record.id,
+        type: 'playUnit',
+        name: record.name || 'play_unit',
+        objects,
+      };
+    }
+
     if (record.type === 'map') {
       return {
         id: record.id,

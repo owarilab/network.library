@@ -25,6 +25,7 @@ docs/
   ├── MAP_CHIP_SPEC.md             # マップチップエディタ仕様書
   ├── PROJECT_SCENE_FLOW_PLAN.md   # タイトル/プロジェクトトップ/遷移基盤の計画
   ├── PLAY_UNIT_DESIGN.md          # PlayUnit / PlayObject / Component 設計書
+  ├── PLAY_UNIT_IMPLEMENTATION_PLAN.md # PlayUnit 実装計画書
   ├── SELECTION_TOOL_PLAN.md       # 選択ツール実装計画
   ├── SPEC_quarter_view_tile.md    # クォータービュータイル生成仕様書
   └── UNDO_REDO_PLAN.md            # Undo / Redo 実装計画
@@ -86,6 +87,7 @@ www/
 - [クォータービュータイル自動生成 仕様書](specs/SPEC_quarter_view_tile.md)
 - [プロジェクト管理・シーン遷移基盤 計画書](specs/PROJECT_SCENE_FLOW_PLAN.md)
 - [PlayUnit 設計書](specs/PLAY_UNIT_DESIGN.md)
+- [PlayUnit 実装計画書](specs/PLAY_UNIT_IMPLEMENTATION_PLAN.md)
 - [ブラウザ保存（IndexedDB）最小設計書](specs/BROWSER_STORAGE_PLAN.md)
 - [マップエディタシーン実装計画書](specs/MAP_EDITOR_SCENE_PLAN.md)
 

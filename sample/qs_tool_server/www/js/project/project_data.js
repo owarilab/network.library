@@ -18,12 +18,13 @@ class ProjectData {
 
     /**
      * 保存対象アセット群。
-     * @type {{ pixelDocuments: object[], tilesets: object[], maps: object[] }}
+     * @type {{ pixelDocuments: object[], tilesets: object[], maps: object[], playUnits: object[] }}
      */
     this.assets = {
       pixelDocuments: [],
       tilesets: [],
       maps: [],
+      playUnits: [],
     };
 
     /**
@@ -109,6 +110,18 @@ class ProjectData {
   }
 
   /**
+   * PlayUnit を追加する。
+   * @param {{ id?: string, name?: string, objects?: PlayObjectData[]|object[] }} [playUnit]
+   * @returns {object}
+   */
+  addPlayUnit(playUnit = {}) {
+    const asset = this._normalizePlayUnit(playUnit);
+    this.assets.playUnits.push(asset);
+    this.touch();
+    return asset;
+  }
+
+  /**
    * 参照情報からアセットを取得する。
    * @param {{ type?: string, id?: string }|null} ref
    * @returns {object|null}
@@ -122,6 +135,8 @@ class ProjectData {
         return this.findTilesetById(ref.id);
       case 'map':
         return this.findMapById(ref.id);
+      case 'playUnit':
+        return this.findPlayUnitById(ref.id);
       default:
         return null;
     }
@@ -149,6 +164,14 @@ class ProjectData {
    */
   findMapById(id) {
     return this.assets.maps.find(map => map.id === id) || null;
+  }
+
+  /**
+   * @param {string} id
+   * @returns {object|null}
+   */
+  findPlayUnitById(id) {
+    return this.assets.playUnits.find(playUnit => playUnit.id === id) || null;
   }
 
   /**
@@ -195,6 +218,22 @@ class ProjectData {
       width: this._normalizeSize(map.width, 32),
       height: this._normalizeSize(map.height, 32),
       mapData: map.mapData || null,
+    };
+  }
+
+  /**
+   * @param {{ id?: string, name?: string, objects?: PlayObjectData[]|object[] }} playUnit
+   * @returns {object}
+   */
+  _normalizePlayUnit(playUnit) {
+    const normalized = playUnit?.objects instanceof Array
+      ? playUnit.objects.map((objectData) => PlayObjectData.from(objectData))
+      : [];
+    return {
+      id: this._normalizeId(playUnit.id, 'pu'),
+      type: 'playUnit',
+      name: this._normalizeName(playUnit.name, 'play_unit'),
+      objects: normalized,
     };
   }
 

@@ -9,12 +9,16 @@ class ProjectTopScene extends Scene {
     this._hoverIndex = -1;
     this._assetItems = [];
     this._hoverAssetIndex = -1;
+    this._assetPanelRect = null;
+    this._assetScrollOffset = 0;
+    this._assetVisibleRows = 0;
     this._appData = null;
     this._statusMessage = '';
     this._statusTone = 'muted';
 
     this._onMouseMove = this._onMouseMove.bind(this);
     this._onMouseDown = this._onMouseDown.bind(this);
+    this._onWheel = this._onWheel.bind(this);
     this._onKeyDown = this._onKeyDown.bind(this);
   }
 
@@ -22,12 +26,14 @@ class ProjectTopScene extends Scene {
     this._appData = appData;
     input.on('mousemove', this._onMouseMove);
     input.on('mousedown', this._onMouseDown);
+    input.on('wheel', this._onWheel);
     input.on('keydown', this._onKeyDown);
   }
 
   onLeave() {
     this._hoverIndex = -1;
     this._hoverAssetIndex = -1;
+    this._assetPanelRect = null;
   }
 
   render(ctx, canvas, appData) {
@@ -49,11 +55,12 @@ class ProjectTopScene extends Scene {
     const docCount = project ? project.assets.pixelDocuments.length : 0;
     const tilesetCount = project ? project.assets.tilesets.length : 0;
     const mapCount = project ? project.assets.maps.length : 0;
-    ctx.fillText(`Pixel Docs: ${docCount}  /  Tilesets: ${tilesetCount}  /  Maps: ${mapCount}`, centerX, topY + 34);
+    const playUnitCount = project ? (project.assets.playUnits || []).length : 0;
+    ctx.fillText(`Pixel Docs: ${docCount}  /  Tilesets: ${tilesetCount}  /  Maps: ${mapCount}  /  PlayUnits: ${playUnitCount}`, centerX, topY + 34);
 
     ctx.fillStyle = '#64748b';
     ctx.font = '13px sans-serif';
-    ctx.fillText('Shortcut: Enter opens active asset / M opens map editor', centerX, topY + 84);
+    ctx.fillText('Shortcut: Enter opens active asset / M opens map editor / P opens PlayUnit editor', centerX, topY + 84);
 
     if (this._statusMessage) {
       ctx.fillStyle = this._statusTone === 'error' ? '#fca5a5' : '#93c5fd';
@@ -96,6 +103,10 @@ class ProjectTopScene extends Scene {
       {
         label: 'Open Map Editor',
         action: () => this._openMapEditor(),
+      },
+      {
+        label: 'Open PlayUnit Editor',
+        action: () => this._openPlayUnitEditor(),
       },
       {
         label: 'Back to Title',
@@ -160,10 +171,13 @@ class ProjectTopScene extends Scene {
 
     ctx.fillStyle = '#94a3b8';
     ctx.font = '13px sans-serif';
+    const totalAssets = this._collectProjectAssets(appData.currentProject).length;
     if (this._assetItems.length === 0) {
       ctx.fillText('No assets yet. Create or import from Editor.', panel.x + 18, panel.y + 54);
       return;
     }
+
+    ctx.fillText(`Wheel: scroll list (${Math.min(totalAssets, this._assetVisibleRows)}/${totalAssets})`, panel.x + 18, panel.y + 54);
 
     for (let index = 0; index < this._assetItems.length; index++) {
       const item = this._assetItems[index];
@@ -179,6 +193,8 @@ class ProjectTopScene extends Scene {
       ? '#f59e0b'
       : item.asset.type === 'map'
         ? '#38bdf8'
+        : item.asset.type === 'playUnit'
+          ? '#f472b6'
         : '#22c55e';
 
     ctx.fillStyle = hovered ? '#132238' : '#0f172a';
@@ -198,6 +214,8 @@ class ProjectTopScene extends Scene {
         ? 'TILESET'
         : item.asset.type === 'map'
           ? 'MAP'
+          : item.asset.type === 'playUnit'
+            ? 'PLAYUNIT'
           : 'PIXEL DOC',
       x + 14,
       y + 16,
@@ -221,14 +239,20 @@ class ProjectTopScene extends Scene {
 
   _buildAssetItems(canvas, appData) {
     const panel = this._getAssetPanelRect(canvas);
+    this._assetPanelRect = panel;
     const assets = this._collectProjectAssets(appData.currentProject);
     const itemGap = 10;
     const itemH = 70;
     const leftPad = 14;
     const rightPad = 14;
-    const topPad = 42;
+    const topPad = 64;
     const maxRows = Math.max(1, Math.floor((panel.h - topPad - 12 + itemGap) / (itemH + itemGap)));
-    const visibleAssets = assets.slice(0, maxRows);
+    this._assetVisibleRows = maxRows;
+    const maxOffset = this._getMaxAssetScrollOffset(assets.length, maxRows);
+    if (this._assetScrollOffset > maxOffset) {
+      this._assetScrollOffset = maxOffset;
+    }
+    const visibleAssets = assets.slice(this._assetScrollOffset, this._assetScrollOffset + maxRows);
 
     return visibleAssets.map((asset, index) => ({
       asset,
@@ -248,6 +272,7 @@ class ProjectTopScene extends Scene {
       ...(project.assets.pixelDocuments || []),
       ...(project.assets.tilesets || []),
       ...(project.assets.maps || []),
+      ...(project.assets.playUnits || []),
     ];
   }
 
@@ -258,6 +283,9 @@ class ProjectTopScene extends Scene {
     }
     if (asset.type === 'map') {
       return `${asset.width | 0}x${asset.height | 0} cells`;
+    }
+    if (asset.type === 'playUnit') {
+      return `${Array.isArray(asset.objects) ? asset.objects.length : 0} objects`;
     }
     return `${asset.width | 0}x${asset.height | 0}px`;
   }
@@ -293,6 +321,23 @@ class ProjectTopScene extends Scene {
     this._openAsset(assetItem.asset);
   }
 
+  _onWheel(e) {
+    if (!this._assetPanelRect || !this._inRect(e.x, e.y, this._assetPanelRect)) return;
+    const assetCount = this._collectProjectAssets(this._appData?.currentProject).length;
+    const maxOffset = this._getMaxAssetScrollOffset(assetCount, this._assetVisibleRows);
+    if (maxOffset <= 0) return;
+
+    const nextOffset = e.deltaY > 0
+      ? Math.min(maxOffset, this._assetScrollOffset + 1)
+      : e.deltaY < 0
+        ? Math.max(0, this._assetScrollOffset - 1)
+        : this._assetScrollOffset;
+
+    if (nextOffset === this._assetScrollOffset) return;
+    this._assetScrollOffset = nextOffset;
+    this._hoverAssetIndex = -1;
+  }
+
   _onKeyDown(e) {
     if (e.key === 'Enter') {
       this._openDotEditor();
@@ -300,6 +345,10 @@ class ProjectTopScene extends Scene {
     }
     if (e.key === 'm' || e.key === 'M') {
       this._openMapEditor();
+      return;
+    }
+    if (e.key === 'p' || e.key === 'P') {
+      this._openPlayUnitEditor();
       return;
     }
     if (e.key === 's' || e.key === 'S') {
@@ -336,6 +385,10 @@ class ProjectTopScene extends Scene {
     }
 
     this._openAsset(asset);
+  }
+
+  _getMaxAssetScrollOffset(assetCount, visibleRows) {
+    return Math.max(0, assetCount - Math.max(1, visibleRows | 0));
   }
 
   _openMapEditor() {
@@ -383,7 +436,29 @@ class ProjectTopScene extends Scene {
       this._appData.changeScene(new MapEditorScene());
       return;
     }
+    if (asset.type === 'playUnit') {
+      this._appData.changeScene(new PlayUnitEditorScene());
+      return;
+    }
     this._appData.changeScene(new EditorScene());
+  }
+
+  _openPlayUnitEditor() {
+    if (!this._appData?.currentProject || !this._appData.projectSession) return;
+
+    let asset = this._appData.getActiveProjectAsset();
+    if (!asset || asset.type !== 'playUnit') {
+      asset = this._appData.currentProject.assets.playUnits[0] || null;
+    }
+
+    if (!asset) {
+      const playUnit = PlayUnitData.createDefault(`play_unit_${(this._appData.currentProject.assets.playUnits?.length || 0) + 1}`);
+      playUnit.addObject({ name: 'Root', parentId: null, children: [], components: [] });
+      asset = this._appData.currentProject.addPlayUnit(playUnit);
+      this._appData.projectSession.markDirty();
+    }
+
+    this._openAsset(asset);
   }
 
   _saveProject() {

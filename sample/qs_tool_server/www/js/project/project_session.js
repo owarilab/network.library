@@ -60,7 +60,7 @@ class ProjectSession {
 
   /**
    * 現在開いているアセット参照を設定する。
-   * @param {'pixelDocument'|'tileset'|'map'} type
+  * @param {'pixelDocument'|'tileset'|'map'|'playUnit'} type
    * @param {string} id
    * @returns {boolean}
    */
@@ -124,7 +124,7 @@ class ProjectSession {
    * @returns {boolean}
    */
   _isValidDocumentType(type) {
-    return type === 'pixelDocument' || type === 'tileset' || type === 'map';
+    return type === 'pixelDocument' || type === 'tileset' || type === 'map' || type === 'playUnit';
   }
 }
 
@@ -190,6 +190,7 @@ class ProjectSerializer {
         pixelDocuments: (project.assets?.pixelDocuments || []).map(doc => ProjectSerializer._serializePixelDocument(doc, fallbackPalette)),
         tilesets: (project.assets?.tilesets || []).map(tileset => ProjectSerializer._serializeTileset(tileset, fallbackPalette)),
         maps: (project.assets?.maps || []).map(map => ProjectSerializer._serializeMap(map)),
+        playUnits: (project.assets?.playUnits || []).map(playUnit => ProjectSerializer._serializePlayUnit(playUnit)),
       },
     };
   }
@@ -244,6 +245,32 @@ class ProjectSerializer {
     };
   }
 
+  static _serializePlayUnit(playUnit) {
+    return {
+      id: playUnit.id,
+      type: 'playUnit',
+      name: playUnit.name,
+      objects: Array.isArray(playUnit.objects)
+        ? playUnit.objects.map(objectData => ({
+          id: objectData.id,
+          name: objectData.name,
+          enabled: objectData.enabled !== false,
+          parentId: typeof objectData.parentId === 'string' && objectData.parentId ? objectData.parentId : null,
+          children: Array.isArray(objectData.children) ? [...objectData.children] : [],
+          components: Array.isArray(objectData.components)
+            ? objectData.components.map(component => ({
+              type: component.type,
+              enabled: component.enabled !== false,
+              data: component.data && typeof component.data === 'object' && !Array.isArray(component.data)
+                ? { ...component.data }
+                : {},
+            }))
+            : [],
+        }))
+        : [],
+    };
+  }
+
   static _serializeSession(session, project) {
     const next = session || ProjectSession.createForProject(project);
     return {
@@ -287,6 +314,14 @@ class ProjectSerializer {
       width: map.width | 0 || 32,
       height: map.height | 0 || 32,
       mapData: map.mapData || null,
+    }));
+    project.assets.playUnits = (obj.assets?.playUnits || []).map(playUnit => ({
+      id: typeof playUnit.id === 'string' && playUnit.id ? playUnit.id : PlayUnitData.createId('pu'),
+      type: 'playUnit',
+      name: typeof playUnit.name === 'string' && playUnit.name.trim() ? playUnit.name.trim() : 'play_unit',
+      objects: Array.isArray(playUnit.objects)
+        ? playUnit.objects.map(objectData => PlayObjectData.from(objectData))
+        : [],
     }));
     return project;
   }
