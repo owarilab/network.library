@@ -6,6 +6,20 @@ class PlayUnitRuntime {
   constructor() {
     this.id = '';
     this.name = 'PlayUnit';
+    this.camera = {
+      objectId: '',
+      objectName: 'DefaultCamera',
+      followTargetObjectId: '',
+      followTargetObjectName: '',
+      followLerp: 1,
+      sourceX: 0,
+      sourceY: 0,
+      targetX: 0,
+      targetY: 0,
+      x: 0,
+      y: 0,
+      zoom: 1,
+    };
     this.textEntries = [];
   }
 
@@ -19,6 +33,7 @@ class PlayUnitRuntime {
     runtime.name = typeof playUnit?.name === 'string' && playUnit.name.trim() ? playUnit.name.trim() : 'PlayUnit';
 
     const objects = Array.isArray(playUnit?.objects) ? playUnit.objects : [];
+    runtime.camera = PlayUnitRuntime._resolveCamera(objects);
     const textEntries = [];
     for (let index = 0; index < objects.length; index++) {
       const objectData = objects[index];
@@ -59,6 +74,89 @@ class PlayUnitRuntime {
       return a.order - b.order;
     });
     return runtime;
+  }
+
+  /**
+   * @param {Array<PlayObjectData|object>} objects
+   * @returns {{objectId: string, objectName: string, x: number, y: number, zoom: number}}
+   */
+  static _resolveCamera(objects) {
+    const fallbackCamera = {
+      objectId: '',
+      objectName: 'DefaultCamera',
+      followTargetObjectId: '',
+      followTargetObjectName: '',
+      followLerp: 1,
+      sourceX: 0,
+      sourceY: 0,
+      targetX: 0,
+      targetY: 0,
+      x: 0,
+      y: 0,
+      zoom: 1,
+    };
+
+    if (!Array.isArray(objects) || !objects.length) return fallbackCamera;
+
+    const playSettingsObject = objects.find((objectData) => {
+      if (!objectData || objectData.enabled === false) return false;
+      return !!PlayUnitRuntime._findEnabledComponent(objectData, 'PlaySettings');
+    }) || null;
+
+    const defaultCameraObjectId = typeof PlayUnitRuntime._findEnabledComponent(playSettingsObject, 'PlaySettings')?.data?.defaultCameraObjectId === 'string'
+      ? PlayUnitRuntime._findEnabledComponent(playSettingsObject, 'PlaySettings').data.defaultCameraObjectId.trim()
+      : '';
+
+    let cameraObject = null;
+    if (defaultCameraObjectId) {
+      cameraObject = objects.find((objectData) => objectData?.id === defaultCameraObjectId) || null;
+    }
+
+    if (!cameraObject) {
+      cameraObject = objects.find((objectData) => {
+        if (!objectData || objectData.enabled === false) return false;
+        return !!PlayUnitRuntime._findEnabledComponent(objectData, 'Camera');
+      }) || null;
+    }
+
+    const cameraComponent = PlayUnitRuntime._findEnabledComponent(cameraObject, 'Camera');
+    const transformComponent = PlayUnitRuntime._findEnabledComponent(cameraObject, 'Transform');
+    if (!cameraObject || !cameraComponent || !transformComponent) return fallbackCamera;
+
+    const followTargetObjectId = typeof cameraComponent.data?.followTargetObjectId === 'string'
+      ? cameraComponent.data.followTargetObjectId.trim()
+      : '';
+    const followTargetObject = followTargetObjectId
+      ? objects.find((objectData) => objectData?.id === followTargetObjectId && objectData.enabled !== false) || null
+      : null;
+    const followTargetTransform = PlayUnitRuntime._findEnabledComponent(followTargetObject, 'Transform');
+    const sourceX = Number.isFinite(Number(transformComponent.data?.x)) ? Number(transformComponent.data.x) : 0;
+    const sourceY = Number.isFinite(Number(transformComponent.data?.y)) ? Number(transformComponent.data.y) : 0;
+    const targetX = followTargetTransform && Number.isFinite(Number(followTargetTransform.data?.x))
+      ? Number(followTargetTransform.data.x)
+      : sourceX;
+    const targetY = followTargetTransform && Number.isFinite(Number(followTargetTransform.data?.y))
+      ? Number(followTargetTransform.data.y)
+      : sourceY;
+    const followLerp = PlayUnitRuntime._normalizeUnitInterval(cameraComponent.data?.followLerp, 1);
+
+    const cameraX = followTargetTransform ? targetX : sourceX;
+    const cameraY = followTargetTransform ? targetY : sourceY;
+
+    return {
+      objectId: typeof cameraObject.id === 'string' ? cameraObject.id : '',
+      objectName: typeof cameraObject.name === 'string' && cameraObject.name.trim() ? cameraObject.name.trim() : 'CameraObject',
+      followTargetObjectId,
+      followTargetObjectName: typeof followTargetObject?.name === 'string' && followTargetObject.name.trim() ? followTargetObject.name.trim() : '',
+      followLerp,
+      sourceX,
+      sourceY,
+      targetX,
+      targetY,
+      x: cameraX,
+      y: cameraY,
+      zoom: PlayUnitRuntime._normalizePositiveNumber(cameraComponent.data?.zoom, 1),
+    };
   }
 
   /**
@@ -108,6 +206,19 @@ class PlayUnitRuntime {
   static _normalizeAlpha(value) {
     const nextValue = Number(value);
     if (!Number.isFinite(nextValue)) return 1;
+    if (nextValue < 0) return 0;
+    if (nextValue > 1) return 1;
+    return nextValue;
+  }
+
+  /**
+   * @param {number|string|undefined|null} value
+   * @param {number} fallback
+   * @returns {number}
+   */
+  static _normalizeUnitInterval(value, fallback) {
+    const nextValue = Number(value);
+    if (!Number.isFinite(nextValue)) return fallback;
     if (nextValue < 0) return 0;
     if (nextValue > 1) return 1;
     return nextValue;

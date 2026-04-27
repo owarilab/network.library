@@ -233,17 +233,48 @@
 
 ## 3. PlaySettings
 
-その PlayUnit にひもづく設定。
+その PlayUnit 全体にひもづく設定。
+
+実際の camera 実体は `Camera` component を持つ `PlayObject` で表し、
+`PlaySettings` は既定 camera の選択を保持する薄い設定 object とする。
 
 ```js
 {
   type: 'PlaySettings',
   enabled: true,
-  data: {}
+  data: {
+    defaultCameraObjectId: 'obj_camera'
+  }
 }
 ```
 
-## 4. Sprite
+## 4. Camera
+
+PlayUnit 内の視点を表す component。
+
+複数 camera を置けるようにし、将来的な分割画面、観戦 camera、
+多人数プレイ camera の基礎にする。
+
+```js
+{
+  type: 'Camera',
+  enabled: true,
+  data: {
+    zoom: 1,
+    viewportX: 0,
+    viewportY: 0,
+    viewportWidth: 0,
+    viewportHeight: 0,
+    followTargetObjectId: '',
+    followLerp: 1
+  }
+}
+```
+
+通常は `Transform` と同一 object に付与し、camera object 自身の位置を
+`Transform` 側で持つ。
+
+## 5. Sprite
 
 スプライト表示用の見た目情報。
 
@@ -258,7 +289,7 @@
 }
 ```
 
-## 5. Text
+## 6. Text
 
 テキスト表示用の最小 component。
 
@@ -278,7 +309,7 @@
 `Transform.data.x`, `Transform.data.y` を描画座標、
 `Text.data.text`, `Text.data.font`, `Text.data.color` を描画設定として扱う。
 
-## 6. Collider
+## 7. Collider
 
 当たり判定または判定用サイズ。
 
@@ -295,7 +326,7 @@
 }
 ```
 
-## 6. Trigger
+## 8. Trigger
 
 接触や操作で反応するイベント起点。
 
@@ -311,6 +342,34 @@
 }
 ```
 
+## 9. Controller
+
+操作される object に直接付与する最小 component。
+
+`Controller` は別 object を参照して操作するのではなく、
+付与された object 自身を操作対象とする。
+
+最初の実装では `Transform` と同一 object に付与し、
+入力に応じてその object の `Transform.data.x`, `Transform.data.y` を更新する。
+
+```js
+{
+  type: 'Controller',
+  enabled: true,
+  data: {
+    inputMode: 'player1',
+    moveSpeed: 120
+  }
+}
+```
+
+### 設計方針
+
+- `Controller` は操作対象 object に直接付与する
+- 初期仕様では `targetObjectId` は持たない
+- 将来必要になれば、遠隔操作や憑依のための拡張項目として別途追加する
+- `Transform` が存在しない object に付与しても移動処理は行わない
+
 ---
 
 ## 抽象化の対応表
@@ -321,6 +380,8 @@
 |-----------|------------|
 | `tilemaps[]` | `Tilemap` component を持つ `PlayObject` |
 | `settings` | `PlaySettings` component を持つ `PlayObject` |
+| `camera` | `Camera` component を持つ `PlayObject` + `PlaySettings.defaultCameraObjectId` |
+| `player control` | `Controller` component を持つ `PlayObject` |
 
 この方式により、構造が一貫し、編集 UI も object inspector ベースで統一しやすくなる。
 
@@ -340,8 +401,19 @@
       name: 'Root',
       enabled: true,
       parentId: null,
-      children: ['obj_tilemap_ground', 'obj_settings', 'obj_player'],
+      children: ['obj_camera', 'obj_settings', 'obj_tilemap_ground'],
       components: []
+    },
+    {
+      id: 'obj_camera',
+      name: 'CameraObject',
+      enabled: true,
+      parentId: 'obj_root',
+      children: [],
+      components: [
+        { type: 'Transform', enabled: true, data: { x: 0, y: 0, z: 0 } },
+        { type: 'Camera', enabled: true, data: { zoom: 1, viewportX: 0, viewportY: 0, viewportWidth: 0, viewportHeight: 0, followTargetObjectId: '', followLerp: 1 } }
+      ]
     },
     {
       id: 'obj_tilemap_ground',
@@ -356,12 +428,12 @@
     },
     {
       id: 'obj_settings',
-      name: 'Play Settings',
+      name: 'PlaySettingsObject',
       enabled: true,
       parentId: 'obj_root',
       children: [],
       components: [
-        { type: 'PlaySettings', enabled: true, data: {} }
+        { type: 'PlaySettings', enabled: true, data: { defaultCameraObjectId: 'obj_camera' } }
       ]
     },
     {
@@ -379,6 +451,18 @@
   ]
 }
 ```
+
+### 新規作成時の初期構成
+
+`PlayUnitData.createDefault(name)` では、最低限次の object 群を自動生成する。
+
+- `Root`
+- `CameraObject`
+- `PlaySettingsObject`
+
+`CameraObject` と `PlaySettingsObject` は `Root` の子として作成し、
+`PlaySettingsObject` の `PlaySettings.data.defaultCameraObjectId` には
+生成した `CameraObject` の ID を設定する。
 
 ---
 

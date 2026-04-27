@@ -19,6 +19,8 @@
 - `PlayUnitData` は `id`, `name`, `objects` を持つ最小構造から始める
 - `PlayObjectData` は `id`, `name`, `enabled`, `parentId`, `children`, `components` を持つ
 - `tilemaps` や `settings` は top-level property ではなく component として表現する
+- `PlaySettings` は PlayUnit 全体の薄い設定 object とし、既定 camera の選択を持つ
+- camera 自体は `Camera` component を持つ `PlayObject` として表現する
 - プレイヤーに関する構造はこの計画の直接対象外とし、別設計で扱う
 
 ---
@@ -56,15 +58,17 @@
 - Phase 4 完了: `ProjectTopScene` から `PlayUnit` の作成、選択、オープン導線を実装済み
 - Phase 5 完了: `PlayUnitEditorScene` の雛形を追加し、選択中 `PlayUnit` の最小表示を実装済み
 - Phase 6 実装進行: object の追加 / 削除 / 改名、component の追加 / 削除、component parameter の最小 JSON 編集、object / component 一覧スクロールを実装済み
+- Phase 6 実装進行: `CameraObject` 追加補助、default camera の可視化、選択 object ID の表示とコピペ用 input を実装済み
 - Phase 6 実装進行: `Text` component の最小編集項目として `text`, `font`, `color`, `alpha`, `align`, `baseline`, `wrap`, `maxWidth`, `lineHeight`, `strokeColor`, `strokeWidth`, `backgroundColor`, `padding` を扱える状態まで拡張済み
 - Phase 7 実装進行: `PlayUnitRuntime` と `PlayTestScene` を追加し、`Transform + Text` の最小 preview 描画を実装済み
+- Phase 7 実装進行: `PlaySettings.defaultCameraObjectId` による default camera 解決、`followTargetObjectId` / `followLerp` による最小 camera follow、`Controller` による object 自己操作 preview を実装済み
 - 周辺 UI 調整として、`Project Assets` と `Browser Projects` の一覧スクロールと表示調整を実装済み
 
 ### 未実装
 
 - Phase 7: `Tilemap` component の参照解決
 - Phase 7: `Trigger` component の最小評価
-- Phase 7: `PlaySettings` の camera 反映など preview 範囲の拡張
+- Phase 7: camera の中央基準描画、offset、screen-space 分離などの詳細仕様
 
 ---
 
@@ -127,12 +131,14 @@
 4. `ComponentData` の最小生成 API を定義する
 5. ID 採番の最小ルールを決める
 6. `objects` 配列を正本とするユーティリティを用意する
+7. `createDefault(name)` で `Root` / `CameraObject` / `PlaySettingsObject` の初期構成を生成する
 
 ### 完了条件
 
 - `PlayUnitData` を 1 つ生成できる
-- 空の `PlayObjectData` を追加できる
-- `Tilemap` / `PlaySettings` / `Text` / `Trigger` component をデータとして保持できる
+- `Root` / `CameraObject` / `PlaySettingsObject` を含む初期 `PlayUnitData` を生成できる
+- `PlaySettings.data.defaultCameraObjectId` が `CameraObject` を指す
+- `Tilemap` / `PlaySettings` / `Camera` / `Text` / `Trigger` component をデータとして保持できる
 
 ### このフェーズで作るもの
 
@@ -275,7 +281,7 @@
 2. object 名変更を可能にする
 3. object 削除を可能にする
 4. `Transform` component の追加を可能にする
-5. `Tilemap` / `PlaySettings` / `Text` / `Trigger` の追加を可能にする
+5. `Tilemap` / `PlaySettings` / `Camera` / `Text` / `Trigger` / `Controller` の追加を可能にする
 6. component parameter の最小 JSON 編集を可能にする
 7. `Text` component は runtime 確認用の表示系 parameter を先行して扱えるようにする
 
@@ -288,6 +294,7 @@
 ### Phase 6 補足
 
 - `Text` component の最小 runtime 確認対象は `text`, `font`, `color`, `alpha`, `align`, `baseline`, `wrap`, `maxWidth`, `lineHeight`, `strokeColor`, `strokeWidth`, `backgroundColor`, `padding` とする
+- `Controller` component は操作対象 object 自身に直接付与する
 - 専用 inspector はまだ作らず、当面は JSON 編集で値を調整する
 
 ### 依存
@@ -307,21 +314,29 @@
 
 1. `PlayUnitRuntime` の最小設計を別紙化する
 2. `PlayUnitData` → `PlayUnitRuntime` 変換 API を作る
-3. `Tilemap` component の参照解決方法を定義する
-4. `Trigger` component の最小評価方法を定義する
-5. `PlayTestScene` 接続用の stub を追加する
-6. 最初の preview 対象を `Transform + Text` に限定して描画確認できるようにする
+3. `PlaySettings.defaultCameraObjectId` から既定 camera を解決する
+4. `Camera` component と `Transform` から preview camera を構成する
+5. `Tilemap` component の参照解決方法を定義する
+6. `Trigger` component の最小評価方法を定義する
+7. `PlayTestScene` 接続用の stub を追加する
+8. 最初の preview 対象を `Transform + Text` に限定して描画確認できるようにする
+9. `Controller` component による最小移動 preview を追加する
 
 ### 完了条件
 
 - `PlayUnitRuntime` の雛形ができる
 - 最小 `PlayUnit` を runtime へ渡せる
+- `PlaySettings.defaultCameraObjectId` から既定 camera を解決できる
+- `Controller` を持つ object の最小移動確認ができる
 
 ### Phase 7 補足
 
 - 最初の preview は `Transform + Text` のみを対象とする
+- preview camera は `PlaySettings.defaultCameraObjectId` が指す `CameraObject` を優先して使う
 - `Text` preview では `align`, `baseline`, `wrap`, `maxWidth`, `lineHeight`, `strokeColor`, `strokeWidth`, `backgroundColor`, `padding`, `alpha` を扱う
-- `Tilemap`, `Trigger`, camera 反映はこの後続タスクで広げる
+- `Controller` は操作対象 object に直接付与し、その object 自身の `Transform` を操作する
+- `Tilemap`, `Trigger`, camera の追従や複数 viewport はこの後続タスクで広げる
+- camera の中央基準描画、offset、screen-space 分離は仕様未確定のため現時点では保留とする
 
 ### このフェーズではやらないこと
 
@@ -351,6 +366,8 @@
 
 - 空の `PlayUnitData` を生成できる
 - object / component を JSON 化しても壊れない
+- 新規作成時に `Root` / `CameraObject` / `PlaySettingsObject` が自動生成される
+- `defaultCameraObjectId` が生成済み camera object を指す
 
 ### Phase 2
 
@@ -377,11 +394,16 @@
 - object の追加 / 削除 / 改名ができる
 - component の最小追加ができる
 - component parameter を JSON で編集して `Text` の表示確認ができる
+- `Controller` component を object に追加できる
+- 選択 object の ID を editor 上で確認し、コピペできる
 
 ### Phase 7
 
 - runtime 変換 API が最小 `PlayUnit` を受け取れる
 - `Transform + Text` を PlayTest 上で preview 表示できる
+- default camera を切り替えたときの preview 対象が一致する
+- `Controller` を持つ object を PlayTest 上で移動できる
+- `followTargetObjectId` と `followLerp` による最小 camera follow を確認できる
 
 ---
 

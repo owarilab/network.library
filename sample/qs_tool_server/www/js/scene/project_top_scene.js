@@ -461,7 +461,6 @@ class ProjectTopScene extends Scene {
 
     if (!asset) {
       const playUnit = PlayUnitData.createDefault(`play_unit_${(this._appData.currentProject.assets.playUnits?.length || 0) + 1}`);
-      playUnit.addObject({ name: 'Root', parentId: null, children: [], components: [] });
       asset = this._appData.currentProject.addPlayUnit(playUnit);
       this._appData.projectSession.markDirty();
     }

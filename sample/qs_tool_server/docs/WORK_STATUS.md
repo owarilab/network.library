@@ -1,6 +1,6 @@
 # ドットエディタ 作業状況
 
-最終更新: 2026-04-26 (21)
+最終更新: 2026-04-27 (22)
 
 ## 概要
 
@@ -26,6 +26,7 @@ docs/
   ├── PROJECT_SCENE_FLOW_PLAN.md   # タイトル/プロジェクトトップ/遷移基盤の計画
   ├── PLAY_UNIT_DESIGN.md          # PlayUnit / PlayObject / Component 設計書
   ├── PLAY_UNIT_IMPLEMENTATION_PLAN.md # PlayUnit 実装計画書
+  ├── CAMERA_PLAY_SETTINGS_JSON_EXAMPLES.md # Camera / PlaySettings 用 JSON テンプレート集
   ├── TEXT_COMPONENT_JSON_EXAMPLES.md # Text component 用 JSON テンプレート集
   ├── SELECTION_TOOL_PLAN.md       # 選択ツール実装計画
   ├── SPEC_quarter_view_tile.md    # クォータービュータイル生成仕様書
@@ -89,6 +90,7 @@ www/
 - [プロジェクト管理・シーン遷移基盤 計画書](specs/PROJECT_SCENE_FLOW_PLAN.md)
 - [PlayUnit 設計書](specs/PLAY_UNIT_DESIGN.md)
 - [PlayUnit 実装計画書](specs/PLAY_UNIT_IMPLEMENTATION_PLAN.md)
+- [Camera / PlaySettings JSON 例集](specs/CAMERA_PLAY_SETTINGS_JSON_EXAMPLES.md)
 - [Text component JSON 例集](specs/TEXT_COMPONENT_JSON_EXAMPLES.md)
 - [ブラウザ保存（IndexedDB）最小設計書](specs/BROWSER_STORAGE_PLAN.md)
 - [マップエディタシーン実装計画書](specs/MAP_EDITOR_SCENE_PLAN.md)
@@ -133,6 +135,15 @@ www/
   - `ProjectTopScene` に既存 asset 一覧表示と選択オープン導線を追加
   - `TitleScene` に browser project 一覧表示・削除導線を追加
   - `ProjectTopScene` の保存導線を browser 保存 / `.qsproj` export に分離
+- [x] `PlayUnit` / `PlayTest` の最小 runtime 導線
+  - `PlayUnitData.createDefault()` で `Root` / `CameraObject` / `PlaySettingsObject` の初期生成を追加
+  - `PlayTestScene` で `Transform + Text` の最小 preview を追加
+  - `PlaySettings.defaultCameraObjectId` による default camera 解決を追加
+  - `Camera.followTargetObjectId` / `followLerp` による最小 follow preview を追加
+  - `Controller` component による object 自己操作 preview を追加
+  - `PlayUnitEditorScene` に `+CameraObject` / `+Camera` / `+Controller` を追加
+  - default camera 表示と object ID のコピペ用 input を追加
+  - camera の中央基準描画や screen-space 分離は仕様未確定のため保留
 - [x] `MapEditorScene` の雛形追加
   - `ProjectTopScene` から map asset を開けるように変更
   - `UIWindow` ベースの `MapViewWindow` / `MapTilesetWindow` / `MapInspectorWindow` を追加

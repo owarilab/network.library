@@ -15,6 +15,7 @@ class PlayUnitEditorScene extends Scene {
     this._componentScrollOffset = 0;
     this._objectVisibleRows = 0;
     this._componentVisibleRows = 0;
+    this._selectedObjectIdInput = null;
     this._hoverButtonIndex = -1;
     this._hoverObjectIndex = -1;
     this._hoverComponentIndex = -1;
@@ -31,6 +32,7 @@ class PlayUnitEditorScene extends Scene {
 
   onEnter(input, appData) {
     this._appData = appData;
+    this._ensureSelectedObjectIdInput();
     input.on('mousemove', this._onMouseMove);
     input.on('mousedown', this._onMouseDown);
     input.on('wheel', this._onWheel);
@@ -47,6 +49,7 @@ class PlayUnitEditorScene extends Scene {
     this._hoverObjectIndex = -1;
     this._hoverComponentIndex = -1;
     this._hoverComponentEditIndex = -1;
+    this._removeSelectedObjectIdInput();
   }
 
   render(ctx, canvas, appData) {
@@ -56,6 +59,7 @@ class PlayUnitEditorScene extends Scene {
     const top = 72;
     const panelW = Math.min(760, canvas.width - 48);
     const panelH = Math.max(260, canvas.height - 120);
+    const canvasRect = canvas.getBoundingClientRect();
 
     this._ensureSelectedObject(asset);
 
@@ -136,6 +140,7 @@ class PlayUnitEditorScene extends Scene {
     ctx.stroke();
 
     if (!asset) {
+      this._hideSelectedObjectIdInput();
       this._objectItems = [];
       this._componentItems = [];
       ctx.fillStyle = '#fca5a5';
@@ -145,9 +150,26 @@ class PlayUnitEditorScene extends Scene {
     }
 
     const selectedObject = this._getSelectedObject();
+    const defaultCameraObjectId = this._getDefaultCameraObjectId(asset);
     ctx.fillStyle = '#94a3b8';
     ctx.font = '13px sans-serif';
-    ctx.fillText(`Selected: ${selectedObject?.name || '-'}`, left + 18, selectedY);
+    const selectedLabel = selectedObject?.id === defaultCameraObjectId
+      ? `Selected: ${selectedObject?.name || '-'} [default camera]`
+      : `Selected: ${selectedObject?.name || '-'}`;
+    ctx.fillText(selectedLabel, left + 18, selectedY);
+    if (selectedObject?.id) {
+      ctx.fillStyle = '#64748b';
+      ctx.font = '11px monospace';
+      ctx.fillText('ID:', left + 18, selectedY + 18);
+      this._updateSelectedObjectIdInput(selectedObject.id, {
+        x: canvasRect.left + left + 48,
+        y: canvasRect.top + selectedY + 6,
+        w: Math.max(140, objectListW - 120),
+        h: 24,
+      });
+    } else {
+      this._hideSelectedObjectIdInput();
+    }
 
     if (!objects.length) {
       this._objectItems = [];
@@ -181,6 +203,7 @@ class PlayUnitEditorScene extends Scene {
       const rowY = listTop + index * rowH;
       const isSelected = objectData.id === this._selectedObjectId;
       const isHovered = index === this._hoverObjectIndex;
+      const isDefaultCamera = objectData.id === defaultCameraObjectId;
       ctx.fillStyle = isSelected ? '#1d4ed8' : isHovered ? '#132238' : index % 2 === 0 ? '#0b1220' : '#0f172a';
       ctx.strokeStyle = isSelected ? '#93c5fd' : '#1f2937';
       ctx.lineWidth = isSelected ? 1.5 : 1;
@@ -192,6 +215,12 @@ class PlayUnitEditorScene extends Scene {
       ctx.fillStyle = objectData.enabled === false ? '#64748b' : '#f8fafc';
       ctx.font = '14px sans-serif';
       ctx.fillText(objectData.name || objectData.id || 'Object', left + 24, rowY + 1);
+
+      if (isDefaultCamera) {
+        ctx.fillStyle = '#fde68a';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.fillText('[default camera]', left + 176, rowY + 1);
+      }
 
       ctx.fillStyle = '#94a3b8';
       ctx.textAlign = 'right';
@@ -208,9 +237,12 @@ class PlayUnitEditorScene extends Scene {
   _buildButtons(left, top, panelW, hasAsset) {
     const buttonDefs = [
       { label: 'Add Object', action: () => this._addObject(), disabled: !hasAsset },
+      { label: '+CameraObject', action: () => this._addCameraObject(), disabled: !hasAsset },
       { label: 'Rename', action: () => this._renameSelectedObject(), disabled: !hasAsset },
       { label: 'Delete', action: () => this._deleteSelectedObject(), disabled: !hasAsset },
       { label: '+Transform', action: () => this._addComponentToSelectedObject('Transform'), disabled: !hasAsset },
+      { label: '+Camera', action: () => this._addComponentToSelectedObject('Camera'), disabled: !hasAsset },
+      { label: '+Controller', action: () => this._addComponentToSelectedObject('Controller'), disabled: !hasAsset },
       { label: '+Tilemap', action: () => this._addComponentToSelectedObject('Tilemap'), disabled: !hasAsset },
       { label: '+Settings', action: () => this._addComponentToSelectedObject('PlaySettings'), disabled: !hasAsset },
       { label: '+Text', action: () => this._addComponentToSelectedObject('Text'), disabled: !hasAsset },
@@ -365,6 +397,35 @@ class PlayUnitEditorScene extends Scene {
     this._markDirty(`Added object: ${objectData.name}`);
   }
 
+  _addCameraObject() {
+    const playUnit = this._getActivePlayUnit();
+    if (!playUnit) {
+      this._statusTone = 'error';
+      this._statusMessage = 'No active PlayUnit';
+      return;
+    }
+
+    const rootObject = playUnit.objects.find((objectData) => objectData?.parentId === null && (objectData.name === 'Root' || objectData.id === this._selectedObjectId)) || null;
+    const cameraIndex = playUnit.objects.filter((objectData) => typeof objectData?.name === 'string' && objectData.name.startsWith('CameraObject')).length + 1;
+    const objectData = playUnit.addObject({
+      name: cameraIndex === 1 ? 'CameraObject' : `CameraObject ${cameraIndex}`,
+      parentId: rootObject?.id || null,
+      children: [],
+      components: [
+        { type: 'Transform', data: this._createComponentTemplate('Transform') },
+        { type: 'Camera', data: this._createComponentTemplate('Camera') },
+      ],
+    });
+
+    if (rootObject && !rootObject.children.includes(objectData.id)) {
+      rootObject.children.push(objectData.id);
+    }
+
+    this._selectedObjectId = objectData.id;
+    this._componentScrollOffset = 0;
+    this._markDirty(`Added camera object: ${objectData.name}`);
+  }
+
   _renameSelectedObject() {
     const objectData = this._getSelectedObject();
     if (!objectData) {
@@ -442,9 +503,22 @@ class PlayUnitEditorScene extends Scene {
         };
       case 'PlaySettings':
         return {
-          cameraX: 0,
-          cameraY: 0,
-          cameraZoom: 1,
+          defaultCameraObjectId: '',
+        };
+      case 'Camera':
+        return {
+          zoom: 1,
+          viewportX: 0,
+          viewportY: 0,
+          viewportWidth: 0,
+          viewportHeight: 0,
+          followTargetObjectId: '',
+          followLerp: 1,
+        };
+      case 'Controller':
+        return {
+          inputMode: 'player1',
+          moveSpeed: 120,
         };
       case 'Text':
         return {
@@ -541,6 +615,63 @@ class PlayUnitEditorScene extends Scene {
     const playUnit = this._getActivePlayUnit();
     if (!playUnit || !this._selectedObjectId) return null;
     return playUnit.findObjectById(this._selectedObjectId);
+  }
+
+  _getDefaultCameraObjectId(playUnit = this._getActivePlayUnit()) {
+    if (!playUnit || !Array.isArray(playUnit.objects)) return '';
+    for (const objectData of playUnit.objects) {
+      const playSettings = objectData?.findComponentByType?.('PlaySettings') || null;
+      const defaultCameraObjectId = typeof playSettings?.data?.defaultCameraObjectId === 'string'
+        ? playSettings.data.defaultCameraObjectId.trim()
+        : '';
+      if (defaultCameraObjectId) return defaultCameraObjectId;
+    }
+    return '';
+  }
+
+  _ensureSelectedObjectIdInput() {
+    if (this._selectedObjectIdInput) return;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.readOnly = true;
+    input.spellcheck = false;
+    input.autocomplete = 'off';
+    input.style.position = 'fixed';
+    input.style.zIndex = '20';
+    input.style.display = 'none';
+    input.style.padding = '2px 8px';
+    input.style.border = '1px solid #475569';
+    input.style.borderRadius = '6px';
+    input.style.background = '#0f172a';
+    input.style.color = '#e2e8f0';
+    input.style.font = '11px monospace';
+    input.style.boxSizing = 'border-box';
+    input.style.outline = 'none';
+    input.addEventListener('focus', () => input.select());
+    document.body.appendChild(input);
+    this._selectedObjectIdInput = input;
+  }
+
+  _updateSelectedObjectIdInput(value, rect) {
+    this._ensureSelectedObjectIdInput();
+    if (!this._selectedObjectIdInput) return;
+    this._selectedObjectIdInput.value = value;
+    this._selectedObjectIdInput.style.display = 'block';
+    this._selectedObjectIdInput.style.left = `${Math.round(rect.x)}px`;
+    this._selectedObjectIdInput.style.top = `${Math.round(rect.y)}px`;
+    this._selectedObjectIdInput.style.width = `${Math.round(rect.w)}px`;
+    this._selectedObjectIdInput.style.height = `${Math.round(rect.h)}px`;
+  }
+
+  _hideSelectedObjectIdInput() {
+    if (!this._selectedObjectIdInput) return;
+    this._selectedObjectIdInput.style.display = 'none';
+  }
+
+  _removeSelectedObjectIdInput() {
+    if (!this._selectedObjectIdInput) return;
+    this._selectedObjectIdInput.remove();
+    this._selectedObjectIdInput = null;
   }
 
   _markDirty(message) {

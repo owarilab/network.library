@@ -21,6 +21,67 @@ class PlayUnitData {
     const playUnit = new PlayUnitData();
     playUnit.id = PlayUnitData.createId('pu');
     playUnit.name = PlayUnitData.normalizeName(name, 'PlayUnit');
+    const rootId = PlayUnitData.createId('obj');
+    const cameraObjectId = PlayUnitData.createId('obj');
+    const playSettingsObjectId = PlayUnitData.createId('obj');
+
+    playUnit.objects = [
+      PlayObjectData.from({
+        id: rootId,
+        name: 'Root',
+        parentId: null,
+        children: [cameraObjectId, playSettingsObjectId],
+        components: [],
+      }),
+      PlayObjectData.from({
+        id: cameraObjectId,
+        name: 'CameraObject',
+        parentId: rootId,
+        children: [],
+        components: [
+          {
+            type: 'Transform',
+            enabled: true,
+            data: {
+              x: 0,
+              y: 0,
+              z: 0,
+              rotation: 0,
+              scaleX: 1,
+              scaleY: 1,
+            },
+          },
+          {
+            type: 'Camera',
+            enabled: true,
+            data: {
+              zoom: 1,
+              viewportX: 0,
+              viewportY: 0,
+              viewportWidth: 0,
+              viewportHeight: 0,
+              followTargetObjectId: '',
+              followLerp: 1,
+            },
+          },
+        ],
+      }),
+      PlayObjectData.from({
+        id: playSettingsObjectId,
+        name: 'PlaySettingsObject',
+        parentId: rootId,
+        children: [],
+        components: [
+          {
+            type: 'PlaySettings',
+            enabled: true,
+            data: {
+              defaultCameraObjectId: cameraObjectId,
+            },
+          },
+        ],
+      }),
+    ];
     return playUnit;
   }
 
