@@ -9,12 +9,28 @@ class PlayTestScene extends Scene {
     this._input = null;
     this._runtime = null;
     this._cameraState = null;
+    this._previewRect = null;
+    this._imageCanvasCache = new Map();
+    this._pointerState = {
+      canvasX: 0,
+      canvasY: 0,
+      worldX: 0,
+      worldY: 0,
+      insidePreview: false,
+      hoveredTriggerMap: new Map(),
+      pressedTriggerIds: new Set(),
+    };
+    this._activeOverlapKeys = new Set();
+    this._firedOnceTriggerKeys = new Set();
     this._pressedKeys = new Set();
     this._statusMessage = 'Play test preview';
     this._statusTone = 'muted';
 
     this._onKeyDown = this._onKeyDown.bind(this);
     this._onKeyUp = this._onKeyUp.bind(this);
+    this._onMouseMove = this._onMouseMove.bind(this);
+    this._onMouseDown = this._onMouseDown.bind(this);
+    this._onMouseUp = this._onMouseUp.bind(this);
   }
 
   onEnter(input, appData) {
@@ -24,10 +40,17 @@ class PlayTestScene extends Scene {
     this._cameraState = this._createCameraState(this._runtime?.camera);
     input.on('keydown', this._onKeyDown);
     input.on('keyup', this._onKeyUp);
+    input.on('mousemove', this._onMouseMove);
+    input.on('mousedown', this._onMouseDown);
+    input.on('mouseup', this._onMouseUp);
   }
 
   onLeave() {
     this._pressedKeys.clear();
+    this._imageCanvasCache.clear();
+    this._pointerState.hoveredTriggerMap.clear();
+    this._pointerState.pressedTriggerIds.clear();
+    this._activeOverlapKeys.clear();
   }
 
   render(ctx, canvas) {
@@ -44,6 +67,7 @@ class PlayTestScene extends Scene {
       w: panel.w - 36,
       h: panel.h - 102,
     };
+    this._previewRect = preview;
 
     ctx.fillStyle = '#08111f';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -79,7 +103,7 @@ class PlayTestScene extends Scene {
 
     ctx.fillStyle = '#94a3b8';
     ctx.font = '13px sans-serif';
-    ctx.fillText(`Text entries: ${runtime?.textEntries?.length || 0}`, panel.x + 18, panel.y + 52);
+    ctx.fillText(`Text: ${runtime?.textEntries?.length || 0} / Image: ${runtime?.imageEntries?.length || 0}`, panel.x + 18, panel.y + 52);
     ctx.fillText(`Camera: ${runtime?.camera?.objectName || 'DefaultCamera'} (${Math.round(this._cameraState?.x || runtime?.camera?.x || 0)}, ${Math.round(this._cameraState?.y || runtime?.camera?.y || 0)}) zoom ${runtime?.camera?.zoom || 1}`, panel.x + 180, panel.y + 52);
     if (runtime?.camera?.followTargetObjectId) {
       ctx.fillText(`Follow: ${runtime.camera.followTargetObjectName || runtime.camera.followTargetObjectId} lerp ${runtime.camera.followLerp || 0}`, panel.x + 18, panel.y + 74);
@@ -102,12 +126,13 @@ class PlayTestScene extends Scene {
     ctx.lineWidth = 1;
     ctx.strokeRect(preview.x + 0.5, preview.y + 0.5, preview.w - 1, preview.h - 1);
 
-    if (!runtime || !Array.isArray(runtime.textEntries) || !runtime.textEntries.length) {
+    const renderEntries = this._buildRenderEntries(runtime);
+    if (!renderEntries.length) {
       ctx.fillStyle = '#64748b';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'top';
       ctx.font = '14px sans-serif';
-      ctx.fillText('No renderable Text entries. Add Transform + Text to a PlayObject.', preview.x + 18, preview.y + 18);
+      ctx.fillText('No renderable entries. Add Transform + Text or Transform + Image to a PlayObject.', preview.x + 18, preview.y + 18);
       ctx.restore();
       return;
     }
@@ -117,7 +142,12 @@ class PlayTestScene extends Scene {
     ctx.scale(camera.zoom || 1, camera.zoom || 1);
     ctx.translate(-(camera.x || 0), -(camera.y || 0));
 
-    for (const entry of runtime.textEntries) {
+    const project = this._appData?.currentProject || null;
+    for (const entry of renderEntries) {
+      if (entry.kind === 'image') {
+        this._drawImageEntry(ctx, entry, project);
+        continue;
+      }
       this._drawTextEntry(ctx, entry);
     }
     ctx.restore();
@@ -131,6 +161,7 @@ class PlayTestScene extends Scene {
 
     const previousCameraObjectId = this._runtime?.camera?.objectId || '';
     this._runtime = PlayUnitRuntime.fromPlayUnit(playUnit);
+    this._processOverlapTriggers(playUnit);
     if (!this._cameraState || previousCameraObjectId !== (this._runtime?.camera?.objectId || '')) {
       this._cameraState = this._createCameraState(this._runtime?.camera);
     } else if (this._runtime?.camera) {
@@ -206,6 +237,104 @@ class PlayTestScene extends Scene {
       transform.data.x = currentX + normalizedX * moveSpeed * deltaSeconds;
       transform.data.y = currentY + normalizedY * moveSpeed * deltaSeconds;
     }
+  }
+
+  _processOverlapTriggers(playUnit) {
+    if (!playUnit || !Array.isArray(playUnit.objects)) return;
+
+    const controllerSources = this._getControllerOverlapSources(playUnit.objects);
+    if (!controllerSources.length) {
+      this._activeOverlapKeys.clear();
+      return;
+    }
+
+    const nextOverlapKeys = new Set();
+    for (const objectData of playUnit.objects) {
+      if (!objectData || objectData.enabled === false) continue;
+      const transform = objectData.findComponentByType?.('Transform') || null;
+      const collider = objectData.findComponentByType?.('Collider') || null;
+      const trigger = objectData.findComponentByType?.('Trigger') || null;
+      if (!transform || transform.enabled === false || !collider || collider.enabled === false || !trigger || trigger.enabled === false) continue;
+      if (collider.data?.shape !== 'rect' || collider.data?.isTrigger !== true) continue;
+
+      const triggerOn = typeof trigger.data?.triggerOn === 'string' && trigger.data.triggerOn.trim()
+        ? trigger.data.triggerOn.trim()
+        : 'overlap';
+      if (triggerOn !== 'overlap') continue;
+
+      const triggerRect = this._getRectBounds(transform, collider);
+      if (!triggerRect) continue;
+
+      const targetObjectId = typeof trigger.data?.targetObjectId === 'string' && trigger.data.targetObjectId.trim()
+        ? trigger.data.targetObjectId.trim()
+        : '';
+
+      for (const source of controllerSources) {
+        if (targetObjectId && source.objectId !== targetObjectId) continue;
+        if (!this._intersectsRect(triggerRect, source.rect)) continue;
+
+        const overlapKey = `${objectData.id}:${source.objectId}`;
+        nextOverlapKeys.add(overlapKey);
+        if (this._activeOverlapKeys.has(overlapKey)) continue;
+
+        this._fireTrigger({
+          objectId: typeof objectData.id === 'string' ? objectData.id : '',
+          objectName: typeof objectData.name === 'string' && objectData.name.trim() ? objectData.name.trim() : 'Object',
+          eventId: typeof trigger.data?.eventId === 'string' ? trigger.data.eventId.trim() : '',
+          triggerOn: 'overlap',
+          once: trigger.data?.once === true,
+          triggerKey: `${objectData.id}:${source.objectId}:${typeof trigger.data?.eventId === 'string' ? trigger.data.eventId.trim() : ''}:overlap`,
+        }, 'overlap');
+      }
+    }
+
+    this._activeOverlapKeys = nextOverlapKeys;
+  }
+
+  _getControllerOverlapSources(objects) {
+    const sources = [];
+    for (const objectData of objects) {
+      if (!objectData || objectData.enabled === false) continue;
+      const controller = objectData.findComponentByType?.('Controller') || null;
+      const transform = objectData.findComponentByType?.('Transform') || null;
+      const collider = objectData.findComponentByType?.('Collider') || null;
+      if (!controller || controller.enabled === false || !transform || transform.enabled === false || !collider || collider.enabled === false) continue;
+      if (collider.data?.shape !== 'rect') continue;
+
+      const rect = this._getRectBounds(transform, collider);
+      if (!rect) continue;
+      sources.push({
+        objectId: typeof objectData.id === 'string' ? objectData.id : '',
+        objectName: typeof objectData.name === 'string' && objectData.name.trim() ? objectData.name.trim() : 'Object',
+        rect,
+      });
+    }
+    return sources;
+  }
+
+  _getRectBounds(transform, collider) {
+    const width = Number(collider?.data?.width);
+    const height = Number(collider?.data?.height);
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null;
+
+    const baseX = Number.isFinite(Number(transform?.data?.x)) ? Number(transform.data.x) : 0;
+    const baseY = Number.isFinite(Number(transform?.data?.y)) ? Number(transform.data.y) : 0;
+    const offsetX = Number.isFinite(Number(collider?.data?.offsetX)) ? Number(collider.data.offsetX) : 0;
+    const offsetY = Number.isFinite(Number(collider?.data?.offsetY)) ? Number(collider.data.offsetY) : 0;
+    return {
+      left: baseX + offsetX,
+      top: baseY + offsetY,
+      right: baseX + offsetX + width,
+      bottom: baseY + offsetY + height,
+    };
+  }
+
+  _intersectsRect(a, b) {
+    if (!a || !b) return false;
+    return a.left < b.right
+      && a.right > b.left
+      && a.top < b.bottom
+      && a.bottom > b.top;
   }
 
   _refreshCameraFollowTarget() {
@@ -287,6 +416,109 @@ class PlayTestScene extends Scene {
     ctx.restore();
   }
 
+  _drawImageEntry(ctx, entry, project) {
+    const pixelDocument = project?.findPixelDocumentById?.(entry.pixelDocumentId) || null;
+    const layerData = pixelDocument?.layerData || null;
+    const pixelData = layerData?.composite?.() || null;
+    if (!pixelDocument || !pixelData?.pixels) return;
+
+    const sourceCanvas = this._getPixelDocumentCanvas(pixelDocument, pixelData);
+    if (!sourceCanvas) return;
+
+    const naturalWidth = pixelDocument.width | 0 || pixelData.width | 0 || sourceCanvas.width;
+    const naturalHeight = pixelDocument.height | 0 || pixelData.height | 0 || sourceCanvas.height;
+    const size = this._resolveImageDrawSize(entry, naturalWidth, naturalHeight);
+    const drawWidth = size.width;
+    const drawHeight = size.height;
+    const drawX = entry.x - drawWidth * (Number.isFinite(Number(entry.originX)) ? Number(entry.originX) : 0);
+    const drawY = entry.y - drawHeight * (Number.isFinite(Number(entry.originY)) ? Number(entry.originY) : 0);
+
+    ctx.save();
+    ctx.globalAlpha = typeof entry.alpha === 'number' ? entry.alpha : 1;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(sourceCanvas, drawX, drawY, drawWidth, drawHeight);
+    ctx.restore();
+  }
+
+  _resolveImageDrawSize(entry, naturalWidth, naturalHeight) {
+    const width = Number.isFinite(Number(entry?.width)) && Number(entry.width) > 0 ? Number(entry.width) : 0;
+    const height = Number.isFinite(Number(entry?.height)) && Number(entry.height) > 0 ? Number(entry.height) : 0;
+    const keepAspect = entry?.keepAspect !== false;
+    const safeNaturalWidth = naturalWidth > 0 ? naturalWidth : 1;
+    const safeNaturalHeight = naturalHeight > 0 ? naturalHeight : 1;
+
+    if (!keepAspect) {
+      return {
+        width: width || safeNaturalWidth,
+        height: height || safeNaturalHeight,
+      };
+    }
+
+    if (width > 0 && height > 0) {
+      return { width, height };
+    }
+    if (width > 0) {
+      return {
+        width,
+        height: width * (safeNaturalHeight / safeNaturalWidth),
+      };
+    }
+    if (height > 0) {
+      return {
+        width: height * (safeNaturalWidth / safeNaturalHeight),
+        height,
+      };
+    }
+    return {
+      width: safeNaturalWidth,
+      height: safeNaturalHeight,
+    };
+  }
+
+  _getPixelDocumentCanvas(pixelDocument, pixelData) {
+    const cacheKey = typeof pixelDocument?.id === 'string' && pixelDocument.id ? pixelDocument.id : '__anonymous__';
+    let canvas = this._imageCanvasCache.get(cacheKey) || null;
+    if (!canvas) {
+      canvas = document.createElement('canvas');
+      this._imageCanvasCache.set(cacheKey, canvas);
+    }
+
+    const width = pixelData.width | 0;
+    const height = pixelData.height | 0;
+    if (width <= 0 || height <= 0 || !pixelData.pixels) return null;
+
+    if (canvas.width !== width) canvas.width = width;
+    if (canvas.height !== height) canvas.height = height;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    const imageData = ctx.createImageData(width, height);
+    const data = imageData.data;
+    for (let index = 0; index < pixelData.pixels.length; index++) {
+      const color = pixelData.pixels[index];
+      data[index * 4] = (color >>> 16) & 0xff;
+      data[index * 4 + 1] = (color >>> 8) & 0xff;
+      data[index * 4 + 2] = color & 0xff;
+      data[index * 4 + 3] = (color >>> 24) & 0xff;
+    }
+    ctx.putImageData(imageData, 0, 0);
+    return canvas;
+  }
+
+  _buildRenderEntries(runtime) {
+    const imageEntries = Array.isArray(runtime?.imageEntries)
+      ? runtime.imageEntries.map((entry) => ({ ...entry, kind: 'image' }))
+      : [];
+    const textEntries = Array.isArray(runtime?.textEntries)
+      ? runtime.textEntries.map((entry) => ({ ...entry, kind: 'text' }))
+      : [];
+    return [...imageEntries, ...textEntries].sort((a, b) => {
+      if (a.z !== b.z) return a.z - b.z;
+      return (a.order || 0) - (b.order || 0);
+    });
+  }
+
   _buildTextLines(ctx, entry) {
     const sourceText = String(entry.text || '');
     const paragraphs = sourceText.split('\n');
@@ -362,5 +594,131 @@ class PlayTestScene extends Scene {
     if (e.code) {
       this._pressedKeys.delete(e.code);
     }
+  }
+
+  _onMouseMove(e) {
+    this._updatePointerState(e);
+    const hits = this._getPointerTriggerHits();
+    this._processPointerHoverTransitions(hits);
+    for (const hit of hits) {
+      this._fireTrigger(hit, 'pointerMove');
+    }
+  }
+
+  _onMouseDown(e) {
+    if (e.button !== 0) return;
+    this._updatePointerState(e);
+    const hits = this._getPointerTriggerHits();
+    this._processPointerHoverTransitions(hits);
+    this._pointerState.pressedTriggerIds.clear();
+    for (const hit of hits) {
+      this._pointerState.pressedTriggerIds.add(hit.objectId);
+      this._fireTrigger(hit, 'pointerDown');
+    }
+  }
+
+  _onMouseUp(e) {
+    if (e.button !== 0) return;
+    this._updatePointerState(e);
+    const hits = this._getPointerTriggerHits();
+    this._processPointerHoverTransitions(hits);
+    for (const hit of hits) {
+      this._fireTrigger(hit, 'pointerUp');
+      if (this._pointerState.pressedTriggerIds.has(hit.objectId)) {
+        this._fireTrigger(hit, 'click');
+      }
+    }
+    this._pointerState.pressedTriggerIds.clear();
+  }
+
+  _updatePointerState(e) {
+    this._pointerState.canvasX = Number.isFinite(Number(e?.x)) ? Number(e.x) : 0;
+    this._pointerState.canvasY = Number.isFinite(Number(e?.y)) ? Number(e.y) : 0;
+
+    const preview = this._previewRect;
+    if (!preview) {
+      this._pointerState.insidePreview = false;
+      return;
+    }
+
+    const insidePreview = this._pointerState.canvasX >= preview.x
+      && this._pointerState.canvasX <= preview.x + preview.w
+      && this._pointerState.canvasY >= preview.y
+      && this._pointerState.canvasY <= preview.y + preview.h;
+    this._pointerState.insidePreview = insidePreview;
+    if (!insidePreview) return;
+
+    const zoom = Number.isFinite(Number(this._cameraState?.zoom)) && Number(this._cameraState.zoom) > 0
+      ? Number(this._cameraState.zoom)
+      : 1;
+    this._pointerState.worldX = (this._pointerState.canvasX - preview.x) / zoom + (this._cameraState?.x || 0);
+    this._pointerState.worldY = (this._pointerState.canvasY - preview.y) / zoom + (this._cameraState?.y || 0);
+  }
+
+  _getPointerTriggerHits() {
+    const playUnit = this._appData?.getActiveProjectAsset?.();
+    if (!this._pointerState.insidePreview || !playUnit || playUnit.type !== 'playUnit' || !Array.isArray(playUnit.objects)) {
+      return [];
+    }
+
+    const hits = [];
+    for (const objectData of playUnit.objects) {
+      if (!objectData || objectData.enabled === false) continue;
+      const transform = objectData.findComponentByType?.('Transform') || null;
+      const collider = objectData.findComponentByType?.('Collider') || null;
+      const trigger = objectData.findComponentByType?.('Trigger') || null;
+      if (!transform || transform.enabled === false || !collider || collider.enabled === false || !trigger || trigger.enabled === false) continue;
+      if (collider.data?.shape !== 'rect' || collider.data?.isTrigger !== true) continue;
+
+      const width = Number(collider.data?.width);
+      const height = Number(collider.data?.height);
+      if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) continue;
+
+      const baseX = Number.isFinite(Number(transform.data?.x)) ? Number(transform.data.x) : 0;
+      const baseY = Number.isFinite(Number(transform.data?.y)) ? Number(transform.data.y) : 0;
+      const offsetX = Number.isFinite(Number(collider.data?.offsetX)) ? Number(collider.data.offsetX) : 0;
+      const offsetY = Number.isFinite(Number(collider.data?.offsetY)) ? Number(collider.data.offsetY) : 0;
+      const left = baseX + offsetX;
+      const top = baseY + offsetY;
+      if (this._pointerState.worldX < left || this._pointerState.worldX > left + width || this._pointerState.worldY < top || this._pointerState.worldY > top + height) {
+        continue;
+      }
+
+      hits.push({
+        objectId: typeof objectData.id === 'string' ? objectData.id : '',
+        objectName: typeof objectData.name === 'string' && objectData.name.trim() ? objectData.name.trim() : 'Object',
+        eventId: typeof trigger.data?.eventId === 'string' ? trigger.data.eventId.trim() : '',
+        triggerOn: typeof trigger.data?.triggerOn === 'string' && trigger.data.triggerOn.trim() ? trigger.data.triggerOn.trim() : 'overlap',
+        once: trigger.data?.once === true,
+      });
+    }
+    return hits;
+  }
+
+  _processPointerHoverTransitions(hits) {
+    const nextHitMap = new Map(hits.map((hit) => [hit.objectId, hit]));
+    for (const [objectId, hit] of nextHitMap.entries()) {
+      if (!this._pointerState.hoveredTriggerMap.has(objectId)) {
+        this._fireTrigger(hit, 'pointerEnter');
+      }
+    }
+    for (const [objectId, hit] of this._pointerState.hoveredTriggerMap.entries()) {
+      if (!nextHitMap.has(objectId)) {
+        this._fireTrigger(hit, 'pointerLeave');
+      }
+    }
+    this._pointerState.hoveredTriggerMap = nextHitMap;
+  }
+
+  _fireTrigger(hit, reason) {
+    if (!hit || hit.triggerOn !== reason) return false;
+    const triggerKey = hit.triggerKey || `${hit.objectId}:${hit.eventId}:${reason}`;
+    if (hit.once && this._firedOnceTriggerKeys.has(triggerKey)) return false;
+    if (hit.once) this._firedOnceTriggerKeys.add(triggerKey);
+
+    const eventLabel = hit.eventId || '(no eventId)';
+    this._statusTone = 'info';
+    this._statusMessage = `Trigger ${eventLabel} on ${hit.objectName} [${reason}]`;
+    return true;
   }
 }

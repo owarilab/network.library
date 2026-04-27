@@ -238,11 +238,14 @@ class PlayUnitEditorScene extends Scene {
     const buttonDefs = [
       { label: 'Add Object', action: () => this._addObject(), disabled: !hasAsset },
       { label: '+CameraObject', action: () => this._addCameraObject(), disabled: !hasAsset },
+      { label: '+ImageObject', action: () => this._addImageObject(), disabled: !hasAsset },
       { label: 'Rename', action: () => this._renameSelectedObject(), disabled: !hasAsset },
       { label: 'Delete', action: () => this._deleteSelectedObject(), disabled: !hasAsset },
       { label: '+Transform', action: () => this._addComponentToSelectedObject('Transform'), disabled: !hasAsset },
+      { label: '+Collider', action: () => this._addComponentToSelectedObject('Collider'), disabled: !hasAsset },
       { label: '+Camera', action: () => this._addComponentToSelectedObject('Camera'), disabled: !hasAsset },
       { label: '+Controller', action: () => this._addComponentToSelectedObject('Controller'), disabled: !hasAsset },
+      { label: '+Image', action: () => this._addComponentToSelectedObject('Image'), disabled: !hasAsset },
       { label: '+Tilemap', action: () => this._addComponentToSelectedObject('Tilemap'), disabled: !hasAsset },
       { label: '+Settings', action: () => this._addComponentToSelectedObject('PlaySettings'), disabled: !hasAsset },
       { label: '+Text', action: () => this._addComponentToSelectedObject('Text'), disabled: !hasAsset },
@@ -426,6 +429,83 @@ class PlayUnitEditorScene extends Scene {
     this._markDirty(`Added camera object: ${objectData.name}`);
   }
 
+  _addImageObject() {
+    const playUnit = this._getActivePlayUnit();
+    if (!playUnit) {
+      this._statusTone = 'error';
+      this._statusMessage = 'No active PlayUnit';
+      return;
+    }
+
+    const selectedPixelDocument = this._promptPixelDocumentSelection();
+    if (selectedPixelDocument === false) return;
+
+    const rootObject = playUnit.objects.find((objectData) => objectData?.parentId === null && (objectData.name === 'Root' || objectData.id === this._selectedObjectId)) || null;
+    const imageIndex = playUnit.objects.filter((objectData) => typeof objectData?.name === 'string' && objectData.name.startsWith('ImageObject')).length + 1;
+    const imageData = this._createComponentTemplate('Image');
+    if (selectedPixelDocument?.id) {
+      imageData.pixelDocumentId = selectedPixelDocument.id;
+    }
+    const objectData = playUnit.addObject({
+      name: imageIndex === 1 ? 'ImageObject' : `ImageObject ${imageIndex}`,
+      parentId: rootObject?.id || null,
+      children: [],
+      components: [
+        { type: 'Transform', data: this._createComponentTemplate('Transform') },
+        { type: 'Image', data: imageData },
+      ],
+    });
+
+    if (rootObject && !rootObject.children.includes(objectData.id)) {
+      rootObject.children.push(objectData.id);
+    }
+
+    this._selectedObjectId = objectData.id;
+    this._componentScrollOffset = 0;
+    this._markDirty(selectedPixelDocument?.name
+      ? `Added image object: ${objectData.name} -> ${selectedPixelDocument.name}`
+      : `Added image object: ${objectData.name}`);
+  }
+
+  _promptPixelDocumentSelection() {
+    const pixelDocuments = Array.isArray(this._appData?.currentProject?.assets?.pixelDocuments)
+      ? this._appData.currentProject.assets.pixelDocuments
+      : [];
+    if (!pixelDocuments.length) {
+      this._statusTone = 'error';
+      this._statusMessage = 'No pixelDocument assets available';
+      return false;
+    }
+
+    if (pixelDocuments.length === 1) {
+      return pixelDocuments[0];
+    }
+
+    const optionsText = pixelDocuments
+      .map((doc, index) => `${index + 1}: ${doc.name || 'untitled'} (${doc.id})`)
+      .join('\n');
+    const nextValue = window.prompt(
+      `Select pixelDocument for ImageObject\n${optionsText}\nEnter number or asset id`,
+      '1'
+    );
+    if (nextValue == null) return false;
+
+    const trimmed = nextValue.trim();
+    if (!trimmed) return pixelDocuments[0];
+
+    const selectedByIndex = Number.parseInt(trimmed, 10);
+    if (Number.isFinite(selectedByIndex) && selectedByIndex >= 1 && selectedByIndex <= pixelDocuments.length) {
+      return pixelDocuments[selectedByIndex - 1];
+    }
+
+    const selectedById = pixelDocuments.find((doc) => doc?.id === trimmed) || null;
+    if (selectedById) return selectedById;
+
+    this._statusTone = 'error';
+    this._statusMessage = 'pixelDocument selection was invalid';
+    return false;
+  }
+
   _renameSelectedObject() {
     const objectData = this._getSelectedObject();
     if (!objectData) {
@@ -520,6 +600,25 @@ class PlayUnitEditorScene extends Scene {
           inputMode: 'player1',
           moveSpeed: 120,
         };
+      case 'Collider':
+        return {
+          shape: 'rect',
+          offsetX: 0,
+          offsetY: 0,
+          width: 1,
+          height: 1,
+          isTrigger: false,
+        };
+      case 'Image':
+        return {
+          pixelDocumentId: '',
+          alpha: 1,
+          width: 0,
+          height: 0,
+          keepAspect: true,
+          originX: 0,
+          originY: 0,
+        };
       case 'Text':
         return {
           text: 'Hello World',
@@ -539,14 +638,9 @@ class PlayUnitEditorScene extends Scene {
       case 'Trigger':
         return {
           eventId: '',
+          triggerOn: 'overlap',
           once: false,
           targetObjectId: '',
-          area: {
-            x: 0,
-            y: 0,
-            w: 1,
-            h: 1,
-          },
         };
       default:
         return {};

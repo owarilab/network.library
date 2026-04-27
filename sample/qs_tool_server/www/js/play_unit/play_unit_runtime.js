@@ -20,6 +20,7 @@ class PlayUnitRuntime {
       y: 0,
       zoom: 1,
     };
+    this.imageEntries = [];
     this.textEntries = [];
   }
 
@@ -34,14 +35,39 @@ class PlayUnitRuntime {
 
     const objects = Array.isArray(playUnit?.objects) ? playUnit.objects : [];
     runtime.camera = PlayUnitRuntime._resolveCamera(objects);
+    const imageEntries = [];
     const textEntries = [];
     for (let index = 0; index < objects.length; index++) {
       const objectData = objects[index];
       if (!objectData || objectData.enabled === false) continue;
 
       const transform = PlayUnitRuntime._findEnabledComponent(objectData, 'Transform');
+      if (!transform) continue;
+
+      const image = PlayUnitRuntime._findEnabledComponent(objectData, 'Image');
+      if (image) {
+        const pixelDocumentId = typeof image.data?.pixelDocumentId === 'string' ? image.data.pixelDocumentId.trim() : '';
+        if (pixelDocumentId) {
+          imageEntries.push({
+            objectId: objectData.id || '',
+            objectName: objectData.name || 'Object',
+            pixelDocumentId,
+            alpha: PlayUnitRuntime._normalizeAlpha(image.data?.alpha),
+            width: PlayUnitRuntime._normalizePositiveNumber(image.data?.width, 0),
+            height: PlayUnitRuntime._normalizePositiveNumber(image.data?.height, 0),
+            keepAspect: image.data?.keepAspect !== false,
+            originX: PlayUnitRuntime._normalizeUnitInterval(image.data?.originX, 0),
+            originY: PlayUnitRuntime._normalizeUnitInterval(image.data?.originY, 0),
+            x: Number.isFinite(Number(transform.data?.x)) ? Number(transform.data.x) : 0,
+            y: Number.isFinite(Number(transform.data?.y)) ? Number(transform.data.y) : 0,
+            z: Number.isFinite(Number(transform.data?.z)) ? Number(transform.data.z) : 0,
+            order: index,
+          });
+        }
+      }
+
       const text = PlayUnitRuntime._findEnabledComponent(objectData, 'Text');
-      if (!transform || !text) continue;
+      if (!text) continue;
 
       const textValue = typeof text.data?.text === 'string' ? text.data.text : '';
       if (!textValue) continue;
@@ -70,6 +96,10 @@ class PlayUnitRuntime {
     }
 
     runtime.textEntries = textEntries.sort((a, b) => {
+      if (a.z !== b.z) return a.z - b.z;
+      return a.order - b.order;
+    });
+    runtime.imageEntries = imageEntries.sort((a, b) => {
       if (a.z !== b.z) return a.z - b.z;
       return a.order - b.order;
     });

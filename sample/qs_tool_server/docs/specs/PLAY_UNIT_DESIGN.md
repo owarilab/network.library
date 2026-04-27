@@ -274,20 +274,46 @@ PlayUnit 内の視点を表す component。
 通常は `Transform` と同一 object に付与し、camera object 自身の位置を
 `Transform` 側で持つ。
 
-## 5. Sprite
+## 5. Image
 
-スプライト表示用の見た目情報。
+`pixelDocument` をそのまま表示するための最小 component。
+
+現在の `pixelDocument` は単体のドット絵アセットとして扱っているため、
+この段階では `Sprite` よりも `Image` の方が責務が明確である。
+
+`Sprite` は将来的に tileset / atlas / frame animation を扱う段階で、
+別 component として導入する。
 
 ```js
 {
-  type: 'Sprite',
+  type: 'Image',
   enabled: true,
   data: {
-    tilesetId: 'ts_player',
-    tileIndex: 0
+    pixelDocumentId: 'px_icon_01',
+    alpha: 1,
+    width: 0,
+    height: 0,
+    keepAspect: true,
+    originX: 0,
+    originY: 0
   }
 }
 ```
+
+最小の runtime 確認では、`Transform` と `Image` を同一 object に付与し、
+`Transform.data.x`, `Transform.data.y` を描画座標、
+`Image.data.pixelDocumentId` を参照先 asset、
+`Image.data.alpha` を透明度として扱う。
+
+`width`, `height` は 0 のとき元の `pixelDocument` サイズを使い、
+0 より大きいときは preview 上でそのサイズへ拡大縮小して描画する。
+
+`keepAspect` が `true` のときは、`width` または `height` の片側だけを指定しても
+元画像の縦横比を維持して補完する。
+
+`originX`, `originY` は 0.0 から 1.0 の範囲で扱い、
+`Transform` の座標を画像のどの基準点として使うかを表す。
+たとえば `(0, 0)` は左上、`(0.5, 0.5)` は中央、`(1, 1)` は右下になる。
 
 ## 6. Text
 
@@ -311,7 +337,16 @@ PlayUnit 内の視点を表す component。
 
 ## 7. Collider
 
-当たり判定または判定用サイズ。
+当たり判定と判定形状を担当する component。
+
+`Collider` 自体はイベントを持たず、
+「どの形で判定するか」「物理衝突として扱うか、trigger 判定として扱うか」を表す。
+
+また、`Collider` は world 上の object 同士の overlap 判定だけでなく、
+マウスカーソルや将来の touch / pointer の hit test にも使う共通の判定面とする。
+
+最初の方針では `shape: 'rect'` を前提とし、
+同一 object 上の `Transform` を基準にローカル矩形を構成する。
 
 ```js
 {
@@ -319,6 +354,8 @@ PlayUnit 内の視点を表す component。
   enabled: true,
   data: {
     shape: 'rect',
+    offsetX: 0,
+    offsetY: 0,
     width: 1,
     height: 1,
     isTrigger: false
@@ -326,21 +363,109 @@ PlayUnit 内の視点を表す component。
 }
 ```
 
+### 設計方針
+
+- `Collider` は判定形状の正本とする
+- `Trigger` は判定形状を自前で持たず、同一 object 上の `Collider` を利用する
+- `isTrigger: true` の `Collider` は物理衝突解決ではなく、イベント判定用の領域として使う
+- `Collider` は object 同士の衝突判定と pointer hit test の両方に使う
+- 最初の pointer hit test は `rect` 前提とし、cursor enter / move / leave / down / up / click の基盤にする
+- 将来 `circle` や複数 collider を扱いたくなった場合も、まずは `Collider` の責務拡張で吸収する
+
+### 将来の pointer 系用途
+
+- ボタン hover / press / click
+- 物をつかむ、ドラッグする
+- オブジェクト選択や inspect
+- UI ライクな hotspot 判定
+
+これらは専用の `Button` component をいきなり作るのではなく、
+まず `Collider` による hit test と `Trigger` のイベント発火を組み合わせて表現できるようにする。
+
 ## 8. Trigger
 
 接触や操作で反応するイベント起点。
+
+`Trigger` は判定そのものを担当せず、
+同一 object 上の `Collider` の判定結果を受けてイベントを発火する。
+
+このため、最小構成では `Transform + Collider + Trigger` を同一 object に付与し、
+runtime 側で `Collider` の重なり判定や pointer hit test が成立したとき `Trigger.eventId` を発火対象とする。
 
 ```js
 {
   type: 'Trigger',
   enabled: true,
   data: {
-    triggerType: 'overlap',
-    actionType: 'message',
-    actionValue: 'hello'
+    eventId: 'ev_message_hello',
+    triggerOn: 'overlap',
+    once: false,
+    targetObjectId: ''
   }
 }
 ```
+
+### 設計方針
+
+- `Trigger` はイベント意味だけを持つ
+- 最初の実装では `eventId`, `once`, `targetObjectId`, `triggerOn` を最小項目とする
+- `targetObjectId` が空のときは、runtime の既定対象を使う
+- `once: true` のときは、一度発火した後に同じ条件では再発火しない
+- `triggerOn` は最初は `overlap` を基準にし、将来 `pointerEnter`, `pointerMove`, `pointerLeave`, `pointerDown`, `pointerUp`, `click`, `dragStart`, `dragMove`, `dragEnd` へ広げられる形にする
+
+### pointer 発火の考え方
+
+- `pointerEnter`: カーソルが collider 内に入った瞬間
+- `pointerMove`: カーソルが collider 内を移動している間
+- `pointerLeave`: カーソルが collider 外へ出た瞬間
+- `pointerDown`: collider 内でマウスボタンを押した瞬間
+- `pointerUp`: collider 内でマウスボタンを離した瞬間
+- `click`: collider 内で down / up が成立したとき
+
+これにより、将来的には `Button` や `GrabHandle` のような高水準 component を追加しなくても、
+`Collider + Trigger` の組み合わせで基本的な UI / インタラクションを記述しやすくする。
+
+### Collider + Trigger の協調
+
+- `Transform`: object の基準位置
+- `Collider`: 判定形状と pointer hit test 面
+- `Trigger`: 発火条件とイベント識別子
+
+この 3 つを同一 object 上に持たせることで、
+「どこにあるか」「どの範囲で反応するか」「何を起こすか」を分離する。
+
+例:
+
+```js
+{
+  id: 'obj_exit_gate',
+  name: 'ExitGate',
+  components: [
+    { type: 'Transform', enabled: true, data: { x: 12, y: 8, z: 0, rotation: 0, scaleX: 1, scaleY: 1 } },
+    { type: 'Collider', enabled: true, data: { shape: 'rect', offsetX: 0, offsetY: 0, width: 2, height: 1, isTrigger: true } },
+    { type: 'Trigger', enabled: true, data: { eventId: 'ev_stage_clear', triggerOn: 'overlap', once: true, targetObjectId: 'obj_player' } }
+  ]
+}
+```
+
+この例では、`obj_player` が `ExitGate` の trigger collider に入ると
+`ev_stage_clear` が発火する想定になる。
+
+ボタン的な例:
+
+```js
+{
+  id: 'obj_start_button',
+  name: 'StartButton',
+  components: [
+    { type: 'Transform', enabled: true, data: { x: 160, y: 120, z: 0, rotation: 0, scaleX: 1, scaleY: 1 } },
+    { type: 'Collider', enabled: true, data: { shape: 'rect', offsetX: 0, offsetY: 0, width: 96, height: 32, isTrigger: true } },
+    { type: 'Trigger', enabled: true, data: { eventId: 'ev_start_game', triggerOn: 'click', once: false, targetObjectId: '' } }
+  ]
+}
+```
+
+この例では、pointer が button collider 上で click したとき `ev_start_game` が発火する想定になる。
 
 ## 9. Controller
 

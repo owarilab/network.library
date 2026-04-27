@@ -59,15 +59,19 @@
 - Phase 5 完了: `PlayUnitEditorScene` の雛形を追加し、選択中 `PlayUnit` の最小表示を実装済み
 - Phase 6 実装進行: object の追加 / 削除 / 改名、component の追加 / 削除、component parameter の最小 JSON 編集、object / component 一覧スクロールを実装済み
 - Phase 6 実装進行: `CameraObject` 追加補助、default camera の可視化、選択 object ID の表示とコピペ用 input を実装済み
+- Phase 6 実装進行: `Image` component の追加、`+ImageObject` 補助、作成時の `pixelDocument` 選択 prompt、最小 JSON 編集 (`pixelDocumentId`, `alpha`, `width`, `height`, `keepAspect`, `originX`, `originY`) を実装済み
 - Phase 6 実装進行: `Text` component の最小編集項目として `text`, `font`, `color`, `alpha`, `align`, `baseline`, `wrap`, `maxWidth`, `lineHeight`, `strokeColor`, `strokeWidth`, `backgroundColor`, `padding` を扱える状態まで拡張済み
-- Phase 7 実装進行: `PlayUnitRuntime` と `PlayTestScene` を追加し、`Transform + Text` の最小 preview 描画を実装済み
+- Phase 6 実装進行: `Trigger` component のテンプレートを `eventId`, `triggerOn`, `once`, `targetObjectId` ベースへ更新済み
+- Phase 7 実装進行: `PlayUnitRuntime` と `PlayTestScene` を追加し、`Transform + Text` / `Transform + Image` の最小 preview 描画を実装済み
 - Phase 7 実装進行: `PlaySettings.defaultCameraObjectId` による default camera 解決、`followTargetObjectId` / `followLerp` による最小 camera follow、`Controller` による object 自己操作 preview を実装済み
+- Phase 7 実装進行: `Collider.shape === 'rect'` かつ `isTrigger === true` の object に対する pointer ベースの `Trigger` ログ表示 (`pointerEnter`, `pointerMove`, `pointerLeave`, `pointerDown`, `pointerUp`, `click`) を PlayTest に実装済み
+- Phase 7 実装進行: `Controller + Collider` と `Trigger + Collider` の `overlap` を PlayTest 上で最小評価し、重なり開始時に `Trigger` ログ表示する状態まで実装済み
 - 周辺 UI 調整として、`Project Assets` と `Browser Projects` の一覧スクロールと表示調整を実装済み
 
 ### 未実装
 
 - Phase 7: `Tilemap` component の参照解決
-- Phase 7: `Trigger` component の最小評価
+- Phase 7: `Collider + Trigger` の event 実行本体や高度な overlap 条件
 - Phase 7: camera の中央基準描画、offset、screen-space 分離などの詳細仕様
 
 ---
@@ -281,7 +285,7 @@
 2. object 名変更を可能にする
 3. object 削除を可能にする
 4. `Transform` component の追加を可能にする
-5. `Tilemap` / `PlaySettings` / `Camera` / `Text` / `Trigger` / `Controller` の追加を可能にする
+5. `Tilemap` / `PlaySettings` / `Camera` / `Image` / `Text` / `Trigger` / `Controller` の追加を可能にする
 6. component parameter の最小 JSON 編集を可能にする
 7. `Text` component は runtime 確認用の表示系 parameter を先行して扱えるようにする
 
@@ -294,6 +298,9 @@
 ### Phase 6 補足
 
 - `Text` component の最小 runtime 確認対象は `text`, `font`, `color`, `alpha`, `align`, `baseline`, `wrap`, `maxWidth`, `lineHeight`, `strokeColor`, `strokeWidth`, `backgroundColor`, `padding` とする
+- `Image` component の最小 runtime 確認対象は `pixelDocumentId`, `alpha`, `width`, `height`, `keepAspect`, `originX`, `originY` とする
+- `Collider` は判定形状を持ち、`Trigger` はイベント意味だけを持つ方針とする
+- `Collider` は world overlap に加えて pointer hit test の共通判定面としても使う方針とする
 - `Controller` component は操作対象 object 自身に直接付与する
 - 専用 inspector はまだ作らず、当面は JSON 編集で値を調整する
 
@@ -317,9 +324,9 @@
 3. `PlaySettings.defaultCameraObjectId` から既定 camera を解決する
 4. `Camera` component と `Transform` から preview camera を構成する
 5. `Tilemap` component の参照解決方法を定義する
-6. `Trigger` component の最小評価方法を定義する
+6. `Collider + Trigger` の最小評価方法を定義する
 7. `PlayTestScene` 接続用の stub を追加する
-8. 最初の preview 対象を `Transform + Text` に限定して描画確認できるようにする
+8. 最初の preview 対象として `Transform + Text` と `Transform + Image` を描画確認できるようにする
 9. `Controller` component による最小移動 preview を追加する
 
 ### 完了条件
@@ -327,13 +334,22 @@
 - `PlayUnitRuntime` の雛形ができる
 - 最小 `PlayUnit` を runtime へ渡せる
 - `PlaySettings.defaultCameraObjectId` から既定 camera を解決できる
+- `pixelDocument` を参照する `Image` component を preview 表示できる
+- `Collider + Trigger` の最小イベント発火条件を評価できる
 - `Controller` を持つ object の最小移動確認ができる
 
 ### Phase 7 補足
 
-- 最初の preview は `Transform + Text` のみを対象とする
+- 最初の preview は `Transform + Text` と `Transform + Image` を対象とする
 - preview camera は `PlaySettings.defaultCameraObjectId` が指す `CameraObject` を優先して使う
+- `Image` preview では `pixelDocumentId`, `alpha`, `width`, `height`, `keepAspect`, `originX`, `originY` を扱う
 - `Text` preview では `align`, `baseline`, `wrap`, `maxWidth`, `lineHeight`, `strokeColor`, `strokeWidth`, `backgroundColor`, `padding`, `alpha` を扱う
+- `Trigger` は判定矩形を内包せず、同一 object 上の `Collider` を参照する前提とする
+- 最初の trigger 評価は `Collider.shape === 'rect'` かつ `isTrigger === true` に限定する
+- 最初の overlap 評価対象は `Controller` を持つ object との overlap に絞る
+- overlap は重なり開始時に 1 回発火し、離れた後に再度重なると再発火できる形を最小仕様とする
+- pointer 系 trigger は最小ログ表示から着手し、`pointerEnter`, `pointerMove`, `pointerLeave`, `pointerDown`, `pointerUp`, `click` を扱う
+- 将来の button や grab 操作は、まず `Collider + Trigger` の組み合わせで表現できることを目標にする
 - `Controller` は操作対象 object に直接付与し、その object 自身の `Transform` を操作する
 - `Tilemap`, `Trigger`, camera の追従や複数 viewport はこの後続タスクで広げる
 - camera の中央基準描画、offset、screen-space 分離は仕様未確定のため現時点では保留とする
@@ -400,7 +416,7 @@
 ### Phase 7
 
 - runtime 変換 API が最小 `PlayUnit` を受け取れる
-- `Transform + Text` を PlayTest 上で preview 表示できる
+- `Transform + Text` / `Transform + Image` を PlayTest 上で preview 表示できる
 - default camera を切り替えたときの preview 対象が一致する
 - `Controller` を持つ object を PlayTest 上で移動できる
 - `followTargetObjectId` と `followLerp` による最小 camera follow を確認できる
