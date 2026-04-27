@@ -60,7 +60,7 @@ class ProjectTopScene extends Scene {
 
     ctx.fillStyle = '#64748b';
     ctx.font = '13px sans-serif';
-    ctx.fillText('Shortcut: Enter opens active asset / M opens map editor / P opens PlayUnit editor / T opens play test', centerX, topY + 84);
+    ctx.fillText('Shortcut: Enter opens active asset / D opens dot editor / M opens map editor / P opens PlayUnit editor / T opens play test', centerX, topY + 84);
 
     if (this._statusMessage) {
       ctx.fillStyle = this._statusTone === 'error' ? '#fca5a5' : '#93c5fd';
@@ -78,14 +78,21 @@ class ProjectTopScene extends Scene {
   }
 
   _buildButtons(canvas) {
-    const buttonW = canvas.width >= 860 ? 240 : Math.min(320, canvas.width - 48);
-    const buttonH = 52;
-    const gapX = 16;
-    const gapY = 16;
-    const startY = Math.max(186, canvas.height * 0.3);
+    const columns = canvas.width >= 980 ? 3 : canvas.width >= 700 ? 2 : 1;
+    const horizontalPadding = canvas.width >= 980 ? 72 : 48;
+    const gapX = canvas.width >= 980 ? 12 : 16;
+    const gapY = 12;
+    const maxButtonW = columns >= 3 ? 200 : columns === 2 ? 228 : 320;
+    const buttonW = Math.min(maxButtonW, Math.floor((canvas.width - horizontalPadding - gapX * (columns - 1)) / columns));
+    const buttonH = 44;
+    const startY = Math.max(176, canvas.height * 0.28);
     const defs = [
       {
         label: 'Open Active Asset',
+        action: () => this._openActiveAsset(),
+      },
+      {
+        label: 'Open Dot Editor',
         action: () => this._openDotEditor(),
       },
       {
@@ -118,7 +125,6 @@ class ProjectTopScene extends Scene {
       },
     ];
 
-    const columns = canvas.width >= 860 ? 2 : 1;
     const totalW = columns * buttonW + Math.max(0, columns - 1) * gapX;
     const startX = ((canvas.width - totalW) / 2) | 0;
 
@@ -151,7 +157,7 @@ class ProjectTopScene extends Scene {
     ctx.fillStyle = disabled ? '#6b7280' : '#f8fafc';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = 'bold 18px sans-serif';
+    ctx.font = 'bold 16px sans-serif';
     ctx.fillText(button.label, x + w / 2, y + h / 2);
   }
 
@@ -299,11 +305,11 @@ class ProjectTopScene extends Scene {
       const bottom = button.rect.y + button.rect.h;
       return bottom > maxY ? bottom : maxY;
     }, Math.max(240, canvas.height * 0.3));
-    const top = buttonBottom + 24;
-    const w = Math.min(560, canvas.width - 48);
-    const h = Math.min(320, Math.max(120, canvas.height - top - 28));
+    const top = buttonBottom + 18;
+    const w = Math.min(760, canvas.width - 40);
+    const h = Math.min(420, Math.max(140, canvas.height - top - 22));
     const x = ((canvas.width - w) / 2) | 0;
-    const y = Math.min(Math.max(top, 390), canvas.height - h - 28);
+    const y = Math.min(Math.max(top, 328), canvas.height - h - 22);
     return { x, y, w, h };
   }
 
@@ -344,6 +350,10 @@ class ProjectTopScene extends Scene {
 
   _onKeyDown(e) {
     if (e.key === 'Enter') {
+      this._openActiveAsset();
+      return;
+    }
+    if (e.key === 'd' || e.key === 'D') {
       this._openDotEditor();
       return;
     }
@@ -368,17 +378,22 @@ class ProjectTopScene extends Scene {
     }
   }
 
-  _openDotEditor() {
+  _openActiveAsset() {
     if (!this._appData?.currentProject || !this._appData.projectSession) return;
 
-    let asset = this._appData.getActiveProjectAsset();
+    const asset = this._appData.getActiveProjectAsset();
     if (asset) {
       this._openAsset(asset);
       return;
     }
-    if (!asset) {
-      asset = this._appData.currentProject.assets.pixelDocuments[0] || null;
-    }
+
+    this._openDotEditor();
+  }
+
+  _openDotEditor() {
+    if (!this._appData?.currentProject || !this._appData.projectSession) return;
+
+    let asset = this._appData.currentProject.assets.pixelDocuments[0] || null;
     if (!asset) {
       asset = this._appData.currentProject.assets.tilesets[0] || null;
     }
