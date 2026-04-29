@@ -1,0 +1,593 @@
+{
+  "format": "qsproj",
+  "version": 1,
+  "project": {
+    "id": "proj_return_playunit_demo_r6n2k8",
+    "version": 1,
+    "name": "Two Way PlayUnit Demo",
+    "createdAt": 1777436608074,
+    "updatedAt": 1777436608074,
+    "settings": {
+      "defaultChipWidth": 16,
+      "defaultChipHeight": 16
+    },
+    "globalVariables": {
+      "version": 1,
+      "system": {
+        "fixed": {
+          "startupPlayUnitId": {
+            "type": "string",
+            "initialValue": "pu_overlay_menu_1",
+            "description": "PlayTest 開始時に最初に開く PlayUnit"
+          },
+          "requestedPlayUnitId": {
+            "type": "string",
+            "initialValue": "",
+            "description": "MainRoom から OverlayMenu へ移る往路で使用"
+          },
+          "currentPlayUnitId": {
+            "type": "string",
+            "initialValue": "",
+            "description": "現在の PlayUnit。Runtime で更新される"
+          },
+          "returnPlayUnitId": {
+            "type": "string",
+            "initialValue": "pu_main_room_1",
+            "description": "returnPlayUnit で戻る先"
+          },
+          "isPaused": {
+            "type": "boolean",
+            "initialValue": false,
+            "description": "将来の pause 用フラグ"
+          }
+        },
+        "persistent": {
+          "masterVolume": {
+            "type": "number",
+            "initialValue": 1,
+            "description": "将来の共通音量用"
+          }
+        }
+      },
+      "user": {
+        "fixed": {},
+        "persistent": {}
+      }
+    },
+    "assets": {
+      "pixelDocuments": [],
+      "tilesets": [],
+      "maps": [],
+      "playUnits": [
+        {
+          "id": "pu_main_room_1",
+          "type": "playUnit",
+          "name": "MainRoom",
+          "description": "requestPlayUnit で OverlayMenu へ移動できるメイン PlayUnit",
+          "objects": [
+            {
+              "id": "obj_main_camera_1",
+              "name": "Main Camera",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 0, "y": 0, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Camera",
+                  "enabled": true,
+                  "data": {
+                    "zoom": 1,
+                    "viewportX": 0,
+                    "viewportY": 0,
+                    "viewportWidth": 800,
+                    "viewportHeight": 600,
+                    "followTargetObjectId": "",
+                    "followLerp": 1
+                  }
+                },
+                {
+                  "type": "PlaySettings",
+                  "enabled": true,
+                  "data": {
+                    "defaultCameraObjectId": "obj_main_camera_1"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_main_title_1",
+              "name": "Main Title",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 400, "y": 120, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Main Room",
+                    "font": "bold 32px sans-serif",
+                    "color": "#e2e8f0",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 36,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_main_info_1",
+              "name": "Main Info",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 400, "y": 190, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "ここから requestPlayUnit で OverlayMenu に移動できます。",
+                    "font": "18px sans-serif",
+                    "color": "#93c5fd",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 24,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_main_panel_1",
+              "name": "Main Panel",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 220, "y": 250, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 360,
+                    "height": 140,
+                    "fillColor": "#0f172a",
+                    "fillAlpha": 1,
+                    "strokeColor": "#38bdf8",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_main_desc_1",
+              "name": "Main Description",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 400, "y": 320, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "request: system.fixed.requestedPlayUnitId = pu_overlay_menu_1",
+                    "font": "14px monospace",
+                    "color": "#cbd5e1",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_main_button_1",
+              "name": "Open Overlay Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 260, "y": 360, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 280,
+                    "height": 64,
+                    "fillColor": "#0f766e",
+                    "fillAlpha": 1,
+                    "strokeColor": "#5eead4",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 280, "height": 64, "isTrigger": true }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": { "eventId": "ev_open_overlay", "triggerOn": "click", "once": false, "targetObjectId": "" }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_open_overlay",
+                    "action": "requestPlayUnit",
+                    "playUnitId": "pu_overlay_menu_1"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_main_button_label_1",
+              "name": "Open Overlay Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 400, "y": 392, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Click To Request OverlayMenu",
+                    "font": "bold 18px sans-serif",
+                    "color": "#ecfeff",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 24,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_main_hint_2",
+              "name": "Main Return Hint",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 400, "y": 455, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "return: system.fixed.returnPlayUnitId = pu_main_room_1",
+                    "font": "14px monospace",
+                    "color": "#93c5fd",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "pu_overlay_menu_1",
+          "type": "playUnit",
+          "name": "OverlayMenu",
+          "description": "startupPlayUnitId または requestPlayUnit で開き、returnPlayUnit で MainRoom に戻るオーバーレイ",
+          "objects": [
+            {
+              "id": "obj_overlay_camera_1",
+              "name": "Overlay Camera",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 0, "y": 0, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Camera",
+                  "enabled": true,
+                  "data": {
+                    "zoom": 1,
+                    "viewportX": 0,
+                    "viewportY": 0,
+                    "viewportWidth": 800,
+                    "viewportHeight": 600,
+                    "followTargetObjectId": "",
+                    "followLerp": 1
+                  }
+                },
+                {
+                  "type": "PlaySettings",
+                  "enabled": true,
+                  "data": {
+                    "defaultCameraObjectId": "obj_overlay_camera_1"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_overlay_bg_1",
+              "name": "Overlay Background",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 80, "y": 70, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 640,
+                    "height": 420,
+                    "fillColor": "#111827",
+                    "fillAlpha": 1,
+                    "strokeColor": "#f59e0b",
+                    "strokeWidth": 3,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_overlay_title_1",
+              "name": "Overlay Title",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 400, "y": 150, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Overlay Menu",
+                    "font": "bold 30px sans-serif",
+                    "color": "#f8fafc",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 34,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_overlay_desc_1",
+              "name": "Overlay Description",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 400, "y": 210, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "startupPlayUnitId で最初に開かれ、MainRoom からは requestPlayUnit でも再表示できます。",
+                    "font": "17px sans-serif",
+                    "color": "#cbd5e1",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": true,
+                    "maxWidth": 520,
+                    "lineHeight": 24,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_overlay_button_1",
+              "name": "Return Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 260, "y": 300, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 280,
+                    "height": 64,
+                    "fillColor": "#1d4ed8",
+                    "fillAlpha": 1,
+                    "strokeColor": "#93c5fd",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 280, "height": 64, "isTrigger": true }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": { "eventId": "ev_return_main", "triggerOn": "click", "once": false, "targetObjectId": "" }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_return_main",
+                    "action": "returnPlayUnit"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_overlay_button_label_1",
+              "name": "Return Button Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 400, "y": 332, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Click To Return To MainRoom",
+                    "font": "bold 18px sans-serif",
+                    "color": "#eff6ff",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 24,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_overlay_hint_1",
+              "name": "Overlay Hint",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 400, "y": 405, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "system.fixed.returnPlayUnitId = pu_main_room_1",
+                    "font": "14px monospace",
+                    "color": "#fcd34d",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "session": {
+    "projectId": "proj_return_playunit_demo_r6n2k8",
+    "dirty": false,
+    "currentScene": "PlayUnitEditorScene",
+    "activeDocumentRef": {
+      "type": "playUnit",
+      "id": "pu_overlay_menu_1"
+    },
+    "editorState": {
+      "activeTool": "pencil",
+      "foreColor": 4278190080,
+      "backColor": 4294967295,
+      "editMode": "free",
+      "selectedChip": {
+        "col": 0,
+        "row": 0
+      }
+    }
+  }
+}

@@ -713,6 +713,7 @@ class PlayUnitEditorScene extends Scene {
           listenTo: '',
           action: 'setProperty',
           targetObjectId: '',
+          playUnitId: '',
           componentType: 'Text',
           property: 'text',
           value: '',

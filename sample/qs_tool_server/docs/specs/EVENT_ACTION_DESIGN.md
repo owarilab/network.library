@@ -25,7 +25,7 @@ PlayTestScene._processEventActions()
     └─ 全オブジェクトの EventAction を走査
     └─ listenTo === eventId のものを _executeAction() で実行
             ↓
-アクション実行（setProperty / setEnabled / playTween / fireEvent）
+アクション実行（setProperty / setEnabled / playTween / fireEvent / returnPlayUnit）
             ↓
 PlayTestScene._updateTweens() (playTween の場合、毎フレーム値を補間)
 ```
@@ -37,8 +37,8 @@ PlayTestScene._updateTweens() (playTween の場合、毎フレーム値を補間
 | フィールド | 型 | 必須 | 説明 |
 |---|---|---|---|
 | `listenTo` | string | ○ | 反応するイベント ID |
-| `action` | string | ○ | `setProperty` / `setEnabled` / `playTween` / `fireEvent` |
-| `targetObjectId` | string | action 依存 | 操作対象オブジェクトの ID。`fireEvent` では不要 |
+| `action` | string | ○ | `setProperty` / `setEnabled` / `playTween` / `fireEvent` / `returnPlayUnit` |
+| `targetObjectId` | string | action 依存 | 操作対象オブジェクトの ID。`fireEvent` と `returnPlayUnit` では不要 |
 
 ### action = `setProperty` 追加フィールド
 
@@ -82,6 +82,13 @@ PlayTestScene._updateTweens() (playTween の場合、毎フレーム値を補間
 循環参照ガード: 同一フレーム内で同一 eventId は最大1回のみ処理。
 フレームをまたいだループは発生しない。
 
+### action = `returnPlayUnit` 追加フィールド
+
+追加フィールドなし。
+
+Runtime global variable `system.fixed.returnPlayUnitId` を参照し、その PlayUnit が有効なら即時切替する。
+切替成功時は `currentPlayUnitId` が切り替わり、`returnPlayUnitId` には切替前の PlayUnit ID が入るため、同じ action を再度実行すると往復移動にも使える。
+
 ---
 
 ## 実行順序
@@ -90,6 +97,7 @@ PlayTestScene._updateTweens() (playTween の場合、毎フレーム値を補間
 2. `update(dt)` 内で `_processEventActions()` が実行される
 3. `fireEvent` で追加された eventId も同一フレーム内で処理される（最大 64 パス）
 4. `playTween` で登録された tween は `_updateTweens(dt)` が毎フレーム補間して反映
+5. `returnPlayUnit` は実行フレーム内で即時に active PlayUnit を差し替える
 
 ---
 
@@ -98,4 +106,5 @@ PlayTestScene._updateTweens() (playTween の場合、毎フレーム値を補間
 - `playTween` はスカラー値（数値）のみ対応。色文字列などには使用不可
 - `setProperty` の `value` は JSON パースを試みるが、複雑なオブジェクトより `string` / `number` / `boolean` を推奨
 - `setEnabled` は `PlayTestScene` の描画ループが `objectData.enabled === false` をスキップすることで非表示を実現しているため、`PlayUnitRuntime.fromPlayUnit()` を経由して反映される
+- `returnPlayUnit` は `system.fixed.returnPlayUnitId` が空または無効 ID の場合は何も切り替えず、エラーステータスのみ表示する
 - EventAction 自体は `PlayUnitData` に保存・ロードされる通常コンポーネントなので、プロジェクト保存でそのまま永続化される

@@ -28,6 +28,13 @@ class AppData {
     this.projectSession = null;
 
     /**
+     * Runtime 上のグローバル変数 current state。
+     * project.globalVariables の定義から起動時に生成される。
+     * @type {{ system: { fixed: object, persistent: object }, user: { fixed: object, persistent: object } }|null}
+     */
+    this.globalVariableState = null;
+
+    /**
      * free モード用の LayerData。
      * layerData getter 経由でアクセスされる。
      * @type {LayerData}
@@ -136,14 +143,162 @@ class AppData {
     this.currentProject = project || null;
     if (!project) {
       this.projectSession = null;
+      this.globalVariableState = null;
       this.mapData = null;
       return null;
     }
 
     const nextSession = session || ProjectSession.createForProject(project);
     this.projectSession = nextSession;
+    this.globalVariableState = this._createGlobalVariableRuntimeState(project.globalVariables);
     this.applyProjectSessionEditorState();
     return this.projectSession;
+  }
+
+  /**
+   * Project 定義側の globalVariables を取得する。
+   * @returns {{ version: number, system: { fixed: object, persistent: object }, user: { fixed: object, persistent: object } }}
+   */
+  getProjectGlobalVariablesDefinition() {
+    return ProjectData.normalizeGlobalVariables(this.currentProject?.globalVariables);
+  }
+
+  /**
+   * Runtime current state の globalVariables を取得する。
+   * 未初期化時は空の4区画を返す。
+   * @returns {{ system: { fixed: object, persistent: object }, user: { fixed: object, persistent: object } }}
+   */
+  getRuntimeGlobalVariables() {
+    if (this.globalVariableState) {
+      return this.globalVariableState;
+    }
+    const fallback = ProjectData.createDefaultGlobalVariables();
+    return {
+      system: {
+        fixed: { ...fallback.system.fixed },
+        persistent: { ...fallback.system.persistent },
+      },
+      user: {
+        fixed: { ...fallback.user.fixed },
+        persistent: { ...fallback.user.persistent },
+      },
+    };
+  }
+
+  /**
+   * Project 定義から Runtime current state を再初期化する。
+   * @returns {{ system: { fixed: object, persistent: object }, user: { fixed: object, persistent: object } }}
+   */
+  resetRuntimeGlobalVariables() {
+    this.globalVariableState = this._createGlobalVariableRuntimeState(this.currentProject?.globalVariables);
+    return this.getRuntimeGlobalVariables();
+  }
+
+  /**
+   * パス形式のグローバル変数 current value を取得する。
+   * 例: system.fixed.startupPlayUnitId
+   * @param {string} path
+   * @returns {any}
+   */
+  getRuntimeGlobalVariable(path) {
+    const resolved = this._resolveGlobalVariablePath(path);
+    if (!resolved) return undefined;
+    return this.getRuntimeGlobalVariables()[resolved.scope][resolved.tier][resolved.name];
+  }
+
+  /**
+   * パス形式のグローバル変数 current value を更新する。
+   * @param {string} path
+   * @param {any} value
+   * @returns {boolean}
+   */
+  setRuntimeGlobalVariable(path, value) {
+    const resolved = this._resolveGlobalVariablePath(path);
+    if (!resolved) return false;
+    if (!this.globalVariableState) {
+      this.globalVariableState = this._createGlobalVariableRuntimeState(this.currentProject?.globalVariables);
+    }
+    this.globalVariableState[resolved.scope][resolved.tier][resolved.name] = value;
+    return true;
+  }
+
+  /**
+   * Project 定義から Runtime 用 current state を生成する。
+   * @param {object|null|undefined} globalVariables
+   * @returns {{ system: { fixed: object, persistent: object }, user: { fixed: object, persistent: object } }}
+   */
+  _createGlobalVariableRuntimeState(globalVariables) {
+    const normalized = ProjectData.normalizeGlobalVariables(globalVariables);
+    return {
+      system: {
+        fixed: this._createGlobalVariableBucketState(normalized.system.fixed),
+        persistent: this._createGlobalVariableBucketState(normalized.system.persistent),
+      },
+      user: {
+        fixed: this._createGlobalVariableBucketState(normalized.user.fixed),
+        persistent: this._createGlobalVariableBucketState(normalized.user.persistent),
+      },
+    };
+  }
+
+  /**
+   * @param {object} bucket
+   * @returns {object}
+   */
+  _createGlobalVariableBucketState(bucket) {
+    const state = {};
+    const entries = bucket && typeof bucket === 'object' && !Array.isArray(bucket)
+      ? Object.entries(bucket)
+      : [];
+    for (const [name, definition] of entries) {
+      if (typeof name !== 'string' || !name) continue;
+      state[name] = this._extractGlobalVariableInitialValue(definition);
+    }
+    return state;
+  }
+
+  /**
+   * @param {any} definition
+   * @returns {any}
+   */
+  _extractGlobalVariableInitialValue(definition) {
+    if (!definition || typeof definition !== 'object' || Array.isArray(definition)) {
+      return undefined;
+    }
+    const value = definition.initialValue;
+    if (Array.isArray(value)) return value.map(item => this._cloneJsonLikeValue(item));
+    return this._cloneJsonLikeValue(value);
+  }
+
+  /**
+   * @param {any} value
+   * @returns {any}
+   */
+  _cloneJsonLikeValue(value) {
+    if (Array.isArray(value)) return value.map(item => this._cloneJsonLikeValue(item));
+    if (value && typeof value === 'object') {
+      const cloned = {};
+      for (const [key, child] of Object.entries(value)) {
+        cloned[key] = this._cloneJsonLikeValue(child);
+      }
+      return cloned;
+    }
+    return value;
+  }
+
+  /**
+   * @param {string} path
+   * @returns {{ scope: 'system'|'user', tier: 'fixed'|'persistent', name: string }|null}
+   */
+  _resolveGlobalVariablePath(path) {
+    if (typeof path !== 'string' || !path.trim()) return null;
+    const parts = path.trim().split('.');
+    if (parts.length !== 3) return null;
+    const [scope, tier, name] = parts;
+    if ((scope !== 'system' && scope !== 'user') || (tier !== 'fixed' && tier !== 'persistent') || !name) {
+      return null;
+    }
+    return { scope, tier, name };
   }
 
   /**
@@ -196,6 +351,128 @@ class AppData {
   getActiveProjectAsset() {
     if (!this.currentProject || !this.projectSession) return null;
     return this.currentProject.getAssetByRef(this.projectSession.activeDocumentRef);
+  }
+
+  /**
+   * PlayTest 開始時に使う PlayUnit を解決してアクティブ化する。
+   * startupPlayUnitId が有効なら優先し、無効なら現在選択中または先頭 PlayUnit を使う。
+   * @returns {object|null}
+   */
+  activateStartupPlayUnit() {
+    if (!this.currentProject || !this.projectSession) return null;
+
+    const startupPlayUnitId = this.getRuntimeGlobalVariable('system.fixed.startupPlayUnitId');
+    const startupAsset = this._resolvePlayUnitAsset(startupPlayUnitId);
+    if (startupAsset) {
+      return this.activateRuntimePlayUnitById(startupAsset.id, {
+        updateReturnPlayUnitId: false,
+        clearRequestedPlayUnitId: true,
+      });
+    }
+
+    const activeAsset = this.getActiveProjectAsset();
+    if (activeAsset?.type === 'playUnit') {
+      return this.activateRuntimePlayUnitById(activeAsset.id, {
+        updateReturnPlayUnitId: false,
+        clearRequestedPlayUnitId: true,
+      });
+    }
+
+    const firstPlayUnit = this.currentProject.assets?.playUnits?.[0] || null;
+    if (!firstPlayUnit) return null;
+    return this.activateRuntimePlayUnitById(firstPlayUnit.id, {
+      updateReturnPlayUnitId: false,
+      clearRequestedPlayUnitId: true,
+    });
+  }
+
+  /**
+   * Runtime から requestedPlayUnitId を消費して PlayUnit 切替を試みる。
+   * 無効 ID でも requestedPlayUnitId は自動クリアする。
+   * @returns {{ changed: boolean, asset: object|null, invalid: boolean, requestedId: string }}
+   */
+  consumeRequestedRuntimePlayUnitSwitch() {
+    const requestedId = this.getRuntimeGlobalVariable('system.fixed.requestedPlayUnitId');
+    if (typeof requestedId !== 'string' || !requestedId.trim()) {
+      return { changed: false, asset: null, invalid: false, requestedId: '' };
+    }
+
+    const nextAsset = this._resolvePlayUnitAsset(requestedId);
+    this.setRuntimeGlobalVariable('system.fixed.requestedPlayUnitId', '');
+    if (!nextAsset) {
+      return { changed: false, asset: null, invalid: true, requestedId: requestedId.trim() };
+    }
+
+    const activeAsset = this.getActiveProjectAsset();
+    if (activeAsset?.type === 'playUnit' && activeAsset.id === nextAsset.id) {
+      this.setRuntimeGlobalVariable('system.fixed.currentPlayUnitId', nextAsset.id);
+      return { changed: false, asset: nextAsset, invalid: false, requestedId: nextAsset.id };
+    }
+
+    const changedAsset = this.activateRuntimePlayUnitById(nextAsset.id, {
+      updateReturnPlayUnitId: true,
+      clearRequestedPlayUnitId: false,
+    });
+    return {
+      changed: !!changedAsset,
+      asset: changedAsset,
+      invalid: false,
+      requestedId: nextAsset.id,
+    };
+  }
+
+  /**
+   * 指定 ID の PlayUnit を Runtime 上で現在アクティブにする。
+   * @param {string} playUnitId
+   * @param {{ updateReturnPlayUnitId?: boolean, clearRequestedPlayUnitId?: boolean }} [options]
+   * @returns {object|null}
+   */
+  activateRuntimePlayUnitById(playUnitId, options = {}) {
+    if (!this.currentProject || !this.projectSession) return null;
+    const asset = this._resolvePlayUnitAsset(playUnitId);
+    if (!asset) {
+      if (options.clearRequestedPlayUnitId !== false) {
+        this.setRuntimeGlobalVariable('system.fixed.requestedPlayUnitId', '');
+      }
+      return null;
+    }
+
+    const previousId = this.getRuntimeGlobalVariable('system.fixed.currentPlayUnitId');
+    this.projectSession.setActiveDocument('playUnit', asset.id);
+    this.setRuntimeGlobalVariable('system.fixed.currentPlayUnitId', asset.id);
+    if (options.updateReturnPlayUnitId !== false) {
+      this.setRuntimeGlobalVariable(
+        'system.fixed.returnPlayUnitId',
+        typeof previousId === 'string' && previousId.trim() ? previousId.trim() : '',
+      );
+    }
+    if (options.clearRequestedPlayUnitId !== false) {
+      this.setRuntimeGlobalVariable('system.fixed.requestedPlayUnitId', '');
+    }
+    return asset;
+  }
+
+  /**
+   * returnPlayUnitId が有効なら、その PlayUnit へ即時に戻す。
+   * 成功時は current/return を入れ替える。
+   * @returns {object|null}
+   */
+  activateReturnRuntimePlayUnit() {
+    const returnPlayUnitId = this.getRuntimeGlobalVariable('system.fixed.returnPlayUnitId');
+    if (typeof returnPlayUnitId !== 'string' || !returnPlayUnitId.trim()) return null;
+    return this.activateRuntimePlayUnitById(returnPlayUnitId, {
+      updateReturnPlayUnitId: true,
+      clearRequestedPlayUnitId: true,
+    });
+  }
+
+  /**
+   * @param {string} playUnitId
+   * @returns {object|null}
+   */
+  _resolvePlayUnitAsset(playUnitId) {
+    if (!this.currentProject || typeof playUnitId !== 'string' || !playUnitId.trim()) return null;
+    return this.currentProject.findPlayUnitById(playUnitId.trim());
   }
 
   /**

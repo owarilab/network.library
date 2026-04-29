@@ -35,6 +35,54 @@ class ProjectData {
       defaultChipWidth: 16,
       defaultChipHeight: 16,
     };
+
+    /**
+     * Project 全体で共有するグローバル変数定義。
+     * @type {{ version: number, system: { fixed: object, persistent: object }, user: { fixed: object, persistent: object } }}
+     */
+    this.globalVariables = ProjectData.createDefaultGlobalVariables();
+  }
+
+  /**
+   * 空の globalVariables 定義を生成する。
+   * @returns {{ version: number, system: { fixed: object, persistent: object }, user: { fixed: object, persistent: object } }}
+   */
+  static createDefaultGlobalVariables() {
+    return {
+      version: 1,
+      system: {
+        fixed: {},
+        persistent: {},
+      },
+      user: {
+        fixed: {},
+        persistent: {},
+      },
+    };
+  }
+
+  /**
+   * globalVariables 定義を正規化する。
+   * 未定義や壊れた形でも最小4区画へ補完する。
+   * @param {object|null|undefined} source
+   * @returns {{ version: number, system: { fixed: object, persistent: object }, user: { fixed: object, persistent: object } }}
+   */
+  static normalizeGlobalVariables(source) {
+    const fallback = ProjectData.createDefaultGlobalVariables();
+    const root = source && typeof source === 'object' && !Array.isArray(source) ? source : {};
+    const system = root.system && typeof root.system === 'object' && !Array.isArray(root.system) ? root.system : {};
+    const user = root.user && typeof root.user === 'object' && !Array.isArray(root.user) ? root.user : {};
+    return {
+      version: Number.isInteger(root.version) ? root.version : fallback.version,
+      system: {
+        fixed: ProjectData._normalizeVariableBucket(system.fixed),
+        persistent: ProjectData._normalizeVariableBucket(system.persistent),
+      },
+      user: {
+        fixed: ProjectData._normalizeVariableBucket(user.fixed),
+        persistent: ProjectData._normalizeVariableBucket(user.persistent),
+      },
+    };
   }
 
   /**
@@ -260,5 +308,14 @@ class ProjectData {
   _normalizeSize(value, fallback) {
     const size = value | 0;
     return size > 0 ? size : fallback;
+  }
+
+  /**
+   * @param {object|null|undefined} bucket
+   * @returns {object}
+   */
+  static _normalizeVariableBucket(bucket) {
+    if (!bucket || typeof bucket !== 'object' || Array.isArray(bucket)) return {};
+    return { ...bucket };
   }
 }

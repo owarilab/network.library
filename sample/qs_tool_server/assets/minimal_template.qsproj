@@ -11,6 +11,17 @@
       "defaultChipWidth": 16,
       "defaultChipHeight": 16
     },
+    "globalVariables": {
+      "version": 1,
+      "system": {
+        "fixed": {},
+        "persistent": {}
+      },
+      "user": {
+        "fixed": {},
+        "persistent": {}
+      }
+    },
     "assets": {
       "pixelDocuments": [
         {

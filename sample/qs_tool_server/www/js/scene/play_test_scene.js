@@ -38,7 +38,8 @@ class PlayTestScene extends Scene {
   onEnter(input, appData) {
     this._input = input;
     this._appData = appData;
-    this._runtime = PlayUnitRuntime.fromPlayUnit(appData?.getActiveProjectAsset?.());
+    const activePlayUnit = appData?.activateStartupPlayUnit?.() || appData?.getActiveProjectAsset?.();
+    this._runtime = PlayUnitRuntime.fromPlayUnit(activePlayUnit);
     this._cameraState = this._createCameraState(this._runtime?.camera);
     input.on('keydown', this._onKeyDown);
     input.on('keyup', this._onKeyUp);
@@ -162,6 +163,16 @@ class PlayTestScene extends Scene {
   }
 
   update(dt) {
+    const playUnitSwitch = this._appData?.consumeRequestedRuntimePlayUnitSwitch?.();
+    if (playUnitSwitch?.invalid) {
+      this._statusTone = 'error';
+      this._statusMessage = `Ignored invalid requestedPlayUnitId: ${playUnitSwitch.requestedId}`;
+    } else if (playUnitSwitch?.changed && playUnitSwitch.asset) {
+      this._statusTone = 'info';
+      this._statusMessage = `Switched PlayUnit: ${playUnitSwitch.asset.name || playUnitSwitch.asset.id}`;
+      this._cameraState = null;
+    }
+
     const playUnit = this._appData?.getActiveProjectAsset?.();
     if (!playUnit || playUnit.type !== 'playUnit') return;
 
@@ -900,13 +911,40 @@ class PlayTestScene extends Scene {
     if (!data || !playUnit) return;
     const action = typeof data.action === 'string' ? data.action.trim() : 'setProperty';
     const targetObjectId = typeof data.targetObjectId === 'string' ? data.targetObjectId.trim() : '';
-    const targetObject = targetObjectId ? playUnit.findObjectById(targetObjectId) : null;
 
     if (action === 'fireEvent') {
       const chainId = typeof data.eventId === 'string' ? data.eventId.trim() : '';
       if (chainId) this._pendingEvents.add(chainId);
       return;
     }
+
+    if (action === 'requestPlayUnit') {
+      const playUnitId = typeof data.playUnitId === 'string' ? data.playUnitId.trim() : '';
+      if (!playUnitId) {
+        this._statusTone = 'error';
+        this._statusMessage = 'playUnitId is required for requestPlayUnit';
+        return;
+      }
+      this._appData?.setRuntimeGlobalVariable?.('system.fixed.requestedPlayUnitId', playUnitId);
+      this._statusTone = 'info';
+      this._statusMessage = `Requested PlayUnit: ${playUnitId}`;
+      return;
+    }
+
+    if (action === 'returnPlayUnit') {
+      const asset = this._appData?.activateReturnRuntimePlayUnit?.() || null;
+      if (!asset) {
+        this._statusTone = 'error';
+        this._statusMessage = 'returnPlayUnitId is empty or invalid';
+        return;
+      }
+      this._statusTone = 'info';
+      this._statusMessage = `Returned to PlayUnit: ${asset.name || asset.id}`;
+      this._cameraState = null;
+      return;
+    }
+
+    const targetObject = targetObjectId ? playUnit.findObjectById(targetObjectId) : null;
 
     if (!targetObject) return;
 

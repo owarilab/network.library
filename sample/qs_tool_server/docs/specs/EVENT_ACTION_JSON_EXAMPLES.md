@@ -155,7 +155,28 @@ ev_scene_start
 
 ---
 
-## 例6: overlap で踏んだらメッセージ表示（RPG 風）
+## 例6: ひとつ前の PlayUnit に戻る（returnPlayUnit）
+
+**目的**: カットイン用 PlayUnit や一時 UI 用 PlayUnit から、元の PlayUnit に戻る
+
+前提:
+- Runtime 側で `system.fixed.returnPlayUnitId` に「戻り先の PlayUnit ID」が入っている
+- これは `requestedPlayUnitId` による切替や起動時選択の結果として管理される
+
+`EventAction.data`
+```json
+{
+  "listenTo": "ev_close_overlay",
+  "action": "returnPlayUnit"
+}
+```
+
+`targetObjectId` は不要。
+`returnPlayUnitId` が有効なら即時にその PlayUnit へ戻る。
+
+---
+
+## 例7: overlap で踏んだらメッセージ表示（RPG 風）
 
 **目的**: Controller を持つキャラが特定ゾーンに重なったらメッセージウィンドウのテキストを書き換える
 
@@ -201,7 +222,7 @@ ev_scene_start
 
 ---
 
-## 例7: ホバーで色変え → 離れたら戻す
+## 例8: ホバーで色変え → 離れたら戻す
 
 **目的**: ボタンにカーソルが乗ったら Rectangle の色を変え、離れたら元に戻す
 
@@ -259,7 +280,7 @@ ev_scene_start
 
 ---
 
-## 例8: フェードアウト後にオブジェクトを非表示にする（chained tween + setEnabled）
+## 例9: フェードアウト後にオブジェクトを非表示にする（chained tween + setEnabled）
 
 **目的**: `ev_dismiss` 受信 → 0.5s でアルファ 0 → 非表示
 

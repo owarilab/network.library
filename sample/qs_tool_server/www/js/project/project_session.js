@@ -186,6 +186,7 @@ class ProjectSerializer {
         defaultChipWidth: project.settings?.defaultChipWidth | 0,
         defaultChipHeight: project.settings?.defaultChipHeight | 0,
       },
+      globalVariables: ProjectData.normalizeGlobalVariables(project.globalVariables),
       assets: {
         pixelDocuments: (project.assets?.pixelDocuments || []).map(doc => ProjectSerializer._serializePixelDocument(doc, fallbackPalette)),
         tilesets: (project.assets?.tilesets || []).map(tileset => ProjectSerializer._serializeTileset(tileset, fallbackPalette)),
@@ -305,6 +306,7 @@ class ProjectSerializer {
       defaultChipWidth: obj.settings?.defaultChipWidth | 0 || 16,
       defaultChipHeight: obj.settings?.defaultChipHeight | 0 || 16,
     };
+    project.globalVariables = ProjectData.normalizeGlobalVariables(obj.globalVariables);
     project.assets.pixelDocuments = (obj.assets?.pixelDocuments || []).map(doc => ProjectSerializer._deserializePixelDocument(doc));
     project.assets.tilesets = (obj.assets?.tilesets || []).map(tileset => ProjectSerializer._deserializeTileset(tileset));
     project.assets.maps = (obj.assets?.maps || []).map(map => ({

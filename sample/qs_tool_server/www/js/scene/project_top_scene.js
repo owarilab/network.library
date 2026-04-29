@@ -60,7 +60,7 @@ class ProjectTopScene extends Scene {
 
     ctx.fillStyle = '#64748b';
     ctx.font = '13px sans-serif';
-    ctx.fillText('Shortcut: Enter opens active asset / D opens dot editor / M opens map editor / P opens PlayUnit editor / T opens play test', centerX, topY + 84);
+    ctx.fillText('Shortcut: Enter opens active asset / D dot editor / M map editor / P PlayUnit editor / T play test / V variables', centerX, topY + 84);
 
     if (this._statusMessage) {
       ctx.fillStyle = this._statusTone === 'error' ? '#fca5a5' : '#93c5fd';
@@ -118,6 +118,10 @@ class ProjectTopScene extends Scene {
       {
         label: 'Open Play Test',
         action: () => this._openPlayTest(),
+      },
+      {
+        label: 'Open Variables Editor',
+        action: () => this._openVariablesEditor(),
       },
       {
         label: 'Back to Title',
@@ -369,6 +373,10 @@ class ProjectTopScene extends Scene {
       this._openPlayTest();
       return;
     }
+    if (e.key === 'v' || e.key === 'V') {
+      this._openVariablesEditor();
+      return;
+    }
     if (e.key === 's' || e.key === 'S') {
       this._saveProject();
       return;
@@ -486,9 +494,15 @@ class ProjectTopScene extends Scene {
   _openPlayTest() {
     if (!this._appData?.currentProject || !this._appData.projectSession) return;
 
-    let asset = this._appData.getActiveProjectAsset();
+    let asset = this._appData.activateStartupPlayUnit();
     if (!asset || asset.type !== 'playUnit') {
       asset = this._appData.currentProject.assets.playUnits[0] || null;
+      if (asset?.id) {
+        asset = this._appData.activateRuntimePlayUnitById(asset.id, {
+          updateReturnPlayUnitId: false,
+          clearRequestedPlayUnitId: true,
+        });
+      }
     }
 
     if (!asset) {
@@ -497,9 +511,14 @@ class ProjectTopScene extends Scene {
       return;
     }
 
-    this._appData.projectSession.setActiveDocument('playUnit', asset.id);
     this._appData.syncEditorStateToProjectSession();
     this._appData.changeScene(new PlayTestScene());
+  }
+
+  _openVariablesEditor() {
+    if (!this._appData?.currentProject || !this._appData.projectSession) return;
+    this._appData.syncEditorStateToProjectSession();
+    this._appData.changeScene(new VariablesEditorScene());
   }
 
   _saveProject() {
