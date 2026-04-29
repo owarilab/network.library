@@ -1,4 +1,4 @@
-# qs_tool_server
+// # qs_tool_server
 
 `qs_tool_server` は、HTML5 Canvas ベースのドット絵 / タイルセット編集ツールです。
 `www/` 以下にフロントエンド実装があり、ゲーム向け素材制作ツールとして拡張を進めています。
@@ -45,3 +45,4 @@ make clean
 
 - document root: `sample/qs_tool_server/www`
 - 想定URL: `http://localhost:4444/`
+```
