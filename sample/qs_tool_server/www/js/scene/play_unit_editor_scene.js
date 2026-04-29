@@ -246,6 +246,9 @@ class PlayUnitEditorScene extends Scene {
       { label: '+Camera', action: () => this._addComponentToSelectedObject('Camera'), disabled: !hasAsset },
       { label: '+Controller', action: () => this._addComponentToSelectedObject('Controller'), disabled: !hasAsset },
       { label: '+Image', action: () => this._addComponentToSelectedObject('Image'), disabled: !hasAsset },
+      { label: '+Rectangle', action: () => this._addComponentToSelectedObject('Rectangle'), disabled: !hasAsset },
+      { label: '+Triangle', action: () => this._addShapeComponent('triangle'), disabled: !hasAsset },
+      { label: '+Star', action: () => this._addShapeComponent('star'), disabled: !hasAsset },
       { label: '+Tilemap', action: () => this._addComponentToSelectedObject('Tilemap'), disabled: !hasAsset },
       { label: '+Settings', action: () => this._addComponentToSelectedObject('PlaySettings'), disabled: !hasAsset },
       { label: '+Text', action: () => this._addComponentToSelectedObject('Text'), disabled: !hasAsset },
@@ -565,6 +568,40 @@ class PlayUnitEditorScene extends Scene {
     this._markDirty(`Added ${component.type} to ${objectData.name || objectData.id}`);
   }
 
+  _addShapeComponent(shape) {
+    const objectData = this._getSelectedObject();
+    if (!objectData) {
+      this._statusTone = 'error';
+      this._statusMessage = 'Select an object first';
+      return;
+    }
+
+    if (objectData.findComponentByType('Rectangle')) {
+      this._statusTone = 'error';
+      this._statusMessage = `Rectangle already exists on ${objectData.name || objectData.id}`;
+      return;
+    }
+
+    const template = this._createShapeTemplate(shape);
+    const component = objectData.addComponent({ type: 'Rectangle', data: template });
+    this._markDirty(`Added Rectangle (${shape}) to ${objectData.name || objectData.id}`);
+  }
+
+  _createShapeTemplate(shape) {
+    const baseTemplate = this._createComponentTemplate('Rectangle');
+    baseTemplate.shape = shape;
+    
+    if (shape === 'triangle') {
+      baseTemplate.fillColor = '#4ecdc4';
+    } else if (shape === 'star') {
+      baseTemplate.fillColor = '#ffd93d';
+      baseTemplate.points = 5;
+      baseTemplate.innerRadius = 0.4;
+    }
+    
+    return baseTemplate;
+  }
+
   _createComponentTemplate(type) {
     switch (type) {
       case 'Transform':
@@ -618,6 +655,23 @@ class PlayUnitEditorScene extends Scene {
           keepAspect: true,
           originX: 0,
           originY: 0,
+        };
+      case 'Rectangle':
+        return {
+          shape: 'rectangle',
+          width: 64,
+          height: 32,
+          fillColor: '#ffffff',
+          fillAlpha: 1,
+          strokeColor: '#000000',
+          strokeWidth: 2,
+          strokeAlpha: 1,
+          rotation: 0,
+          originX: 0,
+          originY: 0,
+          sides: 4,
+          points: 5,
+          innerRadius: 0.4,
         };
       case 'Text':
         return {

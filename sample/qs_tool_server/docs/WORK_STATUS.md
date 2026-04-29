@@ -1,6 +1,6 @@
 # ドットエディタ 作業状況
 
-最終更新: 2026-04-27 (25)
+最終更新: 2026-04-29 (完了: Phase 1, 2)
 
 ## 概要
 
@@ -30,6 +30,8 @@ docs/
   ├── COLLIDER_TRIGGER_JSON_EXAMPLES.md # Collider / Trigger 用 JSON テンプレート集
   ├── IMAGE_COMPONENT_JSON_EXAMPLES.md # Image component 用 JSON テンプレート集
   ├── TEXT_COMPONENT_JSON_EXAMPLES.md # Text component 用 JSON テンプレート集
+  ├── RECTANGLE_COMPONENT_DESIGN.md # Rectangle component 設計書（矩形・円・多角形）
+  ├── RECTANGLE_COMPONENT_JSON_EXAMPLES.md # Rectangle component 用 JSON テンプレート集
   ├── SELECTION_TOOL_PLAN.md       # 選択ツール実装計画
   ├── SPEC_quarter_view_tile.md    # クォータービュータイル生成仕様書
   └── UNDO_REDO_PLAN.md            # Undo / Redo 実装計画
@@ -96,6 +98,8 @@ www/
 - [Collider / Trigger JSON 例集](specs/COLLIDER_TRIGGER_JSON_EXAMPLES.md)
 - [Image component JSON 例集](specs/IMAGE_COMPONENT_JSON_EXAMPLES.md)
 - [Text component JSON 例集](specs/TEXT_COMPONENT_JSON_EXAMPLES.md)
+- [Rectangle component 設計書](specs/RECTANGLE_COMPONENT_DESIGN.md)
+- [Rectangle component JSON 例集](specs/RECTANGLE_COMPONENT_JSON_EXAMPLES.md)
 - [ブラウザ保存（IndexedDB）最小設計書](specs/BROWSER_STORAGE_PLAN.md)
 - [マップエディタシーン実装計画書](specs/MAP_EDITOR_SCENE_PLAN.md)
 
@@ -434,6 +438,62 @@ www/
 - [x] `Ctrl+C / Ctrl+X / Ctrl+V / Ctrl+A` を `EditorScene._onKeyDown` に接続
 - [x] `Enter` で浮動選択を確定
 - [x] `Escape` で選択解除 / 浮動選択キャンセル
+
+#### PlayUnit コンポーネント拡張（Rectangle）
+
+- [x] **Rectangle Component 設計書作成** ✅ 完了
+  - 設計書: [RECTANGLE_COMPONENT_DESIGN.md](specs/RECTANGLE_COMPONENT_DESIGN.md) - 470+ 行の詳細仕様
+  - JSON 例集: [RECTANGLE_COMPONENT_JSON_EXAMPLES.md](specs/RECTANGLE_COMPONENT_JSON_EXAMPLES.md) - 16 例 + triangle/star 専用例
+  - Shape types: rectangle, circle, polygon, triangle, star すべて実装完了
+  - Color: fillColor/fillAlpha, strokeColor/strokeAlpha の独立制御 ✅
+  - Rotation: 方向を持つ図形に対応 ✅
+  
+- [x] **Rectangle Component 実装（Phase 1: 基本）** ✅ 完了
+  - [x] `PlayUnitRuntime` に `rectangleEntries` を追加
+  - [x] rectangle, circle, polygon の基本描画を `PlayTestScene` に実装
+  - [x] fillColor, fillAlpha, strokeColor, strokeWidth, strokeAlpha の適用
+  - [x] originX, originY による基準点制御
+  - [x] rotation による回転
+  - [x] PlayUnitEditorScene に '+Rectangle' ボタンを追加
+  - [x] _createComponentTemplate に Rectangle のデフォルトテンプレートを追加
+  - 動作確認ガイド: [RECTANGLE_IMPLEMENTATION_GUIDE.md](docs/RECTANGLE_IMPLEMENTATION_GUIDE.md)
+
+- [x] **Rectangle Component 実装（Phase 2: 拡張図形）** ✅ 完了
+  - [x] triangle（正三角形）の実装 - _drawRectangleEntry() に triangle 分岐追加
+  - [x] star（星型）の実装 - points, innerRadius パラメータ対応
+  - [x] Polygon の sides パラメータ詳細調整完了 - 3～8 辺対応
+  - [x] PlayUnitEditorScene に '+Triangle' と '+Star' ボタンを追加
+  - [x] _addShapeComponent() メソッド実装 - Shape 専用のコンポーネント追加処理
+  - [x] _createShapeTemplate() メソッド実装 - 形状別デフォルトカラーカスタマイズ
+  - [x] JSON 例を RECTANGLE_COMPONENT_JSON_EXAMPLES.md に追加記載
+  - ビルド状況: ✅ コアライブラリ、C コンパイル成功
+  - ✅ JavaScriptコード構文エラーなし
+
+- [ ] **Rectangle Component UI 整備（Phase 3）**
+  - [ ] `PlayUnitEditorScene` での Rectangle component ビジュアルエディタ実装
+  - [ ] ColorPicker ダイアログを fillColor/strokeColor に統合
+  - [ ] Inspector パネルで width/height/rotation をスライダー制御
+
+- [ ] **Rectangle Component 活用例（参考文書）**
+  - [x] HP バー UI（複数色段階対応） - RECTANGLE_COMPONENT_JSON_EXAMPLES.md に掲載
+  - [x] ボタン背景 - RECTANGLE_COMPONENT_JSON_EXAMPLES.md に掲載
+  - [x] デバッグ表示（当たり判定ビジュアライザー） - RECTANGLE_COMPONENT_JSON_EXAMPLES.md に掲載
+  - [x] 装飾的な UI エレメント（星、矢印など） - RECTANGLE_COMPONENT_JSON_EXAMPLES.md に掲載
+
+#### PlayUnit Runtime 拡張
+
+- [ ] **Tilemap Component の参照解決**
+  - Map asset との link
+  - PlayTest での map 描画
+
+- [ ] **Trigger Event 実行本体**
+  - ログ表示のみから、実際の event 処理へ
+  - message 表示、object 移動、state 遷移など
+
+- [ ] **Camera 詳細仕様**
+  - 中央基準描画
+  - offset パラメータ
+  - screen-space vs world-space 分離
 
 ---
 

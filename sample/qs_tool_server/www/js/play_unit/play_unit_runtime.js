@@ -22,6 +22,7 @@ class PlayUnitRuntime {
     };
     this.imageEntries = [];
     this.textEntries = [];
+    this.rectangleEntries = [];
   }
 
   /**
@@ -37,6 +38,7 @@ class PlayUnitRuntime {
     runtime.camera = PlayUnitRuntime._resolveCamera(objects);
     const imageEntries = [];
     const textEntries = [];
+    const rectangleEntries = [];
     for (let index = 0; index < objects.length; index++) {
       const objectData = objects[index];
       if (!objectData || objectData.enabled === false) continue;
@@ -67,32 +69,59 @@ class PlayUnitRuntime {
       }
 
       const text = PlayUnitRuntime._findEnabledComponent(objectData, 'Text');
-      if (!text) continue;
+      if (text) {
+        const textValue = typeof text.data?.text === 'string' ? text.data.text : '';
+        if (textValue) {
+          textEntries.push({
+            objectId: objectData.id || '',
+            objectName: objectData.name || 'Object',
+            text: textValue,
+            font: typeof text.data?.font === 'string' && text.data.font.trim() ? text.data.font.trim() : '24px sans-serif',
+            color: typeof text.data?.color === 'string' && text.data.color.trim() ? text.data.color.trim() : '#ffffff',
+            alpha: PlayUnitRuntime._normalizeAlpha(text.data?.alpha),
+            align: PlayUnitRuntime._normalizeTextAlign(text.data?.align),
+            baseline: PlayUnitRuntime._normalizeTextBaseline(text.data?.baseline),
+            wrap: text.data?.wrap === true,
+            maxWidth: PlayUnitRuntime._normalizePositiveNumber(text.data?.maxWidth, 0),
+            lineHeight: PlayUnitRuntime._normalizePositiveNumber(text.data?.lineHeight, 28),
+            strokeColor: typeof text.data?.strokeColor === 'string' && text.data.strokeColor.trim() ? text.data.strokeColor.trim() : '',
+            strokeWidth: PlayUnitRuntime._normalizePositiveNumber(text.data?.strokeWidth, 0),
+            backgroundColor: typeof text.data?.backgroundColor === 'string' && text.data.backgroundColor.trim() ? text.data.backgroundColor.trim() : '',
+            padding: PlayUnitRuntime._normalizePositiveNumber(text.data?.padding, 0),
+            x: Number.isFinite(Number(transform.data?.x)) ? Number(transform.data.x) : 0,
+            y: Number.isFinite(Number(transform.data?.y)) ? Number(transform.data.y) : 0,
+            z: Number.isFinite(Number(transform.data?.z)) ? Number(transform.data.z) : 0,
+            order: index,
+          });
+        }
+      }
 
-      const textValue = typeof text.data?.text === 'string' ? text.data.text : '';
-      if (!textValue) continue;
-
-      textEntries.push({
-        objectId: objectData.id || '',
-        objectName: objectData.name || 'Object',
-        text: textValue,
-        font: typeof text.data?.font === 'string' && text.data.font.trim() ? text.data.font.trim() : '24px sans-serif',
-        color: typeof text.data?.color === 'string' && text.data.color.trim() ? text.data.color.trim() : '#ffffff',
-        alpha: PlayUnitRuntime._normalizeAlpha(text.data?.alpha),
-        align: PlayUnitRuntime._normalizeTextAlign(text.data?.align),
-        baseline: PlayUnitRuntime._normalizeTextBaseline(text.data?.baseline),
-        wrap: text.data?.wrap === true,
-        maxWidth: PlayUnitRuntime._normalizePositiveNumber(text.data?.maxWidth, 0),
-        lineHeight: PlayUnitRuntime._normalizePositiveNumber(text.data?.lineHeight, 28),
-        strokeColor: typeof text.data?.strokeColor === 'string' && text.data.strokeColor.trim() ? text.data.strokeColor.trim() : '',
-        strokeWidth: PlayUnitRuntime._normalizePositiveNumber(text.data?.strokeWidth, 0),
-        backgroundColor: typeof text.data?.backgroundColor === 'string' && text.data.backgroundColor.trim() ? text.data.backgroundColor.trim() : '',
-        padding: PlayUnitRuntime._normalizePositiveNumber(text.data?.padding, 0),
-        x: Number.isFinite(Number(transform.data?.x)) ? Number(transform.data.x) : 0,
-        y: Number.isFinite(Number(transform.data?.y)) ? Number(transform.data.y) : 0,
-        z: Number.isFinite(Number(transform.data?.z)) ? Number(transform.data.z) : 0,
-        order: index,
-      });
+      const rectangle = PlayUnitRuntime._findEnabledComponent(objectData, 'Rectangle');
+      if (rectangle) {
+        const shape = typeof rectangle.data?.shape === 'string' ? rectangle.data.shape.trim() : 'rectangle';
+        rectangleEntries.push({
+          objectId: objectData.id || '',
+          objectName: objectData.name || 'Object',
+          shape,
+          width: PlayUnitRuntime._normalizePositiveNumber(rectangle.data?.width, 64),
+          height: PlayUnitRuntime._normalizePositiveNumber(rectangle.data?.height, 32),
+          fillColor: typeof rectangle.data?.fillColor === 'string' && rectangle.data.fillColor.trim() ? rectangle.data.fillColor.trim() : '#ffffff',
+          fillAlpha: PlayUnitRuntime._normalizeAlpha(rectangle.data?.fillAlpha),
+          strokeColor: typeof rectangle.data?.strokeColor === 'string' && rectangle.data.strokeColor.trim() ? rectangle.data.strokeColor.trim() : '#000000',
+          strokeWidth: PlayUnitRuntime._normalizePositiveNumber(rectangle.data?.strokeWidth, 2),
+          strokeAlpha: PlayUnitRuntime._normalizeAlpha(rectangle.data?.strokeAlpha),
+          rotation: Number.isFinite(Number(rectangle.data?.rotation)) ? Number(rectangle.data.rotation) : 0,
+          originX: PlayUnitRuntime._normalizeUnitInterval(rectangle.data?.originX, 0),
+          originY: PlayUnitRuntime._normalizeUnitInterval(rectangle.data?.originY, 0),
+          sides: PlayUnitRuntime._normalizePositiveNumber(rectangle.data?.sides, 4),
+          points: PlayUnitRuntime._normalizePositiveNumber(rectangle.data?.points, 5),
+          innerRadius: PlayUnitRuntime._normalizeUnitInterval(rectangle.data?.innerRadius, 0.4),
+          x: Number.isFinite(Number(transform.data?.x)) ? Number(transform.data.x) : 0,
+          y: Number.isFinite(Number(transform.data?.y)) ? Number(transform.data.y) : 0,
+          z: Number.isFinite(Number(transform.data?.z)) ? Number(transform.data.z) : 0,
+          order: index,
+        });
+      }
     }
 
     runtime.textEntries = textEntries.sort((a, b) => {
@@ -100,6 +129,10 @@ class PlayUnitRuntime {
       return a.order - b.order;
     });
     runtime.imageEntries = imageEntries.sort((a, b) => {
+      if (a.z !== b.z) return a.z - b.z;
+      return a.order - b.order;
+    });
+    runtime.rectangleEntries = rectangleEntries.sort((a, b) => {
       if (a.z !== b.z) return a.z - b.z;
       return a.order - b.order;
     });

@@ -103,7 +103,7 @@ class PlayTestScene extends Scene {
 
     ctx.fillStyle = '#94a3b8';
     ctx.font = '13px sans-serif';
-    ctx.fillText(`Text: ${runtime?.textEntries?.length || 0} / Image: ${runtime?.imageEntries?.length || 0}`, panel.x + 18, panel.y + 52);
+    ctx.fillText(`Text: ${runtime?.textEntries?.length || 0} / Image: ${runtime?.imageEntries?.length || 0} / Rectangle: ${runtime?.rectangleEntries?.length || 0}`, panel.x + 18, panel.y + 52);
     ctx.fillText(`Camera: ${runtime?.camera?.objectName || 'DefaultCamera'} (${Math.round(this._cameraState?.x || runtime?.camera?.x || 0)}, ${Math.round(this._cameraState?.y || runtime?.camera?.y || 0)}) zoom ${runtime?.camera?.zoom || 1}`, panel.x + 180, panel.y + 52);
     if (runtime?.camera?.followTargetObjectId) {
       ctx.fillText(`Follow: ${runtime.camera.followTargetObjectName || runtime.camera.followTargetObjectId} lerp ${runtime.camera.followLerp || 0}`, panel.x + 18, panel.y + 74);
@@ -146,6 +146,10 @@ class PlayTestScene extends Scene {
     for (const entry of renderEntries) {
       if (entry.kind === 'image') {
         this._drawImageEntry(ctx, entry, project);
+        continue;
+      }
+      if (entry.kind === 'rectangle') {
+        this._drawRectangleEntry(ctx, entry);
         continue;
       }
       this._drawTextEntry(ctx, entry);
@@ -359,6 +363,136 @@ class PlayTestScene extends Scene {
     }
   }
 
+  _drawRectangleEntry(ctx, entry) {
+    ctx.save();
+    ctx.globalAlpha = 1;
+
+    const { x, y, width, height, shape, fillColor, fillAlpha, strokeColor, strokeWidth, strokeAlpha, rotation, originX, originY } = entry;
+
+    // 基準点による座標オフセット
+    const offsetX = width * originX;
+    const offsetY = height * originY;
+    const drawX = x - offsetX;
+    const drawY = y - offsetY;
+
+    ctx.translate(drawX + offsetX, drawY + offsetY);
+    if (rotation) {
+      ctx.rotate((rotation * Math.PI) / 180);
+    }
+    ctx.translate(-offsetX, -offsetY);
+
+    // 図形を描画
+    if (shape === 'circle') {
+      ctx.beginPath();
+      ctx.arc(offsetX, offsetY, width * 0.5, 0, Math.PI * 2);
+      
+      if (fillColor && fillAlpha > 0) {
+        ctx.globalAlpha = fillAlpha;
+        ctx.fillStyle = fillColor;
+        ctx.fill();
+      }
+      
+      if (strokeColor && strokeWidth > 0 && strokeAlpha > 0) {
+        ctx.globalAlpha = strokeAlpha;
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = strokeWidth;
+        ctx.stroke();
+      }
+    } else if (shape === 'polygon') {
+      const sides = Math.max(3, Math.floor(entry.sides || 4));
+      const radius = Math.min(width, height) * 0.5;
+      ctx.beginPath();
+      for (let i = 0; i < sides; i++) {
+        const angle = (i / sides) * Math.PI * 2 - Math.PI * 0.5;
+        const px = offsetX + Math.cos(angle) * radius;
+        const py = offsetY + Math.sin(angle) * radius;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      
+      if (fillColor && fillAlpha > 0) {
+        ctx.globalAlpha = fillAlpha;
+        ctx.fillStyle = fillColor;
+        ctx.fill();
+      }
+      
+      if (strokeColor && strokeWidth > 0 && strokeAlpha > 0) {
+        ctx.globalAlpha = strokeAlpha;
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = strokeWidth;
+        ctx.stroke();
+      }
+    } else if (shape === 'triangle') {
+      const radius = Math.min(width, height) * 0.5;
+      ctx.beginPath();
+      for (let i = 0; i < 3; i++) {
+        const angle = (i / 3) * Math.PI * 2 - Math.PI * 0.5;
+        const px = offsetX + Math.cos(angle) * radius;
+        const py = offsetY + Math.sin(angle) * radius;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      
+      if (fillColor && fillAlpha > 0) {
+        ctx.globalAlpha = fillAlpha;
+        ctx.fillStyle = fillColor;
+        ctx.fill();
+      }
+      
+      if (strokeColor && strokeWidth > 0 && strokeAlpha > 0) {
+        ctx.globalAlpha = strokeAlpha;
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = strokeWidth;
+        ctx.stroke();
+      }
+    } else if (shape === 'star') {
+      const points = Math.max(3, Math.floor(entry.points || 5));
+      const outerRadius = Math.min(width, height) * 0.5;
+      const innerRadius = outerRadius * Math.max(0.1, Math.min(0.9, entry.innerRadius || 0.4));
+      ctx.beginPath();
+      for (let i = 0; i < points * 2; i++) {
+        const radius = i % 2 === 0 ? outerRadius : innerRadius;
+        const angle = (i / (points * 2)) * Math.PI * 2 - Math.PI * 0.5;
+        const px = offsetX + Math.cos(angle) * radius;
+        const py = offsetY + Math.sin(angle) * radius;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      
+      if (fillColor && fillAlpha > 0) {
+        ctx.globalAlpha = fillAlpha;
+        ctx.fillStyle = fillColor;
+        ctx.fill();
+      }
+      
+      if (strokeColor && strokeWidth > 0 && strokeAlpha > 0) {
+        ctx.globalAlpha = strokeAlpha;
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = strokeWidth;
+        ctx.stroke();
+      }
+    } else {
+      // rectangle（デフォルト）
+      if (fillColor && fillAlpha > 0) {
+        ctx.globalAlpha = fillAlpha;
+        ctx.fillStyle = fillColor;
+        ctx.fillRect(0, 0, width, height);
+      }
+      
+      if (strokeColor && strokeWidth > 0 && strokeAlpha > 0) {
+        ctx.globalAlpha = strokeAlpha;
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = strokeWidth;
+        ctx.strokeRect(0, 0, width, height);
+      }
+    }
+
+    ctx.restore();
+  }
+
   _drawTextEntry(ctx, entry) {
     ctx.save();
     ctx.font = entry.font;
@@ -513,7 +647,10 @@ class PlayTestScene extends Scene {
     const textEntries = Array.isArray(runtime?.textEntries)
       ? runtime.textEntries.map((entry) => ({ ...entry, kind: 'text' }))
       : [];
-    return [...imageEntries, ...textEntries].sort((a, b) => {
+    const rectangleEntries = Array.isArray(runtime?.rectangleEntries)
+      ? runtime.rectangleEntries.map((entry) => ({ ...entry, kind: 'rectangle' }))
+      : [];
+    return [...imageEntries, ...textEntries, ...rectangleEntries].sort((a, b) => {
       if (a.z !== b.z) return a.z - b.z;
       return (a.order || 0) - (b.order || 0);
     });
