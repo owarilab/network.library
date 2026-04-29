@@ -1,0 +1,747 @@
+{
+  "id": "pu_rpg_hud_display_x7m2k9f4",
+  "type": "playUnit",
+  "name": "RPG_HUD",
+  "description": "RPGゲーム用HUD - HP/MPバー、ステータス、インベントリ",
+  "objects": [
+    {
+      "id": "hud_bg_panel_b3q5w1y8",
+      "name": "HUD_Background_Panel",
+      "x": 10,
+      "y": 10,
+      "z": 0,
+      "components": [
+        {
+          "type": "Transform",
+          "enabled": true,
+          "data": {
+            "x": 10,
+            "y": 10,
+            "z": 0,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        {
+          "type": "Rectangle",
+          "enabled": true,
+          "data": {
+            "shape": "rectangle",
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "width": 300,
+            "height": 150,
+            "rotation": 0,
+            "originX": 0,
+            "originY": 0,
+            "fillColor": "#1a1a1a",
+            "fillAlpha": 0.8,
+            "strokeColor": "#666666",
+            "strokeWidth": 2,
+            "strokeAlpha": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "hp_bar_bg_d7t4n2x9",
+      "name": "HP_Bar_Background",
+      "x": 20,
+      "y": 20,
+      "z": 1,
+      "components": [
+        {
+          "type": "Transform",
+          "enabled": true,
+          "data": {
+            "x": 20,
+            "y": 20,
+            "z": 1,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        {
+          "type": "Rectangle",
+          "enabled": true,
+          "data": {
+            "shape": "rectangle",
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "width": 120,
+            "height": 20,
+            "rotation": 0,
+            "originX": 0,
+            "originY": 0,
+            "fillColor": "#444444",
+            "fillAlpha": 1,
+            "strokeColor": "#888888",
+            "strokeWidth": 1,
+            "strokeAlpha": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "hp_bar_value_a6f8p3k1",
+      "name": "HP_Bar_Value",
+      "x": 20,
+      "y": 20,
+      "z": 2,
+      "components": [
+        {
+          "type": "Transform",
+          "enabled": true,
+          "data": {
+            "x": 20,
+            "y": 20,
+            "z": 2,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        {
+          "type": "Rectangle",
+          "enabled": true,
+          "data": {
+            "shape": "rectangle",
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "width": 90,
+            "height": 20,
+            "rotation": 0,
+            "originX": 0,
+            "originY": 0,
+            "fillColor": "#ff4444",
+            "fillAlpha": 1,
+            "strokeColor": "#000000",
+            "strokeWidth": 0,
+            "strokeAlpha": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "hp_label_text_c8h2r6m9",
+      "name": "HP_Label",
+      "x": 150,
+      "y": 20,
+      "z": 3,
+      "components": [
+        {
+          "type": "Transform",
+          "enabled": true,
+          "data": {
+            "x": 150,
+            "y": 20,
+            "z": 3,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        {
+          "type": "Text",
+          "enabled": true,
+          "data": {
+            "content": "HP: 90/100",
+            "fontFamily": "Arial",
+            "fontSize": 14,
+            "fontColor": "#ffffff",
+            "fontAlpha": 1,
+            "textAlign": "left",
+            "baseline": "top"
+          }
+        }
+      ]
+    },
+    {
+      "id": "mp_bar_bg_e9j3s7l2",
+      "name": "MP_Bar_Background",
+      "x": 20,
+      "y": 50,
+      "z": 1,
+      "components": [
+        {
+          "type": "Transform",
+          "enabled": true,
+          "data": {
+            "x": 20,
+            "y": 50,
+            "z": 1,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        {
+          "type": "Rectangle",
+          "enabled": true,
+          "data": {
+            "shape": "rectangle",
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "width": 120,
+            "height": 20,
+            "rotation": 0,
+            "originX": 0,
+            "originY": 0,
+            "fillColor": "#444444",
+            "fillAlpha": 1,
+            "strokeColor": "#888888",
+            "strokeWidth": 1,
+            "strokeAlpha": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "mp_bar_value_f1k4t8n9",
+      "name": "MP_Bar_Value",
+      "x": 20,
+      "y": 50,
+      "z": 2,
+      "components": [
+        {
+          "type": "Transform",
+          "enabled": true,
+          "data": {
+            "x": 20,
+            "y": 50,
+            "z": 2,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        {
+          "type": "Rectangle",
+          "enabled": true,
+          "data": {
+            "shape": "rectangle",
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "width": 108,
+            "height": 20,
+            "rotation": 0,
+            "originX": 0,
+            "originY": 0,
+            "fillColor": "#4444ff",
+            "fillAlpha": 1,
+            "strokeColor": "#000000",
+            "strokeWidth": 0,
+            "strokeAlpha": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "mp_label_text_g2m5u9p3",
+      "name": "MP_Label",
+      "x": 150,
+      "y": 50,
+      "z": 3,
+      "components": [
+        {
+          "type": "Transform",
+          "enabled": true,
+          "data": {
+            "x": 150,
+            "y": 50,
+            "z": 3,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        {
+          "type": "Text",
+          "enabled": true,
+          "data": {
+            "content": "MP: 54/60",
+            "fontFamily": "Arial",
+            "fontSize": 14,
+            "fontColor": "#ffffff",
+            "fontAlpha": 1,
+            "textAlign": "left",
+            "baseline": "top"
+          }
+        }
+      ]
+    },
+    {
+      "id": "exp_bar_bg_h3n6v1q4",
+      "name": "EXP_Bar_Background",
+      "x": 20,
+      "y": 80,
+      "z": 1,
+      "components": [
+        {
+          "type": "Transform",
+          "enabled": true,
+          "data": {
+            "x": 20,
+            "y": 80,
+            "z": 1,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        {
+          "type": "Rectangle",
+          "enabled": true,
+          "data": {
+            "shape": "rectangle",
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "width": 120,
+            "height": 12,
+            "rotation": 0,
+            "originX": 0,
+            "originY": 0,
+            "fillColor": "#333333",
+            "fillAlpha": 1,
+            "strokeColor": "#666666",
+            "strokeWidth": 1,
+            "strokeAlpha": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "exp_bar_value_i4o7w2r5",
+      "name": "EXP_Bar_Value",
+      "x": 20,
+      "y": 80,
+      "z": 2,
+      "components": [
+        {
+          "type": "Transform",
+          "enabled": true,
+          "data": {
+            "x": 20,
+            "y": 80,
+            "z": 2,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        {
+          "type": "Rectangle",
+          "enabled": true,
+          "data": {
+            "shape": "rectangle",
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "width": 72,
+            "height": 12,
+            "rotation": 0,
+            "originX": 0,
+            "originY": 0,
+            "fillColor": "#ffaa44",
+            "fillAlpha": 1,
+            "strokeColor": "#000000",
+            "strokeWidth": 0,
+            "strokeAlpha": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "level_indicator_j5p8x3s6",
+      "name": "Level_Indicator",
+      "x": 20,
+      "y": 110,
+      "z": 2,
+      "components": [
+        {
+          "type": "Transform",
+          "enabled": true,
+          "data": {
+            "x": 20,
+            "y": 110,
+            "z": 2,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        {
+          "type": "Text",
+          "enabled": true,
+          "data": {
+            "content": "Lv. 25",
+            "fontFamily": "Arial",
+            "fontSize": 16,
+            "fontColor": "#ffff00",
+            "fontAlpha": 1,
+            "textAlign": "left",
+            "baseline": "top"
+          }
+        }
+      ]
+    },
+    {
+      "id": "stats_atk_text_k6q9y4t7",
+      "name": "ATK_Stat",
+      "x": 80,
+      "y": 110,
+      "z": 2,
+      "components": [
+        {
+          "type": "Transform",
+          "enabled": true,
+          "data": {
+            "x": 80,
+            "y": 110,
+            "z": 2,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        {
+          "type": "Text",
+          "enabled": true,
+          "data": {
+            "content": "ATK:48",
+            "fontFamily": "Arial",
+            "fontSize": 12,
+            "fontColor": "#ffcccc",
+            "fontAlpha": 1,
+            "textAlign": "left",
+            "baseline": "top"
+          }
+        }
+      ]
+    },
+    {
+      "id": "stats_def_text_l7r1z5u8",
+      "name": "DEF_Stat",
+      "x": 140,
+      "y": 110,
+      "z": 2,
+      "components": [
+        {
+          "type": "Transform",
+          "enabled": true,
+          "data": {
+            "x": 140,
+            "y": 110,
+            "z": 2,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        {
+          "type": "Text",
+          "enabled": true,
+          "data": {
+            "content": "DEF:32",
+            "fontFamily": "Arial",
+            "fontSize": 12,
+            "fontColor": "#ccccff",
+            "fontAlpha": 1,
+            "textAlign": "left",
+            "baseline": "top"
+          }
+        }
+      ]
+    },
+    {
+      "id": "inventory_slot_1_m8s2a6v9",
+      "name": "Inventory_Slot_1",
+      "x": 20,
+      "y": 130,
+      "z": 1,
+      "components": [
+        {
+          "type": "Transform",
+          "enabled": true,
+          "data": {
+            "x": 20,
+            "y": 130,
+            "z": 1,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        {
+          "type": "Rectangle",
+          "enabled": true,
+          "data": {
+            "shape": "rectangle",
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "width": 28,
+            "height": 28,
+            "rotation": 0,
+            "originX": 0,
+            "originY": 0,
+            "fillColor": "#4a4a4a",
+            "fillAlpha": 1,
+            "strokeColor": "#999999",
+            "strokeWidth": 1,
+            "strokeAlpha": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "inventory_item_1_n9t3b7w1",
+      "name": "Inventory_Item_1",
+      "x": 24,
+      "y": 134,
+      "z": 2,
+      "components": [
+        {
+          "type": "Transform",
+          "enabled": true,
+          "data": {
+            "x": 24,
+            "y": 134,
+            "z": 2,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        {
+          "type": "Rectangle",
+          "enabled": true,
+          "data": {
+            "shape": "circle",
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "width": 16,
+            "height": 16,
+            "rotation": 0,
+            "originX": 0.5,
+            "originY": 0.5,
+            "fillColor": "#ff6633",
+            "fillAlpha": 1,
+            "strokeColor": "#000000",
+            "strokeWidth": 0,
+            "strokeAlpha": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "inventory_slot_2_o1u4c8x2",
+      "name": "Inventory_Slot_2",
+      "x": 58,
+      "y": 130,
+      "z": 1,
+      "components": [
+        {
+          "type": "Transform",
+          "enabled": true,
+          "data": {
+            "x": 58,
+            "y": 130,
+            "z": 1,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        {
+          "type": "Rectangle",
+          "enabled": true,
+          "data": {
+            "shape": "rectangle",
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "width": 28,
+            "height": 28,
+            "rotation": 0,
+            "originX": 0,
+            "originY": 0,
+            "fillColor": "#4a4a4a",
+            "fillAlpha": 1,
+            "strokeColor": "#999999",
+            "strokeWidth": 1,
+            "strokeAlpha": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "inventory_item_2_p2v5d9y3",
+      "name": "Inventory_Item_2",
+      "x": 62,
+      "y": 134,
+      "z": 2,
+      "components": [
+        {
+          "type": "Transform",
+          "enabled": true,
+          "data": {
+            "x": 62,
+            "y": 134,
+            "z": 2,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        {
+          "type": "Rectangle",
+          "enabled": true,
+          "data": {
+            "shape": "rectangle",
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "width": 16,
+            "height": 16,
+            "rotation": 0,
+            "originX": 0.5,
+            "originY": 0.5,
+            "fillColor": "#3399ff",
+            "fillAlpha": 1,
+            "strokeColor": "#000000",
+            "strokeWidth": 0,
+            "strokeAlpha": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "inventory_slot_3_q3w6e1z4",
+      "name": "Inventory_Slot_3",
+      "x": 96,
+      "y": 130,
+      "z": 1,
+      "components": [
+        {
+          "type": "Transform",
+          "enabled": true,
+          "data": {
+            "x": 96,
+            "y": 130,
+            "z": 1,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        {
+          "type": "Rectangle",
+          "enabled": true,
+          "data": {
+            "shape": "rectangle",
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "width": 28,
+            "height": 28,
+            "rotation": 0,
+            "originX": 0,
+            "originY": 0,
+            "fillColor": "#4a4a4a",
+            "fillAlpha": 1,
+            "strokeColor": "#999999",
+            "strokeWidth": 1,
+            "strokeAlpha": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "inventory_item_3_r4x7f2a5",
+      "name": "Inventory_Item_3",
+      "x": 110,
+      "y": 134,
+      "z": 2,
+      "components": [
+        {
+          "type": "Transform",
+          "enabled": true,
+          "data": {
+            "x": 110,
+            "y": 134,
+            "z": 2,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        {
+          "type": "Rectangle",
+          "enabled": true,
+          "data": {
+            "shape": "star",
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "width": 16,
+            "height": 16,
+            "rotation": 0,
+            "originX": 0.5,
+            "originY": 0.5,
+            "fillColor": "#ffff33",
+            "fillAlpha": 1,
+            "strokeColor": "#000000",
+            "strokeWidth": 0,
+            "strokeAlpha": 0,
+            "points": 5,
+            "innerRadius": 0.4
+          }
+        }
+      ]
+    },
+    {
+      "id": "status_state_text_s5y8g3b6",
+      "name": "Status_State",
+      "x": 150,
+      "y": 130,
+      "z": 2,
+      "components": [
+        {
+          "type": "Transform",
+          "enabled": true,
+          "data": {
+            "x": 150,
+            "y": 130,
+            "z": 2,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        {
+          "type": "Text",
+          "enabled": true,
+          "data": {
+            "content": "Status: NORMAL",
+            "fontFamily": "Arial",
+            "fontSize": 11,
+            "fontColor": "#88ff88",
+            "fontAlpha": 1,
+            "textAlign": "left",
+            "baseline": "top"
+          }
+        }
+      ]
+    }
+  ]
+}
