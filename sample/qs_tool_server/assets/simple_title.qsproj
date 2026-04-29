@@ -1,0 +1,551 @@
+{
+  "format": "qsproj",
+  "version": 1,
+  "project": {
+    "id": "proj_gametitle_5rj006ru",
+    "version": 1,
+    "name": "GameTitle",
+    "createdAt": 1777436608074,
+    "updatedAt": 1777436704139,
+    "settings": {
+      "defaultChipWidth": 16,
+      "defaultChipHeight": 16
+    },
+    "assets": {
+      "pixelDocuments": [
+        {
+          "id": "px_gametitle_default_06mu9rav",
+          "type": "pixelDocument",
+          "name": "untitled",
+          "width": 32,
+          "height": 32,
+          "storage": {
+            "type": "embedded",
+            "codec": "qts-base64",
+            "data": "UVNUUwEAAAAgACAAAQABACAAAAAAAAAA/0BAQP+goKD//////4AAAP//AAD//4AA////AP8AgAD/AP8A/wCAgP8A////AACA/wAA//+AAID//wD////gvf/grGn/oGQy/2Q8FP/StIz//7bB///auf+t2Ob/kO6Q//+lAP9GgrT/Iosi/9wUPP8gICD/4ODg/wEOAOODrOOCpOODpOODvCAxAf8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+          }
+        }
+      ],
+      "tilesets": [],
+      "maps": [],
+      "playUnits": [
+        {
+          "id": "pu_title_scene_fesubtaw",
+          "type": "playUnit",
+          "name": "GameTitle",
+          "description": "ゲームタイトル画面（Rectangle, Text, Image コンポーネント活用例）",
+          "objects": [
+                {
+                  "id": "camera_main_bdktw5aw",
+                  "name": "Main Camera",
+                  "components": [
+                    {
+                      "type": "Transform",
+                      "enabled": true,
+                      "data": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0,
+                        "rotation": 0,
+                        "scaleX": 1,
+                        "scaleY": 1
+                      }
+                    },
+                    {
+                      "type": "Camera",
+                      "enabled": true,
+                      "data": {
+                        "zoom": 1,
+                        "viewportX": 0,
+                        "viewportY": 0,
+                        "viewportWidth": 800,
+                        "viewportHeight": 600,
+                        "followTargetObjectId": "",
+                        "followLerp": 1
+                      }
+                    },
+                    {
+                      "type": "PlaySettings",
+                      "enabled": true,
+                      "data": {
+                        "defaultCameraObjectId": "camera_main_bdktw5aw"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "bg_decoration_stars_ccqd9uy7",
+                  "name": "Background Stars",
+                  "components": [
+                    {
+                      "type": "Transform",
+                      "enabled": true,
+                      "data": {
+                        "x": 100,
+                        "y": 80,
+                        "z": 0,
+                        "rotation": 0,
+                        "scaleX": 1,
+                        "scaleY": 1
+                      }
+                    },
+                    {
+                      "type": "Rectangle",
+                      "enabled": true,
+                      "data": {
+                        "shape": "star",
+                        "width": 40,
+                        "height": 40,
+                        "points": 5,
+                        "innerRadius": 0.4,
+                        "fillColor": "#ffd93d",
+                        "fillAlpha": 0.8,
+                        "strokeColor": "#f9ca24",
+                        "strokeWidth": 1,
+                        "strokeAlpha": 1,
+                        "rotation": 0,
+                        "originX": 0.5,
+                        "originY": 0.5,
+                        "sides": 5
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "bg_frame_f1djvtgo",
+                  "name": "Background Frame",
+                  "components": [
+                    {
+                      "type": "Transform",
+                      "enabled": true,
+                      "data": {
+                        "x": 400,
+                        "y": 300,
+                        "z": -1,
+                        "rotation": 0,
+                        "scaleX": 1,
+                        "scaleY": 1
+                      }
+                    },
+                    {
+                      "type": "Rectangle",
+                      "enabled": true,
+                      "data": {
+                        "shape": "rectangle",
+                        "width": 800,
+                        "height": 600,
+                        "fillColor": "#1a1a2e",
+                        "fillAlpha": 1,
+                        "strokeColor": "#0f3460",
+                        "strokeWidth": 3,
+                        "strokeAlpha": 1,
+                        "rotation": 0,
+                        "originX": 0.5,
+                        "originY": 0.5,
+                        "sides": 4,
+                        "points": 5,
+                        "innerRadius": 0.4
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "title_text_t0atoicb",
+                  "name": "Title Text",
+                  "components": [
+                    {
+                      "type": "Transform",
+                      "enabled": true,
+                      "data": {
+                        "x": 400,
+                        "y": 80,
+                        "z": 1,
+                        "rotation": 0,
+                        "scaleX": 1,
+                        "scaleY": 1
+                      }
+                    },
+                    {
+                      "type": "Text",
+                      "enabled": true,
+                      "data": {
+                        "text": "EPIC QUEST",
+                        "font": "bold 64px sans-serif",
+                        "color": "#ffd93d",
+                        "alpha": 1,
+                        "align": "center",
+                        "baseline": "middle",
+                        "wrap": false,
+                        "maxWidth": 0,
+                        "lineHeight": 80,
+                        "strokeColor": "#f9ca24",
+                        "strokeWidth": 2,
+                        "backgroundColor": "",
+                        "padding": 0
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "subtitle_text_qtlfziif",
+                  "name": "Subtitle Text",
+                  "components": [
+                    {
+                      "type": "Transform",
+                      "enabled": true,
+                      "data": {
+                        "x": 400,
+                        "y": 150,
+                        "z": 1,
+                        "rotation": 0,
+                        "scaleX": 1,
+                        "scaleY": 1
+                      }
+                    },
+                    {
+                      "type": "Text",
+                      "enabled": true,
+                      "data": {
+                        "text": "A Journey to Save the Kingdom",
+                        "font": "italic 24px sans-serif",
+                        "color": "#a8e6cf",
+                        "alpha": 0.8,
+                        "align": "center",
+                        "baseline": "middle",
+                        "wrap": false,
+                        "maxWidth": 0,
+                        "lineHeight": 32,
+                        "strokeColor": "",
+                        "strokeWidth": 0,
+                        "backgroundColor": "",
+                        "padding": 0
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "btn_start_bg_0ot7dif6",
+                  "name": "Start Button Background",
+                  "components": [
+                    {
+                      "type": "Transform",
+                      "enabled": true,
+                      "data": {
+                        "x": 400,
+                        "y": 320,
+                        "z": 2,
+                        "rotation": 0,
+                        "scaleX": 1,
+                        "scaleY": 1
+                      }
+                    },
+                    {
+                      "type": "Rectangle",
+                      "enabled": true,
+                      "data": {
+                        "shape": "rectangle",
+                        "width": 200,
+                        "height": 60,
+                        "fillColor": "#6c5ce7",
+                        "fillAlpha": 0.9,
+                        "strokeColor": "#a29bfe",
+                        "strokeWidth": 3,
+                        "strokeAlpha": 1,
+                        "rotation": 0,
+                        "originX": 0.5,
+                        "originY": 0.5,
+                        "sides": 4,
+                        "points": 5,
+                        "innerRadius": 0.4
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "btn_start_text_0nhzc8y9",
+                  "name": "Start Button Text",
+                  "components": [
+                    {
+                      "type": "Transform",
+                      "enabled": true,
+                      "data": {
+                        "x": 400,
+                        "y": 320,
+                        "z": 3,
+                        "rotation": 0,
+                        "scaleX": 1,
+                        "scaleY": 1
+                      }
+                    },
+                    {
+                      "type": "Text",
+                      "enabled": true,
+                      "data": {
+                        "text": "START GAME",
+                        "font": "bold 28px sans-serif",
+                        "color": "#ffffff",
+                        "alpha": 1,
+                        "align": "center",
+                        "baseline": "middle",
+                        "wrap": false,
+                        "maxWidth": 0,
+                        "lineHeight": 36,
+                        "strokeColor": "",
+                        "strokeWidth": 0,
+                        "backgroundColor": "",
+                        "padding": 0
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "btn_options_bg_qqvoz1ru",
+                  "name": "Options Button Background",
+                  "components": [
+                    {
+                      "type": "Transform",
+                      "enabled": true,
+                      "data": {
+                        "x": 350,
+                        "y": 420,
+                        "z": 2,
+                        "rotation": 0,
+                        "scaleX": 1,
+                        "scaleY": 1
+                      }
+                    },
+                    {
+                      "type": "Rectangle",
+                      "enabled": true,
+                      "data": {
+                        "shape": "rectangle",
+                        "width": 140,
+                        "height": 50,
+                        "fillColor": "#0984e3",
+                        "fillAlpha": 0.8,
+                        "strokeColor": "#74b9ff",
+                        "strokeWidth": 2,
+                        "strokeAlpha": 1,
+                        "rotation": 0,
+                        "originX": 0.5,
+                        "originY": 0.5,
+                        "sides": 4,
+                        "points": 5,
+                        "innerRadius": 0.4
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "btn_options_text_9vy5bpmf",
+                  "name": "Options Button Text",
+                  "components": [
+                    {
+                      "type": "Transform",
+                      "enabled": true,
+                      "data": {
+                        "x": 350,
+                        "y": 420,
+                        "z": 3,
+                        "rotation": 0,
+                        "scaleX": 1,
+                        "scaleY": 1
+                      }
+                    },
+                    {
+                      "type": "Text",
+                      "enabled": true,
+                      "data": {
+                        "text": "OPTIONS",
+                        "font": "bold 20px sans-serif",
+                        "color": "#ffffff",
+                        "alpha": 1,
+                        "align": "center",
+                        "baseline": "middle",
+                        "wrap": false,
+                        "maxWidth": 0,
+                        "lineHeight": 28,
+                        "strokeColor": "",
+                        "strokeWidth": 0,
+                        "backgroundColor": "",
+                        "padding": 0
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "btn_quit_bg_4mvdd2l5",
+                  "name": "Quit Button Background",
+                  "components": [
+                    {
+                      "type": "Transform",
+                      "enabled": true,
+                      "data": {
+                        "x": 450,
+                        "y": 420,
+                        "z": 2,
+                        "rotation": 0,
+                        "scaleX": 1,
+                        "scaleY": 1
+                      }
+                    },
+                    {
+                      "type": "Rectangle",
+                      "enabled": true,
+                      "data": {
+                        "shape": "rectangle",
+                        "width": 140,
+                        "height": 50,
+                        "fillColor": "#d63031",
+                        "fillAlpha": 0.8,
+                        "strokeColor": "#fab1a0",
+                        "strokeWidth": 2,
+                        "strokeAlpha": 1,
+                        "rotation": 0,
+                        "originX": 0.5,
+                        "originY": 0.5,
+                        "sides": 4,
+                        "points": 5,
+                        "innerRadius": 0.4
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "btn_quit_text_h7w48kez",
+                  "name": "Quit Button Text",
+                  "components": [
+                    {
+                      "type": "Transform",
+                      "enabled": true,
+                      "data": {
+                        "x": 450,
+                        "y": 420,
+                        "z": 3,
+                        "rotation": 0,
+                        "scaleX": 1,
+                        "scaleY": 1
+                      }
+                    },
+                    {
+                      "type": "Text",
+                      "enabled": true,
+                      "data": {
+                        "text": "QUIT",
+                        "font": "bold 20px sans-serif",
+                        "color": "#ffffff",
+                        "alpha": 1,
+                        "align": "center",
+                        "baseline": "middle",
+                        "wrap": false,
+                        "maxWidth": 0,
+                        "lineHeight": 28,
+                        "strokeColor": "",
+                        "strokeWidth": 0,
+                        "backgroundColor": "",
+                        "padding": 0
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "decorative_line_top_kpebhiw9",
+                  "name": "Decorative Line Top",
+                  "components": [
+                    {
+                      "type": "Transform",
+                      "enabled": true,
+                      "data": {
+                        "x": 400,
+                        "y": 200,
+                        "z": 1,
+                        "rotation": 0,
+                        "scaleX": 1,
+                        "scaleY": 1
+                      }
+                    },
+                    {
+                      "type": "Rectangle",
+                      "enabled": true,
+                      "data": {
+                        "shape": "rectangle",
+                        "width": 300,
+                        "height": 2,
+                        "fillColor": "#a29bfe",
+                        "fillAlpha": 0.5,
+                        "strokeColor": "",
+                        "strokeWidth": 0,
+                        "strokeAlpha": 0,
+                        "rotation": 0,
+                        "originX": 0.5,
+                        "originY": 0.5,
+                        "sides": 4,
+                        "points": 5,
+                        "innerRadius": 0.4
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "corner_accent_tl_toxgvn1m",
+                  "name": "Corner Accent Top-Left",
+                  "components": [
+                    {
+                      "type": "Transform",
+                      "enabled": true,
+                      "data": {
+                        "x": 20,
+                        "y": 30,
+                        "z": 1,
+                        "rotation": 0,
+                        "scaleX": 1,
+                        "scaleY": 1
+                      }
+                    },
+                    {
+                      "type": "Rectangle",
+                      "enabled": true,
+                      "data": {
+                        "shape": "triangle",
+                        "width": 30,
+                        "height": 30,
+                        "fillColor": "#74b9ff",
+                        "fillAlpha": 0.7,
+                        "strokeColor": "#0984e3",
+                        "strokeWidth": 1,
+                        "strokeAlpha": 1,
+                        "rotation": 0,
+                        "originX": 0.5,
+                        "originY": 0.5,
+                        "sides": 3,
+                        "points": 5,
+                        "innerRadius": 0.4
+                      }
+                    }
+                  ]
+                }
+              ]
+        }
+      ]
+    }
+  },
+  "session": {
+    "projectId": "proj_gametitle_5rj006ru",
+    "dirty": true,
+    "currentScene": "PlayUnitEditorScene",
+    "activeDocumentRef": {
+      "type": "playUnit",
+      "id": "pu_title_scene_fesubtaw"
+    },
+    "editorState": {
+      "activeTool": "pencil",
+      "foreColor": 4278190080,
+      "backColor": 4294967295,
+      "editMode": "free",
+      "selectedChip": {
+        "col": 0,
+        "row": 0
+      }
+    }
+  }
+}

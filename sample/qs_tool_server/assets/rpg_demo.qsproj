@@ -1,0 +1,946 @@
+{
+  "format": "qsproj",
+  "version": 1,
+  "project": {
+    "id": "proj_rpg_demo_a7k2q9m5",
+    "version": 1,
+    "name": "RPG Demo",
+    "createdAt": 1777436608074,
+    "updatedAt": 1777436704139,
+    "settings": {
+      "defaultChipWidth": 16,
+      "defaultChipHeight": 16
+    },
+    "assets": {
+      "pixelDocuments": [
+        {
+          "id": "px_rpg_demo_default_m3n8x1y6",
+          "type": "pixelDocument",
+          "name": "untitled",
+          "width": 32,
+          "height": 32,
+          "storage": {
+            "type": "embedded",
+            "codec": "qts-base64",
+            "data": "UVNUUwEAAAAgACAAAQABACAAAAAAAAAA/0BAQP+goKD//////4AAAP//AAD//4AA////AP8AgAD/AP8A/wCAgP8A////AACA/wAA//+AAID//wD////gvf/grGn/oGQy/2Q8FP/StIz//7bB///auf+t2Ob/kO6Q//+lAP9GgrT/Iosi/9wUPP8gICD/4ODg/wEOAOODrOOCpOODpOODvCAxAf8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+          }
+        }
+      ],
+      "tilesets": [],
+      "maps": [],
+      "playUnits": [
+        {
+          "id": "pu_rpg_scene_b5d6k2v9",
+          "type": "playUnit",
+          "name": "GameScene",
+          "description": "RPGゲームシーン（HUD、メッセージウィンドウ、立ち絵を含む）",
+          "objects": [
+            {
+              "id": "camera_main_rpg_a1b2c3d4",
+              "name": "Main Camera",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Camera",
+                  "enabled": true,
+                  "data": {
+                    "zoom": 1,
+                    "viewportX": 0,
+                    "viewportY": 0,
+                    "viewportWidth": 800,
+                    "viewportHeight": 600,
+                    "followTargetObjectId": "",
+                    "followLerp": 1
+                  }
+                },
+                {
+                  "type": "PlaySettings",
+                  "enabled": true,
+                  "data": {
+                    "defaultCameraObjectId": "camera_main_rpg_a1b2c3d4"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "bg_main_rpg_e5f6g7h8",
+              "name": "Background",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 400,
+                    "y": 300,
+                    "z": -10,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 800,
+                    "height": 600,
+                    "fillColor": "#2b3e50",
+                    "fillAlpha": 1,
+                    "strokeColor": "#34495e",
+                    "strokeWidth": 0,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0.5,
+                    "originY": 0.5,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                }
+              ]
+            },
+            {
+              "id": "character_stand_i9j0k1l2",
+              "name": "Character Standing",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 150,
+                    "y": 250,
+                    "z": 1,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 80,
+                    "height": 150,
+                    "fillColor": "#e74c3c",
+                    "fillAlpha": 0.95,
+                    "strokeColor": "#c0392b",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0.5,
+                    "originY": 0.5,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                }
+              ]
+            },
+            {
+              "id": "character_head_m3n4o5p6",
+              "name": "Character Head",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 150,
+                    "y": 130,
+                    "z": 2,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 40,
+                    "height": 45,
+                    "fillColor": "#f39c12",
+                    "fillAlpha": 0.95,
+                    "strokeColor": "#d68910",
+                    "strokeWidth": 1,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0.5,
+                    "originY": 0.5,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                }
+              ]
+            },
+            {
+              "id": "character_hat_q7r8s9t0",
+              "name": "Character Hat",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 150,
+                    "y": 105,
+                    "z": 3,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 50,
+                    "height": 20,
+                    "fillColor": "#3498db",
+                    "fillAlpha": 0.9,
+                    "strokeColor": "#2980b9",
+                    "strokeWidth": 1,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0.5,
+                    "originY": 0.5,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                }
+              ]
+            },
+            {
+              "id": "hud_bg_u1v2w3x4",
+              "name": "HUD Background",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 650,
+                    "y": 100,
+                    "z": 10,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 280,
+                    "height": 180,
+                    "fillColor": "#1a1a2e",
+                    "fillAlpha": 0.95,
+                    "strokeColor": "#16a085",
+                    "strokeWidth": 3,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0.5,
+                    "originY": 0.5,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                }
+              ]
+            },
+            {
+              "id": "hud_hp_label_y5z6a7b8",
+              "name": "HP Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 530,
+                    "y": 25,
+                    "z": 11,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "HP",
+                    "font": "bold 16px sans-serif",
+                    "color": "#e74c3c",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "hud_hp_value_c9d0e1f2",
+              "name": "HP Value",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 580,
+                    "y": 25,
+                    "z": 11,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "100 / 100",
+                    "font": "14px monospace",
+                    "color": "#ecf0f1",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 18,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "hud_hp_bar_g3h4i5j6",
+              "name": "HP Bar",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 580,
+                    "y": 45,
+                    "z": 11,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 150,
+                    "height": 20,
+                    "fillColor": "#27ae60",
+                    "fillAlpha": 0.9,
+                    "strokeColor": "#16a085",
+                    "strokeWidth": 1,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0.5,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                }
+              ]
+            },
+            {
+              "id": "hud_mp_label_k7l8m9n0",
+              "name": "MP Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 530,
+                    "y": 75,
+                    "z": 11,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "MP",
+                    "font": "bold 16px sans-serif",
+                    "color": "#3498db",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "hud_mp_value_o1p2q3r4",
+              "name": "MP Value",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 580,
+                    "y": 75,
+                    "z": 11,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "50 / 50",
+                    "font": "14px monospace",
+                    "color": "#ecf0f1",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 18,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "hud_mp_bar_s5t6u7v8",
+              "name": "MP Bar",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 580,
+                    "y": 95,
+                    "z": 11,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 150,
+                    "height": 20,
+                    "fillColor": "#2980b9",
+                    "fillAlpha": 0.9,
+                    "strokeColor": "#1f618d",
+                    "strokeWidth": 1,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0.5,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                }
+              ]
+            },
+            {
+              "id": "hud_level_label_w9x0y1z2",
+              "name": "Level Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 530,
+                    "y": 125,
+                    "z": 11,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Level",
+                    "font": "bold 16px sans-serif",
+                    "color": "#f39c12",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "hud_level_value_a3b4c5d6",
+              "name": "Level Value",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 600,
+                    "y": 125,
+                    "z": 11,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "5",
+                    "font": "bold 18px monospace",
+                    "color": "#f1c40f",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 22,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "hud_exp_label_e7f8g9h0",
+              "name": "EXP Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 530,
+                    "y": 155,
+                    "z": 11,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "EXP",
+                    "font": "bold 14px sans-serif",
+                    "color": "#9b59b6",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 18,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "hud_exp_bar_i1j2k3l4",
+              "name": "EXP Bar",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 580,
+                    "y": 155,
+                    "z": 11,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 120,
+                    "height": 15,
+                    "fillColor": "#9b59b6",
+                    "fillAlpha": 0.8,
+                    "strokeColor": "#6c3483",
+                    "strokeWidth": 1,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0.5,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                }
+              ]
+            },
+            {
+              "id": "message_window_bg_m5n6o7p8",
+              "name": "Message Window Background",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 400,
+                    "y": 480,
+                    "z": 20,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 600,
+                    "height": 100,
+                    "fillColor": "#1a1a2e",
+                    "fillAlpha": 0.95,
+                    "strokeColor": "#16a085",
+                    "strokeWidth": 3,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0.5,
+                    "originY": 0.5,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                }
+              ]
+            },
+            {
+              "id": "message_speaker_name_q9r0s1t2",
+              "name": "Message Speaker Name",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 220,
+                    "y": 430,
+                    "z": 21,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Warrior",
+                    "font": "bold 16px sans-serif",
+                    "color": "#f39c12",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "message_text_u3v4w5x6",
+              "name": "Message Text",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 220,
+                    "y": 460,
+                    "z": 21,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Prepare yourself, for the battle draws near!",
+                    "font": "14px sans-serif",
+                    "color": "#ecf0f1",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "top",
+                    "wrap": true,
+                    "maxWidth": 550,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 10
+                  }
+                }
+              ]
+            },
+            {
+              "id": "message_indicator_y7z8a9b0",
+              "name": "Message Indicator",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 730,
+                    "y": 540,
+                    "z": 22,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "polygon",
+                    "width": 16,
+                    "height": 16,
+                    "fillColor": "#f39c12",
+                    "fillAlpha": 1,
+                    "strokeColor": "#e67e22",
+                    "strokeWidth": 1,
+                    "strokeAlpha": 1,
+                    "rotation": 45,
+                    "originX": 0.5,
+                    "originY": 0.5,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                }
+              ]
+            },
+            {
+              "id": "enemy_stand_c1d2e3f4",
+              "name": "Enemy Standing",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 600,
+                    "y": 250,
+                    "z": 1,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 70,
+                    "height": 130,
+                    "fillColor": "#8e44ad",
+                    "fillAlpha": 0.9,
+                    "strokeColor": "#6c3483",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0.5,
+                    "originY": 0.5,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                }
+              ]
+            },
+            {
+              "id": "enemy_head_g5h6i7j8",
+              "name": "Enemy Head",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 600,
+                    "y": 135,
+                    "z": 2,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 35,
+                    "height": 40,
+                    "fillColor": "#c0392b",
+                    "fillAlpha": 0.9,
+                    "strokeColor": "#a93226",
+                    "strokeWidth": 1,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0.5,
+                    "originY": 0.5,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                }
+              ]
+            },
+            {
+              "id": "enemy_hp_bg_k9l0m1n2",
+              "name": "Enemy HP Background",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 555,
+                    "y": 95,
+                    "z": 3,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 140,
+                    "height": 15,
+                    "fillColor": "#34495e",
+                    "fillAlpha": 0.8,
+                    "strokeColor": "#2c3e50",
+                    "strokeWidth": 1,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0.5,
+                    "originY": 0.5,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                }
+              ]
+            },
+            {
+              "id": "enemy_hp_bar_o3p4q5r6",
+              "name": "Enemy HP Bar",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 560,
+                    "y": 95,
+                    "z": 4,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 100,
+                    "height": 12,
+                    "fillColor": "#e74c3c",
+                    "fillAlpha": 0.9,
+                    "strokeColor": "#c0392b",
+                    "strokeWidth": 0,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0.5,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
