@@ -253,6 +253,7 @@ class PlayUnitEditorScene extends Scene {
       { label: '+Settings', action: () => this._addComponentToSelectedObject('PlaySettings'), disabled: !hasAsset },
       { label: '+Text', action: () => this._addComponentToSelectedObject('Text'), disabled: !hasAsset },
       { label: '+Trigger', action: () => this._addComponentToSelectedObject('Trigger'), disabled: !hasAsset },
+      { label: '+EventAction', action: () => this._addEventActionToSelectedObject(), disabled: !hasAsset },
     ];
     const buttonW = 120;
     const buttonH = 32;
@@ -568,6 +569,17 @@ class PlayUnitEditorScene extends Scene {
     this._markDirty(`Added ${component.type} to ${objectData.name || objectData.id}`);
   }
 
+  _addEventActionToSelectedObject() {
+    const objectData = this._getSelectedObject();
+    if (!objectData) {
+      this._statusTone = 'error';
+      this._statusMessage = 'Select an object first';
+      return;
+    }
+    const component = objectData.addComponent({ type: 'EventAction', data: this._createComponentTemplate('EventAction') });
+    this._markDirty(`Added EventAction to ${objectData.name || objectData.id}`);
+  }
+
   _addShapeComponent(shape) {
     const objectData = this._getSelectedObject();
     if (!objectData) {
@@ -695,6 +707,21 @@ class PlayUnitEditorScene extends Scene {
           triggerOn: 'overlap',
           once: false,
           targetObjectId: '',
+        };
+      case 'EventAction':
+        return {
+          listenTo: '',
+          action: 'setProperty',
+          targetObjectId: '',
+          componentType: 'Text',
+          property: 'text',
+          value: '',
+          enabled: true,
+          eventId: '',
+          tweenDuration: 500,
+          tweenFrom: 0,
+          tweenTo: 1,
+          tweenEasing: 'linear',
         };
       default:
         return {};

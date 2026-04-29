@@ -23,6 +23,8 @@ class PlayTestScene extends Scene {
     this._activeOverlapKeys = new Set();
     this._firedOnceTriggerKeys = new Set();
     this._pressedKeys = new Set();
+    this._pendingEvents = new Set();
+    this._activeTweens = new Map();
     this._statusMessage = 'Play test preview';
     this._statusTone = 'muted';
 
@@ -51,6 +53,8 @@ class PlayTestScene extends Scene {
     this._pointerState.hoveredTriggerMap.clear();
     this._pointerState.pressedTriggerIds.clear();
     this._activeOverlapKeys.clear();
+    this._pendingEvents.clear();
+    this._activeTweens.clear();
   }
 
   render(ctx, canvas) {
@@ -166,6 +170,8 @@ class PlayTestScene extends Scene {
     const previousCameraObjectId = this._runtime?.camera?.objectId || '';
     this._runtime = PlayUnitRuntime.fromPlayUnit(playUnit);
     this._processOverlapTriggers(playUnit);
+    this._processEventActions(playUnit);
+    this._updateTweens(dt, playUnit);
     if (!this._cameraState || previousCameraObjectId !== (this._runtime?.camera?.objectId || '')) {
       this._cameraState = this._createCameraState(this._runtime?.camera);
     } else if (this._runtime?.camera) {
@@ -853,9 +859,119 @@ class PlayTestScene extends Scene {
     if (hit.once && this._firedOnceTriggerKeys.has(triggerKey)) return false;
     if (hit.once) this._firedOnceTriggerKeys.add(triggerKey);
 
+    if (hit.eventId) this._pendingEvents.add(hit.eventId);
     const eventLabel = hit.eventId || '(no eventId)';
     this._statusTone = 'info';
     this._statusMessage = `Trigger ${eventLabel} on ${hit.objectName} [${reason}]`;
     return true;
+  }
+
+  _processEventActions(playUnit) {
+    if (!this._pendingEvents.size || !playUnit || !Array.isArray(playUnit.objects)) {
+      this._pendingEvents.clear();
+      return;
+    }
+
+    const dispatchedThisFrame = new Set();
+    let guard = 0;
+    while (this._pendingEvents.size && guard++ < 64) {
+      const batch = new Set(this._pendingEvents);
+      this._pendingEvents.clear();
+
+      for (const eventId of batch) {
+        if (dispatchedThisFrame.has(eventId)) continue;
+        dispatchedThisFrame.add(eventId);
+
+        for (const objectData of playUnit.objects) {
+          if (!objectData || objectData.enabled === false) continue;
+          if (!Array.isArray(objectData.components)) continue;
+          for (const component of objectData.components) {
+            if (!component || component.type !== 'EventAction' || component.enabled === false) continue;
+            const listenTo = typeof component.data?.listenTo === 'string' ? component.data.listenTo.trim() : '';
+            if (listenTo !== eventId) continue;
+            this._executeAction(playUnit, component.data);
+          }
+        }
+      }
+    }
+  }
+
+  _executeAction(playUnit, data) {
+    if (!data || !playUnit) return;
+    const action = typeof data.action === 'string' ? data.action.trim() : 'setProperty';
+    const targetObjectId = typeof data.targetObjectId === 'string' ? data.targetObjectId.trim() : '';
+    const targetObject = targetObjectId ? playUnit.findObjectById(targetObjectId) : null;
+
+    if (action === 'fireEvent') {
+      const chainId = typeof data.eventId === 'string' ? data.eventId.trim() : '';
+      if (chainId) this._pendingEvents.add(chainId);
+      return;
+    }
+
+    if (!targetObject) return;
+
+    switch (action) {
+      case 'setProperty': {
+        const componentType = typeof data.componentType === 'string' ? data.componentType.trim() : '';
+        const property = typeof data.property === 'string' ? data.property.trim() : '';
+        if (!componentType || !property) return;
+        const component = targetObject.findComponentByType(componentType);
+        if (!component) return;
+        const rawValue = typeof data.value !== 'undefined' ? String(data.value) : '';
+        let parsedValue;
+        try { parsedValue = JSON.parse(rawValue); } catch { parsedValue = rawValue; }
+        component.data[property] = parsedValue;
+        break;
+      }
+      case 'setEnabled': {
+        targetObject.enabled = data.enabled !== false;
+        break;
+      }
+      case 'playTween': {
+        const componentType = typeof data.componentType === 'string' ? data.componentType.trim() : '';
+        const property = typeof data.property === 'string' ? data.property.trim() : '';
+        if (!componentType || !property) return;
+        const component = targetObject.findComponentByType(componentType);
+        if (!component) return;
+        const duration = Number.isFinite(Number(data.tweenDuration)) && Number(data.tweenDuration) > 0
+          ? Number(data.tweenDuration) : 500;
+        const from = Number.isFinite(Number(data.tweenFrom)) ? Number(data.tweenFrom) : 0;
+        const to = Number.isFinite(Number(data.tweenTo)) ? Number(data.tweenTo) : 1;
+        const easing = typeof data.tweenEasing === 'string' && data.tweenEasing.trim()
+          ? data.tweenEasing.trim() : 'linear';
+        const tweenKey = `${targetObjectId}:${componentType}:${property}`;
+        this._activeTweens.set(tweenKey, { targetObjectId, componentType, property, from, to, duration, elapsed: 0, easing });
+        component.data[property] = from;
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  _updateTweens(dt, playUnit) {
+    if (!this._activeTweens.size || !playUnit) return;
+    const deltaMs = Number.isFinite(Number(dt)) && Number(dt) > 0 ? Number(dt) : 16.6667;
+    const completed = [];
+    for (const [key, tween] of this._activeTweens.entries()) {
+      tween.elapsed += deltaMs;
+      const rawT = tween.duration > 0 ? Math.min(1, tween.elapsed / tween.duration) : 1;
+      const t = this._applyEasing(rawT, tween.easing);
+      const value = tween.from + (tween.to - tween.from) * t;
+      const targetObject = playUnit.findObjectById(tween.targetObjectId);
+      const component = targetObject?.findComponentByType(tween.componentType);
+      if (component) component.data[tween.property] = value;
+      if (tween.elapsed >= tween.duration) completed.push(key);
+    }
+    for (const key of completed) this._activeTweens.delete(key);
+  }
+
+  _applyEasing(t, easing) {
+    switch (easing) {
+      case 'easeIn': return t * t;
+      case 'easeOut': return 1 - (1 - t) * (1 - t);
+      case 'easeInOut': return t < 0.5 ? 2 * t * t : 1 - 2 * (1 - t) * (1 - t);
+      default: return t;
+    }
   }
 }

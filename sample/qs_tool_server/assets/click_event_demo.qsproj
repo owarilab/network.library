@@ -1,0 +1,1418 @@
+{
+  "format": "qsproj",
+  "version": 1,
+  "project": {
+    "id": "proj_click_event_demo_k3m7n9",
+    "version": 1,
+    "name": "Click Event Demo",
+    "createdAt": 1777436608074,
+    "updatedAt": 1777436608074,
+    "settings": {
+      "defaultChipWidth": 16,
+      "defaultChipHeight": 16
+    },
+    "assets": {
+      "pixelDocuments": [],
+      "tilesets": [],
+      "maps": [],
+      "playUnits": [
+        {
+          "id": "pu_click_demo_q8w2e4r6",
+          "type": "playUnit",
+          "name": "ClickDemo",
+          "description": "マウスクリックで EventAction を確認するシンプルなサンプル",
+          "objects": [
+            {
+              "id": "obj_cam_main_a1b2c3d4",
+              "name": "Main Camera",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 0, "y": 0, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Camera",
+                  "enabled": true,
+                  "data": {
+                    "zoom": 1,
+                    "viewportX": 0,
+                    "viewportY": 0,
+                    "viewportWidth": 800,
+                    "viewportHeight": 600,
+                    "followTargetObjectId": "",
+                    "followLerp": 1
+                  }
+                },
+                {
+                  "type": "PlaySettings",
+                  "enabled": true,
+                  "data": { "defaultCameraObjectId": "obj_cam_main_a1b2c3d4" }
+                }
+              ]
+            },
+            {
+              "id": "obj_title_t5u6v7w8",
+              "name": "Title",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 210, "y": 70, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "setProperty デモ",
+                    "font": "bold 22px sans-serif",
+                    "color": "#e2e8f0",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 28,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_sp_rect_target_p1q2r3s4",
+              "name": "SP Rect Target",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 20, "y": 105, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 100,
+                    "height": 60,
+                    "fillColor": "#e74c3c",
+                    "fillAlpha": 1,
+                    "strokeColor": "#ff6b6b",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_sp_text_target_t5u6v7w8",
+              "name": "SP Text Target",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 140, "y": 135, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "サンプルテキスト",
+                    "font": "16px sans-serif",
+                    "color": "#e2e8f0",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 24,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_sp_btn1_x9y0z1a2",
+              "name": "SP Btn1 ChangeText",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 20, "y": 195, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 190,
+                    "height": 46,
+                    "fillColor": "#1e293b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#38bdf8",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 190, "height": 46, "isTrigger": true }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": { "eventId": "ev_sp_text", "triggerOn": "click", "once": false, "targetObjectId": "" }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_sp_text",
+                    "action": "setProperty",
+                    "targetObjectId": "obj_sp_text_target_t5u6v7w8",
+                    "componentType": "Text",
+                    "property": "text",
+                    "value": "書き換えました！"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_sp_btn1_lbl_b3c4d5e6",
+              "name": "SP Btn1 Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 115, "y": 218, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Text.text を変更",
+                    "font": "bold 13px sans-serif",
+                    "color": "#38bdf8",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_sp_btn2_f7g8h9i0",
+              "name": "SP Btn2 ChangeColor",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 20, "y": 251, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 190,
+                    "height": 46,
+                    "fillColor": "#1e293b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#f97316",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 190, "height": 46, "isTrigger": true }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": { "eventId": "ev_sp_color", "triggerOn": "click", "once": false, "targetObjectId": "" }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_sp_color",
+                    "action": "setProperty",
+                    "targetObjectId": "obj_sp_text_target_t5u6v7w8",
+                    "componentType": "Text",
+                    "property": "color",
+                    "value": "#f97316"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_sp_btn2_lbl_j1k2l3m4",
+              "name": "SP Btn2 Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 115, "y": 274, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Text.color を変更",
+                    "font": "bold 13px sans-serif",
+                    "color": "#f97316",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_sp_btn3_n5o6p7q8",
+              "name": "SP Btn3 ChangeFill",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 20, "y": 307, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 190,
+                    "height": 46,
+                    "fillColor": "#1e293b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#a78bfa",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 190, "height": 46, "isTrigger": true }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": { "eventId": "ev_sp_fill", "triggerOn": "click", "once": false, "targetObjectId": "" }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_sp_fill",
+                    "action": "setProperty",
+                    "targetObjectId": "obj_sp_rect_target_p1q2r3s4",
+                    "componentType": "Rectangle",
+                    "property": "fillColor",
+                    "value": "#3b82f6"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_sp_btn3_lbl_r9s0t1u2",
+              "name": "SP Btn3 Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 115, "y": 330, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Rect.fillColor を変更",
+                    "font": "bold 13px sans-serif",
+                    "color": "#a78bfa",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_sp_btn_reset_v3w4x5y6",
+              "name": "SP Reset Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 20, "y": 363, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 190,
+                    "height": 46,
+                    "fillColor": "#1e293b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#475569",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 190, "height": 46, "isTrigger": true }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": { "eventId": "ev_sp_reset", "triggerOn": "click", "once": false, "targetObjectId": "" }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_sp_reset",
+                    "action": "setProperty",
+                    "targetObjectId": "obj_sp_text_target_t5u6v7w8",
+                    "componentType": "Text",
+                    "property": "text",
+                    "value": "サンプルテキスト"
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_sp_reset",
+                    "action": "setProperty",
+                    "targetObjectId": "obj_sp_text_target_t5u6v7w8",
+                    "componentType": "Text",
+                    "property": "color",
+                    "value": "#e2e8f0"
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_sp_reset",
+                    "action": "setProperty",
+                    "targetObjectId": "obj_sp_rect_target_p1q2r3s4",
+                    "componentType": "Rectangle",
+                    "property": "fillColor",
+                    "value": "#e74c3c"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_sp_reset_lbl_z7a8b9c0",
+              "name": "SP Reset Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 115, "y": 386, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Reset",
+                    "font": "bold 13px sans-serif",
+                    "color": "#64748b",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_divider_aa11bb22",
+              "name": "Divider",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 420, "y": 100, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 2,
+                    "height": 360,
+                    "fillColor": "#1e293b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#1e293b",
+                    "strokeWidth": 0,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_section2_title_cc33dd44",
+              "name": "Section2 Title",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 615, "y": 70, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Hide / Show デモ",
+                    "font": "bold 18px sans-serif",
+                    "color": "#e2e8f0",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 28,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_target_box_ee55ff66",
+              "name": "Target Box",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 500, "y": 120, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 230,
+                    "height": 70,
+                    "fillColor": "#0f4c75",
+                    "fillAlpha": 1,
+                    "strokeColor": "#38bdf8",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_target_label_gg77hh88",
+              "name": "Target Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 615, "y": 155, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "[ 表示対象ボックス ]",
+                    "font": "bold 15px sans-serif",
+                    "color": "#bae6fd",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 24,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_status2_ii99jj00",
+              "name": "Status2",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 615, "y": 230, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "ボタンでボックスを消してみてください",
+                    "font": "14px sans-serif",
+                    "color": "#94a3b8",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 24,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_hide_btn_kk11ll22",
+              "name": "Hide Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 480, "y": 280, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 120,
+                    "height": 50,
+                    "fillColor": "#1e293b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#f87171",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rect",
+                    "offsetX": 0,
+                    "offsetY": 0,
+                    "width": 120,
+                    "height": 50,
+                    "isTrigger": true
+                  }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": {
+                    "eventId": "ev_hide",
+                    "triggerOn": "click",
+                    "once": false,
+                    "targetObjectId": ""
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_hide",
+                    "action": "setEnabled",
+                    "targetObjectId": "obj_target_box_ee55ff66",
+                    "enabled": false
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_hide",
+                    "action": "setEnabled",
+                    "targetObjectId": "obj_target_label_gg77hh88",
+                    "enabled": false
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_hide",
+                    "action": "setProperty",
+                    "targetObjectId": "obj_status2_ii99jj00",
+                    "componentType": "Text",
+                    "property": "text",
+                    "value": "非表示にしました"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_hide_btn_label_mm33nn44",
+              "name": "Hide Button Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 540, "y": 305, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Hide",
+                    "font": "bold 16px sans-serif",
+                    "color": "#f87171",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 24,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_show_btn_oo55pp66",
+              "name": "Show Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 620, "y": 280, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 120,
+                    "height": 50,
+                    "fillColor": "#1e293b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#4ade80",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rect",
+                    "offsetX": 0,
+                    "offsetY": 0,
+                    "width": 120,
+                    "height": 50,
+                    "isTrigger": true
+                  }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": {
+                    "eventId": "ev_show",
+                    "triggerOn": "click",
+                    "once": false,
+                    "targetObjectId": ""
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_show",
+                    "action": "setEnabled",
+                    "targetObjectId": "obj_target_box_ee55ff66",
+                    "enabled": true
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_show",
+                    "action": "setEnabled",
+                    "targetObjectId": "obj_target_label_gg77hh88",
+                    "enabled": true
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_show",
+                    "action": "setProperty",
+                    "targetObjectId": "obj_status2_ii99jj00",
+                    "componentType": "Text",
+                    "property": "text",
+                    "value": "再表示しました"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_show_btn_label_qq77rr88",
+              "name": "Show Button Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 680, "y": 305, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Show",
+                    "font": "bold 16px sans-serif",
+                    "color": "#4ade80",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 24,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_tween_divider_t1u2v3w4",
+              "name": "Tween Section Divider",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 0, "y": 415, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 800,
+                    "height": 2,
+                    "fillColor": "#1e293b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#1e293b",
+                    "strokeWidth": 0,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_tween_title_x5y6z7a8",
+              "name": "Tween Title",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 400, "y": 438, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "playTween デモ",
+                    "font": "bold 18px sans-serif",
+                    "color": "#e2e8f0",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 28,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_tween_target_b9c0d1e2",
+              "name": "Tween Target",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 40, "y": 460, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 100,
+                    "height": 70,
+                    "fillColor": "#f97316",
+                    "fillAlpha": 1,
+                    "strokeColor": "#fb923c",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_fade_out_btn_f3g4h5i6",
+              "name": "Fade Out Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 180, "y": 465, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 130,
+                    "height": 50,
+                    "fillColor": "#1e293b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#c084fc",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 130, "height": 50, "isTrigger": true }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": { "eventId": "ev_fade_out", "triggerOn": "click", "once": false, "targetObjectId": "" }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_fade_out",
+                    "action": "playTween",
+                    "targetObjectId": "obj_tween_target_b9c0d1e2",
+                    "componentType": "Rectangle",
+                    "property": "fillAlpha",
+                    "tweenFrom": 1,
+                    "tweenTo": 0,
+                    "tweenDuration": 600,
+                    "tweenEasing": "easeIn"
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_fade_out",
+                    "action": "setProperty",
+                    "targetObjectId": "obj_tween_status_l5m6n7o8",
+                    "componentType": "Text",
+                    "property": "text",
+                    "value": "Fade Out (easeIn, 600ms)"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_fade_out_lbl_j7k8l9m0",
+              "name": "Fade Out Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 245, "y": 490, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Fade Out",
+                    "font": "bold 14px sans-serif",
+                    "color": "#c084fc",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_fade_in_btn_n1o2p3q4",
+              "name": "Fade In Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 330, "y": 465, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 130,
+                    "height": 50,
+                    "fillColor": "#1e293b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#a3e635",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 130, "height": 50, "isTrigger": true }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": { "eventId": "ev_fade_in", "triggerOn": "click", "once": false, "targetObjectId": "" }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_fade_in",
+                    "action": "playTween",
+                    "targetObjectId": "obj_tween_target_b9c0d1e2",
+                    "componentType": "Rectangle",
+                    "property": "fillAlpha",
+                    "tweenFrom": 0,
+                    "tweenTo": 1,
+                    "tweenDuration": 600,
+                    "tweenEasing": "easeOut"
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_fade_in",
+                    "action": "setProperty",
+                    "targetObjectId": "obj_tween_status_l5m6n7o8",
+                    "componentType": "Text",
+                    "property": "text",
+                    "value": "Fade In (easeOut, 600ms)"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_fade_in_lbl_r5s6t7u8",
+              "name": "Fade In Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 395, "y": 490, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Fade In",
+                    "font": "bold 14px sans-serif",
+                    "color": "#a3e635",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_slide_r_btn_v9w0x1y2",
+              "name": "Slide Right Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 490, "y": 465, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 120,
+                    "height": 50,
+                    "fillColor": "#1e293b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#fbbf24",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 120, "height": 50, "isTrigger": true }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": { "eventId": "ev_slide_right", "triggerOn": "click", "once": false, "targetObjectId": "" }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_slide_right",
+                    "action": "playTween",
+                    "targetObjectId": "obj_tween_target_b9c0d1e2",
+                    "componentType": "Transform",
+                    "property": "x",
+                    "tweenFrom": 40,
+                    "tweenTo": 240,
+                    "tweenDuration": 500,
+                    "tweenEasing": "easeInOut"
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_slide_right",
+                    "action": "setProperty",
+                    "targetObjectId": "obj_tween_status_l5m6n7o8",
+                    "componentType": "Text",
+                    "property": "text",
+                    "value": "Slide → (easeInOut, 500ms)"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_slide_r_lbl_z3a4b5c6",
+              "name": "Slide Right Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 550, "y": 490, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Slide →",
+                    "font": "bold 14px sans-serif",
+                    "color": "#fbbf24",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_slide_l_btn_d7e8f9g0",
+              "name": "Slide Left Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 630, "y": 465, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 120,
+                    "height": 50,
+                    "fillColor": "#1e293b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#fbbf24",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 120, "height": 50, "isTrigger": true }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": { "eventId": "ev_slide_left", "triggerOn": "click", "once": false, "targetObjectId": "" }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_slide_left",
+                    "action": "playTween",
+                    "targetObjectId": "obj_tween_target_b9c0d1e2",
+                    "componentType": "Transform",
+                    "property": "x",
+                    "tweenFrom": 240,
+                    "tweenTo": 40,
+                    "tweenDuration": 500,
+                    "tweenEasing": "easeInOut"
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_slide_left",
+                    "action": "setProperty",
+                    "targetObjectId": "obj_tween_status_l5m6n7o8",
+                    "componentType": "Text",
+                    "property": "text",
+                    "value": "Slide ← (easeInOut, 500ms)"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_slide_l_lbl_h1i2j3k4",
+              "name": "Slide Left Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 690, "y": 490, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Slide ←",
+                    "font": "bold 14px sans-serif",
+                    "color": "#fbbf24",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_tween_status_l5m6n7o8",
+              "name": "Tween Status",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 400, "y": 548, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "ボタンを押すとアニメーションします",
+                    "font": "14px sans-serif",
+                    "color": "#475569",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "session": {
+    "projectId": "proj_click_event_demo_k3m7n9",
+    "dirty": false,
+    "currentScene": "PlayTestScene",
+    "activeDocumentRef": {
+      "type": "playUnit",
+      "id": "pu_click_demo_q8w2e4r6"
+    },
+    "editorState": {
+      "activeTool": "pencil",
+      "foreColor": 4278190080,
+      "backColor": 4294967295,
+      "editMode": "free",
+      "selectedChip": { "col": 0, "row": 0 }
+    }
+  }
+}
