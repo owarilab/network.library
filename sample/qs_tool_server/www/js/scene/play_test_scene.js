@@ -931,6 +931,52 @@ class PlayTestScene extends Scene {
       return;
     }
 
+    if (action === 'setGlobalVariable') {
+      const variablePath = typeof data.variablePath === 'string' ? data.variablePath.trim() : '';
+      if (!variablePath) {
+        this._statusTone = 'error';
+        this._statusMessage = 'variablePath is required for setGlobalVariable';
+        return;
+      }
+      if (!this._appData?.hasRuntimeGlobalVariable?.(variablePath)) {
+        this._statusTone = 'error';
+        this._statusMessage = `Global variable not found: ${variablePath}`;
+        return;
+      }
+
+      const sourceType = typeof data.valueSource === 'string' ? data.valueSource.trim() : 'literal';
+      let nextValue;
+      if (sourceType === 'variable') {
+        const sourcePath = typeof data.valueVariablePath === 'string' ? data.valueVariablePath.trim() : '';
+        if (!sourcePath) {
+          this._statusTone = 'error';
+          this._statusMessage = 'valueVariablePath is required for variable source';
+          return;
+        }
+        if (!this._appData?.hasRuntimeGlobalVariable?.(sourcePath)) {
+          this._statusTone = 'error';
+          this._statusMessage = `Source global variable not found: ${sourcePath}`;
+          return;
+        }
+        nextValue = this._appData.getRuntimeGlobalVariable(sourcePath);
+      } else {
+        nextValue = typeof data.value === 'undefined' ? '' : data.value;
+      }
+
+      const updated = this._appData?.setRuntimeGlobalVariable?.(variablePath, nextValue) === true;
+      if (!updated) {
+        this._statusTone = 'error';
+        const reason = this._appData?.getLastRuntimeGlobalVariableError?.() || `Failed to set global variable: ${variablePath}`;
+        this._statusMessage = reason;
+        return;
+      }
+
+      this._statusTone = 'info';
+      this._statusMessage = `Set global variable: ${variablePath}`;
+      this._lastEventActionValue = this._appData?.getRuntimeGlobalVariable?.(variablePath);
+      return;
+    }
+
     if (action === 'returnPlayUnit') {
       const asset = this._appData?.activateReturnRuntimePlayUnit?.() || null;
       if (!asset) {

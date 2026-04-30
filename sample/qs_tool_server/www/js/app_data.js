@@ -130,6 +130,12 @@ class AppData {
      * @type {object|null}
      */
     this.mapData = null;
+
+    /**
+     * 直近の runtime global variable 操作エラー。
+     * @type {string}
+     */
+    this._lastRuntimeGlobalVariableError = '';
   }
 
   /**
@@ -186,6 +192,58 @@ class AppData {
   }
 
   /**
+   * 変数パスの解決結果を返す。
+   * @param {string} path
+   * @returns {{ scope: 'system'|'user', tier: 'fixed'|'persistent', name: string }|null}
+   */
+  resolveRuntimeGlobalVariablePath(path) {
+    return this._resolveGlobalVariablePath(path);
+  }
+
+  /**
+   * 直近の runtime global variable 操作エラーを返す。
+   * @returns {string}
+   */
+  getLastRuntimeGlobalVariableError() {
+    return this._lastRuntimeGlobalVariableError || '';
+  }
+
+  /**
+   * 変数が project 定義および runtime state に存在するかを返す。
+   * @param {string} path
+   * @returns {boolean}
+   */
+  hasRuntimeGlobalVariable(path) {
+    const resolved = this._resolveGlobalVariablePath(path);
+    if (!resolved) return false;
+    const definition = this._getGlobalVariableBucketDefinition(resolved.scope, resolved.tier);
+    if (!definition || !Object.prototype.hasOwnProperty.call(definition, resolved.name)) {
+      return false;
+    }
+    const state = this.getRuntimeGlobalVariables()[resolved.scope]?.[resolved.tier];
+    return !!state && Object.prototype.hasOwnProperty.call(state, resolved.name);
+  }
+
+  /**
+   * 変数 bucket 内の定義済み変数一覧を返す。
+   * @param {string} scopePath 例: "system.fixed"
+   * @returns {Array<{ name: string, value: any }>}
+   */
+  listRuntimeGlobalVariables(scopePath) {
+    const resolved = this._resolveGlobalVariableBucketPath(scopePath);
+    if (!resolved) return [];
+    const definition = this._getGlobalVariableBucketDefinition(resolved.scope, resolved.tier);
+    const state = this.getRuntimeGlobalVariables()[resolved.scope]?.[resolved.tier];
+    if (!definition || !state) return [];
+    return Object.keys(definition)
+      .filter(name => Object.prototype.hasOwnProperty.call(state, name))
+      .map(name => ({
+        name,
+        value: this._cloneJsonLikeValue(state[name]),
+      }));
+  }
+
+  /**
    * Project 定義から Runtime current state を再初期化する。
    * @returns {{ system: { fixed: object, persistent: object }, user: { fixed: object, persistent: object } }}
    */
@@ -203,7 +261,8 @@ class AppData {
   getRuntimeGlobalVariable(path) {
     const resolved = this._resolveGlobalVariablePath(path);
     if (!resolved) return undefined;
-    return this.getRuntimeGlobalVariables()[resolved.scope][resolved.tier][resolved.name];
+    if (!this.hasRuntimeGlobalVariable(path)) return undefined;
+    return this._cloneJsonLikeValue(this.getRuntimeGlobalVariables()[resolved.scope][resolved.tier][resolved.name]);
   }
 
   /**
@@ -214,12 +273,65 @@ class AppData {
    */
   setRuntimeGlobalVariable(path, value) {
     const resolved = this._resolveGlobalVariablePath(path);
-    if (!resolved) return false;
+    if (!resolved) {
+      this._lastRuntimeGlobalVariableError = 'invalid variable path';
+      return false;
+    }
+    if (!this.hasRuntimeGlobalVariable(path)) {
+      this._lastRuntimeGlobalVariableError = `Global variable not found: ${path}`;
+      return false;
+    }
     if (!this.globalVariableState) {
       this.globalVariableState = this._createGlobalVariableRuntimeState(this.currentProject?.globalVariables);
     }
-    this.globalVariableState[resolved.scope][resolved.tier][resolved.name] = value;
+    const definition = this._getGlobalVariableDefinition(resolved.scope, resolved.tier, resolved.name);
+    const type = typeof definition?.type === 'string' ? definition.type.trim() : '';
+    const normalized = ProjectData.coerceRuntimeGlobalVariableValue(value, type);
+    if (!normalized.ok) {
+      this._lastRuntimeGlobalVariableError = normalized.message || `Invalid value for ${path}`;
+      return false;
+    }
+    this.globalVariableState[resolved.scope][resolved.tier][resolved.name] = this._cloneJsonLikeValue(normalized.value);
+    this._lastRuntimeGlobalVariableError = '';
     return true;
+  }
+
+  /**
+   * 変数を runtime state から削除する。
+   * project 定義に存在する変数のみ削除可能。
+   * @param {string} path
+   * @returns {boolean}
+   */
+  deleteRuntimeGlobalVariable(path) {
+    const resolved = this._resolveGlobalVariablePath(path);
+    if (!resolved) return false;
+    if (!this.hasRuntimeGlobalVariable(path)) return false;
+    delete this.getRuntimeGlobalVariables()[resolved.scope][resolved.tier][resolved.name];
+    return true;
+  }
+
+  /**
+   * bucket 定義を取得する。
+   * @param {'system'|'user'} scope
+   * @param {'fixed'|'persistent'} tier
+   * @returns {object|null}
+   */
+  _getGlobalVariableBucketDefinition(scope, tier) {
+    const definition = this.getProjectGlobalVariablesDefinition();
+    return definition?.[scope]?.[tier] ?? null;
+  }
+
+  /**
+   * 変数定義を取得する。
+   * @param {'system'|'user'} scope
+   * @param {'fixed'|'persistent'} tier
+   * @param {string} name
+   * @returns {object|null}
+   */
+  _getGlobalVariableDefinition(scope, tier, name) {
+    const bucket = this._getGlobalVariableBucketDefinition(scope, tier);
+    if (!bucket || !Object.prototype.hasOwnProperty.call(bucket, name)) return null;
+    return bucket[name];
   }
 
   /**
@@ -299,6 +411,22 @@ class AppData {
       return null;
     }
     return { scope, tier, name };
+  }
+
+  /**
+   * bucket パスを解決する。
+   * @param {string} scopePath 例: "system.fixed"
+   * @returns {{ scope: 'system'|'user', tier: 'fixed'|'persistent' }|null}
+   */
+  _resolveGlobalVariableBucketPath(scopePath) {
+    if (typeof scopePath !== 'string' || !scopePath.trim()) return null;
+    const parts = scopePath.trim().split('.');
+    if (parts.length !== 2) return null;
+    const [scope, tier] = parts;
+    if ((scope !== 'system' && scope !== 'user') || (tier !== 'fixed' && tier !== 'persistent')) {
+      return null;
+    }
+    return { scope, tier };
   }
 
   /**

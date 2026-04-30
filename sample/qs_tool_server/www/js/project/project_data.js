@@ -86,6 +86,120 @@ class ProjectData {
   }
 
   /**
+   * グローバル変数定義の値型を正規化する。
+   * @param {any} value
+   * @param {string} type
+   * @returns {any}
+   */
+  static normalizeGlobalVariableInitialValue(value, type) {
+    switch (type) {
+      case 'string':
+        return ProjectData._coerceStringLikeValue(value, '');
+      case 'number':
+        return ProjectData._coerceFiniteNumber(value, 0);
+      case 'boolean':
+        return ProjectData._coerceBooleanLikeValue(value, false);
+      case 'json':
+        return ProjectData._coerceJsonLikeValueOrFallback(value, { value });
+      default:
+        return value;
+    }
+  }
+
+  /**
+   * runtime 書き込み用に値を型へ正規化する。
+   * @param {any} value
+   * @param {string} type
+   * @returns {{ ok: boolean, value?: any, message?: string }}
+   */
+  static coerceRuntimeGlobalVariableValue(value, type) {
+    switch (type) {
+      case 'string': {
+        if (typeof value === 'string') return { ok: true, value };
+        if (typeof value === 'number' || typeof value === 'boolean') {
+          return { ok: true, value: String(value) };
+        }
+        return { ok: false, message: 'value must be a string' };
+      }
+      case 'number': {
+        if (typeof value === 'number' && Number.isFinite(value)) return { ok: true, value };
+        if (typeof value === 'string') {
+          const trimmed = value.trim();
+          if (!trimmed) return { ok: false, message: 'value must be a finite number' };
+          const parsed = Number(trimmed);
+          if (Number.isFinite(parsed)) return { ok: true, value: parsed };
+        }
+        return { ok: false, message: 'value must be a finite number' };
+      }
+      case 'boolean': {
+        if (typeof value === 'boolean') return { ok: true, value };
+        if (typeof value === 'number') {
+          if (value === 1) return { ok: true, value: true };
+          if (value === 0) return { ok: true, value: false };
+        }
+        if (typeof value === 'string') {
+          const normalized = value.trim().toLowerCase();
+          if (normalized === 'true' || normalized === '1') return { ok: true, value: true };
+          if (normalized === 'false' || normalized === '0') return { ok: true, value: false };
+        }
+        return { ok: false, message: 'value must be a boolean' };
+      }
+      case 'json': {
+        const jsonValue = ProjectData._coerceJsonLikeValue(value);
+        if (!jsonValue.ok) {
+          return { ok: false, message: jsonValue.message || 'value must be JSON serializable' };
+        }
+        return { ok: true, value: jsonValue.value };
+      }
+      default:
+        return { ok: false, message: 'unsupported type' };
+    }
+  }
+
+  /**
+   * グローバル変数定義を検証する。
+   * @param {object|null|undefined} source
+   * @returns {{ ok: boolean, message: string, scopePath?: string, variableName?: string }}
+   */
+  static validateGlobalVariables(source) {
+    const root = ProjectData.normalizeGlobalVariables(source);
+    const scopes = [
+      { scope: 'system', tier: 'fixed' },
+      { scope: 'system', tier: 'persistent' },
+      { scope: 'user', tier: 'fixed' },
+      { scope: 'user', tier: 'persistent' },
+    ];
+    for (const item of scopes) {
+      const bucket = root?.[item.scope]?.[item.tier];
+      const scopePath = `${item.scope}.${item.tier}`;
+      if (!bucket || typeof bucket !== 'object' || Array.isArray(bucket)) {
+        return { ok: false, message: `Invalid bucket: ${scopePath}`, scopePath };
+      }
+      for (const [name, definition] of Object.entries(bucket)) {
+        if (typeof name !== 'string' || !name.trim()) {
+          return { ok: false, message: `Variable name is required in ${scopePath}`, scopePath, variableName: name || '' };
+        }
+        if (!definition || typeof definition !== 'object' || Array.isArray(definition)) {
+          return { ok: false, message: `Invalid definition for ${name}`, scopePath, variableName: name };
+        }
+        const type = typeof definition.type === 'string' ? definition.type.trim() : '';
+        if (!['string', 'number', 'boolean', 'json'].includes(type)) {
+          return { ok: false, message: `Unsupported type for ${name}`, scopePath, variableName: name };
+        }
+        const normalized = ProjectData.normalizeGlobalVariableInitialValue(definition.initialValue, type);
+        if (type === 'json') {
+          try {
+            JSON.stringify(normalized);
+          } catch (_err) {
+            return { ok: false, message: `${name}: initialValue must be JSON serializable`, scopePath, variableName: name };
+          }
+        }
+      }
+    }
+    return { ok: true, message: '' };
+  }
+
+  /**
    * 空のプロジェクトを生成する。
    * @param {string} [name='New Project']
    * @returns {ProjectData}
@@ -316,6 +430,147 @@ class ProjectData {
    */
   static _normalizeVariableBucket(bucket) {
     if (!bucket || typeof bucket !== 'object' || Array.isArray(bucket)) return {};
-    return { ...bucket };
+    const normalized = {};
+    for (const [name, definition] of Object.entries(bucket)) {
+      if (typeof name !== 'string' || !name.trim()) continue;
+      if (!definition || typeof definition !== 'object' || Array.isArray(definition)) continue;
+      const type = typeof definition.type === 'string' ? definition.type.trim() : '';
+      if (!['string', 'number', 'boolean', 'json'].includes(type)) continue;
+      normalized[name] = {
+        type,
+        initialValue: ProjectData.normalizeGlobalVariableInitialValue(definition.initialValue, type),
+        description: typeof definition.description === 'string' ? definition.description : '',
+      };
+    }
+    return normalized;
+  }
+
+  /**
+   * @param {any} value
+   * @param {string} fallback
+   * @returns {string}
+   */
+  static _coerceStringLikeValue(value, fallback) {
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    return fallback;
+  }
+
+  /**
+   * @param {any} value
+   * @param {number} fallback
+   * @returns {number}
+   */
+  static _coerceFiniteNumber(value, fallback) {
+    const parsed = typeof value === 'number' ? value : Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  /**
+   * @param {any} value
+   * @param {boolean} fallback
+   * @returns {boolean}
+   */
+  static _coerceBooleanLikeValue(value, fallback) {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') {
+      if (value === 1) return true;
+      if (value === 0) return false;
+      return fallback;
+    }
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === 'true' || normalized === '1') return true;
+      if (normalized === 'false' || normalized === '0') return false;
+    }
+    return fallback;
+  }
+
+  /**
+   * @param {any} value
+   * @param {any} fallback
+   * @returns {any}
+   */
+  static _coerceJsonLikeValueOrFallback(value, fallback) {
+    const result = ProjectData._coerceJsonLikeValue(value);
+    return result.ok ? result.value : ProjectData._cloneJsonLikeValue(fallback);
+  }
+
+  /**
+   * @param {any} value
+   * @returns {{ ok: boolean, value?: any, message?: string }}
+   */
+  static _coerceJsonLikeValue(value) {
+    const seen = new WeakSet();
+    return ProjectData._cloneJsonCompatibleValue(value, seen, true);
+  }
+
+  /**
+   * @param {any} value
+   * @param {WeakSet<object>} seen
+   * @param {boolean} allowPrimitiveRoot
+   * @returns {{ ok: boolean, value?: any, message?: string }}
+   */
+  static _cloneJsonCompatibleValue(value, seen, allowPrimitiveRoot) {
+    if (value === null) return { ok: true, value: null };
+    if (typeof value === 'string' || typeof value === 'boolean') return { ok: true, value };
+    if (typeof value === 'number') {
+      return Number.isFinite(value)
+        ? { ok: true, value }
+        : { ok: false, message: 'value must be JSON serializable' };
+    }
+    if (typeof value === 'undefined' || typeof value === 'function' || typeof value === 'symbol' || typeof value === 'bigint') {
+      return { ok: false, message: 'value must be JSON serializable' };
+    }
+    if (!value || typeof value !== 'object') {
+      return allowPrimitiveRoot
+        ? { ok: true, value }
+        : { ok: false, message: 'value must be JSON serializable' };
+    }
+    if (seen.has(value)) return { ok: false, message: 'value must be JSON serializable' };
+    seen.add(value);
+
+    if (Array.isArray(value)) {
+      const cloned = [];
+      for (const item of value) {
+        const child = ProjectData._cloneJsonCompatibleValue(item, seen, true);
+        if (!child.ok) return child;
+        cloned.push(child.value);
+      }
+      seen.delete(value);
+      return { ok: true, value: cloned };
+    }
+
+    const prototype = Object.getPrototypeOf(value);
+    const isPlainObject = Object.prototype.toString.call(value) === '[object Object]';
+    if (!isPlainObject && prototype !== null) {
+      seen.delete(value);
+      return { ok: false, message: 'value must be JSON serializable' };
+    }
+
+    const cloned = {};
+    for (const [key, childValue] of Object.entries(value)) {
+      const child = ProjectData._cloneJsonCompatibleValue(childValue, seen, true);
+      if (!child.ok) return child;
+      cloned[key] = child.value;
+    }
+    seen.delete(value);
+    return { ok: true, value: cloned };
+  }
+
+  /**
+   * @param {any} value
+   * @returns {any}
+   */
+  static _cloneJsonLikeValue(value) {
+    if (Array.isArray(value)) return value.map(item => ProjectData._cloneJsonLikeValue(item));
+    if (value && typeof value === 'object') {
+      const cloned = {};
+      for (const [key, child] of Object.entries(value)) {
+        cloned[key] = ProjectData._cloneJsonLikeValue(child);
+      }
+      return cloned;
+    }
+    return value;
   }
 }

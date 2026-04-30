@@ -853,87 +853,8 @@ class VariablesEditorScene extends Scene {
   }
 
   _validateProjectGlobalVariables() {
-    const root = this._getProjectGlobalVariables();
-    const scopes = [
-      { scope: 'system', tier: 'fixed' },
-      { scope: 'system', tier: 'persistent' },
-      { scope: 'user', tier: 'fixed' },
-      { scope: 'user', tier: 'persistent' },
-    ];
-    for (const item of scopes) {
-      const bucket = root?.[item.scope]?.[item.tier];
-      if (!bucket || typeof bucket !== 'object' || Array.isArray(bucket)) {
-        return {
-          ok: false,
-          message: `Invalid bucket: ${item.scope}.${item.tier}`,
-          scopePath: `${item.scope}.${item.tier}`,
-          variableName: '',
-        };
-      }
-      for (const [name, definition] of Object.entries(bucket)) {
-        const scopePath = `${item.scope}.${item.tier}`;
-        if (typeof name !== 'string' || !name.trim()) {
-          return {
-            ok: false,
-            message: `Variable name is required in ${scopePath}`,
-            scopePath,
-            variableName: name || '',
-          };
-        }
-        if (!definition || typeof definition !== 'object' || Array.isArray(definition)) {
-          return {
-            ok: false,
-            message: `Invalid definition for ${name}`,
-            scopePath,
-            variableName: name,
-          };
-        }
-        if (!this._normalizeType(definition.type)) {
-          return {
-            ok: false,
-            message: `Unsupported type for ${name}`,
-            scopePath,
-            variableName: name,
-          };
-        }
-        const valueCheck = this._validateInitialValue(definition.initialValue, definition.type);
-        if (!valueCheck.ok) {
-          return {
-            ok: false,
-            message: `${name}: ${valueCheck.message}`,
-            scopePath,
-            variableName: name,
-          };
-        }
-      }
-    }
+    const validation = ProjectData.validateGlobalVariables(this._getProjectGlobalVariables());
+    if (!validation.ok) return validation;
     return { ok: true, message: '' };
-  }
-
-  _validateInitialValue(value, type) {
-    if (type === 'string') {
-      return typeof value === 'string'
-        ? { ok: true }
-        : { ok: false, message: 'initialValue must be a string' };
-    }
-    if (type === 'number') {
-      return Number.isFinite(value)
-        ? { ok: true }
-        : { ok: false, message: 'initialValue must be a finite number' };
-    }
-    if (type === 'boolean') {
-      return typeof value === 'boolean'
-        ? { ok: true }
-        : { ok: false, message: 'initialValue must be true or false' };
-    }
-    if (type === 'json') {
-      try {
-        JSON.stringify(value);
-        return { ok: true };
-      } catch (_err) {
-        return { ok: false, message: 'initialValue must be JSON serializable' };
-      }
-    }
-    return { ok: false, message: 'unsupported type' };
   }
 }

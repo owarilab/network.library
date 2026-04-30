@@ -1,0 +1,667 @@
+{
+  "format": "qsproj",
+  "version": 1,
+  "project": {
+    "id": "proj_phase4_set_global_variable_check_8n4k2p1q",
+    "version": 1,
+    "name": "Phase4 Set Global Variable Check",
+    "createdAt": 1777436608074,
+    "updatedAt": 1777436608074,
+    "settings": {
+      "defaultChipWidth": 16,
+      "defaultChipHeight": 16
+    },
+    "globalVariables": {
+      "version": 1,
+      "system": {
+        "fixed": {
+          "startupPlayUnitId": {
+            "type": "string",
+            "initialValue": "pu_phase4_check_2m9v7c1x"
+          },
+          "requestedPlayUnitId": {
+            "type": "string",
+            "initialValue": ""
+          },
+          "currentPlayUnitId": {
+            "type": "string",
+            "initialValue": ""
+          },
+          "returnPlayUnitId": {
+            "type": "string",
+            "initialValue": ""
+          },
+          "isPaused": {
+            "type": "boolean",
+            "initialValue": false
+          }
+        },
+        "persistent": {
+          "masterVolume": {
+            "type": "number",
+            "initialValue": 1
+          }
+        }
+      },
+      "user": {
+        "fixed": {
+          "counter": {
+            "type": "number",
+            "initialValue": 1
+          },
+          "message": {
+            "type": "string",
+            "initialValue": "start"
+          }
+        },
+        "persistent": {
+          "score": {
+            "type": "number",
+            "initialValue": 10
+          },
+          "flag": {
+            "type": "boolean",
+            "initialValue": false
+          }
+        }
+      }
+    },
+    "assets": {
+      "pixelDocuments": [],
+      "tilesets": [],
+      "maps": [],
+      "playUnits": [
+        {
+          "id": "pu_phase4_check_2m9v7c1x",
+          "type": "playUnit",
+          "name": "Phase4Check",
+          "description": "Phase4 の setGlobalVariable 確認用。クリックで user.persistent.score を更新する",
+          "objects": [
+            {
+              "id": "obj_cam_phase4_1a2b3c4d",
+              "name": "Main Camera",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Camera",
+                  "enabled": true,
+                  "data": {
+                    "zoom": 1,
+                    "viewportX": 0,
+                    "viewportY": 0,
+                    "viewportWidth": 800,
+                    "viewportHeight": 600,
+                    "followTargetObjectId": "",
+                    "followLerp": 1
+                  }
+                },
+                {
+                  "type": "PlaySettings",
+                  "enabled": true,
+                  "data": {
+                    "defaultCameraObjectId": "obj_cam_phase4_1a2b3c4d"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_title_phase4_5e6f7g8h",
+              "name": "Title",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 160,
+                    "y": 50,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Phase4 Set Global Variable Check",
+                    "font": "bold 22px sans-serif",
+                    "color": "#e2e8f0",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 28,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_vars_phase4_4y5z6a7b",
+              "name": "Variables View",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 30,
+                    "y": 90,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "score: 10\nmessage: start\ncounter: 1\nflag: false",
+                    "font": "16px monospace",
+                    "color": "#f8fafc",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "top",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 24,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_info_score_9i0j1k2l",
+              "name": "Score Info",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 30,
+                    "y": 110,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "score: 10",
+                    "font": "18px sans-serif",
+                    "color": "#38bdf8",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 24,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_btn_add_3m4n5o6p",
+              "name": "Add Score Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 30,
+                    "y": 180,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 220,
+                    "height": 50,
+                    "fillColor": "#1e293b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#22c55e",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rect",
+                    "offsetX": 0,
+                    "offsetY": 0,
+                    "width": 220,
+                    "height": 50,
+                    "isTrigger": true
+                  }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": {
+                    "eventId": "ev_phase4_add_score",
+                    "triggerOn": "click",
+                    "once": false,
+                    "targetObjectId": ""
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_phase4_add_score",
+                    "action": "setGlobalVariable",
+                    "variablePath": "user.persistent.score",
+                    "valueSource": "literal",
+                    "value": 11
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_btn_add_score_sync_4a5b6c7d",
+              "name": "Add Score Sync",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 270,
+                    "y": 180,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_phase4_add_score",
+                    "action": "setProperty",
+                    "targetObjectId": "obj_vars_phase4_4y5z6a7b",
+                    "componentType": "Text",
+                    "property": "text",
+                    "value": "score: 11\nmessage: start\ncounter: 1\nflag: false"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_btn_add_lbl_7q8r9s0t",
+              "name": "Add Score Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 145,
+                    "y": 208,
+                    "z": 1,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "click => score = 11",
+                    "font": "bold 14px sans-serif",
+                    "color": "#86efac",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_btn_add_msg_1u2v3w4x",
+              "name": "Message Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 30,
+                    "y": 250,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 220,
+                    "height": 50,
+                    "fillColor": "#1e293b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#f97316",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rect",
+                    "offsetX": 0,
+                    "offsetY": 0,
+                    "width": 220,
+                    "height": 50,
+                    "isTrigger": true
+                  }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": {
+                    "eventId": "ev_phase4_set_message",
+                    "triggerOn": "click",
+                    "once": false,
+                    "targetObjectId": ""
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_phase4_set_message",
+                    "action": "setGlobalVariable",
+                    "variablePath": "user.fixed.message",
+                    "valueSource": "literal",
+                    "value": "updated from click"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_btn_add_msg_sync_8e9f0g1h",
+              "name": "Add Message Sync",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 270,
+                    "y": 250,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_phase4_set_message",
+                    "action": "setProperty",
+                    "targetObjectId": "obj_vars_phase4_4y5z6a7b",
+                    "componentType": "Text",
+                    "property": "text",
+                    "value": "score: 11\nmessage: updated from click\ncounter: 1\nflag: false"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_btn_add_msg_lbl_5y6z7a8b",
+              "name": "Message Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 145,
+                    "y": 278,
+                    "z": 1,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "click => message change",
+                    "font": "bold 14px sans-serif",
+                    "color": "#fdba74",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_btn_copy_score_9c8b7a6d",
+              "name": "Copy Score Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 30,
+                    "y": 320,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 220,
+                    "height": 50,
+                    "fillColor": "#1e293b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#a855f7",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rect",
+                    "offsetX": 0,
+                    "offsetY": 0,
+                    "width": 220,
+                    "height": 50,
+                    "isTrigger": true
+                  }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": {
+                    "eventId": "ev_phase4_copy_score",
+                    "triggerOn": "click",
+                    "once": false,
+                    "targetObjectId": ""
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_phase4_copy_score",
+                    "action": "setGlobalVariable",
+                    "variablePath": "user.fixed.counter",
+                    "valueSource": "variable",
+                    "valueVariablePath": "user.persistent.score"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_btn_copy_score_sync_2i3j4k5l",
+              "name": "Copy Score Sync",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 270,
+                    "y": 320,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_phase4_copy_score",
+                    "action": "setProperty",
+                    "targetObjectId": "obj_vars_phase4_4y5z6a7b",
+                    "componentType": "Text",
+                    "property": "text",
+                    "value": "score: 11\nmessage: updated from click\ncounter: 11\nflag: false"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_btn_copy_score_lbl_0d1e2f3g",
+              "name": "Copy Score Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 145,
+                    "y": 348,
+                    "z": 1,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "click => counter = score",
+                    "font": "bold 14px sans-serif",
+                    "color": "#c084fc",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "session": {
+    "projectId": "proj_phase4_set_global_variable_check_8n4k2p1q",
+    "dirty": true,
+    "currentScene": "PlayUnitEditorScene",
+    "activeDocumentRef": {
+      "type": "playUnit",
+      "id": "pu_phase4_check_2m9v7c1x"
+    },
+    "editorState": {
+      "activeTool": "pencil",
+      "foreColor": 4278190080,
+      "backColor": 4294967295,
+      "editMode": "free",
+      "selectedChip": {
+        "col": 0,
+        "row": 0
+      }
+    }
+  }
+}
