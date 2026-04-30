@@ -160,6 +160,7 @@ class PlayTestScene extends Scene {
       this._drawTextEntry(ctx, entry);
     }
     ctx.restore();
+    this._drawGlobalVariablesPanel(ctx, canvas, panel);
   }
 
   update(dt) {
@@ -1057,5 +1058,77 @@ class PlayTestScene extends Scene {
       case 'easeInOut': return t < 0.5 ? 2 * t * t : 1 - 2 * (1 - t) * (1 - t);
       default: return t;
     }
+  }
+
+  _drawGlobalVariablesPanel(ctx, canvas, panel) {
+    const panelW = 250;
+    const panelH = panel.h;
+    const panelX = canvas.width - panelW - 12;
+    const panelY = panel.y;
+
+    const scopes = [
+      { label: 'system.fixed', path: 'system.fixed' },
+      { label: 'system.persistent', path: 'system.persistent' },
+      { label: 'user.fixed', path: 'user.fixed' },
+      { label: 'user.persistent', path: 'user.persistent' },
+    ];
+
+    ctx.fillStyle = '#0f172a';
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(panelX, panelY, panelW, panelH, 14);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#e2e8f0';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.fillText('Variables', panelX + 12, panelY + 24);
+
+    let offsetY = panelY + 50;
+    const lineHeight = 18;
+
+    ctx.font = '11px monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+
+    for (const scope of scopes) {
+      if (offsetY + 40 > panelY + panelH) break;
+
+      ctx.fillStyle = '#64748b';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.fillText(scope.label, panelX + 12, offsetY);
+      offsetY += lineHeight;
+
+      ctx.fillStyle = '#cbd5e1';
+      ctx.font = '10px monospace';
+
+      const variables = this._appData?.listRuntimeGlobalVariables?.(scope.path) || [];
+      if (variables.length === 0) {
+        ctx.fillStyle = '#475569';
+        ctx.fillText('(none)', panelX + 20, offsetY);
+        offsetY += lineHeight;
+      } else {
+        for (const variable of variables) {
+          if (offsetY + 12 > panelY + panelH) break;
+          const valueStr = this._formatVariableValue(variable.value, 32);
+          ctx.fillText(`${variable.name}: ${valueStr}`, panelX + 20, offsetY);
+          offsetY += lineHeight;
+        }
+      }
+      offsetY += 8;
+    }
+  }
+
+  _formatVariableValue(value, maxLen = 32) {
+    if (value === null) return 'null';
+    if (typeof value === 'string') return `"${value.slice(0, maxLen)}"`;
+    if (typeof value === 'boolean') return value ? 'true' : 'false';
+    if (typeof value === 'number') return String(value);
+    if (Array.isArray(value)) return `[${value.length}]`;
+    if (typeof value === 'object') return '{...}';
+    return String(value);
   }
 }
