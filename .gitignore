@@ -34,3 +34,8 @@
 
 # vidual studio code
 .vscode
+
+# Codex
+.codex/
+.codex
+.codex-plugin/
