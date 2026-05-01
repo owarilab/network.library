@@ -39,7 +39,7 @@ class PlayTestScene extends Scene {
     this._input = input;
     this._appData = appData;
     const activePlayUnit = appData?.activateStartupPlayUnit?.() || appData?.getActiveProjectAsset?.();
-    this._runtime = PlayUnitRuntime.fromPlayUnit(activePlayUnit);
+    this._runtime = PlayUnitRuntime.fromPlayUnit(activePlayUnit, appData);
     this._cameraState = this._createCameraState(this._runtime?.camera);
     input.on('keydown', this._onKeyDown);
     input.on('keyup', this._onKeyUp);
@@ -180,7 +180,7 @@ class PlayTestScene extends Scene {
     this._applyControllerMovement(dt, playUnit);
 
     const previousCameraObjectId = this._runtime?.camera?.objectId || '';
-    this._runtime = PlayUnitRuntime.fromPlayUnit(playUnit);
+    this._runtime = PlayUnitRuntime.fromPlayUnit(playUnit, this._appData);
     this._processOverlapTriggers(playUnit);
     this._processEventActions(playUnit);
     this._updateTweens(dt, playUnit);
@@ -898,10 +898,16 @@ class PlayTestScene extends Scene {
           if (!objectData || objectData.enabled === false) continue;
           if (!Array.isArray(objectData.components)) continue;
           for (const component of objectData.components) {
-            if (!component || component.type !== 'EventAction' || component.enabled === false) continue;
+            if (!component || component.enabled === false) continue;
+            if (component.type !== 'EventAction' && component.type !== 'Conditional') continue;
             const listenTo = typeof component.data?.listenTo === 'string' ? component.data.listenTo.trim() : '';
             if (listenTo !== eventId) continue;
-            this._executeAction(playUnit, component.data);
+
+            if (component.type === 'EventAction') {
+              this._executeAction(playUnit, component.data);
+            } else if (component.type === 'Conditional') {
+              this._executeConditional(playUnit, component.data);
+            }
           }
         }
       }
@@ -916,7 +922,7 @@ class PlayTestScene extends Scene {
     if (action === 'fireEvent') {
       const chainId = typeof data.eventId === 'string' ? data.eventId.trim() : '';
       if (chainId) this._pendingEvents.add(chainId);
-      return;
+      return true;
     }
 
     if (action === 'requestPlayUnit') {
@@ -924,12 +930,12 @@ class PlayTestScene extends Scene {
       if (!playUnitId) {
         this._statusTone = 'error';
         this._statusMessage = 'playUnitId is required for requestPlayUnit';
-        return;
+        return false;
       }
       this._appData?.setRuntimeGlobalVariable?.('system.fixed.requestedPlayUnitId', playUnitId);
       this._statusTone = 'info';
       this._statusMessage = `Requested PlayUnit: ${playUnitId}`;
-      return;
+      return true;
     }
 
     if (action === 'setGlobalVariable') {
@@ -937,31 +943,76 @@ class PlayTestScene extends Scene {
       if (!variablePath) {
         this._statusTone = 'error';
         this._statusMessage = 'variablePath is required for setGlobalVariable';
-        return;
+        return false;
       }
       if (!this._appData?.hasRuntimeGlobalVariable?.(variablePath)) {
         this._statusTone = 'error';
         this._statusMessage = `Global variable not found: ${variablePath}`;
-        return;
+        return false;
+      }
+
+      const op = typeof data.op === 'string' && data.op.trim() ? data.op.trim() : 'set';
+      const arithmeticOps = new Set(['add', 'subtract', 'multiply', 'divide']);
+      const currentValue = this._appData.getRuntimeGlobalVariable(variablePath);
+      const resolved = this._appData.resolveRuntimeGlobalVariablePath(variablePath);
+      const varDefinition = resolved ? this._appData.currentProject?.globalVariables?.[resolved.scope]?.[resolved.tier]?.[resolved.name] : null;
+      const varType = typeof varDefinition?.type === 'string' ? varDefinition.type.trim() : '';
+
+      if (arithmeticOps.has(op) && varType !== 'number') {
+        this._statusTone = 'error';
+        this._statusMessage = `Arithmetic op '${op}' requires target variable type 'number', got '${varType}'`;
+        return false;
       }
 
       const sourceType = typeof data.valueSource === 'string' ? data.valueSource.trim() : 'literal';
-      let nextValue;
+      let operand;
       if (sourceType === 'variable') {
         const sourcePath = typeof data.valueVariablePath === 'string' ? data.valueVariablePath.trim() : '';
         if (!sourcePath) {
           this._statusTone = 'error';
           this._statusMessage = 'valueVariablePath is required for variable source';
-          return;
+          return false;
         }
         if (!this._appData?.hasRuntimeGlobalVariable?.(sourcePath)) {
           this._statusTone = 'error';
           this._statusMessage = `Source global variable not found: ${sourcePath}`;
-          return;
+          return false;
         }
-        nextValue = this._appData.getRuntimeGlobalVariable(sourcePath);
+        operand = this._appData.getRuntimeGlobalVariable(sourcePath);
       } else {
-        nextValue = typeof data.value === 'undefined' ? '' : data.value;
+        operand = typeof data.value === 'undefined' ? '' : data.value;
+      }
+
+      let nextValue;
+      if (arithmeticOps.has(op)) {
+        const numericOperand = Number(operand);
+        const numericCurrent = Number(currentValue);
+        if (!Number.isFinite(numericOperand) || !Number.isFinite(numericCurrent)) {
+          this._statusTone = 'error';
+          this._statusMessage = `Arithmetic operation requires numeric values`;
+          return false;
+        }
+        switch (op) {
+          case 'add':
+            nextValue = numericCurrent + numericOperand;
+            break;
+          case 'subtract':
+            nextValue = numericCurrent - numericOperand;
+            break;
+          case 'multiply':
+            nextValue = numericCurrent * numericOperand;
+            break;
+          case 'divide':
+            if (numericOperand === 0) {
+              this._statusTone = 'error';
+              this._statusMessage = 'Division by zero';
+              return false;
+            }
+            nextValue = numericCurrent / numericOperand;
+            break;
+        }
+      } else {
+        nextValue = operand;
       }
 
       const updated = this._appData?.setRuntimeGlobalVariable?.(variablePath, nextValue) === true;
@@ -969,13 +1020,13 @@ class PlayTestScene extends Scene {
         this._statusTone = 'error';
         const reason = this._appData?.getLastRuntimeGlobalVariableError?.() || `Failed to set global variable: ${variablePath}`;
         this._statusMessage = reason;
-        return;
+        return false;
       }
 
       this._statusTone = 'info';
-      this._statusMessage = `Set global variable: ${variablePath}`;
+      this._statusMessage = op === 'set' ? `Set global variable: ${variablePath}` : `Applied ${op} to global variable: ${variablePath}`;
       this._lastEventActionValue = this._appData?.getRuntimeGlobalVariable?.(variablePath);
-      return;
+      return true;
     }
 
     if (action === 'returnPlayUnit') {
@@ -983,41 +1034,41 @@ class PlayTestScene extends Scene {
       if (!asset) {
         this._statusTone = 'error';
         this._statusMessage = 'returnPlayUnitId is empty or invalid';
-        return;
+        return false;
       }
       this._statusTone = 'info';
       this._statusMessage = `Returned to PlayUnit: ${asset.name || asset.id}`;
       this._cameraState = null;
-      return;
+      return true;
     }
 
     const targetObject = targetObjectId ? playUnit.findObjectById(targetObjectId) : null;
 
-    if (!targetObject) return;
+    if (!targetObject) return false;
 
     switch (action) {
       case 'setProperty': {
         const componentType = typeof data.componentType === 'string' ? data.componentType.trim() : '';
         const property = typeof data.property === 'string' ? data.property.trim() : '';
-        if (!componentType || !property) return;
+        if (!componentType || !property) return false;
         const component = targetObject.findComponentByType(componentType);
-        if (!component) return;
+        if (!component) return false;
         const rawValue = typeof data.value !== 'undefined' ? String(data.value) : '';
         let parsedValue;
         try { parsedValue = JSON.parse(rawValue); } catch { parsedValue = rawValue; }
         component.data[property] = parsedValue;
-        break;
+        return true;
       }
       case 'setEnabled': {
         targetObject.enabled = data.enabled !== false;
-        break;
+        return true;
       }
       case 'playTween': {
         const componentType = typeof data.componentType === 'string' ? data.componentType.trim() : '';
         const property = typeof data.property === 'string' ? data.property.trim() : '';
-        if (!componentType || !property) return;
+        if (!componentType || !property) return false;
         const component = targetObject.findComponentByType(componentType);
-        if (!component) return;
+        if (!component) return false;
         const duration = Number.isFinite(Number(data.tweenDuration)) && Number(data.tweenDuration) > 0
           ? Number(data.tweenDuration) : 500;
         const from = Number.isFinite(Number(data.tweenFrom)) ? Number(data.tweenFrom) : 0;
@@ -1027,10 +1078,10 @@ class PlayTestScene extends Scene {
         const tweenKey = `${targetObjectId}:${componentType}:${property}`;
         this._activeTweens.set(tweenKey, { targetObjectId, componentType, property, from, to, duration, elapsed: 0, easing });
         component.data[property] = from;
-        break;
+        return true;
       }
       default:
-        break;
+        return false;
     }
   }
 
@@ -1120,6 +1171,43 @@ class PlayTestScene extends Scene {
       }
       offsetY += 8;
     }
+  }
+
+  _executeConditional(playUnit, data) {
+    if (!data || !playUnit) return;
+    if (!Array.isArray(data.branches)) {
+      this._statusTone = 'error';
+      this._statusMessage = 'Conditional: branches array is missing';
+      return;
+    }
+
+    // Evaluate each branch condition in order (short-circuit)
+    for (const branch of data.branches) {
+      if (!branch || !branch.action) continue;
+
+      const condition = branch.condition || null;
+      const evaluated = ConditionalAction.evaluateCondition(condition, this._appData);
+
+      if (evaluated) {
+        const executed = this._executeAction(playUnit, branch.action) === true;
+        if (!executed) return;
+        this._statusTone = 'info';
+        this._statusMessage = `Conditional: executed branch with action '${branch.action.action || 'setProperty'}'`;
+        return;
+      }
+    }
+
+    // No branch matched, execute defaultAction if present
+    if (data.defaultAction) {
+      const executed = this._executeAction(playUnit, data.defaultAction) === true;
+      if (!executed) return;
+      this._statusTone = 'info';
+      this._statusMessage = `Conditional: executed defaultAction '${data.defaultAction.action || 'setProperty'}'`;
+      return;
+    }
+
+    this._statusTone = 'info';
+    this._statusMessage = 'Conditional: no matching branch, no defaultAction';
   }
 
   _formatVariableValue(value, maxLen = 32) {

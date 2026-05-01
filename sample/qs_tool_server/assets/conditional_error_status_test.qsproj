@@ -1,0 +1,318 @@
+{
+  "format": "qsproj",
+  "version": 1,
+  "project": {
+    "id": "proj_conditional_error_status_1",
+    "version": 1,
+    "name": "Conditional Error Status Test",
+    "createdAt": 1777440000000,
+    "updatedAt": 1777440000000,
+    "settings": {
+      "defaultChipWidth": 16,
+      "defaultChipHeight": 16
+    },
+    "globalVariables": {
+      "version": 1,
+      "system": {
+        "fixed": {
+          "startupPlayUnitId": {
+            "type": "string",
+            "initialValue": "pu_conditional_error_status_1"
+          }
+        },
+        "persistent": {}
+      },
+      "user": {
+        "fixed": {},
+        "persistent": {
+          "hp": {
+            "type": "number",
+            "initialValue": 80
+          },
+          "note": {
+            "type": "string",
+            "initialValue": "Click the green button and check the top-right status message."
+          }
+        }
+      }
+    },
+    "assets": {
+      "pixelDocuments": [],
+      "tilesets": [],
+      "maps": [],
+      "playUnits": [
+        {
+          "id": "pu_conditional_error_status_1",
+          "type": "playUnit",
+          "name": "ConditionalErrorStatusScene",
+          "description": "Conditional branch action failure regression test. Clicking Run executes a matching branch whose setGlobalVariable target is intentionally invalid. Expected result: the top-right status stays error with 'Global variable not found: user.persistent.missingVar'.",
+          "objects": [
+            {
+              "id": "obj_cam_cond_err_1",
+              "name": "Main Camera",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 0, "y": 0, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Camera",
+                  "enabled": true,
+                  "data": {
+                    "zoom": 1,
+                    "viewportX": 0,
+                    "viewportY": 0,
+                    "viewportWidth": 800,
+                    "viewportHeight": 600,
+                    "followTargetObjectId": "",
+                    "followLerp": 1
+                  }
+                },
+                {
+                  "type": "PlaySettings",
+                  "enabled": true,
+                  "data": { "defaultCameraObjectId": "obj_cam_cond_err_1" }
+                }
+              ]
+            },
+            {
+              "id": "obj_title_cond_err_1",
+              "name": "Title",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 250, "y": 56, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Conditional Error Status Test",
+                    "font": "bold 22px sans-serif",
+                    "color": "#e2e8f0",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 28,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_info_cond_err_1",
+              "name": "Info Text",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 40, "y": 126, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Expected: Global variable not found: user.persistent.missingVar",
+                    "font": "16px monospace",
+                    "color": "#fca5a5",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 22,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_hp_cond_err_1",
+              "name": "HP Text",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 40, "y": 166, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "hp: ${ user.persistent.hp }",
+                    "font": "18px monospace",
+                    "color": "#38bdf8",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 24,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_note_cond_err_1",
+              "name": "Note Text",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 40, "y": 206, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "${user.persistent.note}",
+                    "font": "15px sans-serif",
+                    "color": "#cbd5e1",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 22,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_run_btn_cond_err_1",
+              "name": "Run Failure Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 40, "y": 268, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 260,
+                    "height": 48,
+                    "fillColor": "#1e293b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#22c55e",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 260, "height": 48, "isTrigger": true }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": { "eventId": "ev_run_error_status", "triggerOn": "click", "once": false, "targetObjectId": "" }
+                }
+              ]
+            },
+            {
+              "id": "obj_run_label_cond_err_1",
+              "name": "Run Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 170, "y": 292, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Run failing Conditional branch",
+                    "font": "bold 13px sans-serif",
+                    "color": "#86efac",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_conditional_logic_cond_err_1",
+              "name": "Conditional Failure Logic",
+              "components": [
+                {
+                  "type": "Conditional",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_run_error_status",
+                    "branches": [
+                      {
+                        "condition": {
+                          "type": "compare",
+                          "left": "${ user.persistent.hp }",
+                          "operator": ">",
+                          "right": 0
+                        },
+                        "action": {
+                          "action": "setGlobalVariable",
+                          "variablePath": "user.persistent.missingVar",
+                          "valueSource": "literal",
+                          "value": "should fail",
+                          "op": "set"
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "session": {
+    "projectId": "proj_conditional_error_status_1",
+    "dirty": false,
+    "currentScene": "PlayUnitEditorScene",
+    "activeDocumentRef": { "type": "playUnit", "id": "pu_conditional_error_status_1" },
+    "editorState": {
+      "activeTool": "pencil",
+      "foreColor": 4278190080,
+      "backColor": 4294967295,
+      "editMode": "free",
+      "selectedChip": { "col": 0, "row": 0 }
+    }
+  }
+}

@@ -27,9 +27,10 @@ class PlayUnitRuntime {
 
   /**
    * @param {PlayUnitData|object|null} playUnit
+   * @param {AppData|null} appData
    * @returns {PlayUnitRuntime}
    */
-  static fromPlayUnit(playUnit) {
+  static fromPlayUnit(playUnit, appData = null) {
     const runtime = new PlayUnitRuntime();
     runtime.id = typeof playUnit?.id === 'string' ? playUnit.id : '';
     runtime.name = typeof playUnit?.name === 'string' && playUnit.name.trim() ? playUnit.name.trim() : 'PlayUnit';
@@ -72,10 +73,11 @@ class PlayUnitRuntime {
       if (text) {
         const textValue = typeof text.data?.text === 'string' ? text.data.text : '';
         if (textValue) {
+          const resolvedText = PlayUnitRuntime._resolveTemplateText(textValue, appData);
           textEntries.push({
             objectId: objectData.id || '',
             objectName: objectData.name || 'Object',
-            text: textValue,
+            text: resolvedText,
             font: typeof text.data?.font === 'string' && text.data.font.trim() ? text.data.font.trim() : '24px sans-serif',
             color: typeof text.data?.color === 'string' && text.data.color.trim() ? text.data.color.trim() : '#ffffff',
             alpha: PlayUnitRuntime._normalizeAlpha(text.data?.alpha),
@@ -285,5 +287,29 @@ class PlayUnitRuntime {
     if (nextValue < 0) return 0;
     if (nextValue > 1) return 1;
     return nextValue;
+  }
+
+  /**
+   * テンプレート変数 ${path} を解析して、グローバル変数値に置換
+   * @param {string} text - テンプレート文字列 (例: "score: ${user.persistent.score}")
+   * @param {AppData|null} appData - グローバル変数にアクセスするためのAppData
+   * @returns {string} - 解析後のテキスト
+   */
+  static _resolveTemplateText(text, appData) {
+    if (!text || !appData) return text;
+    
+    // ${...} マッチの正規表現
+    const templatePattern = /\$\{([^}]+)\}/g;
+    
+    return text.replace(templatePattern, (match, variablePath) => {
+      const trimmedPath = variablePath.trim();
+      if (!trimmedPath) return match;
+      
+      // appData の getRuntimeGlobalVariable メソッドを使用
+      const value = appData.getRuntimeGlobalVariable?.(trimmedPath);
+      if (value === undefined || value === null) return match;
+      
+      return String(value);
+    });
   }
 }
