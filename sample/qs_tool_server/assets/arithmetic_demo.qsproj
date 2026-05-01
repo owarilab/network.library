@@ -22,6 +22,10 @@
           "isPaused": {
             "type": "boolean",
             "initialValue": false
+          },
+          "timer": {
+            "type": "number",
+            "initialValue": 0
           }
         },
         "persistent": {}

@@ -40,7 +40,7 @@
           "id": "pu_timer_sample_1",
           "type": "playUnit",
           "name": "Timer Sample",
-          "description": "Timer system の基本動作確認。onTimer と onUpdate triggers、system.fixed.timer global variable を使用。",
+          "description": "Timer system の基本動作確認。3秒 onTimer と 5秒 conditional の発火を画面テキストで確認できる。",
           "objects": [
             {
               "id": "obj_camera",
@@ -164,6 +164,126 @@
               ]
             },
             {
+              "id": "obj_timer_event_status",
+              "name": "Timer Event Status",
+              "enabled": true,
+              "parentId": "",
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 400,
+                    "y": 160,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "onTimer(3s): waiting...",
+                    "font": "bold 20px sans-serif",
+                    "color": "#fbbf24",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 24,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_conditional_event_status",
+              "name": "Conditional Event Status",
+              "enabled": true,
+              "parentId": "",
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 400,
+                    "y": 200,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Conditional(timer >= 5): waiting...",
+                    "font": "bold 20px sans-serif",
+                    "color": "#f472b6",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 24,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_status_hint",
+              "name": "Status Hint",
+              "enabled": true,
+              "parentId": "",
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 400,
+                    "y": 250,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "3秒後に上の行、5秒後に下の行が DONE へ変わります",
+                    "font": "16px sans-serif",
+                    "color": "#94a3b8",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
               "id": "obj_on_timer_trigger",
               "name": "OnTimerTrigger",
               "enabled": true,
@@ -218,20 +338,59 @@
                       {
                         "condition": {
                           "type": "compare",
-                          "left": {
-                            "type": "globalVariable",
-                            "path": "system.fixed.timer"
-                          },
+                          "left": "${system.fixed.timer}",
                           "operator": ">=",
-                          "right": {
-                            "type": "literal",
-                            "value": 5
-                          }
+                          "right": 5
                         },
-                        "eventId": "ev_timer_milestone_5s"
+                        "action": {
+                          "action": "fireEvent",
+                          "eventId": "ev_timer_milestone_5s"
+                        }
                       }
                     ],
                     "defaultAction": ""
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_timer_event_action",
+              "name": "Timer Event Action",
+              "enabled": true,
+              "parentId": "",
+              "children": [],
+              "components": [
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_timer_3s",
+                    "action": "setProperty",
+                    "targetObjectId": "obj_timer_event_status",
+                    "componentType": "Text",
+                    "property": "text",
+                    "value": "onTimer(3s): DONE"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_conditional_event_action",
+              "name": "Conditional Event Action",
+              "enabled": true,
+              "parentId": "",
+              "children": [],
+              "components": [
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_timer_milestone_5s",
+                    "action": "setProperty",
+                    "targetObjectId": "obj_conditional_event_status",
+                    "componentType": "Text",
+                    "property": "text",
+                    "value": "Conditional(timer >= 5): DONE"
                   }
                 }
               ]

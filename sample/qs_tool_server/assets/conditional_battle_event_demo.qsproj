@@ -18,6 +18,10 @@
           "startupPlayUnitId": {
             "type": "string",
             "initialValue": "pu_conditional_battle_event_demo_1"
+          },
+          "timer": {
+            "type": "number",
+            "initialValue": 0
           }
         },
         "persistent": {}

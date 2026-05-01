@@ -39,6 +39,11 @@
             "type": "boolean",
             "initialValue": false,
             "description": "将来の pause 用フラグ"
+          },
+          "timer": {
+            "type": "number",
+            "initialValue": 0,
+            "description": "PlayTest 開始からの経過秒。Runtime で更新される"
           }
         },
         "persistent": {

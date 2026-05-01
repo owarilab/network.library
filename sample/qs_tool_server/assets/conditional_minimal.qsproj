@@ -18,6 +18,10 @@
           "startupPlayUnitId": {
             "type": "string",
             "initialValue": "pu_conditional_minimal_1"
+          },
+          "timer": {
+            "type": "number",
+            "initialValue": 0
           }
         },
         "persistent": {}
