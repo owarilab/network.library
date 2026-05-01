@@ -1,0 +1,178 @@
+{
+  "version": 1,
+  "id": "timer_sample_basic",
+  "name": "Timer System Sample",
+  "objects": [
+    {
+      "id": "obj_root",
+      "name": "Root",
+      "enabled": true,
+      "parentId": "",
+      "children": ["obj_camera", "obj_timer_text", "obj_timer_trigger", "obj_update_trigger", "obj_five_second_check"],
+      "components": []
+    },
+    {
+      "id": "obj_camera",
+      "name": "MainCamera",
+      "enabled": true,
+      "parentId": "obj_root",
+      "children": [],
+      "components": [
+        {
+          "type": "Transform",
+          "enabled": true,
+          "data": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        {
+          "type": "Camera",
+          "enabled": true,
+          "data": {
+            "zoom": 1,
+            "viewportX": 0,
+            "viewportY": 0,
+            "viewportWidth": 0,
+            "viewportHeight": 0,
+            "followTargetObjectId": "",
+            "followLerp": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "obj_play_settings",
+      "name": "PlaySettings",
+      "enabled": true,
+      "parentId": "obj_root",
+      "children": [],
+      "components": [
+        {
+          "type": "PlaySettings",
+          "enabled": true,
+          "data": {
+            "defaultCameraObjectId": "obj_camera"
+          }
+        }
+      ]
+    },
+    {
+      "id": "obj_timer_text",
+      "name": "TimerDisplay",
+      "enabled": true,
+      "parentId": "obj_root",
+      "children": [],
+      "components": [
+        {
+          "type": "Transform",
+          "enabled": true,
+          "data": {
+            "x": 64,
+            "y": 32,
+            "z": 0,
+            "rotation": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          }
+        },
+        {
+          "type": "Text",
+          "enabled": true,
+          "data": {
+            "text": "Time: 0.00s",
+            "font": "24px monospace",
+            "color": "#ffffff",
+            "alpha": 1,
+            "align": "left",
+            "baseline": "top",
+            "wrap": false,
+            "maxWidth": 0,
+            "lineHeight": 28,
+            "strokeColor": "",
+            "strokeWidth": 0,
+            "backgroundColor": "",
+            "padding": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "obj_timer_trigger",
+      "name": "OnTimerTrigger",
+      "enabled": true,
+      "parentId": "obj_root",
+      "children": [],
+      "components": [
+        {
+          "type": "Trigger",
+          "enabled": true,
+          "data": {
+            "eventId": "ev_timer_3s",
+            "triggerOn": "onTimer",
+            "duration": 3,
+            "once": true,
+            "targetObjectId": ""
+          }
+        }
+      ]
+    },
+    {
+      "id": "obj_update_trigger",
+      "name": "OnUpdateTrigger",
+      "enabled": true,
+      "parentId": "obj_root",
+      "children": [],
+      "components": [
+        {
+          "type": "Trigger",
+          "enabled": true,
+          "data": {
+            "eventId": "ev_frame_update",
+            "triggerOn": "onUpdate",
+            "once": false,
+            "targetObjectId": ""
+          }
+        }
+      ]
+    },
+    {
+      "id": "obj_five_second_check",
+      "name": "FiveSecondCheck",
+      "enabled": true,
+      "parentId": "obj_root",
+      "children": [],
+      "components": [
+        {
+          "type": "Conditional",
+          "enabled": true,
+          "data": {
+            "listenTo": "ev_frame_update",
+            "branches": [
+              {
+                "condition": {
+                  "type": "compare",
+                  "left": {
+                    "type": "globalVariable",
+                    "path": "system.fixed.timer"
+                  },
+                  "operator": ">=",
+                  "right": {
+                    "type": "literal",
+                    "value": 5
+                  }
+                },
+                "eventId": "ev_timer_5s"
+              }
+            ],
+            "defaultAction": ""
+          }
+        }
+      ]
+    }
+  ]
+}
