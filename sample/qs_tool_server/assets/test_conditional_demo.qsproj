@@ -1,0 +1,1231 @@
+{
+  "format": "qsproj",
+  "version": 1,
+  "project": {
+    "id": "proj_conditional_demo_x9y8z7w6",
+    "version": 1,
+    "name": "Conditional Demo",
+    "createdAt": 1777436608074,
+    "updatedAt": 1777436608074,
+    "settings": {
+      "defaultChipWidth": 16,
+      "defaultChipHeight": 16
+    },
+    "globalVariables": {
+      "version": 1,
+      "system": {
+        "fixed": {
+          "startupPlayUnitId": {
+            "type": "string",
+            "initialValue": "pu_conditional_demo_test1"
+          }
+        },
+        "persistent": {}
+      },
+      "user": {
+        "fixed": {},
+        "persistent": {
+          "hp": {
+            "type": "number",
+            "initialValue": 75
+          },
+          "maxHp": {
+            "type": "number",
+            "initialValue": 100
+          },
+          "state": {
+            "type": "string",
+            "initialValue": "defending"
+          },
+          "hasShield": {
+            "type": "boolean",
+            "initialValue": true
+          },
+          "inventory": {
+            "type": "object",
+            "initialValue": {
+              "potion": 5,
+              "antidote": 2
+            }
+          },
+          "testResult": {
+            "type": "string",
+            "initialValue": "pending"
+          },
+          "compareResult": {
+            "type": "string",
+            "initialValue": ""
+          },
+          "equalsResult": {
+            "type": "string",
+            "initialValue": ""
+          },
+          "truthyResult": {
+            "type": "string",
+            "initialValue": ""
+          },
+          "hasResult": {
+            "type": "string",
+            "initialValue": ""
+          },
+          "existsResult": {
+            "type": "string",
+            "initialValue": ""
+          },
+          "defaultResult": {
+            "type": "string",
+            "initialValue": ""
+          },
+          "enemyHp": {
+            "type": "number",
+            "initialValue": 30
+          },
+          "enemyMaxHp": {
+            "type": "number",
+            "initialValue": 50
+          },
+          "enemyAttackPower": {
+            "type": "number",
+            "initialValue": 12
+          },
+          "battleAction": {
+            "type": "string",
+            "initialValue": ""
+          },
+          "itemUsed": {
+            "type": "string",
+            "initialValue": ""
+          }
+        }
+      }
+    },
+    "assets": {
+      "pixelDocuments": [],
+      "tilesets": [],
+      "maps": [],
+      "playUnits": [
+        {
+          "id": "pu_conditional_demo_test1",
+          "type": "playUnit",
+          "name": "ConditionalTest",
+          "description": "Conditional コンポーネントの動作確認テスト。各条件型の評価と分岐実行を検証",
+          "objects": [
+            {
+              "id": "obj_camera_main",
+              "name": "Main Camera",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Camera",
+                  "enabled": true,
+                  "data": {
+                    "zoom": 1,
+                    "viewportX": 0,
+                    "viewportY": 0,
+                    "viewportWidth": 800,
+                    "viewportHeight": 600,
+                    "followTargetObjectId": "",
+                    "followLerp": 1
+                  }
+                },
+                {
+                  "type": "PlaySettings",
+                  "enabled": true,
+                  "data": {
+                    "defaultCameraObjectId": "obj_camera_main"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_title_1",
+              "name": "Title",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 100,
+                    "y": 20,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "=== Conditional Component Tests ===",
+                    "fontSize": 16,
+                    "fontFamily": "monospace",
+                    "fillColor": "#f0f0f0",
+                    "textAlign": "left",
+                    "textBaseline": "top"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_compare_trigger",
+              "name": "Compare Test Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 100,
+                    "y": 60,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "width": 250,
+                    "height": 30,
+                    "fillColor": "#334455",
+                    "strokeColor": "#88aaff",
+                    "lineWidth": 2
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Test 1: COMPARE (hp > 50)",
+                    "fontSize": 12,
+                    "fontFamily": "monospace",
+                    "fillColor": "#ffffff",
+                    "textAlign": "left",
+                    "textBaseline": "middle"
+                  }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": {
+                    "triggerKey": "trigger_compare_test",
+                    "triggerOn": "click",
+                    "eventId": "event_compare_test",
+                    "once": false
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_equals_trigger",
+              "name": "Equals Test Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 100,
+                    "y": 100,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "width": 250,
+                    "height": 30,
+                    "fillColor": "#334455",
+                    "strokeColor": "#88aaff",
+                    "lineWidth": 2
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Test 2: EQUALS (state == 'defending')",
+                    "fontSize": 12,
+                    "fontFamily": "monospace",
+                    "fillColor": "#ffffff",
+                    "textAlign": "left",
+                    "textBaseline": "middle"
+                  }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": {
+                    "triggerKey": "trigger_equals_test",
+                    "triggerOn": "click",
+                    "eventId": "event_equals_test",
+                    "once": false
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_truthy_trigger",
+              "name": "Truthy Test Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 100,
+                    "y": 140,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "width": 250,
+                    "height": 30,
+                    "fillColor": "#334455",
+                    "strokeColor": "#88aaff",
+                    "lineWidth": 2
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Test 3: TRUTHY (hasShield)",
+                    "fontSize": 12,
+                    "fontFamily": "monospace",
+                    "fillColor": "#ffffff",
+                    "textAlign": "left",
+                    "textBaseline": "middle"
+                  }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": {
+                    "triggerKey": "trigger_truthy_test",
+                    "triggerOn": "click",
+                    "eventId": "event_truthy_test",
+                    "once": false
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_has_trigger",
+              "name": "Has Test Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 100,
+                    "y": 180,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "width": 250,
+                    "height": 30,
+                    "fillColor": "#334455",
+                    "strokeColor": "#88aaff",
+                    "lineWidth": 2
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Test 4: HAS (inventory.potion)",
+                    "fontSize": 12,
+                    "fontFamily": "monospace",
+                    "fillColor": "#ffffff",
+                    "textAlign": "left",
+                    "textBaseline": "middle"
+                  }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": {
+                    "triggerKey": "trigger_has_test",
+                    "triggerOn": "click",
+                    "eventId": "event_has_test",
+                    "once": false
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_exists_trigger",
+              "name": "Exists Test Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 100,
+                    "y": 220,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "width": 250,
+                    "height": 30,
+                    "fillColor": "#334455",
+                    "strokeColor": "#88aaff",
+                    "lineWidth": 2
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Test 5: EXISTS (user.persistent.hp)",
+                    "fontSize": 12,
+                    "fontFamily": "monospace",
+                    "fillColor": "#ffffff",
+                    "textAlign": "left",
+                    "textBaseline": "middle"
+                  }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": {
+                    "triggerKey": "trigger_exists_test",
+                    "triggerOn": "click",
+                    "eventId": "event_exists_test",
+                    "once": false
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_default_trigger",
+              "name": "DefaultAction Test Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 100,
+                    "y": 260,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "width": 250,
+                    "height": 30,
+                    "fillColor": "#334455",
+                    "strokeColor": "#88aaff",
+                    "lineWidth": 2
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Test 6: DEFAULT ACTION (else)",
+                    "fontSize": 12,
+                    "fontFamily": "monospace",
+                    "fillColor": "#ffffff",
+                    "textAlign": "left",
+                    "textBaseline": "middle"
+                  }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": {
+                    "triggerKey": "trigger_default_test",
+                    "triggerOn": "click",
+                    "eventId": "event_default_test",
+                    "once": false
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_compare_result",
+              "name": "Compare Result",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 400,
+                    "y": 60,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Result: ${user.persistent.compareResult}",
+                    "fontSize": 12,
+                    "fontFamily": "monospace",
+                    "fillColor": "#ffff88",
+                    "textAlign": "left",
+                    "textBaseline": "middle"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_equals_result",
+              "name": "Equals Result",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 400,
+                    "y": 100,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Result: ${user.persistent.equalsResult}",
+                    "fontSize": 12,
+                    "fontFamily": "monospace",
+                    "fillColor": "#ffff88",
+                    "textAlign": "left",
+                    "textBaseline": "middle"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_truthy_result",
+              "name": "Truthy Result",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 400,
+                    "y": 140,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Result: ${user.persistent.truthyResult}",
+                    "fontSize": 12,
+                    "fontFamily": "monospace",
+                    "fillColor": "#ffff88",
+                    "textAlign": "left",
+                    "textBaseline": "middle"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_has_result",
+              "name": "Has Result",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 400,
+                    "y": 180,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Result: ${user.persistent.hasResult}",
+                    "fontSize": 12,
+                    "fontFamily": "monospace",
+                    "fillColor": "#ffff88",
+                    "textAlign": "left",
+                    "textBaseline": "middle"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_exists_result",
+              "name": "Exists Result",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 400,
+                    "y": 220,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Result: ${user.persistent.existsResult}",
+                    "fontSize": 12,
+                    "fontFamily": "monospace",
+                    "fillColor": "#ffff88",
+                    "textAlign": "left",
+                    "textBaseline": "middle"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_default_result",
+              "name": "DefaultAction Result",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 400,
+                    "y": 260,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Result: ${user.persistent.defaultResult}",
+                    "fontSize": 12,
+                    "fontFamily": "monospace",
+                    "fillColor": "#ffff88",
+                    "textAlign": "left",
+                    "textBaseline": "middle"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_current_state_label",
+              "name": "Current State Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 100,
+                    "y": 320,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "=== Current Game State ===",
+                    "fontSize": 14,
+                    "fontFamily": "monospace",
+                    "fillColor": "#88ff88",
+                    "textAlign": "left",
+                    "textBaseline": "top"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_state_display",
+              "name": "State Display",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 100,
+                    "y": 350,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "hp: ${user.persistent.hp}/${user.persistent.maxHp}, state: ${user.persistent.state}, shield: ${user.persistent.hasShield}",
+                    "fontSize": 11,
+                    "fontFamily": "monospace",
+                    "fillColor": "#cccccc",
+                    "textAlign": "left",
+                    "textBaseline": "top"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_compare_conditional",
+              "name": "Compare Conditional",
+              "components": [
+                {
+                  "type": "Conditional",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "event_compare_test",
+                    "branches": [
+                      {
+                        "condition": {
+                          "type": "compare",
+                          "left": "${user.persistent.hp}",
+                          "operator": ">",
+                          "right": 50
+                        },
+                        "action": {
+                          "action": "setGlobalVariable",
+                          "variablePath": "user.persistent.compareResult",
+                          "valueSource": "literal",
+                          "value": "PASS (hp=75 > 50)",
+                          "op": "set"
+                        }
+                      }
+                    ],
+                    "defaultAction": {
+                      "action": "setGlobalVariable",
+                      "variablePath": "user.persistent.compareResult",
+                      "valueSource": "literal",
+                      "value": "FAIL",
+                      "op": "set"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_equals_conditional",
+              "name": "Equals Conditional",
+              "components": [
+                {
+                  "type": "Conditional",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "event_equals_test",
+                    "branches": [
+                      {
+                        "condition": {
+                          "type": "equals",
+                          "left": "${user.persistent.state}",
+                          "right": "defending"
+                        },
+                        "action": {
+                          "action": "setGlobalVariable",
+                          "variablePath": "user.persistent.equalsResult",
+                          "valueSource": "literal",
+                          "value": "PASS (state='defending')",
+                          "op": "set"
+                        }
+                      }
+                    ],
+                    "defaultAction": {
+                      "action": "setGlobalVariable",
+                      "variablePath": "user.persistent.equalsResult",
+                      "valueSource": "literal",
+                      "value": "FAIL",
+                      "op": "set"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_truthy_conditional",
+              "name": "Truthy Conditional",
+              "components": [
+                {
+                  "type": "Conditional",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "event_truthy_test",
+                    "branches": [
+                      {
+                        "condition": {
+                          "type": "truthy",
+                          "left": "${user.persistent.hasShield}"
+                        },
+                        "action": {
+                          "action": "setGlobalVariable",
+                          "variablePath": "user.persistent.truthyResult",
+                          "valueSource": "literal",
+                          "value": "PASS (hasShield=true)",
+                          "op": "set"
+                        }
+                      }
+                    ],
+                    "defaultAction": {
+                      "action": "setGlobalVariable",
+                      "variablePath": "user.persistent.truthyResult",
+                      "valueSource": "literal",
+                      "value": "FAIL",
+                      "op": "set"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_has_conditional",
+              "name": "Has Conditional",
+              "components": [
+                {
+                  "type": "Conditional",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "event_has_test",
+                    "branches": [
+                      {
+                        "condition": {
+                          "type": "has",
+                          "left": "${user.persistent.inventory}",
+                          "right": "potion"
+                        },
+                        "action": {
+                          "action": "setGlobalVariable",
+                          "variablePath": "user.persistent.hasResult",
+                          "valueSource": "literal",
+                          "value": "PASS (inventory.potion exists)",
+                          "op": "set"
+                        }
+                      }
+                    ],
+                    "defaultAction": {
+                      "action": "setGlobalVariable",
+                      "variablePath": "user.persistent.hasResult",
+                      "valueSource": "literal",
+                      "value": "FAIL",
+                      "op": "set"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_exists_conditional",
+              "name": "Exists Conditional",
+              "components": [
+                {
+                  "type": "Conditional",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "event_exists_test",
+                    "branches": [
+                      {
+                        "condition": {
+                          "type": "exists",
+                          "left": "user.persistent.hp"
+                        },
+                        "action": {
+                          "action": "setGlobalVariable",
+                          "variablePath": "user.persistent.existsResult",
+                          "valueSource": "literal",
+                          "value": "PASS (user.persistent.hp exists)",
+                          "op": "set"
+                        }
+                      }
+                    ],
+                    "defaultAction": {
+                      "action": "setGlobalVariable",
+                      "variablePath": "user.persistent.existsResult",
+                      "valueSource": "literal",
+                      "value": "FAIL",
+                      "op": "set"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_default_conditional",
+              "name": "Default Conditional",
+              "components": [
+                {
+                  "type": "Conditional",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "event_default_test",
+                    "branches": [
+                      {
+                        "condition": {
+                          "type": "compare",
+                          "left": "${user.persistent.hp}",
+                          "operator": "<",
+                          "right": 0
+                        },
+                        "action": {
+                          "action": "setGlobalVariable",
+                          "variablePath": "user.persistent.defaultResult",
+                          "valueSource": "literal",
+                          "value": "Branch matched (hp < 0)",
+                          "op": "set"
+                        }
+                      },
+                      {
+                        "condition": {
+                          "type": "equals",
+                          "left": "${user.persistent.state}",
+                          "right": "dead"
+                        },
+                        "action": {
+                          "action": "setGlobalVariable",
+                          "variablePath": "user.persistent.defaultResult",
+                          "valueSource": "literal",
+                          "value": "Branch matched (state='dead')",
+                          "op": "set"
+                        }
+                      }
+                    ],
+                    "defaultAction": {
+                      "action": "setGlobalVariable",
+                      "variablePath": "user.persistent.defaultResult",
+                      "valueSource": "literal",
+                      "value": "PASS (defaultAction executed)",
+                      "op": "set"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "pu_conditional_demo_complex_rpg",
+          "type": "playUnit",
+          "name": "RPG Battle AI Test",
+          "description": "複雑なシナリオテスト：RPG戦闘AI（敵のHP が低いと逃げるなど）",
+          "objects": [
+            {
+              "id": "obj_camera_rpg",
+              "name": "Main Camera",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Camera",
+                  "enabled": true,
+                  "data": {
+                    "zoom": 1,
+                    "viewportX": 0,
+                    "viewportY": 0,
+                    "viewportWidth": 800,
+                    "viewportHeight": 600,
+                    "followTargetObjectId": "",
+                    "followLerp": 1
+                  }
+                },
+                {
+                  "type": "PlaySettings",
+                  "enabled": true,
+                  "data": {
+                    "defaultCameraObjectId": "obj_camera_rpg"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_rpg_title",
+              "name": "Title",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 100,
+                    "y": 20,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "=== Complex Scenario: RPG Battle AI ===",
+                    "fontSize": 16,
+                    "fontFamily": "monospace",
+                    "fillColor": "#f0f0f0",
+                    "textAlign": "left",
+                    "textBaseline": "top"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_enemy_status",
+              "name": "Enemy Status",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 100,
+                    "y": 60,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Enemy HP: ${user.persistent.enemyHp}/${user.persistent.enemyMaxHp}, Attack: ${user.persistent.enemyAttackPower}",
+                    "fontSize": 12,
+                    "fontFamily": "monospace",
+                    "fillColor": "#ff8888",
+                    "textAlign": "left",
+                    "textBaseline": "top"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_player_status",
+              "name": "Player Status",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 100,
+                    "y": 90,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Player HP: ${user.persistent.hp}/${user.persistent.maxHp}",
+                    "fontSize": 12,
+                    "fontFamily": "monospace",
+                    "fillColor": "#88ff88",
+                    "textAlign": "left",
+                    "textBaseline": "top"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ai_trigger",
+              "name": "AI Decision Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 100,
+                    "y": 140,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "width": 250,
+                    "height": 30,
+                    "fillColor": "#334455",
+                    "strokeColor": "#ff8888",
+                    "lineWidth": 2
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Click: Enemy AI Decision",
+                    "fontSize": 12,
+                    "fontFamily": "monospace",
+                    "fillColor": "#ffffff",
+                    "textAlign": "left",
+                    "textBaseline": "middle"
+                  }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": {
+                    "triggerKey": "trigger_ai_decision",
+                    "triggerOn": "click",
+                    "eventId": "event_ai_decision",
+                    "once": false
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_battle_action_result",
+              "name": "Battle Action Result",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 400,
+                    "y": 140,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "AI Action: ${user.persistent.battleAction}",
+                    "fontSize": 12,
+                    "fontFamily": "monospace",
+                    "fillColor": "#ffff88",
+                    "textAlign": "left",
+                    "textBaseline": "middle"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ai_conditional",
+              "name": "AI Decision Conditional",
+              "components": [
+                {
+                  "type": "Conditional",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "event_ai_decision",
+                    "branches": [
+                      {
+                        "condition": {
+                          "type": "compare",
+                          "left": "${user.persistent.enemyHp}",
+                          "operator": "<",
+                          "right": 15
+                        },
+                        "action": {
+                          "action": "setGlobalVariable",
+                          "variablePath": "user.persistent.battleAction",
+                          "valueSource": "literal",
+                          "value": "FLEE (HP critical)",
+                          "op": "set"
+                        }
+                      },
+                      {
+                        "condition": {
+                          "type": "compare",
+                          "left": "${user.persistent.hp}",
+                          "operator": ">",
+                          "right": 80
+                        },
+                        "action": {
+                          "action": "setGlobalVariable",
+                          "variablePath": "user.persistent.battleAction",
+                          "valueSource": "literal",
+                          "value": "ATTACK (Player weak)",
+                          "op": "set"
+                        }
+                      }
+                    ],
+                    "defaultAction": {
+                      "action": "setGlobalVariable",
+                      "variablePath": "user.persistent.battleAction",
+                      "valueSource": "literal",
+                      "value": "DEFEND (balanced state)",
+                      "op": "set"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

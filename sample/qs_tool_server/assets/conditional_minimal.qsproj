@@ -1,0 +1,382 @@
+{
+  "format": "qsproj",
+  "version": 1,
+  "project": {
+    "id": "proj_conditional_minimal_1",
+    "version": 1,
+    "name": "Conditional Minimal",
+    "createdAt": 1777436608074,
+    "updatedAt": 1777436608074,
+    "settings": {
+      "defaultChipWidth": 16,
+      "defaultChipHeight": 16
+    },
+    "globalVariables": {
+      "version": 1,
+      "system": {
+        "fixed": {
+          "startupPlayUnitId": {
+            "type": "string",
+            "initialValue": "pu_conditional_minimal_1"
+          }
+        },
+        "persistent": {}
+      },
+      "user": {
+        "fixed": {},
+        "persistent": {
+          "hp": {
+            "type": "number",
+            "initialValue": 80
+          },
+          "result": {
+            "type": "string",
+            "initialValue": "not run"
+          },
+          "damage": {
+            "type": "number",
+            "initialValue": 40
+          }
+        }
+      }
+    },
+    "assets": {
+      "pixelDocuments": [],
+      "tilesets": [],
+      "maps": [],
+      "playUnits": [
+        {
+          "id": "pu_conditional_minimal_1",
+          "type": "playUnit",
+          "name": "ConditionalMinimalScene",
+          "description": "Conditional の最小動作確認。Run を押すと hp > 50 を判定。Damage を押すと hp が 40 減る。",
+          "objects": [
+            {
+              "id": "obj_cam_cond_min_1",
+              "name": "Main Camera",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 0, "y": 0, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Camera",
+                  "enabled": true,
+                  "data": {
+                    "zoom": 1,
+                    "viewportX": 0,
+                    "viewportY": 0,
+                    "viewportWidth": 800,
+                    "viewportHeight": 600,
+                    "followTargetObjectId": "",
+                    "followLerp": 1
+                  }
+                },
+                {
+                  "type": "PlaySettings",
+                  "enabled": true,
+                  "data": { "defaultCameraObjectId": "obj_cam_cond_min_1" }
+                }
+              ]
+            },
+            {
+              "id": "obj_title_cond_min_1",
+              "name": "Title",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 220, "y": 48, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Conditional Minimal Test",
+                    "font": "bold 22px sans-serif",
+                    "color": "#e2e8f0",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 28,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_hp_label_cond_min_1",
+              "name": "HP Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 40, "y": 120, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "hp: ${user.persistent.hp}",
+                    "font": "20px monospace",
+                    "color": "#38bdf8",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 24,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_result_label_cond_min_1",
+              "name": "Result Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 40, "y": 160, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "result: ${user.persistent.result}",
+                    "font": "20px monospace",
+                    "color": "#f59e0b",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 24,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_run_btn_cond_min_1",
+              "name": "Run Conditional Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 40, "y": 220, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 220,
+                    "height": 46,
+                    "fillColor": "#1e293b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#22c55e",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 220, "height": 46, "isTrigger": true }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": { "eventId": "ev_run_conditional", "triggerOn": "click", "once": false, "targetObjectId": "" }
+                }
+              ]
+            },
+            {
+              "id": "obj_run_btn_label_cond_min_1",
+              "name": "Run Conditional Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 150, "y": 243, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Run Conditional",
+                    "font": "bold 13px sans-serif",
+                    "color": "#86efac",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_damage_btn_cond_min_1",
+              "name": "Damage Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 40, "y": 280, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 220,
+                    "height": 46,
+                    "fillColor": "#1e293b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#ef4444",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 220, "height": 46, "isTrigger": true }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": { "eventId": "ev_take_damage_min", "triggerOn": "click", "once": false, "targetObjectId": "" }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_take_damage_min",
+                    "action": "setGlobalVariable",
+                    "variablePath": "user.persistent.hp",
+                    "valueSource": "variable",
+                    "valueVariablePath": "user.persistent.damage",
+                    "op": "subtract"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_damage_btn_label_cond_min_1",
+              "name": "Damage Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 150, "y": 303, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "hp -= 40",
+                    "font": "bold 13px sans-serif",
+                    "color": "#fca5a5",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_conditional_logic_cond_min_1",
+              "name": "Conditional Logic",
+              "components": [
+                {
+                  "type": "Conditional",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_run_conditional",
+                    "branches": [
+                      {
+                        "condition": {
+                          "type": "compare",
+                          "left": "${user.persistent.hp}",
+                          "operator": ">",
+                          "right": 50
+                        },
+                        "action": {
+                          "action": "setGlobalVariable",
+                          "variablePath": "user.persistent.result",
+                          "valueSource": "literal",
+                          "value": "PASS: hp > 50",
+                          "op": "set"
+                        }
+                      }
+                    ],
+                    "defaultAction": {
+                      "action": "setGlobalVariable",
+                      "variablePath": "user.persistent.result",
+                      "valueSource": "literal",
+                      "value": "FALLBACK: hp <= 50",
+                      "op": "set"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "session": {
+    "projectId": "proj_conditional_minimal_1",
+    "dirty": false,
+    "currentScene": "PlayUnitEditorScene",
+    "activeDocumentRef": { "type": "playUnit", "id": "pu_conditional_minimal_1" },
+    "editorState": {
+      "activeTool": "pencil",
+      "foreColor": 4278190080,
+      "backColor": 4294967295,
+      "editMode": "free",
+      "selectedChip": { "col": 0, "row": 0 }
+    }
+  }
+}

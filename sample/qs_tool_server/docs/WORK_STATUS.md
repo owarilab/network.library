@@ -1,6 +1,6 @@
 # ドットエディタ 作業状況
 
-最終更新: 2026-04-29 (完了: Phase 1, 2)
+最終更新: 2026-05-01 (Conditional 実装・サンプル更新済み)
 
 ## 概要
 
@@ -124,6 +124,24 @@ www/
 ---
 
 ## 実装済み機能
+
+### イベント / Conditional
+
+- [x] `Conditional` コンポーネント実装
+  - `www/js/component/conditional_action.js` を追加
+  - `compare` / `equals` / `truthy` / `has` / `exists` の 5 条件型を実装
+  - `${variable_path}` テンプレート変数を条件評価で解決
+  - 最初の一致のみ実行する短絡評価を実装
+- [x] `PlayTestScene` へ Conditional を統合
+  - `_processEventActions()` が `EventAction` と `Conditional` の両方を処理
+  - `_executeConditional()` で branch 順評価と `defaultAction` 実行を追加
+- [x] Conditional の単体テスト追加
+  - `www/js/component/conditional_action_test.js`
+  - 31 テストケースで条件評価とテンプレート解決を確認
+- [x] Conditional 用サンプル asset 追加
+  - `assets/conditional_minimal.qsproj`: 最小確認用
+  - `assets/conditional_simple_test.qsproj`: 別ファイルの簡易確認用
+  - `assets/conditional_battle_event_demo.qsproj`: 実用寄りの戦闘イベントサンプル
 
 ### 基盤
 

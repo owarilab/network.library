@@ -334,3 +334,233 @@ ev_dismiss
 ```
 
 `action` を変更する際は不要なフィールドを残しても動作に影響はないが、可読性のため不要フィールドは削除することを推奨。
+---
+
+## 例13: グローバル変数を読む（readGlobalVariable）
+
+**目的**: `user.fixed` / `user.persistent` の値を読み取り、表示や後続処理に使う
+
+`EventAction.data`
+```json
+{
+  "listenTo": "ev_show_score",
+  "action": "readGlobalVariable",
+  "variablePath": "user.persistent.score",
+  "targetObjectId": "表示先オブジェクトのID",
+  "componentType": "Text",
+  "property": "text"
+}
+```
+
+**補足**:
+- `variablePath` は `system.fixed.*` / `system.persistent.*` / `user.fixed.*` / `user.persistent.*` 形式
+- 取得結果は `targetObjectId` の `componentType.property` に反映できる
+- `targetObjectId` を省略した場合は、runtime 側の一時結果として扱う実装もある
+
+---
+
+## 例14: グローバル変数に書き込む（setGlobalVariable）
+
+**目的**: クリック時に `user.persistent.score` を更新し、別の `user.fixed` へコピーする
+
+`EventAction.data`（リテラル代入）
+```json
+{
+  "listenTo": "ev_add_score",
+  "action": "setGlobalVariable",
+  "variablePath": "user.persistent.score",
+  "valueSource": "literal",
+  "value": "11"
+}
+```
+
+`EventAction.data`（別変数から代入）
+```json
+{
+  "listenTo": "ev_copy_score",
+  "action": "setGlobalVariable",
+  "variablePath": "user.fixed.counter",
+  "valueSource": "variable",
+  "valueVariablePath": "user.persistent.score"
+}
+```
+
+`EventAction.data`（別変数を加算：スコア加算など）
+```json
+{
+  "listenTo": "ev_add_score",
+  "action": "setGlobalVariable",
+  "variablePath": "user.persistent.score",
+  "valueSource": "variable",
+  "valueVariablePath": "player.level",
+  "op": "add"
+}
+```
+
+`EventAction.data`（リテラル値で減算：HP減算など）
+```json
+{
+  "listenTo": "ev_take_damage",
+  "action": "setGlobalVariable",
+  "variablePath": "user.persistent.hp",
+  "valueSource": "literal",
+  "value": 10,
+  "op": "subtract"
+}
+```
+
+**補足**:
+- `valueSource` は `literal` / `variable`
+- `literal` の `value` は JSON として解釈され、失敗した場合は文字列として扱われる
+- `variable` の場合は `valueVariablePath` が必要
+- `op` は `set`（デフォルト）/ `add` / `subtract` / `multiply` / `divide`
+- 算術演算（add/subtract/multiply/divide）は変数の type が `number` のみ有効
+
+## 4. Conditional Component
+
+複数の条件分岐を順序付きで評価し、最初にマッチした分岐のアクションを実行します（短絡評価）。
+
+`Conditional.data`（基本的な if-else 分岐）
+```json
+{
+  "listenTo": "ev_level_up",
+  "branches": [
+    {
+      "condition": {
+        "type": "compare",
+        "left": "${user.persistent.level}",
+        "operator": ">=",
+        "right": 10
+      },
+      "action": {
+        "action": "setGlobalVariable",
+        "variablePath": "user.persistent.battleAction",
+        "valueSource": "literal",
+        "value": "ULTIMATE_SKILL",
+        "op": "set"
+      }
+    },
+    {
+      "condition": {
+        "type": "compare",
+        "left": "${user.persistent.level}",
+        "operator": ">=",
+        "right": 5
+      },
+      "action": {
+        "action": "setGlobalVariable",
+        "variablePath": "user.persistent.battleAction",
+        "valueSource": "literal",
+        "value": "SPECIAL_SKILL",
+        "op": "set"
+      }
+    }
+  ],
+  "defaultAction": {
+    "action": "setGlobalVariable",
+    "variablePath": "user.persistent.battleAction",
+    "valueSource": "literal",
+    "value": "NORMAL_ATTACK",
+    "op": "set"
+  }
+}
+```
+
+`Conditional.data`（複数条件型：truthy + has）
+```json
+{
+  "listenTo": "ev_item_use",
+  "branches": [
+    {
+      "condition": {
+        "type": "truthy",
+        "left": "${user.persistent.hasPoison}"
+      },
+      "action": {
+        "action": "setGlobalVariable",
+        "variablePath": "user.persistent.itemUsed",
+        "valueSource": "literal",
+        "value": "POISON_APPLIED",
+        "op": "set"
+      }
+    },
+    {
+      "condition": {
+        "type": "has",
+        "left": "${user.persistent.inventory}",
+        "right": "antidote"
+      },
+      "action": {
+        "action": "setGlobalVariable",
+        "variablePath": "user.persistent.itemUsed",
+        "valueSource": "literal",
+        "value": "ANTIDOTE_USED",
+        "op": "set"
+      }
+    }
+  ],
+  "defaultAction": {
+    "action": "setGlobalVariable",
+    "variablePath": "user.persistent.itemUsed",
+    "valueSource": "literal",
+    "value": "NO_SUITABLE_ITEM",
+    "op": "set"
+  }
+}
+```
+
+**Conditional 仕様**:
+- `listenTo`: イベント ID（EventAction と同じ）
+- `branches`: 条件分岐の配列（順序が重要、最初のマッチのみ実行）
+  - 各 branch は `condition` と `action` を含む
+  - `condition`: 評価する条件オブジェクト
+  - `action`: マッチ時に実行する EventAction 形式のアクション
+- `defaultAction`: 全分岐がマッチしなかった場合に実行（オプション）
+- **評価順序**: branches 配列の順序で評価。最初にマッチした分岐のアクションを実行して終了
+- **No Match 時**: defaultAction が存在すれば実行、なければ何もしない
+
+**Condition Types**:
+| Type | left | operator/right | 説明 |
+|------|------|---|---|
+| compare | 値/変数 | `>` `>=` `<` `<=` `===` `!==` | 数値比較 |
+| equals | 値/変数 | right: 文字列 | 文字列一致（大小文字区別） |
+| truthy | 値/変数 | なし | JavaScript 的な真値判定 |
+| has | オブジェクト/変数 | right: プロパティ名 | オブジェクトにプロパティが存在するか |
+| exists | 変数パス文字列 | なし | グローバル変数が存在するか |
+
+**例1: HP が低いと逃げる**
+```json
+{
+  "condition": {
+    "type": "compare",
+    "left": "${user.persistent.hp}",
+    "operator": "<",
+    "right": 20
+  },
+  "action": { "action": "setGlobalVariable", "variablePath": "user.persistent.state", "value": "FLEE", "op": "set" }
+}
+```
+
+**例2: 状態が「中毒」かどうか確認**
+```json
+{
+  "condition": {
+    "type": "equals",
+    "left": "${user.persistent.status}",
+    "right": "poison"
+  },
+  "action": { "action": "setGlobalVariable", "variablePath": "user.persistent.battleAction", "value": "USE_ANTIDOTE", "op": "set" }
+}
+```
+
+**例3: シールドを持っているか確認**
+```json
+{
+  "condition": {
+    "type": "truthy",
+    "left": "${user.persistent.hasShield}"
+  },
+  "action": { "action": "setGlobalVariable", "variablePath": "user.persistent.defense", "value": 5, "op": "add" }
+}
+```
+

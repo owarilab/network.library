@@ -273,7 +273,7 @@ EventAction から runtime の global variable を書き換えられるように
 
 ## Phase 5: EventAction JSON 例と UI の整備
 
-状態: 進行中
+状態: 完了
 
 ### 目的
 
@@ -292,6 +292,12 @@ EventAction から runtime の global variable を書き換えられるように
 - `EventAction` の JSON テンプレートから変数参照・代入を編集できる
 - Phase 4 の確認用 `.qsproj` をそのまま編集・再利用できる
 - 将来の専用フォーム化に向けて必要項目が漏れていない
+
+### 完了メモ
+
+- `EVENT_ACTION_JSON_EXAMPLES.md` に `readGlobalVariable` / `setGlobalVariable` の例を追加した
+- `QSPROJ_LLM_EXAMPLES_COMPACT.md` に `user.fixed` / `user.persistent` の最小サンプルを追加した
+- `PlayUnitEditorScene` の EventAction テンプレートは変数参照・代入の編集項目を保持している
 
 ---
 

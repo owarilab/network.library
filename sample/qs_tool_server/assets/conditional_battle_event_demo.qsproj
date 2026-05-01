@@ -1,0 +1,910 @@
+{
+  "format": "qsproj",
+  "version": 1,
+  "project": {
+    "id": "proj_conditional_battle_event_demo_1",
+    "version": 1,
+    "name": "Conditional Battle Event Demo",
+    "createdAt": 1777436608074,
+    "updatedAt": 1777436608074,
+    "settings": {
+      "defaultChipWidth": 16,
+      "defaultChipHeight": 16
+    },
+    "globalVariables": {
+      "version": 1,
+      "system": {
+        "fixed": {
+          "startupPlayUnitId": {
+            "type": "string",
+            "initialValue": "pu_conditional_battle_event_demo_1"
+          }
+        },
+        "persistent": {}
+      },
+      "user": {
+        "fixed": {},
+        "persistent": {
+          "playerHp": {
+            "type": "number",
+            "initialValue": 60
+          },
+          "playerMaxHp": {
+            "type": "number",
+            "initialValue": 100
+          },
+          "enemyHp": {
+            "type": "number",
+            "initialValue": 45
+          },
+          "enemyMaxHp": {
+            "type": "number",
+            "initialValue": 45
+          },
+          "potions": {
+            "type": "number",
+            "initialValue": 1
+          },
+          "attackDamage": {
+            "type": "number",
+            "initialValue": 12
+          },
+          "healAmount": {
+            "type": "number",
+            "initialValue": 20
+          },
+          "enemyNormalDamage": {
+            "type": "number",
+            "initialValue": 10
+          },
+          "enemyFinisherDamage": {
+            "type": "number",
+            "initialValue": 18
+          },
+          "enemyDesperateDamage": {
+            "type": "number",
+            "initialValue": 6
+          },
+          "battleLog": {
+            "type": "string",
+            "initialValue": "Battle start. Choose an action."
+          }
+        }
+      }
+    },
+    "assets": {
+      "pixelDocuments": [],
+      "tilesets": [],
+      "maps": [],
+      "playUnits": [
+        {
+          "id": "pu_conditional_battle_event_demo_1",
+          "type": "playUnit",
+          "name": "ConditionalBattleScene",
+          "description": "攻撃、ポーション、敵ターンを持つ実用寄りの Conditional サンプル。イベント連鎖と分岐を確認できる。",
+          "objects": [
+            {
+              "id": "obj_cam_battle_demo_1",
+              "name": "Main Camera",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 0, "y": 0, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Camera",
+                  "enabled": true,
+                  "data": {
+                    "zoom": 1,
+                    "viewportX": 0,
+                    "viewportY": 0,
+                    "viewportWidth": 800,
+                    "viewportHeight": 600,
+                    "followTargetObjectId": "",
+                    "followLerp": 1
+                  }
+                },
+                {
+                  "type": "PlaySettings",
+                  "enabled": true,
+                  "data": { "defaultCameraObjectId": "obj_cam_battle_demo_1" }
+                }
+              ]
+            },
+            {
+              "id": "obj_bg_battle_demo_1",
+              "name": "Background",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 400, "y": 300, "z": -10, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 800,
+                    "height": 600,
+                    "fillColor": "#16202a",
+                    "fillAlpha": 1,
+                    "strokeColor": "#16202a",
+                    "strokeWidth": 0,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0.5,
+                    "originY": 0.5,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_title_battle_demo_1",
+              "name": "Title",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 400, "y": 42, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Conditional Battle Event Demo",
+                    "font": "bold 24px sans-serif",
+                    "color": "#f8fafc",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 28,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_player_panel_battle_demo_1",
+              "name": "Player Panel",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 170, "y": 150, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 260,
+                    "height": 120,
+                    "fillColor": "#1e293b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#38bdf8",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0.5,
+                    "originY": 0.5,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_player_text_battle_demo_1",
+              "name": "Player Text",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 70, "y": 118, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Player\nHP: ${user.persistent.playerHp}/${user.persistent.playerMaxHp}\nPotions: ${user.persistent.potions}",
+                    "font": "18px monospace",
+                    "color": "#bae6fd",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "top",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 24,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_enemy_panel_battle_demo_1",
+              "name": "Enemy Panel",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 625, "y": 150, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 250,
+                    "height": 120,
+                    "fillColor": "#2b1f2b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#f87171",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0.5,
+                    "originY": 0.5,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_enemy_text_battle_demo_1",
+              "name": "Enemy Text",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 535, "y": 118, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Enemy Slime\nHP: ${user.persistent.enemyHp}/${user.persistent.enemyMaxHp}",
+                    "font": "18px monospace",
+                    "color": "#fecaca",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "top",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 24,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_log_panel_battle_demo_1",
+              "name": "Log Panel",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 400, "y": 420, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 700,
+                    "height": 110,
+                    "fillColor": "#0f172a",
+                    "fillAlpha": 1,
+                    "strokeColor": "#64748b",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0.5,
+                    "originY": 0.5,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_log_text_battle_demo_1",
+              "name": "Battle Log",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 70, "y": 385, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Log: ${user.persistent.battleLog}",
+                    "font": "18px monospace",
+                    "color": "#f8fafc",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "top",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 24,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_attack_btn_battle_demo_1",
+              "name": "Attack Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 70, "y": 245, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 200,
+                    "height": 48,
+                    "fillColor": "#1e293b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#22c55e",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 200, "height": 48, "isTrigger": true }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": { "eventId": "ev_player_attack", "triggerOn": "click", "once": false, "targetObjectId": "" }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_player_attack",
+                    "action": "setGlobalVariable",
+                    "variablePath": "user.persistent.enemyHp",
+                    "valueSource": "variable",
+                    "valueVariablePath": "user.persistent.attackDamage",
+                    "op": "subtract"
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_player_attack",
+                    "action": "setGlobalVariable",
+                    "variablePath": "user.persistent.battleLog",
+                    "valueSource": "literal",
+                    "value": "You attack the slime.",
+                    "op": "set"
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_player_attack",
+                    "action": "fireEvent",
+                    "eventId": "ev_check_enemy_defeat"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_attack_btn_label_battle_demo_1",
+              "name": "Attack Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 170, "y": 269, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Attack",
+                    "font": "bold 14px sans-serif",
+                    "color": "#86efac",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_potion_btn_battle_demo_1",
+              "name": "Potion Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 300, "y": 245, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 200,
+                    "height": 48,
+                    "fillColor": "#1e293b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#f59e0b",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 200, "height": 48, "isTrigger": true }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": { "eventId": "ev_use_potion", "triggerOn": "click", "once": false, "targetObjectId": "" }
+                }
+              ]
+            },
+            {
+              "id": "obj_potion_btn_label_battle_demo_1",
+              "name": "Potion Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 400, "y": 269, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Use Potion",
+                    "font": "bold 14px sans-serif",
+                    "color": "#fcd34d",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_enemy_turn_btn_battle_demo_1",
+              "name": "Enemy Turn Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 530, "y": 245, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 200,
+                    "height": 48,
+                    "fillColor": "#1e293b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#a78bfa",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 200, "height": 48, "isTrigger": true }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": { "eventId": "ev_enemy_turn", "triggerOn": "click", "once": false, "targetObjectId": "" }
+                }
+              ]
+            },
+            {
+              "id": "obj_enemy_turn_btn_label_battle_demo_1",
+              "name": "Enemy Turn Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 630, "y": 269, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Enemy Turn",
+                    "font": "bold 14px sans-serif",
+                    "color": "#c4b5fd",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_check_enemy_defeat_battle_demo_1",
+              "name": "Check Enemy Defeat",
+              "components": [
+                {
+                  "type": "Conditional",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_check_enemy_defeat",
+                    "branches": [
+                      {
+                        "condition": {
+                          "type": "compare",
+                          "left": "${user.persistent.enemyHp}",
+                          "operator": "<=",
+                          "right": 0
+                        },
+                        "action": {
+                          "action": "setGlobalVariable",
+                          "variablePath": "user.persistent.battleLog",
+                          "valueSource": "literal",
+                          "value": "Enemy defeated. Battle won!",
+                          "op": "set"
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_use_potion_conditional_battle_demo_1",
+              "name": "Use Potion Conditional",
+              "components": [
+                {
+                  "type": "Conditional",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_use_potion",
+                    "branches": [
+                      {
+                        "condition": {
+                          "type": "compare",
+                          "left": "${user.persistent.potions}",
+                          "operator": ">",
+                          "right": 0
+                        },
+                        "action": {
+                          "action": "fireEvent",
+                          "eventId": "ev_use_potion_success"
+                        }
+                      }
+                    ],
+                    "defaultAction": {
+                      "action": "setGlobalVariable",
+                      "variablePath": "user.persistent.battleLog",
+                      "valueSource": "literal",
+                      "value": "No potion left.",
+                      "op": "set"
+                    }
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_use_potion_success",
+                    "action": "setGlobalVariable",
+                    "variablePath": "user.persistent.playerHp",
+                    "valueSource": "variable",
+                    "valueVariablePath": "user.persistent.healAmount",
+                    "op": "add"
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_use_potion_success",
+                    "action": "setGlobalVariable",
+                    "variablePath": "user.persistent.potions",
+                    "valueSource": "literal",
+                    "value": 1,
+                    "op": "subtract"
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_use_potion_success",
+                    "action": "setGlobalVariable",
+                    "variablePath": "user.persistent.battleLog",
+                    "valueSource": "literal",
+                    "value": "You used a potion.",
+                    "op": "set"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_enemy_turn_conditional_battle_demo_1",
+              "name": "Enemy Turn Conditional",
+              "components": [
+                {
+                  "type": "Conditional",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_enemy_turn",
+                    "branches": [
+                      {
+                        "condition": {
+                          "type": "compare",
+                          "left": "${user.persistent.enemyHp}",
+                          "operator": "<=",
+                          "right": 0
+                        },
+                        "action": {
+                          "action": "setGlobalVariable",
+                          "variablePath": "user.persistent.battleLog",
+                          "valueSource": "literal",
+                          "value": "Enemy already defeated.",
+                          "op": "set"
+                        }
+                      },
+                      {
+                        "condition": {
+                          "type": "compare",
+                          "left": "${user.persistent.playerHp}",
+                          "operator": "<=",
+                          "right": 20
+                        },
+                        "action": {
+                          "action": "fireEvent",
+                          "eventId": "ev_enemy_finisher"
+                        }
+                      },
+                      {
+                        "condition": {
+                          "type": "compare",
+                          "left": "${user.persistent.enemyHp}",
+                          "operator": "<",
+                          "right": 20
+                        },
+                        "action": {
+                          "action": "fireEvent",
+                          "eventId": "ev_enemy_desperate"
+                        }
+                      }
+                    ],
+                    "defaultAction": {
+                      "action": "fireEvent",
+                      "eventId": "ev_enemy_normal"
+                    }
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_enemy_finisher",
+                    "action": "setGlobalVariable",
+                    "variablePath": "user.persistent.playerHp",
+                    "valueSource": "variable",
+                    "valueVariablePath": "user.persistent.enemyFinisherDamage",
+                    "op": "subtract"
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_enemy_finisher",
+                    "action": "setGlobalVariable",
+                    "variablePath": "user.persistent.battleLog",
+                    "valueSource": "literal",
+                    "value": "Enemy uses a heavy strike!",
+                    "op": "set"
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_enemy_finisher",
+                    "action": "fireEvent",
+                    "eventId": "ev_check_player_defeat"
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_enemy_desperate",
+                    "action": "setGlobalVariable",
+                    "variablePath": "user.persistent.playerHp",
+                    "valueSource": "variable",
+                    "valueVariablePath": "user.persistent.enemyDesperateDamage",
+                    "op": "subtract"
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_enemy_desperate",
+                    "action": "setGlobalVariable",
+                    "variablePath": "user.persistent.battleLog",
+                    "valueSource": "literal",
+                    "value": "Enemy panics and lashes out.",
+                    "op": "set"
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_enemy_desperate",
+                    "action": "fireEvent",
+                    "eventId": "ev_check_player_defeat"
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_enemy_normal",
+                    "action": "setGlobalVariable",
+                    "variablePath": "user.persistent.playerHp",
+                    "valueSource": "variable",
+                    "valueVariablePath": "user.persistent.enemyNormalDamage",
+                    "op": "subtract"
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_enemy_normal",
+                    "action": "setGlobalVariable",
+                    "variablePath": "user.persistent.battleLog",
+                    "valueSource": "literal",
+                    "value": "Enemy attacks.",
+                    "op": "set"
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_enemy_normal",
+                    "action": "fireEvent",
+                    "eventId": "ev_check_player_defeat"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_check_player_defeat_battle_demo_1",
+              "name": "Check Player Defeat",
+              "components": [
+                {
+                  "type": "Conditional",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_check_player_defeat",
+                    "branches": [
+                      {
+                        "condition": {
+                          "type": "compare",
+                          "left": "${user.persistent.playerHp}",
+                          "operator": "<=",
+                          "right": 0
+                        },
+                        "action": {
+                          "action": "setGlobalVariable",
+                          "variablePath": "user.persistent.battleLog",
+                          "valueSource": "literal",
+                          "value": "Player defeated. Game over.",
+                          "op": "set"
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "session": {
+    "projectId": "proj_conditional_battle_event_demo_1",
+    "dirty": false,
+    "currentScene": "PlayUnitEditorScene",
+    "activeDocumentRef": { "type": "playUnit", "id": "pu_conditional_battle_event_demo_1" },
+    "editorState": {
+      "activeTool": "pencil",
+      "foreColor": 4278190080,
+      "backColor": 4294967295,
+      "editMode": "free",
+      "selectedChip": { "col": 0, "row": 0 }
+    }
+  }
+}

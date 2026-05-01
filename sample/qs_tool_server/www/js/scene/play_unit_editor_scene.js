@@ -720,6 +720,7 @@ class PlayUnitEditorScene extends Scene {
           variablePath: '',
           valueSource: 'literal',
           valueVariablePath: '',
+          op: 'set',
           enabled: true,
           eventId: '',
           tweenDuration: 500,

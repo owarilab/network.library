@@ -1,0 +1,951 @@
+{
+  "format": "qsproj",
+  "version": 1,
+  "project": {
+    "id": "proj_arithmetic_demo_5k7m9n2p",
+    "version": 1,
+    "name": "Arithmetic Demo",
+    "createdAt": 1777436608074,
+    "updatedAt": 1777436608074,
+    "settings": {
+      "defaultChipWidth": 16,
+      "defaultChipHeight": 16
+    },
+    "globalVariables": {
+      "version": 1,
+      "system": {
+        "fixed": {
+          "startupPlayUnitId": {
+            "type": "string",
+            "initialValue": "pu_arithmetic_demo_1a2b3c4d"
+          },
+          "isPaused": {
+            "type": "boolean",
+            "initialValue": false
+          }
+        },
+        "persistent": {}
+      },
+      "user": {
+        "fixed": {},
+        "persistent": {
+          "score": {
+            "type": "number",
+            "initialValue": 100
+          },
+          "hp": {
+            "type": "number",
+            "initialValue": 100
+          },
+          "level": {
+            "type": "number",
+            "initialValue": 1
+          },
+          "damage": {
+            "type": "number",
+            "initialValue": 15
+          }
+        }
+      }
+    },
+    "assets": {
+      "pixelDocuments": [],
+      "tilesets": [],
+      "maps": [],
+      "playUnits": [
+        {
+          "id": "pu_arithmetic_demo_1a2b3c4d",
+          "type": "playUnit",
+          "name": "ArithmeticDemo",
+          "description": "setGlobalVariable 算術演算 (op) の動作確認用。add/subtract/multiply/divide をクリックで実行",
+          "objects": [
+            {
+              "id": "obj_cam_1a2b3c4d",
+              "name": "Main Camera",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 0, "y": 0, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Camera",
+                  "enabled": true,
+                  "data": {
+                    "zoom": 1,
+                    "viewportX": 0,
+                    "viewportY": 0,
+                    "viewportWidth": 800,
+                    "viewportHeight": 600,
+                    "followTargetObjectId": "",
+                    "followLerp": 1
+                  }
+                },
+                {
+                  "type": "PlaySettings",
+                  "enabled": true,
+                  "data": { "defaultCameraObjectId": "obj_cam_1a2b3c4d" }
+                }
+              ]
+            },
+            {
+              "id": "obj_title_5e6f7g8h",
+              "name": "Title",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 200, "y": 50, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "setGlobalVariable 算術演算 デモ",
+                    "font": "bold 22px sans-serif",
+                    "color": "#e2e8f0",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 28,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_vars_9i0j1k2l",
+              "name": "Variables View",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 30, "y": 90, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "score: 100\nhp: 100\nlevel: 1\ndamage: 15",
+                    "font": "16px monospace",
+                    "color": "#f8fafc",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "top",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 24,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_score_label_3m4n5o6p",
+              "name": "Score Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 30, "y": 110, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "score: ${user.persistent.score}",
+                    "font": "18px sans-serif",
+                    "color": "#38bdf8",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 24,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_hp_label_7q8r9s0t",
+              "name": "HP Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 30, "y": 140, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "hp: ${user.persistent.hp}",
+                    "font": "18px sans-serif",
+                    "color": "#ef4444",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 24,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_level_label_1u2v3w4x",
+              "name": "Level Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 30, "y": 170, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "level: ${user.persistent.level}",
+                    "font": "18px sans-serif",
+                    "color": "#eab308",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 24,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_btn_add_score_5y6z7a8b",
+              "name": "Add Score Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 30, "y": 200, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 220,
+                    "height": 46,
+                    "fillColor": "#1e293b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#22c55e",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 220, "height": 46, "isTrigger": true }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": { "eventId": "ev_add_score", "triggerOn": "click", "once": false, "targetObjectId": "" }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_add_score",
+                    "action": "setGlobalVariable",
+                    "variablePath": "user.persistent.score",
+                    "valueSource": "variable",
+                    "valueVariablePath": "user.persistent.damage",
+                    "op": "add"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_btn_add_score_lbl_9c0d1e2f",
+              "name": "Add Score Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 145, "y": 223, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "score += damage",
+                    "font": "bold 13px sans-serif",
+                    "color": "#86efac",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_btn_divide_score_3g4h5i6j",
+              "name": "Divide Score Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 30, "y": 256, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 220,
+                    "height": 46,
+                    "fillColor": "#1e293b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#a855f7",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 220, "height": 46, "isTrigger": true }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": { "eventId": "ev_divide_score", "triggerOn": "click", "once": false, "targetObjectId": "" }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_divide_score",
+                    "action": "setGlobalVariable",
+                    "variablePath": "user.persistent.score",
+                    "valueSource": "literal",
+                    "value": 2,
+                    "op": "divide"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_btn_divide_score_lbl_7k8l9m0n",
+              "name": "Divide Score Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 145, "y": 279, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "score /= 2",
+                    "font": "bold 13px sans-serif",
+                    "color": "#d8b4fe",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_btn_take_damage_1o2p3q4r",
+              "name": "Take Damage Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 30, "y": 312, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 220,
+                    "height": 46,
+                    "fillColor": "#1e293b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#ef4444",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 220, "height": 46, "isTrigger": true }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": { "eventId": "ev_take_damage", "triggerOn": "click", "once": false, "targetObjectId": "" }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_take_damage",
+                    "action": "setGlobalVariable",
+                    "variablePath": "user.persistent.hp",
+                    "valueSource": "variable",
+                    "valueVariablePath": "user.persistent.damage",
+                    "op": "subtract"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_btn_take_damage_lbl_5s6t7u8v",
+              "name": "Take Damage Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 145, "y": 335, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "hp -= damage",
+                    "font": "bold 13px sans-serif",
+                    "color": "#fca5a5",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_btn_double_level_9w0x1y2z",
+              "name": "Double Level Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 30, "y": 368, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 220,
+                    "height": 46,
+                    "fillColor": "#1e293b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#eab308",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 220, "height": 46, "isTrigger": true }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": { "eventId": "ev_double_level", "triggerOn": "click", "once": false, "targetObjectId": "" }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_double_level",
+                    "action": "setGlobalVariable",
+                    "variablePath": "user.persistent.level",
+                    "valueSource": "literal",
+                    "value": 2,
+                    "op": "multiply"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_btn_double_level_lbl_3a4b5c6d",
+              "name": "Double Level Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 145, "y": 391, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "level *= 2",
+                    "font": "bold 13px sans-serif",
+                    "color": "#fef08a",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_btn_reset_7e8f9g0h",
+              "name": "Reset Button",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 30, "y": 424, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 220,
+                    "height": 46,
+                    "fillColor": "#1e293b",
+                    "fillAlpha": 1,
+                    "strokeColor": "#f97316",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 220, "height": 46, "isTrigger": true }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": { "eventId": "ev_reset", "triggerOn": "click", "once": false, "targetObjectId": "" }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_reset",
+                    "action": "setGlobalVariable",
+                    "variablePath": "user.persistent.score",
+                    "valueSource": "literal",
+                    "value": 100,
+                    "op": "set"
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_reset",
+                    "action": "setGlobalVariable",
+                    "variablePath": "user.persistent.hp",
+                    "valueSource": "literal",
+                    "value": 100,
+                    "op": "set"
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_reset",
+                    "action": "setGlobalVariable",
+                    "variablePath": "user.persistent.level",
+                    "valueSource": "literal",
+                    "value": 1,
+                    "op": "set"
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_reset",
+                    "action": "setGlobalVariable",
+                    "variablePath": "user.persistent.damage",
+                    "valueSource": "literal",
+                    "value": 15,
+                    "op": "set"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_btn_reset_lbl_1i2j3k4l",
+              "name": "Reset Label",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 145, "y": 447, "z": 1, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Reset All",
+                    "font": "bold 13px sans-serif",
+                    "color": "#fdba74",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_sync_all_5m6n7o8p",
+              "name": "Sync All Labels",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 270, "y": 200, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_add_score",
+                    "action": "setProperty",
+                    "targetObjectId": "obj_vars_9i0j1k2l",
+                    "componentType": "Text",
+                    "property": "text",
+                    "value": "score: 115\nhp: 100\nlevel: 1\ndamage: 15"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_sync_divide_9q0r1s2t",
+              "name": "Sync Divide Labels",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 270, "y": 256, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_divide_score",
+                    "action": "setProperty",
+                    "targetObjectId": "obj_vars_9i0j1k2l",
+                    "componentType": "Text",
+                    "property": "text",
+                    "value": "score: 50\nhp: 100\nlevel: 1\ndamage: 15"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_sync_damage_3u4v5w6x",
+              "name": "Sync Damage Labels",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 270, "y": 312, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_take_damage",
+                    "action": "setProperty",
+                    "targetObjectId": "obj_vars_9i0j1k2l",
+                    "componentType": "Text",
+                    "property": "text",
+                    "value": "score: 100\nhp: 85\nlevel: 1\ndamage: 15"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_sync_level_7y8z9a0b",
+              "name": "Sync Level Labels",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 270, "y": 368, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_double_level",
+                    "action": "setProperty",
+                    "targetObjectId": "obj_vars_9i0j1k2l",
+                    "componentType": "Text",
+                    "property": "text",
+                    "value": "score: 100\nhp: 100\nlevel: 2\ndamage: 15"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_sync_reset_1c2d3e4f",
+              "name": "Sync Reset Labels",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 270, "y": 424, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_reset",
+                    "action": "setProperty",
+                    "targetObjectId": "obj_vars_9i0j1k2l",
+                    "componentType": "Text",
+                    "property": "text",
+                    "value": "score: 100\nhp: 100\nlevel: 1\ndamage: 15"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_test_combined_5f6g7h8i",
+              "name": "Test Combined Variables",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 30, "y": 240, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Combined: score=${user.persistent.score}, hp=${user.persistent.hp}, dmg=${user.persistent.damage}",
+                    "font": "14px monospace",
+                    "color": "#a78bfa",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "top",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_test_multiline_9j0k1l2m",
+              "name": "Test Multi-line Template",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 30, "y": 265, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "All vars:\nScore: ${user.persistent.score}\nHP: ${user.persistent.hp}\nLevel: ${user.persistent.level}\nDamage: ${user.persistent.damage}",
+                    "font": "12px monospace",
+                    "color": "#86efac",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "top",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 18,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_test_undefined_3n4o5p6q",
+              "name": "Test Undefined Variable",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 30, "y": 320, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Test undefined: ${user.persistent.nonexistent} (should show ${...})",
+                    "font": "12px monospace",
+                    "color": "#f87171",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "top",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 18,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_test_ratio_7r8s9t0u",
+              "name": "Test Ratio Display",
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 30, "y": 345, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "HP Ratio: ${user.persistent.hp}/100 | Level Progress: ${user.persistent.level}",
+                    "font": "12px monospace",
+                    "color": "#fbbf24",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "top",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 18,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "session": {
+    "projectId": "proj_arithmetic_demo_5k7m9n2p",
+    "dirty": true,
+    "currentScene": "PlayUnitEditorScene",
+    "activeDocumentRef": {
+      "type": "playUnit",
+      "id": "pu_arithmetic_demo_1a2b3c4d"
+    },
+    "editorState": {
+      "activeTool": "pencil",
+      "foreColor": 4278190080,
+      "backColor": 4294967295,
+      "editMode": "free",
+      "selectedChip": {
+        "col": 0,
+        "row": 0
+      }
+    }
+  }
+}
