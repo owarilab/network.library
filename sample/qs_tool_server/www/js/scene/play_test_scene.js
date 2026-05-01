@@ -22,6 +22,7 @@ class PlayTestScene extends Scene {
     };
     this._activeOverlapKeys = new Set();
     this._firedOnceTriggerKeys = new Set();
+    this._activeTimerTriggers = new Map(); // key: triggerId, value: { elapsed: number }
     this._pressedKeys = new Set();
     this._pendingEvents = new Set();
     this._activeTweens = new Map();
@@ -54,6 +55,7 @@ class PlayTestScene extends Scene {
     this._pointerState.hoveredTriggerMap.clear();
     this._pointerState.pressedTriggerIds.clear();
     this._activeOverlapKeys.clear();
+    this._activeTimerTriggers.clear();
     this._pendingEvents.clear();
     this._activeTweens.clear();
   }
@@ -164,6 +166,12 @@ class PlayTestScene extends Scene {
   }
 
   update(dt) {
+    // Timer の加算: dt はミリ秒なので秒に変換して system.fixed.timer に加算
+    if (this._appData?.globalVariableState?.system?.fixed && Number.isFinite(Number(dt))) {
+      const deltaSeconds = Math.max(0, Number(dt) / 1000);
+      this._appData.globalVariableState.system.fixed.timer = (this._appData.globalVariableState.system.fixed.timer || 0) + deltaSeconds;
+    }
+
     const playUnitSwitch = this._appData?.consumeRequestedRuntimePlayUnitSwitch?.();
     if (playUnitSwitch?.invalid) {
       this._statusTone = 'error';
@@ -182,6 +190,7 @@ class PlayTestScene extends Scene {
     const previousCameraObjectId = this._runtime?.camera?.objectId || '';
     this._runtime = PlayUnitRuntime.fromPlayUnit(playUnit, this._appData);
     this._processOverlapTriggers(playUnit);
+    this._processTimerTriggers(dt, playUnit);
     this._processEventActions(playUnit);
     this._updateTweens(dt, playUnit);
     if (!this._cameraState || previousCameraObjectId !== (this._runtime?.camera?.objectId || '')) {
@@ -311,6 +320,76 @@ class PlayTestScene extends Scene {
     }
 
     this._activeOverlapKeys = nextOverlapKeys;
+  }
+
+  _processTimerTriggers(dt, playUnit) {
+    if (!playUnit || !Array.isArray(playUnit.objects) || !Number.isFinite(Number(dt)) || Number(dt) <= 0) return;
+
+    const deltaSeconds = Math.max(0, Number(dt) / 1000);
+    for (const objectData of playUnit.objects) {
+      if (!objectData || objectData.enabled === false) continue;
+      const trigger = objectData.findComponentByType?.('Trigger') || null;
+      if (!trigger || trigger.enabled === false) continue;
+
+      const triggerOn = typeof trigger.data?.triggerOn === 'string' ? trigger.data.triggerOn.trim() : 'overlap';
+      
+      // onUpdate: 毎フレーム発火
+      if (triggerOn === 'onUpdate') {
+        const eventId = typeof trigger.data?.eventId === 'string' ? trigger.data.eventId.trim() : '';
+        if (eventId) {
+          this._fireTrigger({
+            objectId: typeof objectData.id === 'string' ? objectData.id : '',
+            objectName: typeof objectData.name === 'string' && objectData.name.trim() ? objectData.name.trim() : 'Object',
+            eventId,
+            triggerOn: 'onUpdate',
+            once: trigger.data?.once === true,
+            triggerKey: `${objectData.id}:${eventId}:onUpdate`,
+          }, 'onUpdate');
+        }
+        continue;
+      }
+
+      // onTimer: 指定時間経過時に発火
+      if (triggerOn === 'onTimer') {
+        const duration = Number.isFinite(Number(trigger.data?.duration)) ? Number(trigger.data.duration) : 1;
+        if (duration <= 0) continue;
+
+        const triggerId = typeof objectData.id === 'string' ? objectData.id : '';
+        if (!triggerId) continue;
+
+        let timerState = this._activeTimerTriggers.get(triggerId);
+        if (!timerState) {
+          timerState = { elapsed: 0 };
+          this._activeTimerTriggers.set(triggerId, timerState);
+        }
+
+        timerState.elapsed += deltaSeconds;
+
+        if (timerState.elapsed >= duration) {
+          const eventId = typeof trigger.data?.eventId === 'string' ? trigger.data.eventId.trim() : '';
+          const once = trigger.data?.once === true;
+          const triggerKey = `${triggerId}:${eventId}:onTimer`;
+
+          if (!once || !this._firedOnceTriggerKeys.has(triggerKey)) {
+            if (eventId) {
+              this._fireTrigger({
+                objectId: triggerId,
+                objectName: typeof objectData.name === 'string' && objectData.name.trim() ? objectData.name.trim() : 'Object',
+                eventId,
+                triggerOn: 'onTimer',
+                once,
+                triggerKey,
+              }, 'onTimer');
+            }
+            if (once) {
+              this._firedOnceTriggerKeys.add(triggerKey);
+            }
+          }
+
+          timerState.elapsed = 0; // リセット
+        }
+      }
+    }
   }
 
   _getControllerOverlapSources(objects) {

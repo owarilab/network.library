@@ -51,7 +51,12 @@ class ProjectData {
     return {
       version: 1,
       system: {
-        fixed: {},
+        fixed: {
+          timer: {
+            type: 'number',
+            initialValue: 0,
+          },
+        },
         persistent: {},
       },
       user: {

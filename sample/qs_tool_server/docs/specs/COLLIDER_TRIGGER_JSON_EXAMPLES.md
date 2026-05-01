@@ -1,14 +1,15 @@
 # Collider / Trigger JSON 例集
 
-最終更新: 2026-04-27
+最終更新: 2026-05-01
 
 `PlayUnitEditorScene` の JSON 編集で `Collider` component と `Trigger` component を扱うための、
 最小テンプレート集。
 
-現状の `PlayTestScene` では、次の 2 系統が確認対象になっている。
+現状の `PlayTestScene` では、次の 3 系統が確認対象になっている。
 
 - pointer 系: `pointerEnter`, `pointerMove`, `pointerLeave`, `pointerDown`, `pointerUp`, `click`
 - overlap 系: `Controller + Collider` を持つ object と、`Trigger + Collider` を持つ object の矩形重なり
+- timer 系: `onTimer`（指定時間経過時に発火）、`onUpdate`（毎フレーム発火）
 
 この文書の例は、基本的に `Collider.data` または `Trigger.data` にそのまま入れる想定で記述する。
 
@@ -46,9 +47,10 @@
 ```
 
 - `eventId`: 発火時に識別子として使う文字列
-- `triggerOn`: `pointerEnter`, `pointerMove`, `pointerLeave`, `pointerDown`, `pointerUp`, `click`, `overlap`
+- `triggerOn`: `pointerEnter`, `pointerMove`, `pointerLeave`, `pointerDown`, `pointerUp`, `click`, `overlap`, `onTimer`, `onUpdate`
 - `once`: `true` のとき一度発火したら同じ条件では再発火しない
 - `targetObjectId`: `overlap` 時に対象を特定 object に絞りたい場合に使う
+- `duration`: `onTimer` 使用時に、発火までの秒数を指定（デフォルト: 1秒）
 
 ---
 
@@ -287,3 +289,107 @@
 - 現状の `PlayTestScene` では `shape: "rect"` のみ対応
 - `overlap` は重なり開始時に 1 回発火し、離れてから再度入ると再発火する
 - `once: true` なら、同じ trigger 条件で 1 回だけ発火する
+- `onTimer` は一定時間経過時に発火し、発火後は時間がリセットされて再びカウント開始（`once: true` でない場合）
+- `onUpdate` は毎フレーム発火する（条件判定毎回実行）
+
+---
+
+## 例8: 一定時間後に何かを起動する
+
+用途: ゲーム開始後 3 秒でイベントを発火させたい場合
+
+`Trigger.data`
+
+```json
+{
+  "eventId": "ev_game_start_event",
+  "triggerOn": "onTimer",
+  "duration": 3,
+  "once": true,
+  "targetObjectId": ""
+}
+```
+
+- `duration: 3` は 3 秒を意味する
+- `once: true` で 1 回だけ発火
+- Collider は不要（timer ベースなので常に評価される）
+
+---
+
+## 例9: 毎フレーム何かをチェックする
+
+用途: `Conditional` component と組み合わせて、毎フレーム条件判定を実行したい場合
+
+`Trigger.data`
+
+```json
+{
+  "eventId": "ev_update_check",
+  "triggerOn": "onUpdate",
+  "once": false,
+  "targetObjectId": ""
+}
+```
+
+- `onUpdate` は毎フレーム発火
+- `EventAction` / `Conditional` と組み合わせて条件判定や状態変更を実行可能
+- Collider は不要（timer ベースなので常に評価される）
+
+---
+
+## 例10: Global Variable の timer を活用した時間経過判定
+
+用途: `system.fixed.timer` を条件として参照したい場合
+
+`Trigger.data`
+
+```json
+{
+  "eventId": "ev_timer_milestone",
+  "triggerOn": "onUpdate",
+  "once": false,
+  "targetObjectId": ""
+}
+```
+
+`Conditional.data` でそのイベントをリッスンする場合
+
+```json
+{
+  "listenTo": "ev_timer_milestone",
+  "branches": [
+    {
+      "condition": {
+        "type": "compare",
+        "left": {
+          "type": "globalVariable",
+          "path": "system.fixed.timer"
+        },
+        "operator": ">=",
+        "right": {
+          "type": "literal",
+          "value": 5
+        }
+      },
+      "eventId": "ev_time_five_seconds"
+    }
+  ]
+}
+```
+
+- `system.fixed.timer` はゲーム開始時に 0 から始まり、毎フレーム加算される
+- 秒単位の浮動小数点数
+- `onUpdate` で毎フレーム `system.fixed.timer >= 5` を判定し、5秒以上経過したら発火
+
+---
+
+## 補足
+
+- `Trigger` を動かすには、同じ object に `Transform` と `Collider` が必要
+- pointer 系を確認する場合は `Collider.data.isTrigger` を `true` にする
+- `overlap` を確認する場合は、相手側にも `Controller + Collider` が必要
+- 現状の `PlayTestScene` では `shape: "rect"` のみ対応
+- `overlap` は重なり開始時に 1 回発火し、離れてから再度入ると再発火する
+- `once: true` なら、同じ trigger 条件で 1 回だけ発火する
+- `onTimer` は一定時間経過時に発火し、発火後は時間がリセットされて再びカウント開始（`once: true` でない場合）
+- `onUpdate` は毎フレーム発火する（条件判定毎回実行）

@@ -143,6 +143,32 @@ www/
   - `assets/conditional_simple_test.qsproj`: 別ファイルの簡易確認用
   - `assets/conditional_battle_event_demo.qsproj`: 実用寄りの戦闘イベントサンプル
 
+### タイマーシステム
+
+- [x] `system.fixed.timer` グローバル変数の追加
+  - `ProjectData.createDefaultGlobalVariables()` で `system.fixed.timer` を予約
+  - 初期値: 0、型: number（秒単位）
+- [x] `PlayTestScene` での deltaTime 処理
+  - `update(dt)` の冒頭で `system.fixed.timer` に deltaSeconds を加算
+  - dt をミリ秒から秒へ正規化
+- [x] `Trigger` タイプの拡張
+  - `triggerOn: 'onTimer'`: 指定時間経過時に1回発火
+    - `duration` パラメータで待機秒数を指定
+    - `once: true` で1回発火後は再発火しない
+    - `once: false` で時間をリセットして何度も発火可能
+  - `triggerOn: 'onUpdate'`: 毎フレーム発火（条件判定毎回実行）
+    - Collider 不要
+- [x] タイマートリガー評価実装
+  - `_processTimerTriggers(dt, playUnit)` メソッドを追加
+  - `_activeTimerTriggers` Map で onTimer の経過時間を管理
+  - onTimer / onUpdate それぞれの評価と `_fireTrigger()` 呼び出しを実装
+- [x] Global Variable 参照の統合
+  - Conditional の条件評価で `system.fixed.timer` を参照可能
+  - 時間経過に基づく条件分岐が可能に
+- [x] ドキュメント整備
+  - [COLLIDER_TRIGGER_JSON_EXAMPLES.md](specs/COLLIDER_TRIGGER_JSON_EXAMPLES.md): onTimer / onUpdate の例を追加
+  - [TIMER_SYSTEM_GUIDE.md](specs/TIMER_SYSTEM_GUIDE.md): タイマーシステム実装ガイドを新規作成
+
 ### 基盤
 
 - [x] `CanvasManager`: 全画面 canvas、RAF 60fps ループ（ドリフト補正付き）、resize 対応
