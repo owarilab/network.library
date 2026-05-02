@@ -255,8 +255,83 @@ cmake --build . -j"$(nproc)"
 ```bash
 cd stable-diffusion.cpp
 mkdir models
+cd models
+curl -L -O https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.safetensors
+
 mkdir outputs
 ```
+
+### stable-diffusion.cpp を更新して再ビルドする
+
+すでに `llm/third_party/stable-diffusion.cpp/` でビルド済みの場合は、stable-diffusion.cpp 側を更新したあとに LLM モジュールを必要に応じて再ビルドします。
+
+1) stable-diffusion.cpp リポジトリを更新
+
+通常の clone 配置:
+
+```bash
+cd llm/third_party/stable-diffusion.cpp
+git pull --ff-only
+```
+
+submodule 配置:
+
+```bash
+git submodule update --remote --merge llm/third_party/stable-diffusion.cpp
+```
+
+2) 旧 build を消して stable-diffusion.cpp を再ビルド
+
+CPU ビルド:
+
+```bash
+cd llm/third_party/stable-diffusion.cpp
+rm -rf build
+# mv build build_old
+mkdir -p build
+cd build
+
+cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake --build . -j"$(nproc)"
+```
+
+CUDA ビルド:
+
+```bash
+cd llm/third_party/stable-diffusion.cpp
+rm -rf build
+# mv build build_old
+mkdir -p build
+cd build
+
+cmake .. -DCMAKE_BUILD_TYPE=Release -DSD_CUDA=ON
+cmake --build . -j"$(nproc)"
+```
+
+3) network.library の LLM モジュールを再ビルド（必要に応じて）
+
+`qs_diffusion_module.c` などで stable-diffusion.cpp を組み込んでいる場合は、LLM モジュールを再ビルドします。
+
+CPU:
+
+```bash
+cd llm/src
+make clean
+make build
+```
+
+CUDA:
+
+```bash
+cd llm/src
+make clean
+make build DIFFUSION_CUDA=1
+```
+
+補足:
+- stable-diffusion.cpp の更新は `-DSD_CUDA=ON` フラグに影響を与えることがあるため、更新後は必ず clean build を実施してください。
+- `mv build build_old` でバックアップを取ることで、問題が発生した場合に前のビルドに戻すことができます。
+- submodule 運用の場合、親リポジトリ側にも submodule の更新差分が出るため、必要ならその状態も commit してください。
 
 
 ## ビルド（Linux）
