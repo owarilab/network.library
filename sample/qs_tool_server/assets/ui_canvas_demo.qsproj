@@ -1,0 +1,357 @@
+{
+  "format": "qsproj",
+  "version": 1,
+  "project": {
+    "id": "proj_ui_canvas_demo_1",
+    "version": 1,
+    "name": "UICanvas Demo",
+    "createdAt": 1777600000000,
+    "updatedAt": 1777600000000,
+    "settings": {
+      "defaultChipWidth": 16,
+      "defaultChipHeight": 16
+    },
+    "globalVariables": {
+      "version": 1,
+      "system": {
+        "fixed": {
+          "startupPlayUnitId": {
+            "type": "string",
+            "initialValue": "pu_ui_canvas_demo_1"
+          },
+          "timer": {
+            "type": "number",
+            "initialValue": 0
+          }
+        },
+        "persistent": {}
+      },
+      "user": {
+        "fixed": {},
+        "persistent": {}
+      }
+    },
+    "assets": {
+      "pixelDocuments": [],
+      "tilesets": [],
+      "maps": [],
+      "playUnits": [
+        {
+          "id": "pu_ui_canvas_demo_1",
+          "type": "playUnit",
+          "name": "UICanvas Demo",
+          "description": "UICanvas と UITransform の最小描画・クリック確認用サンプル。",
+          "objects": [
+            {
+              "id": "obj_camera",
+              "name": "MainCamera",
+              "enabled": true,
+              "parentId": "",
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Camera",
+                  "enabled": true,
+                  "data": {
+                    "zoom": 1,
+                    "viewportX": 0,
+                    "viewportY": 0,
+                    "viewportWidth": 800,
+                    "viewportHeight": 600,
+                    "followTargetObjectId": "",
+                    "followLerp": 1
+                  }
+                },
+                {
+                  "type": "PlaySettings",
+                  "enabled": true,
+                  "data": {
+                    "defaultCameraObjectId": "obj_camera"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_root",
+              "name": "UIRoot",
+              "enabled": true,
+              "parentId": "",
+              "children": [
+                "obj_ui_panel",
+                "obj_ui_title",
+                "obj_ui_button",
+                "obj_ui_status"
+              ],
+              "components": [
+                {
+                  "type": "UICanvas",
+                  "enabled": true,
+                  "data": {
+                    "renderMode": "screen",
+                    "sortOrder": 100,
+                    "referenceWidth": 640,
+                    "referenceHeight": 360
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_panel",
+              "name": "UIPanel",
+              "enabled": true,
+              "parentId": "obj_ui_root",
+              "children": [],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 420,
+                    "height": 220,
+                    "anchorX": 0.5,
+                    "anchorY": 0.5,
+                    "pivotX": 0.5,
+                    "pivotY": 0.5
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 420,
+                    "height": 220,
+                    "fillColor": "#0f172a",
+                    "fillAlpha": 0.92,
+                    "strokeColor": "#38bdf8",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 0.8,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_title",
+              "name": "UITitle",
+              "enabled": true,
+              "parentId": "obj_ui_root",
+              "children": [],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": {
+                    "x": 0,
+                    "y": -72,
+                    "width": 360,
+                    "height": 40,
+                    "anchorX": 0.5,
+                    "anchorY": 0.5,
+                    "pivotX": 0.5,
+                    "pivotY": 0.5
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "UICanvas Demo",
+                    "font": "bold 26px sans-serif",
+                    "color": "#e2e8f0",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 30,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_button",
+              "name": "UIButton",
+              "enabled": true,
+              "parentId": "obj_ui_root",
+              "children": [
+                "obj_ui_button_label"
+              ],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": {
+                    "x": 0,
+                    "y": 8,
+                    "width": 220,
+                    "height": 56,
+                    "anchorX": 0.5,
+                    "anchorY": 0.5,
+                    "pivotX": 0.5,
+                    "pivotY": 0.5
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 220,
+                    "height": 56,
+                    "fillColor": "#1d4ed8",
+                    "fillAlpha": 1,
+                    "strokeColor": "#93c5fd",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rect",
+                    "offsetX": 0,
+                    "offsetY": 0,
+                    "width": 220,
+                    "height": 56,
+                    "isTrigger": true
+                  }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": {
+                    "eventId": "ev_ui_button_click",
+                    "triggerOn": "click",
+                    "once": false,
+                    "targetObjectId": ""
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_ui_button_click",
+                    "action": "setProperty",
+                    "targetObjectId": "obj_ui_status",
+                    "componentType": "Text",
+                    "property": "text",
+                    "value": "UICanvas button clicked"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_button_label",
+              "name": "UIButtonLabel",
+              "enabled": true,
+              "parentId": "obj_ui_button",
+              "children": [],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 220,
+                    "height": 56,
+                    "anchorX": 0.5,
+                    "anchorY": 0.5,
+                    "pivotX": 0.5,
+                    "pivotY": 0.5
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Click Button",
+                    "font": "bold 20px sans-serif",
+                    "color": "#eff6ff",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 24,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_status",
+              "name": "UIStatus",
+              "enabled": true,
+              "parentId": "obj_ui_root",
+              "children": [],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": {
+                    "x": 0,
+                    "y": 82,
+                    "width": 320,
+                    "height": 32,
+                    "anchorX": 0.5,
+                    "anchorY": 0.5,
+                    "pivotX": 0.5,
+                    "pivotY": 0.5
+                  }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Waiting for UI click",
+                    "font": "18px sans-serif",
+                    "color": "#fbbf24",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 22,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

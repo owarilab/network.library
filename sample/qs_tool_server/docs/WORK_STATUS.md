@@ -1,6 +1,6 @@
 # ドットエディタ 作業状況
 
-最終更新: 2026-05-01 (Conditional 実装・サンプル更新済み)
+最終更新: 2026-05-02 (UICanvas / pointer drag / qsproj 生成ツール更新済み)
 
 ## 概要
 
@@ -142,6 +142,49 @@ www/
   - `assets/conditional_minimal.qsproj`: 最小確認用
   - `assets/conditional_simple_test.qsproj`: 別ファイルの簡易確認用
   - `assets/conditional_battle_event_demo.qsproj`: 実用寄りの戦闘イベントサンプル
+
+### PlayUnit UI / Pointer / Runtime
+
+- [x] `UICanvas` / `UITransform` の最小 runtime を実装
+  - `PlayUnitRuntime` で world 描画とは別に UI entry 解決を追加
+  - `UICanvas.sortOrder` と object tree の `children` 順を使った描画順を実装
+  - `UITransform` の `anchorX/Y` と `pivotX/Y` を使った rect 解決を実装
+  - `PlayTestScene` で preview 内に screen-space UI を重ねて描画できる状態にした
+- [x] `PlayTestScene` の pointer trigger を UI / world 両対応へ拡張
+  - world hit test と UI hit test を分離し、UI を優先して拾うようにした
+  - `pointerEnter` / `pointerMove` / `pointerLeave` / `pointerDown` / `pointerUp` / `click` を UI object 上でも評価可能にした
+  - hover 判定を object 単位ではなく trigger 単位で追跡するように修正した
+- [x] drag 系 trigger の最小実装を追加
+  - `dragStart` / `dragMove` / `dragEnd` を PlayTest で発火可能にした
+  - `pointerDown` 開始位置と移動量から drag 閾値を判定する
+  - drag 開始後は `click` を抑止する最小挙動を実装した
+- [x] 同一 object 上の複数 `Trigger` component を runtime で扱えるようにした
+  - `PlayObjectData.findComponentsByType()` を追加
+  - pointer / overlap / timer 評価で複数 trigger を列挙して処理するように変更した
+- [x] camera follow を viewport 中心基準へ修正
+  - `Camera.viewportWidth` / `viewportHeight` を runtime camera 情報へ保持
+  - follow target の collider / rectangle サイズを使って target 中心へ寄せるようにした
+- [x] UI / pointer 確認用の sample asset を追加
+  - `assets/ui_canvas_demo.qsproj`: UICanvas の最小表示と click 確認用
+  - `assets/ui_pointer_events_demo.qsproj`: 1つの box で pointer / drag を確認するサンプル
+  - `assets/rpg_hud_world_button_demo.qsproj`: fixed HUD と world button と camera follow を同時確認するサンプル
+
+### PlayUnit ツール / Fixture 生成
+
+- [x] `tools/generate_qs_project.py` を追加し、qsproj fixture の CLI 生成を実装
+  - `--template minimal|ui_canvas|world_ui` を追加
+  - `--output`, `--seed`, `--indent`, `--include-session`, `--validate` を追加
+  - 生成結果を stdout またはファイルへ出力できるようにした
+- [x] UI spec ベースの UICanvas 生成を追加
+  - `--ui-spec` で外部 JSON から UI object tree を生成できる
+  - node id を object id へ解決しつつ `parent` / `children` を構築する
+  - `EventAction.targetObjectId` / `Trigger.targetObjectId` / `Camera.followTargetObjectId` などの参照解決を組み込んだ
+- [x] event 記述用の簡易 DSL を追加
+  - `node.events[]` から `Trigger` と `EventAction` を自動展開できる
+  - `target` や `component` の省略記法を runtime component 形式へ正規化する
+- [x] UI spec サンプルを追加
+  - `tools/ui_canvas_spec_example.json` で panel / title / button / status の生成例を追加
+  - spec 内の button click から status 更新までを 1 ファイルで確認できる
 
 ### タイマーシステム
 

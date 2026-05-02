@@ -1,0 +1,1243 @@
+{
+  "format": "qsproj",
+  "version": 1,
+  "project": {
+    "id": "proj_rpg_hud_world_button_demo_1",
+    "version": 1,
+    "name": "RPG HUD World Button Demo",
+    "createdAt": 1777604000000,
+    "updatedAt": 1777604000000,
+    "settings": {
+      "defaultChipWidth": 16,
+      "defaultChipHeight": 16
+    },
+    "globalVariables": {
+      "version": 1,
+      "system": {
+        "fixed": {
+          "startupPlayUnitId": {
+            "type": "string",
+            "initialValue": "pu_rpg_hud_world_button_demo_1"
+          },
+          "timer": {
+            "type": "number",
+            "initialValue": 0
+          }
+        },
+        "persistent": {}
+      },
+      "user": {
+        "fixed": {},
+        "persistent": {}
+      }
+    },
+    "assets": {
+      "pixelDocuments": [],
+      "tilesets": [],
+      "maps": [],
+      "playUnits": [
+        {
+          "id": "pu_rpg_hud_world_button_demo_1",
+          "type": "playUnit",
+          "name": "RPG HUD World Button Demo",
+          "description": "RPG の HUD 風 UICanvas と、ワールド上のクリック可能ボタン、Controller で移動できるプレイヤー矩形を同時確認するサンプル。",
+          "objects": [
+            {
+              "id": "obj_camera",
+              "name": "MainCamera",
+              "enabled": true,
+              "parentId": "",
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 0, "y": 0, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Camera",
+                  "enabled": true,
+                  "data": {
+                    "zoom": 1,
+                    "viewportX": 0,
+                    "viewportY": 0,
+                    "viewportWidth": 800,
+                    "viewportHeight": 600,
+                    "followTargetObjectId": "obj_player",
+                    "followLerp": 0.18
+                  }
+                },
+                {
+                  "type": "PlaySettings",
+                  "enabled": true,
+                  "data": { "defaultCameraObjectId": "obj_camera" }
+                }
+              ]
+            },
+            {
+              "id": "obj_world_bg",
+              "name": "FieldBackground",
+              "enabled": true,
+              "parentId": "",
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 0, "y": 0, "z": -20, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 1400,
+                    "height": 900,
+                    "fillColor": "#1f3b2d",
+                    "fillAlpha": 1,
+                    "strokeColor": "#365f49",
+                    "strokeWidth": 0,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_world_path",
+              "name": "StonePath",
+              "enabled": true,
+              "parentId": "",
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 70, "y": 180, "z": -10, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 960,
+                    "height": 72,
+                    "fillColor": "#8b7355",
+                    "fillAlpha": 0.9,
+                    "strokeColor": "#bfa98b",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 0.45,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_world_ruin",
+              "name": "RuinGate",
+              "enabled": true,
+              "parentId": "",
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 980, "y": 120, "z": -5, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 120,
+                    "height": 150,
+                    "fillColor": "#334155",
+                    "fillAlpha": 0.95,
+                    "strokeColor": "#94a3b8",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 0.7,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_player",
+              "name": "Player",
+              "enabled": true,
+              "parentId": "",
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 300, "y": 320, "z": 20, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 42,
+                    "height": 52,
+                    "fillColor": "#2563eb",
+                    "fillAlpha": 1,
+                    "strokeColor": "#dbeafe",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0
+                  }
+                },
+                {
+                  "type": "Controller",
+                  "enabled": true,
+                  "data": {
+                    "inputMode": "player1",
+                    "moveSpeed": 150
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rect",
+                    "offsetX": 0,
+                    "offsetY": 0,
+                    "width": 42,
+                    "height": 52,
+                    "isTrigger": false
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_player_label",
+              "name": "PlayerLabel",
+              "enabled": true,
+              "parentId": "",
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 322, "y": 306, "z": 21, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Player",
+                    "font": "bold 14px sans-serif",
+                    "color": "#eff6ff",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "bottom",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 18,
+                    "strokeColor": "#0f172a",
+                    "strokeWidth": 3,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_world_button",
+              "name": "AncientSwitch",
+              "enabled": true,
+              "parentId": "",
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 760, "y": 336, "z": 12, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 180,
+                    "height": 56,
+                    "fillColor": "#7c2d12",
+                    "fillAlpha": 1,
+                    "strokeColor": "#fdba74",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rect",
+                    "offsetX": 0,
+                    "offsetY": 0,
+                    "width": 180,
+                    "height": 56,
+                    "isTrigger": true
+                  }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": {
+                    "eventId": "ev_world_switch_click",
+                    "triggerOn": "click",
+                    "once": false,
+                    "targetObjectId": ""
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_world_switch_click",
+                    "action": "setProperty",
+                    "targetObjectId": "obj_ui_status_text",
+                    "componentType": "Text",
+                    "property": "text",
+                    "value": "Status: Ancient switch pressed"
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_world_switch_click",
+                    "action": "setProperty",
+                    "targetObjectId": "obj_ui_quest_body",
+                    "componentType": "Text",
+                    "property": "text",
+                    "value": "Quest: Shrine gate unlocked by world button"
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_world_switch_click",
+                    "action": "setProperty",
+                    "targetObjectId": "obj_signal_lamp",
+                    "componentType": "Rectangle",
+                    "property": "fillColor",
+                    "value": "#f59e0b"
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "ev_world_switch_click",
+                    "action": "setProperty",
+                    "targetObjectId": "obj_signal_text",
+                    "componentType": "Text",
+                    "property": "text",
+                    "value": "Lamp: ON"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_world_button_label",
+              "name": "AncientSwitchLabel",
+              "enabled": true,
+              "parentId": "",
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 850, "y": 364, "z": 13, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "World Button",
+                    "font": "bold 18px sans-serif",
+                    "color": "#fff7ed",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 22,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_signal_lamp",
+              "name": "SignalLamp",
+              "enabled": true,
+              "parentId": "",
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 1100, "y": 168, "z": 8, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 28,
+                    "height": 28,
+                    "fillColor": "#334155",
+                    "fillAlpha": 1,
+                    "strokeColor": "#cbd5e1",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_signal_text",
+              "name": "SignalLampText",
+              "enabled": true,
+              "parentId": "",
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 1066, "y": 212, "z": 9, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Lamp: OFF",
+                    "font": "bold 16px sans-serif",
+                    "color": "#e2e8f0",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 20,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_world_hint",
+              "name": "WorldHint",
+              "enabled": true,
+              "parentId": "",
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 220, "y": 470, "z": 5, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Move the player with WASD / Arrows. The camera follows the player while the HUD stays fixed.",
+                    "font": "16px sans-serif",
+                    "color": "#f8fafc",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 22,
+                    "strokeColor": "#0f172a",
+                    "strokeWidth": 3,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_root",
+              "name": "UIRoot",
+              "enabled": true,
+              "parentId": "",
+              "children": [
+                "obj_ui_hud_blocker",
+                "obj_ui_hud_frame",
+                "obj_ui_hud_title",
+                "obj_ui_hud_name",
+                "obj_ui_hp_bg",
+                "obj_ui_mp_bg",
+                "obj_ui_gold_panel",
+                "obj_ui_minimap_panel",
+                "obj_ui_quest_panel",
+                "obj_ui_status_panel",
+                "obj_ui_controls"
+              ],
+              "components": [
+                {
+                  "type": "UICanvas",
+                  "enabled": true,
+                  "data": {
+                    "renderMode": "screen",
+                    "sortOrder": 100,
+                    "referenceWidth": 640,
+                    "referenceHeight": 360
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_hud_blocker",
+              "name": "HUDBlocker",
+              "enabled": true,
+              "parentId": "obj_ui_root",
+              "children": [],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": { "x": 18, "y": 16, "width": 250, "height": 128, "anchorX": 0, "anchorY": 0, "pivotX": 0, "pivotY": 0 }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rect",
+                    "offsetX": 0,
+                    "offsetY": 0,
+                    "width": 250,
+                    "height": 128,
+                    "isTrigger": true
+                  }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": {
+                    "eventId": "",
+                    "triggerOn": "pointerDown",
+                    "once": false,
+                    "targetObjectId": ""
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_hud_frame",
+              "name": "HUDFrame",
+              "enabled": true,
+              "parentId": "obj_ui_root",
+              "children": [],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": { "x": 18, "y": 16, "width": 250, "height": 128, "anchorX": 0, "anchorY": 0, "pivotX": 0, "pivotY": 0 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 250,
+                    "height": 128,
+                    "fillColor": "#0f172a",
+                    "fillAlpha": 0.88,
+                    "strokeColor": "#38bdf8",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 0.85,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_hud_title",
+              "name": "HUDTitle",
+              "enabled": true,
+              "parentId": "obj_ui_root",
+              "children": [],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": { "x": 34, "y": 24, "width": 200, "height": 22, "anchorX": 0, "anchorY": 0, "pivotX": 0, "pivotY": 0 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "RPG HUD",
+                    "font": "bold 22px sans-serif",
+                    "color": "#e0f2fe",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "top",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 26,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_hud_name",
+              "name": "HUDName",
+              "enabled": true,
+              "parentId": "obj_ui_root",
+              "children": [],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": { "x": 34, "y": 52, "width": 180, "height": 20, "anchorX": 0, "anchorY": 0, "pivotX": 0, "pivotY": 0 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Aster Lv.12 Ranger",
+                    "font": "bold 15px sans-serif",
+                    "color": "#f8fafc",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "top",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 18,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_hp_bg",
+              "name": "HPBarBG",
+              "enabled": true,
+              "parentId": "obj_ui_root",
+              "children": [
+                "obj_ui_hp_fill",
+                "obj_ui_hp_label"
+              ],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": { "x": 34, "y": 78, "width": 180, "height": 20, "anchorX": 0, "anchorY": 0, "pivotX": 0, "pivotY": 0 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 180,
+                    "height": 20,
+                    "fillColor": "#3f1d2e",
+                    "fillAlpha": 1,
+                    "strokeColor": "#fecdd3",
+                    "strokeWidth": 1,
+                    "strokeAlpha": 0.5,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_hp_fill",
+              "name": "HPBarFill",
+              "enabled": true,
+              "parentId": "obj_ui_hp_bg",
+              "children": [],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": { "x": 0, "y": 0, "width": 132, "height": 20, "anchorX": 0, "anchorY": 0, "pivotX": 0, "pivotY": 0 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 132,
+                    "height": 20,
+                    "fillColor": "#ef4444",
+                    "fillAlpha": 1,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "strokeAlpha": 0,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_hp_label",
+              "name": "HPLabel",
+              "enabled": true,
+              "parentId": "obj_ui_hp_bg",
+              "children": [],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": { "x": 90, "y": 10, "width": 180, "height": 20, "anchorX": 0, "anchorY": 0, "pivotX": 0.5, "pivotY": 0.5 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "HP 88 / 120",
+                    "font": "bold 13px sans-serif",
+                    "color": "#fff1f2",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 16,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_mp_bg",
+              "name": "MPBarBG",
+              "enabled": true,
+              "parentId": "obj_ui_root",
+              "children": [
+                "obj_ui_mp_fill",
+                "obj_ui_mp_label"
+              ],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": { "x": 34, "y": 104, "width": 180, "height": 18, "anchorX": 0, "anchorY": 0, "pivotX": 0, "pivotY": 0 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 180,
+                    "height": 18,
+                    "fillColor": "#10223f",
+                    "fillAlpha": 1,
+                    "strokeColor": "#93c5fd",
+                    "strokeWidth": 1,
+                    "strokeAlpha": 0.45,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_mp_fill",
+              "name": "MPBarFill",
+              "enabled": true,
+              "parentId": "obj_ui_mp_bg",
+              "children": [],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": { "x": 0, "y": 0, "width": 104, "height": 18, "anchorX": 0, "anchorY": 0, "pivotX": 0, "pivotY": 0 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 104,
+                    "height": 18,
+                    "fillColor": "#3b82f6",
+                    "fillAlpha": 1,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "strokeAlpha": 0,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_mp_label",
+              "name": "MPLabel",
+              "enabled": true,
+              "parentId": "obj_ui_mp_bg",
+              "children": [],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": { "x": 90, "y": 9, "width": 180, "height": 18, "anchorX": 0, "anchorY": 0, "pivotX": 0.5, "pivotY": 0.5 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "MP 34 / 60",
+                    "font": "bold 12px sans-serif",
+                    "color": "#dbeafe",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 14,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_gold_panel",
+              "name": "GoldPanel",
+              "enabled": true,
+              "parentId": "obj_ui_root",
+              "children": [
+                "obj_ui_gold_text"
+              ],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": { "x": 218, "y": 78, "width": 34, "height": 44, "anchorX": 0, "anchorY": 0, "pivotX": 0, "pivotY": 0 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 34,
+                    "height": 44,
+                    "fillColor": "#3f2d0c",
+                    "fillAlpha": 1,
+                    "strokeColor": "#facc15",
+                    "strokeWidth": 1,
+                    "strokeAlpha": 0.65,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_gold_text",
+              "name": "GoldText",
+              "enabled": true,
+              "parentId": "obj_ui_gold_panel",
+              "children": [],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": { "x": 17, "y": 22, "width": 34, "height": 44, "anchorX": 0, "anchorY": 0, "pivotX": 0.5, "pivotY": 0.5 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "842G",
+                    "font": "bold 12px sans-serif",
+                    "color": "#fde68a",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 14,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_minimap_panel",
+              "name": "MiniMapPanel",
+              "enabled": true,
+              "parentId": "obj_ui_root",
+              "children": [
+                "obj_ui_minimap_cross_h",
+                "obj_ui_minimap_cross_v",
+                "obj_ui_minimap_dot"
+              ],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": { "x": -18, "y": 16, "width": 94, "height": 94, "anchorX": 1, "anchorY": 0, "pivotX": 1, "pivotY": 0 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 94,
+                    "height": 94,
+                    "fillColor": "#0b1220",
+                    "fillAlpha": 0.9,
+                    "strokeColor": "#94a3b8",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 0.75,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_minimap_cross_h",
+              "name": "MiniMapCrossH",
+              "enabled": true,
+              "parentId": "obj_ui_minimap_panel",
+              "children": [],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": { "x": 10, "y": 46, "width": 74, "height": 2, "anchorX": 0, "anchorY": 0, "pivotX": 0, "pivotY": 0 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 74,
+                    "height": 2,
+                    "fillColor": "#334155",
+                    "fillAlpha": 1,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "strokeAlpha": 0,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_minimap_cross_v",
+              "name": "MiniMapCrossV",
+              "enabled": true,
+              "parentId": "obj_ui_minimap_panel",
+              "children": [],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": { "x": 46, "y": 10, "width": 2, "height": 74, "anchorX": 0, "anchorY": 0, "pivotX": 0, "pivotY": 0 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 2,
+                    "height": 74,
+                    "fillColor": "#334155",
+                    "fillAlpha": 1,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "strokeAlpha": 0,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_minimap_dot",
+              "name": "MiniMapDot",
+              "enabled": true,
+              "parentId": "obj_ui_minimap_panel",
+              "children": [],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": { "x": 42, "y": 42, "width": 10, "height": 10, "anchorX": 0, "anchorY": 0, "pivotX": 0, "pivotY": 0 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 10,
+                    "height": 10,
+                    "fillColor": "#22c55e",
+                    "fillAlpha": 1,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "strokeAlpha": 0,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_quest_panel",
+              "name": "QuestPanel",
+              "enabled": true,
+              "parentId": "obj_ui_root",
+              "children": [
+                "obj_ui_quest_title",
+                "obj_ui_quest_body"
+              ],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": { "x": 18, "y": -18, "width": 360, "height": 58, "anchorX": 0, "anchorY": 1, "pivotX": 0, "pivotY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 360,
+                    "height": 58,
+                    "fillColor": "#111827",
+                    "fillAlpha": 0.9,
+                    "strokeColor": "#f59e0b",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 0.7,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_quest_title",
+              "name": "QuestTitle",
+              "enabled": true,
+              "parentId": "obj_ui_quest_panel",
+              "children": [],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": { "x": 12, "y": 8, "width": 336, "height": 18, "anchorX": 0, "anchorY": 0, "pivotX": 0, "pivotY": 0 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Objective",
+                    "font": "bold 14px sans-serif",
+                    "color": "#fde68a",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "top",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 16,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_quest_body",
+              "name": "QuestBody",
+              "enabled": true,
+              "parentId": "obj_ui_quest_panel",
+              "children": [],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": { "x": 12, "y": 28, "width": 336, "height": 20, "anchorX": 0, "anchorY": 0, "pivotX": 0, "pivotY": 0 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Quest: Find and press the ancient switch in the world",
+                    "font": "14px sans-serif",
+                    "color": "#e5e7eb",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "top",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 18,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_status_panel",
+              "name": "StatusPanel",
+              "enabled": true,
+              "parentId": "obj_ui_root",
+              "children": [
+                "obj_ui_status_text"
+              ],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": { "x": -18, "y": -18, "width": 220, "height": 48, "anchorX": 1, "anchorY": 1, "pivotX": 1, "pivotY": 1 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 220,
+                    "height": 48,
+                    "fillColor": "#111827",
+                    "fillAlpha": 0.92,
+                    "strokeColor": "#38bdf8",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 0.7,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_status_text",
+              "name": "StatusText",
+              "enabled": true,
+              "parentId": "obj_ui_status_panel",
+              "children": [],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": { "x": 12, "y": 15, "width": 196, "height": 18, "anchorX": 0, "anchorY": 0, "pivotX": 0, "pivotY": 0 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Status: Waiting for input",
+                    "font": "bold 14px sans-serif",
+                    "color": "#e0f2fe",
+                    "alpha": 1,
+                    "align": "left",
+                    "baseline": "top",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 18,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_controls",
+              "name": "ControlsHint",
+              "enabled": true,
+              "parentId": "obj_ui_root",
+              "children": [],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": { "x": -18, "y": 118, "width": 210, "height": 18, "anchorX": 1, "anchorY": 0, "pivotX": 1, "pivotY": 0 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "HUD stays fixed while the world moves behind it",
+                    "font": "13px sans-serif",
+                    "color": "#cbd5e1",
+                    "alpha": 1,
+                    "align": "right",
+                    "baseline": "top",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 16,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

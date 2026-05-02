@@ -18,7 +18,15 @@ class PlayTestScene extends Scene {
       worldY: 0,
       insidePreview: false,
       hoveredTriggerMap: new Map(),
-      pressedTriggerIds: new Set(),
+      pressedTriggerKeys: new Set(),
+      pressedDragHits: {
+        dragStart: null,
+        dragMove: null,
+        dragEnd: null,
+      },
+      pressStartCanvasX: 0,
+      pressStartCanvasY: 0,
+      dragActivated: false,
     };
     this._activeOverlapKeys = new Set();
     this._firedOnceTriggerKeys = new Set();
@@ -53,7 +61,11 @@ class PlayTestScene extends Scene {
     this._pressedKeys.clear();
     this._imageCanvasCache.clear();
     this._pointerState.hoveredTriggerMap.clear();
-    this._pointerState.pressedTriggerIds.clear();
+    this._pointerState.pressedTriggerKeys.clear();
+    this._pointerState.pressedDragHits.dragStart = null;
+    this._pointerState.pressedDragHits.dragMove = null;
+    this._pointerState.pressedDragHits.dragEnd = null;
+    this._pointerState.dragActivated = false;
     this._activeOverlapKeys.clear();
     this._activeTimerTriggers.clear();
     this._pendingEvents.clear();
@@ -70,9 +82,9 @@ class PlayTestScene extends Scene {
     };
     const preview = {
       x: panel.x + 18,
-      y: panel.y + 84,
+      y: panel.y + 108,
       w: panel.w - 36,
-      h: panel.h - 102,
+      h: panel.h - 126,
     };
     this._previewRect = preview;
 
@@ -110,10 +122,10 @@ class PlayTestScene extends Scene {
 
     ctx.fillStyle = '#94a3b8';
     ctx.font = '13px sans-serif';
-    ctx.fillText(`Text: ${runtime?.textEntries?.length || 0} / Image: ${runtime?.imageEntries?.length || 0} / Rectangle: ${runtime?.rectangleEntries?.length || 0}`, panel.x + 18, panel.y + 52);
-    ctx.fillText(`Camera: ${runtime?.camera?.objectName || 'DefaultCamera'} (${Math.round(this._cameraState?.x || runtime?.camera?.x || 0)}, ${Math.round(this._cameraState?.y || runtime?.camera?.y || 0)}) zoom ${runtime?.camera?.zoom || 1}`, panel.x + 180, panel.y + 52);
+    ctx.fillText(`Text: ${runtime?.textEntries?.length || 0} / Image: ${runtime?.imageEntries?.length || 0} / Rectangle: ${runtime?.rectangleEntries?.length || 0} / UI: ${runtime?.uiEntries?.length || 0}`, panel.x + 18, panel.y + 52);
+    ctx.fillText(`Camera: ${runtime?.camera?.objectName || 'DefaultCamera'} (${Math.round(this._cameraState?.x || runtime?.camera?.x || 0)}, ${Math.round(this._cameraState?.y || runtime?.camera?.y || 0)}) zoom ${runtime?.camera?.zoom || 1}`, panel.x + 18, panel.y + 74);
     if (runtime?.camera?.followTargetObjectId) {
-      ctx.fillText(`Follow: ${runtime.camera.followTargetObjectName || runtime.camera.followTargetObjectId} lerp ${runtime.camera.followLerp || 0}`, panel.x + 18, panel.y + 74);
+      ctx.fillText(`Follow: ${runtime.camera.followTargetObjectName || runtime.camera.followTargetObjectId} lerp ${runtime.camera.followLerp || 0}`, panel.x + 18, panel.y + 96);
     }
 
     ctx.fillStyle = '#020617';
@@ -134,32 +146,41 @@ class PlayTestScene extends Scene {
     ctx.strokeRect(preview.x + 0.5, preview.y + 0.5, preview.w - 1, preview.h - 1);
 
     const renderEntries = this._buildRenderEntries(runtime);
-    if (!renderEntries.length) {
+    const uiEntries = Array.isArray(runtime?.uiEntries) ? runtime.uiEntries : [];
+    if (!renderEntries.length && !uiEntries.length) {
       ctx.fillStyle = '#64748b';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'top';
       ctx.font = '14px sans-serif';
-      ctx.fillText('No renderable entries. Add Transform + Text or Transform + Image to a PlayObject.', preview.x + 18, preview.y + 18);
+      ctx.fillText('No renderable entries. Add Transform/UITransform with Text/Image/Rectangle to a PlayObject.', preview.x + 18, preview.y + 18);
       ctx.restore();
       return;
     }
 
     const camera = this._cameraState || runtime?.camera || { x: 0, y: 0, zoom: 1 };
-    ctx.translate(preview.x, preview.y);
-    ctx.scale(camera.zoom || 1, camera.zoom || 1);
-    ctx.translate(-(camera.x || 0), -(camera.y || 0));
-
     const project = this._appData?.currentProject || null;
-    for (const entry of renderEntries) {
-      if (entry.kind === 'image') {
-        this._drawImageEntry(ctx, entry, project);
-        continue;
+    if (renderEntries.length) {
+      ctx.save();
+      ctx.translate(preview.x, preview.y);
+      ctx.scale(camera.zoom || 1, camera.zoom || 1);
+      ctx.translate(-(camera.x || 0), -(camera.y || 0));
+
+      for (const entry of renderEntries) {
+        if (entry.kind === 'image') {
+          this._drawImageEntry(ctx, entry, project);
+          continue;
+        }
+        if (entry.kind === 'rectangle') {
+          this._drawRectangleEntry(ctx, entry);
+          continue;
+        }
+        this._drawTextEntry(ctx, entry);
       }
-      if (entry.kind === 'rectangle') {
-        this._drawRectangleEntry(ctx, entry);
-        continue;
-      }
-      this._drawTextEntry(ctx, entry);
+      ctx.restore();
+    }
+
+    if (uiEntries.length) {
+      this._drawUIEntries(ctx, uiEntries, preview, project);
     }
     ctx.restore();
     this._drawGlobalVariablesPanel(ctx, canvas, panel);
@@ -284,38 +305,43 @@ class PlayTestScene extends Scene {
       if (!objectData || objectData.enabled === false) continue;
       const transform = objectData.findComponentByType?.('Transform') || null;
       const collider = objectData.findComponentByType?.('Collider') || null;
-      const trigger = objectData.findComponentByType?.('Trigger') || null;
-      if (!transform || transform.enabled === false || !collider || collider.enabled === false || !trigger || trigger.enabled === false) continue;
+      const triggers = objectData.findComponentsByType?.('Trigger') || [];
+      if (!transform || transform.enabled === false || !collider || collider.enabled === false || !triggers.length) continue;
       if (collider.data?.shape !== 'rect' || collider.data?.isTrigger !== true) continue;
-
-      const triggerOn = typeof trigger.data?.triggerOn === 'string' && trigger.data.triggerOn.trim()
-        ? trigger.data.triggerOn.trim()
-        : 'overlap';
-      if (triggerOn !== 'overlap') continue;
 
       const triggerRect = this._getRectBounds(transform, collider);
       if (!triggerRect) continue;
 
-      const targetObjectId = typeof trigger.data?.targetObjectId === 'string' && trigger.data.targetObjectId.trim()
-        ? trigger.data.targetObjectId.trim()
-        : '';
+      for (let triggerIndex = 0; triggerIndex < triggers.length; triggerIndex++) {
+        const trigger = triggers[triggerIndex];
+        if (!trigger || trigger.enabled === false) continue;
 
-      for (const source of controllerSources) {
-        if (targetObjectId && source.objectId !== targetObjectId) continue;
-        if (!this._intersectsRect(triggerRect, source.rect)) continue;
+        const triggerOn = typeof trigger.data?.triggerOn === 'string' && trigger.data.triggerOn.trim()
+          ? trigger.data.triggerOn.trim()
+          : 'overlap';
+        if (triggerOn !== 'overlap') continue;
 
-        const overlapKey = `${objectData.id}:${source.objectId}`;
-        nextOverlapKeys.add(overlapKey);
-        if (this._activeOverlapKeys.has(overlapKey)) continue;
+        const targetObjectId = typeof trigger.data?.targetObjectId === 'string' && trigger.data.targetObjectId.trim()
+          ? trigger.data.targetObjectId.trim()
+          : '';
 
-        this._fireTrigger({
-          objectId: typeof objectData.id === 'string' ? objectData.id : '',
-          objectName: typeof objectData.name === 'string' && objectData.name.trim() ? objectData.name.trim() : 'Object',
-          eventId: typeof trigger.data?.eventId === 'string' ? trigger.data.eventId.trim() : '',
-          triggerOn: 'overlap',
-          once: trigger.data?.once === true,
-          triggerKey: `${objectData.id}:${source.objectId}:${typeof trigger.data?.eventId === 'string' ? trigger.data.eventId.trim() : ''}:overlap`,
-        }, 'overlap');
+        for (const source of controllerSources) {
+          if (targetObjectId && source.objectId !== targetObjectId) continue;
+          if (!this._intersectsRect(triggerRect, source.rect)) continue;
+
+          const overlapKey = `${objectData.id}:${triggerIndex}:${source.objectId}`;
+          nextOverlapKeys.add(overlapKey);
+          if (this._activeOverlapKeys.has(overlapKey)) continue;
+
+          this._fireTrigger({
+            objectId: typeof objectData.id === 'string' ? objectData.id : '',
+            objectName: typeof objectData.name === 'string' && objectData.name.trim() ? objectData.name.trim() : 'Object',
+            eventId: typeof trigger.data?.eventId === 'string' ? trigger.data.eventId.trim() : '',
+            triggerOn: 'overlap',
+            once: trigger.data?.once === true,
+            triggerKey: `${objectData.id}:${triggerIndex}:${source.objectId}:${typeof trigger.data?.eventId === 'string' ? trigger.data.eventId.trim() : ''}:overlap`,
+          }, 'overlap');
+        }
       }
     }
 
@@ -328,65 +354,69 @@ class PlayTestScene extends Scene {
     const deltaSeconds = Math.max(0, Number(dt) / 1000);
     for (const objectData of playUnit.objects) {
       if (!objectData || objectData.enabled === false) continue;
-      const trigger = objectData.findComponentByType?.('Trigger') || null;
-      if (!trigger || trigger.enabled === false) continue;
+      const triggers = objectData.findComponentsByType?.('Trigger') || [];
+      for (let triggerIndex = 0; triggerIndex < triggers.length; triggerIndex++) {
+        const trigger = triggers[triggerIndex];
+        if (!trigger || trigger.enabled === false) continue;
 
-      const triggerOn = typeof trigger.data?.triggerOn === 'string' ? trigger.data.triggerOn.trim() : 'overlap';
-      
-      // onUpdate: 毎フレーム発火
-      if (triggerOn === 'onUpdate') {
-        const eventId = typeof trigger.data?.eventId === 'string' ? trigger.data.eventId.trim() : '';
-        if (eventId) {
-          this._fireTrigger({
-            objectId: typeof objectData.id === 'string' ? objectData.id : '',
-            objectName: typeof objectData.name === 'string' && objectData.name.trim() ? objectData.name.trim() : 'Object',
-            eventId,
-            triggerOn: 'onUpdate',
-            once: trigger.data?.once === true,
-            triggerKey: `${objectData.id}:${eventId}:onUpdate`,
-          }, 'onUpdate');
-        }
-        continue;
-      }
+        const triggerOn = typeof trigger.data?.triggerOn === 'string' ? trigger.data.triggerOn.trim() : 'overlap';
 
-      // onTimer: 指定時間経過時に発火
-      if (triggerOn === 'onTimer') {
-        const duration = Number.isFinite(Number(trigger.data?.duration)) ? Number(trigger.data.duration) : 1;
-        if (duration <= 0) continue;
-
-        const triggerId = typeof objectData.id === 'string' ? objectData.id : '';
-        if (!triggerId) continue;
-
-        let timerState = this._activeTimerTriggers.get(triggerId);
-        if (!timerState) {
-          timerState = { elapsed: 0 };
-          this._activeTimerTriggers.set(triggerId, timerState);
-        }
-
-        timerState.elapsed += deltaSeconds;
-
-        if (timerState.elapsed >= duration) {
+        // onUpdate: 毎フレーム発火
+        if (triggerOn === 'onUpdate') {
           const eventId = typeof trigger.data?.eventId === 'string' ? trigger.data.eventId.trim() : '';
-          const once = trigger.data?.once === true;
-          const triggerKey = `${triggerId}:${eventId}:onTimer`;
+          if (eventId) {
+            this._fireTrigger({
+              objectId: typeof objectData.id === 'string' ? objectData.id : '',
+              objectName: typeof objectData.name === 'string' && objectData.name.trim() ? objectData.name.trim() : 'Object',
+              eventId,
+              triggerOn: 'onUpdate',
+              once: trigger.data?.once === true,
+              triggerKey: `${objectData.id}:${triggerIndex}:${eventId}:onUpdate`,
+            }, 'onUpdate');
+          }
+          continue;
+        }
 
-          if (!once || !this._firedOnceTriggerKeys.has(triggerKey)) {
-            if (eventId) {
-              this._fireTrigger({
-                objectId: triggerId,
-                objectName: typeof objectData.name === 'string' && objectData.name.trim() ? objectData.name.trim() : 'Object',
-                eventId,
-                triggerOn: 'onTimer',
-                once,
-                triggerKey,
-              }, 'onTimer');
-            }
-            if (once) {
-              this._firedOnceTriggerKeys.add(triggerKey);
-            }
+        // onTimer: 指定時間経過時に発火
+        if (triggerOn === 'onTimer') {
+          const duration = Number.isFinite(Number(trigger.data?.duration)) ? Number(trigger.data.duration) : 1;
+          if (duration <= 0) continue;
+
+          const triggerId = typeof objectData.id === 'string' ? objectData.id : '';
+          if (!triggerId) continue;
+
+          const timerId = `${triggerId}:${triggerIndex}`;
+          let timerState = this._activeTimerTriggers.get(timerId);
+          if (!timerState) {
+            timerState = { elapsed: 0 };
+            this._activeTimerTriggers.set(timerId, timerState);
           }
 
-          timerState.elapsed = 0; // リセット
+          timerState.elapsed += deltaSeconds;
+
+          if (timerState.elapsed >= duration) {
+            const eventId = typeof trigger.data?.eventId === 'string' ? trigger.data.eventId.trim() : '';
+            const once = trigger.data?.once === true;
+            const triggerKey = `${triggerId}:${triggerIndex}:${eventId}:onTimer`;
+
+            if (!once || !this._firedOnceTriggerKeys.has(triggerKey)) {
+              if (eventId) {
+                this._fireTrigger({
+                  objectId: triggerId,
+                  objectName: typeof objectData.name === 'string' && objectData.name.trim() ? objectData.name.trim() : 'Object',
+                  eventId,
+                  triggerOn: 'onTimer',
+                  once,
+                  triggerKey,
+                }, 'onTimer');
+              }
+              if (once) {
+                this._firedOnceTriggerKeys.add(triggerKey);
+              }
+            }
+
+            timerState.elapsed = 0; // リセット
+          }
         }
       }
     }
@@ -447,17 +477,31 @@ class PlayTestScene extends Scene {
 
     const targetObject = playUnit.findObjectById(camera.followTargetObjectId);
     const targetTransform = targetObject?.findComponentByType?.('Transform') || null;
+    const targetCollider = targetObject?.findComponentByType?.('Collider') || null;
+    const targetRectangle = targetObject?.findComponentByType?.('Rectangle') || null;
     if (!targetObject || !targetTransform) return;
 
     camera.followTargetObjectName = typeof targetObject.name === 'string' && targetObject.name.trim()
       ? targetObject.name.trim()
       : camera.followTargetObjectId;
-    if (Number.isFinite(Number(targetTransform.data?.x))) {
-      camera.targetX = Number(targetTransform.data.x);
-    }
-    if (Number.isFinite(Number(targetTransform.data?.y))) {
-      camera.targetY = Number(targetTransform.data.y);
-    }
+    const targetBaseX = Number.isFinite(Number(targetTransform.data?.x)) ? Number(targetTransform.data.x) : camera.targetX;
+    const targetBaseY = Number.isFinite(Number(targetTransform.data?.y)) ? Number(targetTransform.data.y) : camera.targetY;
+    const targetWidth = targetCollider
+      ? this._normalizePositiveNumber(targetCollider.data?.width, 0)
+      : this._normalizePositiveNumber(targetRectangle?.data?.width, 0);
+    const targetHeight = targetCollider
+      ? this._normalizePositiveNumber(targetCollider.data?.height, 0)
+      : this._normalizePositiveNumber(targetRectangle?.data?.height, 0);
+    const zoom = Number.isFinite(Number(camera.zoom)) && Number(camera.zoom) > 0 ? Number(camera.zoom) : 1;
+    const viewportWidth = this._normalizePositiveNumber(camera.viewportWidth, 800);
+    const viewportHeight = this._normalizePositiveNumber(camera.viewportHeight, 600);
+    camera.targetX = targetBaseX + targetWidth * 0.5 - viewportWidth * 0.5 / zoom;
+    camera.targetY = targetBaseY + targetHeight * 0.5 - viewportHeight * 0.5 / zoom;
+  }
+
+  _normalizePositiveNumber(value, fallback) {
+    const nextValue = Number(value);
+    return Number.isFinite(nextValue) && nextValue > 0 ? nextValue : fallback;
   }
 
   _drawRectangleEntry(ctx, entry) {
@@ -671,6 +715,97 @@ class PlayTestScene extends Scene {
     ctx.restore();
   }
 
+  _drawUIEntries(ctx, entries, preview, project) {
+    if (!Array.isArray(entries) || !entries.length || !preview) return;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(preview.x, preview.y, preview.w, preview.h);
+    ctx.clip();
+
+    for (const entry of entries) {
+      const mappedEntry = this._mapUIEntryToPreview(entry, preview);
+      if (!mappedEntry) continue;
+      if (mappedEntry.kind === 'image') {
+        this._drawImageEntry(ctx, mappedEntry, project);
+        continue;
+      }
+      if (mappedEntry.kind === 'rectangle') {
+        this._drawRectangleEntry(ctx, mappedEntry);
+        continue;
+      }
+      this._drawTextEntry(ctx, mappedEntry);
+    }
+
+    ctx.restore();
+  }
+
+  _mapUIEntryToPreview(entry, preview) {
+    const canvasWidth = Number.isFinite(Number(entry?.canvasWidth)) && Number(entry.canvasWidth) > 0
+      ? Number(entry.canvasWidth)
+      : 1;
+    const canvasHeight = Number.isFinite(Number(entry?.canvasHeight)) && Number(entry.canvasHeight) > 0
+      ? Number(entry.canvasHeight)
+      : 1;
+    const scaleX = preview.w / canvasWidth;
+    const scaleY = preview.h / canvasHeight;
+    const mappedEntry = {
+      ...entry,
+      x: preview.x + (Number.isFinite(Number(entry?.x)) ? Number(entry.x) : 0) * scaleX,
+      y: preview.y + (Number.isFinite(Number(entry?.y)) ? Number(entry.y) : 0) * scaleY,
+      width: (Number.isFinite(Number(entry?.width)) ? Number(entry.width) : 0) * scaleX,
+      height: (Number.isFinite(Number(entry?.height)) ? Number(entry.height) : 0) * scaleY,
+      maxWidth: (Number.isFinite(Number(entry?.maxWidth)) ? Number(entry.maxWidth) : 0) * scaleX,
+      lineHeight: (Number.isFinite(Number(entry?.lineHeight)) ? Number(entry.lineHeight) : 28) * scaleY,
+      padding: (Number.isFinite(Number(entry?.padding)) ? Number(entry.padding) : 0) * Math.min(scaleX, scaleY),
+      strokeWidth: (Number.isFinite(Number(entry?.strokeWidth)) ? Number(entry.strokeWidth) : 0) * Math.min(scaleX, scaleY),
+      rect: entry?.rect
+        ? {
+          left: preview.x + entry.rect.left * scaleX,
+          top: preview.y + entry.rect.top * scaleY,
+          width: entry.rect.width * scaleX,
+          height: entry.rect.height * scaleY,
+          right: preview.x + entry.rect.right * scaleX,
+          bottom: preview.y + entry.rect.bottom * scaleY,
+        }
+        : null,
+    };
+
+    if (typeof entry?.font === 'string') {
+      mappedEntry.font = this._scaleFont(entry.font, Math.min(scaleX, scaleY));
+    }
+
+    if (mappedEntry.kind === 'text' && mappedEntry.rect) {
+      if (mappedEntry.align === 'center') {
+        mappedEntry.x = mappedEntry.rect.left + mappedEntry.rect.width * 0.5;
+      } else if (mappedEntry.align === 'right') {
+        mappedEntry.x = mappedEntry.rect.right;
+      } else {
+        mappedEntry.x = mappedEntry.rect.left;
+      }
+
+      if (mappedEntry.baseline === 'middle') {
+        mappedEntry.y = mappedEntry.rect.top + mappedEntry.rect.height * 0.5;
+      } else if (mappedEntry.baseline === 'bottom') {
+        mappedEntry.y = mappedEntry.rect.bottom;
+      } else {
+        mappedEntry.y = mappedEntry.rect.top;
+      }
+    }
+
+    return mappedEntry;
+  }
+
+  _scaleFont(font, scale) {
+    if (typeof font !== 'string' || !font.trim()) return '24px sans-serif';
+    const match = font.match(/(\d+(?:\.\d+)?)px/);
+    if (!match) return font;
+    const size = Number(match[1]);
+    if (!Number.isFinite(size) || size <= 0) return font;
+    const nextSize = Math.max(1, Math.round(size * (Number.isFinite(Number(scale)) && Number(scale) > 0 ? Number(scale) : 1) * 100) / 100);
+    return font.replace(match[0], `${nextSize}px`);
+  }
+
   _resolveImageDrawSize(entry, naturalWidth, naturalHeight) {
     const width = Number.isFinite(Number(entry?.width)) && Number(entry.width) > 0 ? Number(entry.width) : 0;
     const height = Number.isFinite(Number(entry?.height)) && Number(entry.height) > 0 ? Number(entry.height) : 0;
@@ -834,6 +969,20 @@ class PlayTestScene extends Scene {
     this._updatePointerState(e);
     const hits = this._getPointerTriggerHits();
     this._processPointerHoverTransitions(hits);
+
+    if (this._pointerState.pressedDragHits.dragStart || this._pointerState.pressedDragHits.dragMove) {
+      const deltaX = this._pointerState.canvasX - this._pointerState.pressStartCanvasX;
+      const deltaY = this._pointerState.canvasY - this._pointerState.pressStartCanvasY;
+      const dragThreshold = 6;
+      if (!this._pointerState.dragActivated && deltaX * deltaX + deltaY * deltaY >= dragThreshold * dragThreshold) {
+        this._pointerState.dragActivated = true;
+        this._fireTrigger(this._pointerState.pressedDragHits.dragStart, 'dragStart');
+      }
+      if (this._pointerState.dragActivated) {
+        this._fireTrigger(this._pointerState.pressedDragHits.dragMove, 'dragMove');
+      }
+    }
+
     for (const hit of hits) {
       this._fireTrigger(hit, 'pointerMove');
     }
@@ -844,9 +993,15 @@ class PlayTestScene extends Scene {
     this._updatePointerState(e);
     const hits = this._getPointerTriggerHits();
     this._processPointerHoverTransitions(hits);
-    this._pointerState.pressedTriggerIds.clear();
+    this._pointerState.pressedTriggerKeys.clear();
+    this._pointerState.pressedDragHits.dragStart = hits.find((hit) => hit.triggerOn === 'dragStart') || null;
+    this._pointerState.pressedDragHits.dragMove = hits.find((hit) => hit.triggerOn === 'dragMove') || null;
+    this._pointerState.pressedDragHits.dragEnd = hits.find((hit) => hit.triggerOn === 'dragEnd') || null;
+    this._pointerState.pressStartCanvasX = this._pointerState.canvasX;
+    this._pointerState.pressStartCanvasY = this._pointerState.canvasY;
+    this._pointerState.dragActivated = false;
     for (const hit of hits) {
-      this._pointerState.pressedTriggerIds.add(hit.objectId);
+      this._pointerState.pressedTriggerKeys.add(hit.triggerKey);
       this._fireTrigger(hit, 'pointerDown');
     }
   }
@@ -856,13 +1011,22 @@ class PlayTestScene extends Scene {
     this._updatePointerState(e);
     const hits = this._getPointerTriggerHits();
     this._processPointerHoverTransitions(hits);
+
+    if (this._pointerState.dragActivated && this._pointerState.pressedDragHits.dragEnd) {
+      this._fireTrigger(this._pointerState.pressedDragHits.dragEnd, 'dragEnd');
+    }
+
     for (const hit of hits) {
       this._fireTrigger(hit, 'pointerUp');
-      if (this._pointerState.pressedTriggerIds.has(hit.objectId)) {
+      if (!this._pointerState.dragActivated && this._pointerState.pressedTriggerKeys.has(hit.triggerKey)) {
         this._fireTrigger(hit, 'click');
       }
     }
-    this._pointerState.pressedTriggerIds.clear();
+    this._pointerState.pressedTriggerKeys.clear();
+    this._pointerState.pressedDragHits.dragStart = null;
+    this._pointerState.pressedDragHits.dragMove = null;
+    this._pointerState.pressedDragHits.dragEnd = null;
+    this._pointerState.dragActivated = false;
   }
 
   _updatePointerState(e) {
@@ -895,49 +1059,244 @@ class PlayTestScene extends Scene {
       return [];
     }
 
+    const uiHits = this._getUIPointerTriggerHits(playUnit.objects);
+    if (uiHits.length) {
+      return this._selectTopPointerHits(uiHits);
+    }
+
+    const worldHits = this._getWorldPointerTriggerHits(playUnit.objects);
+    return worldHits.length ? this._selectTopPointerHits(worldHits) : [];
+  }
+
+  _selectTopPointerHits(hits) {
+    if (!Array.isArray(hits) || !hits.length) return [];
+    const topHit = hits[0];
+    const topGroupKey = typeof topHit.hitGroupKey === 'string' ? topHit.hitGroupKey : '';
+    return hits.filter((hit) => hit?.hitGroupKey === topGroupKey);
+  }
+
+  _getWorldPointerTriggerHits(objects) {
     const hits = [];
-    for (const objectData of playUnit.objects) {
+    for (let index = 0; index < objects.length; index++) {
+      const objectData = objects[index];
       if (!objectData || objectData.enabled === false) continue;
       const transform = objectData.findComponentByType?.('Transform') || null;
       const collider = objectData.findComponentByType?.('Collider') || null;
-      const trigger = objectData.findComponentByType?.('Trigger') || null;
-      if (!transform || transform.enabled === false || !collider || collider.enabled === false || !trigger || trigger.enabled === false) continue;
-      if (collider.data?.shape !== 'rect' || collider.data?.isTrigger !== true) continue;
+      const triggers = objectData.findComponentsByType?.('Trigger') || [];
+      if (!transform || transform.enabled === false || !collider || collider.enabled === false || !triggers.length) continue;
+      if (collider.data?.shape !== 'rect') continue;
 
-      const width = Number(collider.data?.width);
-      const height = Number(collider.data?.height);
-      if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) continue;
-
-      const baseX = Number.isFinite(Number(transform.data?.x)) ? Number(transform.data.x) : 0;
-      const baseY = Number.isFinite(Number(transform.data?.y)) ? Number(transform.data.y) : 0;
-      const offsetX = Number.isFinite(Number(collider.data?.offsetX)) ? Number(collider.data.offsetX) : 0;
-      const offsetY = Number.isFinite(Number(collider.data?.offsetY)) ? Number(collider.data.offsetY) : 0;
-      const left = baseX + offsetX;
-      const top = baseY + offsetY;
-      if (this._pointerState.worldX < left || this._pointerState.worldX > left + width || this._pointerState.worldY < top || this._pointerState.worldY > top + height) {
+      const bounds = this._getRectBounds(transform, collider);
+      if (!bounds) continue;
+      if (this._pointerState.worldX < bounds.left || this._pointerState.worldX > bounds.right || this._pointerState.worldY < bounds.top || this._pointerState.worldY > bounds.bottom) {
         continue;
       }
 
-      hits.push({
-        objectId: typeof objectData.id === 'string' ? objectData.id : '',
-        objectName: typeof objectData.name === 'string' && objectData.name.trim() ? objectData.name.trim() : 'Object',
-        eventId: typeof trigger.data?.eventId === 'string' ? trigger.data.eventId.trim() : '',
-        triggerOn: typeof trigger.data?.triggerOn === 'string' && trigger.data.triggerOn.trim() ? trigger.data.triggerOn.trim() : 'overlap',
-        once: trigger.data?.once === true,
+      for (let triggerIndex = 0; triggerIndex < triggers.length; triggerIndex++) {
+        const trigger = triggers[triggerIndex];
+        if (!trigger || trigger.enabled === false) continue;
+        if (!this._isPointerTriggerType(trigger.data?.triggerOn)) continue;
+
+        const objectId = typeof objectData.id === 'string' ? objectData.id : '';
+        const eventId = typeof trigger.data?.eventId === 'string' ? trigger.data.eventId.trim() : '';
+        const triggerOn = typeof trigger.data?.triggerOn === 'string' && trigger.data.triggerOn.trim() ? trigger.data.triggerOn.trim() : 'overlap';
+        const z = Number.isFinite(Number(transform.data?.z)) ? Number(transform.data.z) : 0;
+        hits.push({
+          objectId,
+          objectName: typeof objectData.name === 'string' && objectData.name.trim() ? objectData.name.trim() : 'Object',
+          eventId,
+          triggerOn,
+          once: trigger.data?.once === true,
+          triggerKey: `${objectId}:${triggerIndex}:${eventId}:${triggerOn}`,
+          hitGroupKey: `world:${objectId}:${z}:${index}`,
+          z,
+          order: index,
+        });
+      }
+    }
+
+    return hits.sort((a, b) => {
+      if (a.z !== b.z) return b.z - a.z;
+      return b.order - a.order;
+    });
+  }
+
+  _getUIPointerTriggerHits(objects) {
+    if (!Array.isArray(objects) || !this._previewRect) return [];
+
+    const objectMap = new Map();
+    for (const objectData of objects) {
+      if (!objectData || typeof objectData.id !== 'string' || !objectData.id) continue;
+      objectMap.set(objectData.id, objectData);
+    }
+
+    const hits = [];
+    let order = 0;
+    for (const objectData of objects) {
+      if (!objectData || objectData.enabled === false) continue;
+      const uiCanvas = objectData.findComponentByType?.('UICanvas') || null;
+      if (!uiCanvas || uiCanvas.enabled === false) continue;
+      if (this._hasEnabledAncestorCanvas(objectData, objectMap)) continue;
+
+      const canvasSortOrder = Number.isFinite(Number(uiCanvas.data?.sortOrder)) ? Number(uiCanvas.data.sortOrder) : 0;
+      const canvasWidth = Number.isFinite(Number(uiCanvas.data?.referenceWidth)) && Number(uiCanvas.data.referenceWidth) > 0
+        ? Number(uiCanvas.data.referenceWidth)
+        : 640;
+      const canvasHeight = Number.isFinite(Number(uiCanvas.data?.referenceHeight)) && Number(uiCanvas.data.referenceHeight) > 0
+        ? Number(uiCanvas.data.referenceHeight)
+        : 360;
+      const parentRect = { left: 0, top: 0, width: canvasWidth, height: canvasHeight, right: canvasWidth, bottom: canvasHeight };
+      const childIds = Array.isArray(objectData.children) ? objectData.children : [];
+      for (const childId of childIds) {
+        order = this._collectUIPointerTriggerHits({
+          objectId: childId,
+          objectMap,
+          parentRect,
+          canvasSortOrder,
+          canvasWidth,
+          canvasHeight,
+          hits,
+          order,
+        });
+      }
+    }
+
+    return hits.sort((a, b) => {
+      if (a.canvasSortOrder !== b.canvasSortOrder) return b.canvasSortOrder - a.canvasSortOrder;
+      return b.order - a.order;
+    });
+  }
+
+  _collectUIPointerTriggerHits(params) {
+    const objectData = params.objectMap.get(params.objectId) || null;
+    if (!objectData || objectData.enabled === false) return params.order;
+
+    const uiTransform = objectData.findComponentByType?.('UITransform') || null;
+    if (!uiTransform || uiTransform.enabled === false) return params.order;
+
+    const rect = this._resolveUIRect(uiTransform, params.parentRect);
+    let nextOrder = params.order;
+    const collider = objectData.findComponentByType?.('Collider') || null;
+    const triggers = objectData.findComponentsByType?.('Trigger') || [];
+    if (collider && collider.enabled !== false && triggers.length && collider.data?.shape === 'rect') {
+      const hitPoint = this._resolveUIPointerPoint(params.canvasWidth, params.canvasHeight);
+      const offsetX = Number.isFinite(Number(collider.data?.offsetX)) ? Number(collider.data.offsetX) : 0;
+      const offsetY = Number.isFinite(Number(collider.data?.offsetY)) ? Number(collider.data.offsetY) : 0;
+      const width = Number.isFinite(Number(collider.data?.width)) && Number(collider.data.width) > 0 ? Number(collider.data.width) : rect.width;
+      const height = Number.isFinite(Number(collider.data?.height)) && Number(collider.data.height) > 0 ? Number(collider.data.height) : rect.height;
+      const bounds = {
+        left: rect.left + offsetX,
+        top: rect.top + offsetY,
+        right: rect.left + offsetX + width,
+        bottom: rect.top + offsetY + height,
+      };
+      if (hitPoint.x >= bounds.left && hitPoint.x <= bounds.right && hitPoint.y >= bounds.top && hitPoint.y <= bounds.bottom) {
+        for (let triggerIndex = 0; triggerIndex < triggers.length; triggerIndex++) {
+          const trigger = triggers[triggerIndex];
+          if (!trigger || trigger.enabled === false) continue;
+          if (!this._isPointerTriggerType(trigger.data?.triggerOn)) continue;
+
+          const objectId = typeof objectData.id === 'string' ? objectData.id : '';
+          const eventId = typeof trigger.data?.eventId === 'string' ? trigger.data.eventId.trim() : '';
+          const triggerOn = typeof trigger.data?.triggerOn === 'string' && trigger.data.triggerOn.trim() ? trigger.data.triggerOn.trim() : 'overlap';
+          params.hits.push({
+            objectId,
+            objectName: typeof objectData.name === 'string' && objectData.name.trim() ? objectData.name.trim() : 'Object',
+            eventId,
+            triggerOn,
+            once: trigger.data?.once === true,
+            triggerKey: `${objectId}:${triggerIndex}:${eventId}:${triggerOn}`,
+            hitGroupKey: `ui:${objectId}:${params.canvasSortOrder}:${nextOrder}`,
+            canvasSortOrder: params.canvasSortOrder,
+            order: nextOrder,
+          });
+        }
+      }
+    }
+    nextOrder += 1;
+
+    const childIds = Array.isArray(objectData.children) ? objectData.children : [];
+    for (const childId of childIds) {
+      nextOrder = this._collectUIPointerTriggerHits({
+        ...params,
+        objectId: childId,
+        parentRect: rect,
+        order: nextOrder,
       });
     }
-    return hits;
+    return nextOrder;
+  }
+
+  _resolveUIPointerPoint(canvasWidth, canvasHeight) {
+    const preview = this._previewRect;
+    if (!preview || preview.w <= 0 || preview.h <= 0) {
+      return { x: 0, y: 0 };
+    }
+    return {
+      x: ((this._pointerState.canvasX - preview.x) / preview.w) * canvasWidth,
+      y: ((this._pointerState.canvasY - preview.y) / preview.h) * canvasHeight,
+    };
+  }
+
+  _resolveUIRect(uiTransform, parentRect) {
+    const width = Number.isFinite(Number(uiTransform?.data?.width)) && Number(uiTransform.data.width) > 0 ? Number(uiTransform.data.width) : 0;
+    const height = Number.isFinite(Number(uiTransform?.data?.height)) && Number(uiTransform.data.height) > 0 ? Number(uiTransform.data.height) : 0;
+    const anchorX = Number.isFinite(Number(uiTransform?.data?.anchorX)) ? Math.max(0, Math.min(1, Number(uiTransform.data.anchorX))) : 0;
+    const anchorY = Number.isFinite(Number(uiTransform?.data?.anchorY)) ? Math.max(0, Math.min(1, Number(uiTransform.data.anchorY))) : 0;
+    const pivotX = Number.isFinite(Number(uiTransform?.data?.pivotX)) ? Math.max(0, Math.min(1, Number(uiTransform.data.pivotX))) : 0;
+    const pivotY = Number.isFinite(Number(uiTransform?.data?.pivotY)) ? Math.max(0, Math.min(1, Number(uiTransform.data.pivotY))) : 0;
+    const x = Number.isFinite(Number(uiTransform?.data?.x)) ? Number(uiTransform.data.x) : 0;
+    const y = Number.isFinite(Number(uiTransform?.data?.y)) ? Number(uiTransform.data.y) : 0;
+    const anchorPointX = parentRect.left + parentRect.width * anchorX;
+    const anchorPointY = parentRect.top + parentRect.height * anchorY;
+    const left = anchorPointX + x - width * pivotX;
+    const top = anchorPointY + y - height * pivotY;
+    return {
+      left,
+      top,
+      width,
+      height,
+      right: left + width,
+      bottom: top + height,
+    };
+  }
+
+  _hasEnabledAncestorCanvas(objectData, objectMap) {
+    let parentId = typeof objectData?.parentId === 'string' ? objectData.parentId : '';
+    while (parentId) {
+      const parentObject = objectMap.get(parentId) || null;
+      if (!parentObject) return false;
+      const uiCanvas = parentObject.findComponentByType?.('UICanvas') || null;
+      if (parentObject.enabled !== false && uiCanvas && uiCanvas.enabled !== false) {
+        return true;
+      }
+      parentId = typeof parentObject.parentId === 'string' ? parentObject.parentId : '';
+    }
+    return false;
+  }
+
+  _isPointerTriggerType(triggerOn) {
+    const normalized = typeof triggerOn === 'string' ? triggerOn.trim() : '';
+    return normalized === 'pointerEnter'
+      || normalized === 'pointerMove'
+      || normalized === 'pointerLeave'
+      || normalized === 'pointerDown'
+      || normalized === 'pointerUp'
+      || normalized === 'click'
+      || normalized === 'dragStart'
+      || normalized === 'dragMove'
+      || normalized === 'dragEnd';
   }
 
   _processPointerHoverTransitions(hits) {
-    const nextHitMap = new Map(hits.map((hit) => [hit.objectId, hit]));
-    for (const [objectId, hit] of nextHitMap.entries()) {
-      if (!this._pointerState.hoveredTriggerMap.has(objectId)) {
+    const nextHitMap = new Map(hits.map((hit) => [hit.triggerKey, hit]));
+    for (const [triggerKey, hit] of nextHitMap.entries()) {
+      if (!this._pointerState.hoveredTriggerMap.has(triggerKey)) {
         this._fireTrigger(hit, 'pointerEnter');
       }
     }
-    for (const [objectId, hit] of this._pointerState.hoveredTriggerMap.entries()) {
-      if (!nextHitMap.has(objectId)) {
+    for (const [triggerKey, hit] of this._pointerState.hoveredTriggerMap.entries()) {
+      if (!nextHitMap.has(triggerKey)) {
         this._fireTrigger(hit, 'pointerLeave');
       }
     }

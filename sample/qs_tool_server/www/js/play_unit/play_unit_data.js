@@ -256,6 +256,16 @@ class PlayObjectData {
 
   /**
    * @param {string} type
+   * @returns {ComponentData[]}
+   */
+  findComponentsByType(type) {
+    if (typeof type !== 'string' || !type.trim()) return [];
+    const nextType = type.trim();
+    return this.components.filter((component) => component.type === nextType);
+  }
+
+  /**
+   * @param {string} type
    * @returns {number}
    */
   removeComponentsByType(type) {

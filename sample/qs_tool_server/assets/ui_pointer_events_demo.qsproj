@@ -1,0 +1,370 @@
+{
+  "format": "qsproj",
+  "version": 1,
+  "project": {
+    "id": "proj_ui_pointer_events_demo_1",
+    "version": 1,
+    "name": "UI Pointer Events Demo",
+    "createdAt": 1777601000000,
+    "updatedAt": 1777601000000,
+    "settings": {
+      "defaultChipWidth": 16,
+      "defaultChipHeight": 16
+    },
+    "globalVariables": {
+      "version": 1,
+      "system": {
+        "fixed": {
+          "startupPlayUnitId": {
+            "type": "string",
+            "initialValue": "pu_ui_pointer_events_demo_1"
+          },
+          "timer": {
+            "type": "number",
+            "initialValue": 0
+          }
+        },
+        "persistent": {}
+      },
+      "user": {
+        "fixed": {},
+        "persistent": {}
+      }
+    },
+    "assets": {
+      "pixelDocuments": [],
+      "tilesets": [],
+      "maps": [],
+      "playUnits": [
+        {
+          "id": "pu_ui_pointer_events_demo_1",
+          "type": "playUnit",
+          "name": "UI Pointer Events Demo",
+          "description": "UICanvas 上で 1つの box から pointerEnter/Leave/Down/Up/dragStart/dragMove/dragEnd を確認しつつ、click も確認するサンプル。",
+          "objects": [
+            {
+              "id": "obj_camera",
+              "name": "MainCamera",
+              "enabled": true,
+              "parentId": "",
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": { "x": 0, "y": 0, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 }
+                },
+                {
+                  "type": "Camera",
+                  "enabled": true,
+                  "data": {
+                    "zoom": 1,
+                    "viewportX": 0,
+                    "viewportY": 0,
+                    "viewportWidth": 800,
+                    "viewportHeight": 600,
+                    "followTargetObjectId": "",
+                    "followLerp": 1
+                  }
+                },
+                {
+                  "type": "PlaySettings",
+                  "enabled": true,
+                  "data": { "defaultCameraObjectId": "obj_camera" }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_root",
+              "name": "UIRoot",
+              "enabled": true,
+              "parentId": "",
+              "children": [
+                "obj_ui_panel",
+                "obj_ui_title",
+                "obj_ui_hint",
+                "obj_ui_status",
+                "obj_ui_enter",
+                "obj_ui_click"
+              ],
+              "components": [
+                {
+                  "type": "UICanvas",
+                  "enabled": true,
+                  "data": {
+                    "renderMode": "screen",
+                    "sortOrder": 100,
+                    "referenceWidth": 640,
+                    "referenceHeight": 360
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_panel",
+              "name": "UIPanel",
+              "enabled": true,
+              "parentId": "obj_ui_root",
+              "children": [],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": { "x": 0, "y": 0, "width": 560, "height": 300, "anchorX": 0.5, "anchorY": 0.5, "pivotX": 0.5, "pivotY": 0.5 }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 560,
+                    "height": 300,
+                    "fillColor": "#111827",
+                    "fillAlpha": 0.94,
+                    "strokeColor": "#334155",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_title",
+              "name": "UITitle",
+              "enabled": true,
+              "parentId": "obj_ui_root",
+              "children": [],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": { "x": 0, "y": -122, "width": 480, "height": 30, "anchorX": 0.5, "anchorY": 0.5, "pivotX": 0.5, "pivotY": 0.5 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "UI Pointer Events Demo",
+                    "font": "bold 24px sans-serif",
+                    "color": "#f8fafc",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 28,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_hint",
+              "name": "UIHint",
+              "enabled": true,
+              "parentId": "obj_ui_root",
+              "children": [],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": { "x": 0, "y": -94, "width": 500, "height": 24, "anchorX": 0.5, "anchorY": 0.5, "pivotX": 0.5, "pivotY": 0.5 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "中央の box で pointerEnter / Leave / Down / Up / Drag を確認。左下は click 用",
+                    "font": "14px sans-serif",
+                    "color": "#94a3b8",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 18,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_status",
+              "name": "UIStatus",
+              "enabled": true,
+              "parentId": "obj_ui_root",
+              "children": [],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": { "x": 0, "y": -54, "width": 440, "height": 28, "anchorX": 0.5, "anchorY": 0.5, "pivotX": 0.5, "pivotY": 0.5 }
+                },
+                {
+                  "type": "Text",
+                  "enabled": true,
+                  "data": {
+                    "text": "Waiting for pointer event",
+                    "font": "bold 18px sans-serif",
+                    "color": "#fbbf24",
+                    "alpha": 1,
+                    "align": "center",
+                    "baseline": "middle",
+                    "wrap": false,
+                    "maxWidth": 0,
+                    "lineHeight": 22,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "backgroundColor": "",
+                    "padding": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_ui_enter",
+              "name": "BasicPointerBox",
+              "enabled": true,
+              "parentId": "obj_ui_root",
+              "children": [],
+              "components": [
+                { "type": "UITransform", "enabled": true, "data": { "x": 0, "y": 36, "width": 420, "height": 56, "anchorX": 0.5, "anchorY": 0.5, "pivotX": 0.5, "pivotY": 0.5 } },
+                { "type": "Rectangle", "enabled": true, "data": { "shape": "rectangle", "width": 420, "height": 56, "fillColor": "#0f766e", "fillAlpha": 1, "strokeColor": "#99f6e4", "strokeWidth": 2, "strokeAlpha": 1, "rotation": 0, "originX": 0, "originY": 0 } },
+                { "type": "Text", "enabled": true, "data": { "text": "Basic Pointer + Drag Box", "font": "bold 18px sans-serif", "color": "#ecfeff", "alpha": 1, "align": "center", "baseline": "middle", "wrap": false, "maxWidth": 0, "lineHeight": 22, "strokeColor": "", "strokeWidth": 0, "backgroundColor": "", "padding": 0 } },
+                { "type": "Collider", "enabled": true, "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 420, "height": 56, "isTrigger": true } },
+                { "type": "Trigger", "enabled": true, "data": { "eventId": "ev_ui_enter", "triggerOn": "pointerEnter", "once": false, "targetObjectId": "" } },
+                { "type": "Trigger", "enabled": true, "data": { "eventId": "ev_ui_leave", "triggerOn": "pointerLeave", "once": false, "targetObjectId": "" } },
+                { "type": "Trigger", "enabled": true, "data": { "eventId": "ev_ui_down", "triggerOn": "pointerDown", "once": false, "targetObjectId": "" } },
+                { "type": "Trigger", "enabled": true, "data": { "eventId": "ev_ui_up", "triggerOn": "pointerUp", "once": false, "targetObjectId": "" } },
+                { "type": "Trigger", "enabled": true, "data": { "eventId": "ev_ui_drag_start", "triggerOn": "dragStart", "once": false, "targetObjectId": "" } },
+                { "type": "Trigger", "enabled": true, "data": { "eventId": "ev_ui_drag_move", "triggerOn": "dragMove", "once": false, "targetObjectId": "" } },
+                { "type": "Trigger", "enabled": true, "data": { "eventId": "ev_ui_drag_end", "triggerOn": "dragEnd", "once": false, "targetObjectId": "" } },
+                { "type": "EventAction", "enabled": true, "data": { "listenTo": "ev_ui_enter", "action": "setProperty", "targetObjectId": "obj_ui_status", "componentType": "Text", "property": "text", "value": "pointerEnter fired" } }
+                ,{ "type": "EventAction", "enabled": true, "data": { "listenTo": "ev_ui_leave", "action": "setProperty", "targetObjectId": "obj_ui_status", "componentType": "Text", "property": "text", "value": "pointerLeave fired" } }
+                ,{ "type": "EventAction", "enabled": true, "data": { "listenTo": "ev_ui_down", "action": "setProperty", "targetObjectId": "obj_ui_status", "componentType": "Text", "property": "text", "value": "pointerDown fired" } }
+                ,{ "type": "EventAction", "enabled": true, "data": { "listenTo": "ev_ui_up", "action": "setProperty", "targetObjectId": "obj_ui_status", "componentType": "Text", "property": "text", "value": "pointerUp fired" } }
+                ,{ "type": "EventAction", "enabled": true, "data": { "listenTo": "ev_ui_drag_start", "action": "setProperty", "targetObjectId": "obj_ui_status", "componentType": "Text", "property": "text", "value": "dragStart fired" } }
+                ,{ "type": "EventAction", "enabled": true, "data": { "listenTo": "ev_ui_drag_move", "action": "setProperty", "targetObjectId": "obj_ui_status", "componentType": "Text", "property": "text", "value": "dragMove fired" } }
+                ,{ "type": "EventAction", "enabled": true, "data": { "listenTo": "ev_ui_drag_end", "action": "setProperty", "targetObjectId": "obj_ui_status", "componentType": "Text", "property": "text", "value": "dragEnd fired" } }
+              ]
+            },
+            {
+              "id": "obj_ui_leave",
+              "name": "LeaveBox",
+              "enabled": true,
+              "parentId": "obj_ui_root",
+              "children": [],
+              "components": [
+                { "type": "UITransform", "enabled": true, "data": { "x": 140, "y": 10, "width": 200, "height": 42, "anchorX": 0.5, "anchorY": 0.5, "pivotX": 0.5, "pivotY": 0.5 } },
+                { "type": "Rectangle", "enabled": true, "data": { "shape": "rectangle", "width": 200, "height": 42, "fillColor": "#7c3aed", "fillAlpha": 1, "strokeColor": "#ddd6fe", "strokeWidth": 2, "strokeAlpha": 1, "rotation": 0, "originX": 0, "originY": 0 } },
+                { "type": "Text", "enabled": true, "data": { "text": "pointerLeave", "font": "bold 16px sans-serif", "color": "#f5f3ff", "alpha": 1, "align": "center", "baseline": "middle", "wrap": false, "maxWidth": 0, "lineHeight": 20, "strokeColor": "", "strokeWidth": 0, "backgroundColor": "", "padding": 0 } },
+                { "type": "Collider", "enabled": true, "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 200, "height": 42, "isTrigger": true } },
+                { "type": "Trigger", "enabled": true, "data": { "eventId": "ev_ui_leave", "triggerOn": "pointerLeave", "once": false, "targetObjectId": "" } },
+                { "type": "EventAction", "enabled": true, "data": { "listenTo": "ev_ui_leave", "action": "setProperty", "targetObjectId": "obj_ui_status", "componentType": "Text", "property": "text", "value": "pointerLeave fired" } }
+              ]
+            },
+            {
+              "id": "obj_ui_down",
+              "name": "DownBox",
+              "enabled": true,
+              "parentId": "obj_ui_root",
+              "children": [],
+              "components": [
+                { "type": "UITransform", "enabled": true, "data": { "x": -140, "y": 62, "width": 200, "height": 42, "anchorX": 0.5, "anchorY": 0.5, "pivotX": 0.5, "pivotY": 0.5 } },
+                { "type": "Rectangle", "enabled": true, "data": { "shape": "rectangle", "width": 200, "height": 42, "fillColor": "#1d4ed8", "fillAlpha": 1, "strokeColor": "#bfdbfe", "strokeWidth": 2, "strokeAlpha": 1, "rotation": 0, "originX": 0, "originY": 0 } },
+                { "type": "Text", "enabled": true, "data": { "text": "pointerDown", "font": "bold 16px sans-serif", "color": "#eff6ff", "alpha": 1, "align": "center", "baseline": "middle", "wrap": false, "maxWidth": 0, "lineHeight": 20, "strokeColor": "", "strokeWidth": 0, "backgroundColor": "", "padding": 0 } },
+                { "type": "Collider", "enabled": true, "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 200, "height": 42, "isTrigger": true } },
+                { "type": "Trigger", "enabled": true, "data": { "eventId": "ev_ui_down", "triggerOn": "pointerDown", "once": false, "targetObjectId": "" } },
+                { "type": "EventAction", "enabled": true, "data": { "listenTo": "ev_ui_down", "action": "setProperty", "targetObjectId": "obj_ui_status", "componentType": "Text", "property": "text", "value": "pointerDown fired" } }
+              ]
+            },
+            {
+              "id": "obj_ui_up",
+              "name": "UpBox",
+              "enabled": true,
+              "parentId": "obj_ui_root",
+              "children": [],
+              "components": [
+                { "type": "UITransform", "enabled": true, "data": { "x": 140, "y": 62, "width": 200, "height": 42, "anchorX": 0.5, "anchorY": 0.5, "pivotX": 0.5, "pivotY": 0.5 } },
+                { "type": "Rectangle", "enabled": true, "data": { "shape": "rectangle", "width": 200, "height": 42, "fillColor": "#b45309", "fillAlpha": 1, "strokeColor": "#fde68a", "strokeWidth": 2, "strokeAlpha": 1, "rotation": 0, "originX": 0, "originY": 0 } },
+                { "type": "Text", "enabled": true, "data": { "text": "pointerUp", "font": "bold 16px sans-serif", "color": "#fffbeb", "alpha": 1, "align": "center", "baseline": "middle", "wrap": false, "maxWidth": 0, "lineHeight": 20, "strokeColor": "", "strokeWidth": 0, "backgroundColor": "", "padding": 0 } },
+                { "type": "Collider", "enabled": true, "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 200, "height": 42, "isTrigger": true } },
+                { "type": "Trigger", "enabled": true, "data": { "eventId": "ev_ui_up", "triggerOn": "pointerUp", "once": false, "targetObjectId": "" } },
+                { "type": "EventAction", "enabled": true, "data": { "listenTo": "ev_ui_up", "action": "setProperty", "targetObjectId": "obj_ui_status", "componentType": "Text", "property": "text", "value": "pointerUp fired" } }
+              ]
+            },
+            {
+              "id": "obj_ui_click",
+              "name": "ClickBox",
+              "enabled": true,
+              "parentId": "obj_ui_root",
+              "children": [],
+              "components": [
+                { "type": "UITransform", "enabled": true, "data": { "x": -140, "y": 114, "width": 200, "height": 42, "anchorX": 0.5, "anchorY": 0.5, "pivotX": 0.5, "pivotY": 0.5 } },
+                { "type": "Rectangle", "enabled": true, "data": { "shape": "rectangle", "width": 200, "height": 42, "fillColor": "#be123c", "fillAlpha": 1, "strokeColor": "#fecdd3", "strokeWidth": 2, "strokeAlpha": 1, "rotation": 0, "originX": 0, "originY": 0 } },
+                { "type": "Text", "enabled": true, "data": { "text": "click", "font": "bold 16px sans-serif", "color": "#fff1f2", "alpha": 1, "align": "center", "baseline": "middle", "wrap": false, "maxWidth": 0, "lineHeight": 20, "strokeColor": "", "strokeWidth": 0, "backgroundColor": "", "padding": 0 } },
+                { "type": "Collider", "enabled": true, "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 200, "height": 42, "isTrigger": true } },
+                { "type": "Trigger", "enabled": true, "data": { "eventId": "ev_ui_click", "triggerOn": "click", "once": false, "targetObjectId": "" } },
+                { "type": "EventAction", "enabled": true, "data": { "listenTo": "ev_ui_click", "action": "setProperty", "targetObjectId": "obj_ui_status", "componentType": "Text", "property": "text", "value": "click fired" } }
+              ]
+            },
+            {
+              "id": "obj_ui_drag_start",
+              "name": "DragStartBox",
+              "enabled": true,
+              "parentId": "obj_ui_root",
+              "children": [],
+              "components": [
+                { "type": "UITransform", "enabled": true, "data": { "x": 140, "y": 114, "width": 200, "height": 42, "anchorX": 0.5, "anchorY": 0.5, "pivotX": 0.5, "pivotY": 0.5 } },
+                { "type": "Rectangle", "enabled": true, "data": { "shape": "rectangle", "width": 200, "height": 42, "fillColor": "#166534", "fillAlpha": 1, "strokeColor": "#bbf7d0", "strokeWidth": 2, "strokeAlpha": 1, "rotation": 0, "originX": 0, "originY": 0 } },
+                { "type": "Text", "enabled": true, "data": { "text": "dragStart", "font": "bold 16px sans-serif", "color": "#f0fdf4", "alpha": 1, "align": "center", "baseline": "middle", "wrap": false, "maxWidth": 0, "lineHeight": 20, "strokeColor": "", "strokeWidth": 0, "backgroundColor": "", "padding": 0 } },
+                { "type": "Collider", "enabled": true, "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 200, "height": 42, "isTrigger": true } },
+                { "type": "Trigger", "enabled": true, "data": { "eventId": "ev_ui_drag_start", "triggerOn": "dragStart", "once": false, "targetObjectId": "" } },
+                { "type": "EventAction", "enabled": true, "data": { "listenTo": "ev_ui_drag_start", "action": "setProperty", "targetObjectId": "obj_ui_status", "componentType": "Text", "property": "text", "value": "dragStart fired" } }
+              ]
+            },
+            {
+              "id": "obj_ui_drag_move",
+              "name": "DragMoveBox",
+              "enabled": true,
+              "parentId": "obj_ui_root",
+              "children": [],
+              "components": [
+                { "type": "UITransform", "enabled": true, "data": { "x": -140, "y": 166, "width": 200, "height": 42, "anchorX": 0.5, "anchorY": 0.5, "pivotX": 0.5, "pivotY": 0.5 } },
+                { "type": "Rectangle", "enabled": true, "data": { "shape": "rectangle", "width": 200, "height": 42, "fillColor": "#4338ca", "fillAlpha": 1, "strokeColor": "#c7d2fe", "strokeWidth": 2, "strokeAlpha": 1, "rotation": 0, "originX": 0, "originY": 0 } },
+                { "type": "Text", "enabled": true, "data": { "text": "dragMove", "font": "bold 16px sans-serif", "color": "#eef2ff", "alpha": 1, "align": "center", "baseline": "middle", "wrap": false, "maxWidth": 0, "lineHeight": 20, "strokeColor": "", "strokeWidth": 0, "backgroundColor": "", "padding": 0 } },
+                { "type": "Collider", "enabled": true, "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 200, "height": 42, "isTrigger": true } },
+                { "type": "Trigger", "enabled": true, "data": { "eventId": "ev_ui_drag_move", "triggerOn": "dragMove", "once": false, "targetObjectId": "" } },
+                { "type": "EventAction", "enabled": true, "data": { "listenTo": "ev_ui_drag_move", "action": "setProperty", "targetObjectId": "obj_ui_status", "componentType": "Text", "property": "text", "value": "dragMove fired" } }
+              ]
+            },
+            {
+              "id": "obj_ui_drag_end",
+              "name": "DragEndBox",
+              "enabled": true,
+              "parentId": "obj_ui_root",
+              "children": [],
+              "components": [
+                { "type": "UITransform", "enabled": true, "data": { "x": 140, "y": 166, "width": 200, "height": 42, "anchorX": 0.5, "anchorY": 0.5, "pivotX": 0.5, "pivotY": 0.5 } },
+                { "type": "Rectangle", "enabled": true, "data": { "shape": "rectangle", "width": 200, "height": 42, "fillColor": "#9a3412", "fillAlpha": 1, "strokeColor": "#fdba74", "strokeWidth": 2, "strokeAlpha": 1, "rotation": 0, "originX": 0, "originY": 0 } },
+                { "type": "Text", "enabled": true, "data": { "text": "dragEnd", "font": "bold 16px sans-serif", "color": "#fff7ed", "alpha": 1, "align": "center", "baseline": "middle", "wrap": false, "maxWidth": 0, "lineHeight": 20, "strokeColor": "", "strokeWidth": 0, "backgroundColor": "", "padding": 0 } },
+                { "type": "Collider", "enabled": true, "data": { "shape": "rect", "offsetX": 0, "offsetY": 0, "width": 200, "height": 42, "isTrigger": true } },
+                { "type": "Trigger", "enabled": true, "data": { "eventId": "ev_ui_drag_end", "triggerOn": "dragEnd", "once": false, "targetObjectId": "" } },
+                { "type": "EventAction", "enabled": true, "data": { "listenTo": "ev_ui_drag_end", "action": "setProperty", "targetObjectId": "obj_ui_status", "componentType": "Text", "property": "text", "value": "dragEnd fired" } }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,222 @@
+{
+  "projectName": "Generated UI Spec Demo",
+  "playUnitName": "UI Spec Demo",
+  "description": "Custom UICanvas generated from a ui-spec JSON file",
+  "canvas": {
+    "name": "UIRoot",
+    "sortOrder": 120,
+    "referenceWidth": 640,
+    "referenceHeight": 360
+  },
+  "nodes": [
+    {
+      "id": "panel",
+      "name": "Panel",
+      "components": [
+        {
+          "type": "UITransform",
+          "data": {
+            "x": 0,
+            "y": 0,
+            "width": 420,
+            "height": 220,
+            "anchorX": 0.5,
+            "anchorY": 0.5,
+            "pivotX": 0.5,
+            "pivotY": 0.5
+          }
+        },
+        {
+          "type": "Rectangle",
+          "data": {
+            "shape": "rectangle",
+            "width": 420,
+            "height": 220,
+            "fillColor": "#111827",
+            "fillAlpha": 0.94,
+            "strokeColor": "#38bdf8",
+            "strokeWidth": 2,
+            "strokeAlpha": 0.9,
+            "rotation": 0,
+            "originX": 0,
+            "originY": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "title",
+      "name": "Title",
+      "components": [
+        {
+          "type": "UITransform",
+          "data": {
+            "x": 0,
+            "y": -72,
+            "width": 320,
+            "height": 32,
+            "anchorX": 0.5,
+            "anchorY": 0.5,
+            "pivotX": 0.5,
+            "pivotY": 0.5
+          }
+        },
+        {
+          "type": "Text",
+          "data": {
+            "text": "Spec Driven UI",
+            "font": "bold 24px sans-serif",
+            "color": "#f8fafc",
+            "alpha": 1,
+            "align": "center",
+            "baseline": "middle",
+            "wrap": false,
+            "maxWidth": 0,
+            "lineHeight": 28,
+            "strokeColor": "",
+            "strokeWidth": 0,
+            "backgroundColor": "",
+            "padding": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "button",
+      "name": "Button",
+      "components": [
+        {
+          "type": "UITransform",
+          "data": {
+            "x": 0,
+            "y": 8,
+            "width": 220,
+            "height": 56,
+            "anchorX": 0.5,
+            "anchorY": 0.5,
+            "pivotX": 0.5,
+            "pivotY": 0.5
+          }
+        },
+        {
+          "type": "Rectangle",
+          "data": {
+            "shape": "rectangle",
+            "width": 220,
+            "height": 56,
+            "fillColor": "#1d4ed8",
+            "fillAlpha": 1,
+            "strokeColor": "#93c5fd",
+            "strokeWidth": 2,
+            "strokeAlpha": 1,
+            "rotation": 0,
+            "originX": 0,
+            "originY": 0
+          }
+        },
+        {
+          "type": "Collider",
+          "data": {
+            "shape": "rect",
+            "offsetX": 0,
+            "offsetY": 0,
+            "width": 220,
+            "height": 56,
+            "isTrigger": true
+          }
+        }
+      ],
+      "events": [
+        {
+          "on": "click",
+          "eventId": "ev_button_click",
+          "actions": [
+            {
+              "action": "setProperty",
+              "target": "status",
+              "component": "Text",
+              "property": "text",
+              "value": "Status: Spec button clicked"
+            }
+          ]
+        }
+      ],
+      "children": []
+    },
+    {
+      "id": "button_label",
+      "name": "ButtonLabel",
+      "parent": "button",
+      "components": [
+        {
+          "type": "UITransform",
+          "data": {
+            "x": 0,
+            "y": 0,
+            "width": 220,
+            "height": 56,
+            "anchorX": 0.5,
+            "anchorY": 0.5,
+            "pivotX": 0.5,
+            "pivotY": 0.5
+          }
+        },
+        {
+          "type": "Text",
+          "data": {
+            "text": "Click",
+            "font": "bold 20px sans-serif",
+            "color": "#eff6ff",
+            "alpha": 1,
+            "align": "center",
+            "baseline": "middle",
+            "wrap": false,
+            "maxWidth": 0,
+            "lineHeight": 24,
+            "strokeColor": "",
+            "strokeWidth": 0,
+            "backgroundColor": "",
+            "padding": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "status",
+      "name": "Status",
+      "components": [
+        {
+          "type": "UITransform",
+          "data": {
+            "x": 0,
+            "y": 74,
+            "width": 300,
+            "height": 28,
+            "anchorX": 0.5,
+            "anchorY": 0.5,
+            "pivotX": 0.5,
+            "pivotY": 0.5
+          }
+        },
+        {
+          "type": "Text",
+          "data": {
+            "text": "Status: Waiting",
+            "font": "bold 18px sans-serif",
+            "color": "#fbbf24",
+            "alpha": 1,
+            "align": "center",
+            "baseline": "middle",
+            "wrap": false,
+            "maxWidth": 0,
+            "lineHeight": 22,
+            "strokeColor": "",
+            "strokeWidth": 0,
+            "backgroundColor": "",
+            "padding": 0
+          }
+        }
+      ]
+    }
+  ]
+}
