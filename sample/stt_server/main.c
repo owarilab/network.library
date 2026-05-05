@@ -28,6 +28,7 @@ typedef struct STT_CONNECTION_DATA_STRUCT
 	uint64_t last_probe_total_samples;
 	char last_logged_text[1024];
 	FILE* wav_file;
+	FILE* txt_file;
 	uint32_t sample_rate;
 	uint16_t channels;
 	uint16_t bits_per_sample;
@@ -36,6 +37,7 @@ typedef struct STT_CONNECTION_DATA_STRUCT
 	uint32_t session_id;
 	int is_recording;
 	char wav_path[256];
+	char txt_path[256];
 } STT_CONNECTION_DATA;
 
 #define STT_CONNECTION_MAX 128
@@ -60,6 +62,7 @@ typedef struct STT_CONNECTION_DATA_STRUCT
 #define STT_WINDOW_MIN_PEAK 0.050f
 #define STT_WHISPER_NO_SPEECH_THOLD 0.60f
 #define STT_WHISPER_LOGPROB_THOLD -0.80f
+#define STT_TEXT_CONTEXT_EXPIRE_MS 6000
 
 int on_connect(QS_EVENT_PARAMETER params);
 int on_http_event(QS_EVENT_PARAMETER params);
@@ -191,12 +194,12 @@ static int stt_init_whisper(void)
 		return 0;
 	}
 	cparams = whisper_context_default_params();
-	g_whisper_ctx = whisper_init_from_file_with_params("../../stt/models/ggml-medium.bin", cparams);
+	g_whisper_ctx = whisper_init_from_file_with_params("../../stt/models/ggml-large-v3-turbo.bin", cparams);
 	if (!g_whisper_ctx) {
-		printf("[STT][whisper] init failed: ../../stt/models/ggml-medium.bin\n");
+		printf("[STT][whisper] init failed: ../../stt/models/ggml-large-v3-turbo.bin\n");
 		return -1;
 	}
-	printf("[STT][whisper] initialized: ggml-medium.bin\n");
+	printf("[STT][whisper] initialized: ggml-large-v3-turbo.bin\n");
 	return 0;
 }
 
@@ -448,6 +451,10 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 		con_data->connection_id,
 		con_data->window_count,
 		emit_text);
+	if (con_data->txt_file) {
+		fprintf(con_data->txt_file, "%s\n", emit_text);
+		fflush(con_data->txt_file);
+	}
 	free(pcmf32);
 }
 
@@ -474,6 +481,8 @@ static void stt_reset_connection_data(STT_CONNECTION_DATA* con_data)
 	con_data->last_probe_total_samples = 0;
 	memset(con_data->last_logged_text, 0, sizeof(con_data->last_logged_text));
 	memset(con_data->wav_path, 0, sizeof(con_data->wav_path));
+	memset(con_data->txt_path, 0, sizeof(con_data->txt_path));
+	con_data->txt_file = NULL;
 	memset(con_data->overlap_buffer, 0, sizeof(con_data->overlap_buffer));
 }
 
@@ -484,6 +493,9 @@ static void stt_clear_connection_slot(STT_CONNECTION_DATA* con_data)
 	}
 	if (con_data->wav_file) {
 		fclose(con_data->wav_file);
+	}
+	if (con_data->txt_file) {
+		fclose(con_data->txt_file);
 	}
 	if (con_data->ring_buffer) {
 		free(con_data->ring_buffer);
@@ -657,17 +669,21 @@ static void stt_process_connections(void)
 			continue;
 		}
 
+		/* Reset stale text context so a new speech segment starts fresh */
+		if (con_data->last_inference_time_ms > 0 &&
+			(now_ms - con_data->last_inference_time_ms) > STT_TEXT_CONTEXT_EXPIRE_MS) {
+			memset(con_data->last_logged_text, 0, sizeof(con_data->last_logged_text));
+		}
+
 		/* Grab inference window: last STT_VAD_INFERENCE_LENGTH_MS (or all available) */
 		inference_samples = (int32_t)(con_data->total_samples_received < STT_VAD_INFERENCE_SAMPLES
 			? con_data->total_samples_received : STT_VAD_INFERENCE_SAMPLES);
 		stt_copy_recent_samples(con_data, infer_window, inference_samples);
-		// printf("[STT][probe] connection_id=%s window=%u speech_ratio=%.2f [SPEECH] inference_samples=%d\n",
-		// 	con_data->connection_id,
-		// 	con_data->window_count,
-		// 	vad_prob,
-		// 	inference_samples);
 		stt_run_inference_window(con_data, infer_window, inference_samples);
 		con_data->last_inference_time_ms = stt_now_ms();
+		/* Advance probe baseline to current position so the NEXT probe is driven
+		 * by fresh incoming audio, not residual queued steps over the same window. */
+		con_data->last_probe_total_samples = con_data->total_samples_received;
 	}
 }
 
@@ -768,6 +784,11 @@ static int stt_begin_recording(STT_CONNECTION_DATA* con_data, const char* connec
 		stt_reset_connection_data(con_data);
 		return -1;
 	}
+	snprintf(con_data->txt_path, sizeof(con_data->txt_path), "./recv_%s_%u.txt", connection_id, con_data->session_id);
+	con_data->txt_file = fopen(con_data->txt_path, "a");
+	if (!con_data->txt_file) {
+		printf("[STT] failed to open txt file: %s\n", con_data->txt_path);
+	}
 	if (-1 == stt_write_wav_header(con_data->wav_file, con_data->sample_rate, con_data->channels, con_data->bits_per_sample, 0)) {
 		fclose(con_data->wav_file);
 		remove(con_data->wav_path);
@@ -857,6 +878,11 @@ static int stt_finalize_recording(STT_CONNECTION_DATA* con_data, const char* con
 	fflush(con_data->wav_file);
 	fclose(con_data->wav_file);
 	con_data->wav_file = NULL;
+	if (con_data->txt_file) {
+		fflush(con_data->txt_file);
+		fclose(con_data->txt_file);
+		con_data->txt_file = NULL;
+	}
 
 	if (discard_empty && saved_bytes == 0) {
 		remove(saved_path);
