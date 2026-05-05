@@ -25,7 +25,7 @@ window.onload=function()
 				self_uuid = room_manager.selfUuid;
 			},
 			onWsRawMessage: function(payload) {
-				console.log('recv : ', payload.data);
+				console.log('recv len : ', payload.data.length);
 			},
 			onSelfConnectionId: function(payload) {
 				self_con_id = payload.connectionId;

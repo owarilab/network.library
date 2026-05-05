@@ -8,6 +8,13 @@ class RoomServerManager {
 		this.selfUuid = '';
 		this.selfConnectionId = '';
 		this.currentJoinRoomId = '';
+		this.sttChunkMaxBytes = opts.sttChunkMaxBytes || (16 * 1024);
+		this._sttRecording = false;
+		this._sttTargetRate = 16000;
+		this._sttPcmChunks = [];
+		this._sttStream = null;
+		this._sttAudioCtx = null;
+		this._sttWorklet = null;
 		this.callbacks = {};
 		this.setCallbacks(opts.callbacks || {});
 	}
@@ -47,10 +54,6 @@ class RoomServerManager {
 		this.wsSocket = new WebSocket(this.wsBase);
 		this.wsSocket.binaryType = 'arraybuffer';
 		this.wsSocket.addEventListener('open', (event) => {
-			if (this.autoHandshake) {
-				this.selfUuid = Math.random().toString(36).slice(-8);
-				this.send(this.selfUuid);
-			}
 			this.emit('onWsOpen', {
 				event,
 				manager: this,
@@ -62,94 +65,6 @@ class RoomServerManager {
 			this.emit('onWsRawMessage', {
 				event,
 				data: event.data,
-				manager: this,
-				state: this.getState()
-			});
-
-			let packet;
-			try {
-				packet = JSON.parse(event.data);
-			} catch (error) {
-				this.emit('onParseError', {
-					error,
-					source: 'ws_message',
-					data: event.data,
-					manager: this,
-					state: this.getState()
-				});
-				return;
-			}
-
-			const hasCommonFields =
-				packet &&
-				packet.id !== undefined &&
-				packet.type !== undefined &&
-				packet.message !== undefined;
-
-			if (!hasCommonFields) {
-				this.emit('onWsMessage', {
-					packet,
-					event,
-					manager: this,
-					state: this.getState()
-				});
-				return;
-			}
-
-			if (packet.type === 'message') {
-				if (this.selfUuid && packet.message === this.selfUuid) {
-					this.selfConnectionId = packet.id;
-					this.emit('onSelfConnectionId', {
-						connectionId: this.selfConnectionId,
-						packet,
-						manager: this,
-						state: this.getState()
-					});
-				}
-				this.emit('onMessage', {
-					connectionId: packet.id,
-					message: packet.message,
-					packet,
-					event,
-					manager: this,
-					state: this.getState()
-				});
-			} else if (packet.type === 'join' || packet.type === 'leave') {
-				let roomInfo = null;
-				if (typeof packet.message === 'string' && packet.message.length > 0) {
-					try {
-						roomInfo = JSON.parse(packet.message);
-					} catch (error) {
-						this.emit('onParseError', {
-							error,
-							source: packet.type,
-							data: packet.message,
-							manager: this,
-							state: this.getState()
-						});
-					}
-				}
-
-				const payload = {
-					connectionId: packet.id,
-					roomInfo,
-					message: packet.message,
-					packet,
-					event,
-					manager: this,
-					state: this.getState()
-				};
-
-				if (packet.type === 'join') {
-					this.emit('onJoin', payload);
-				} else {
-					this.emit('onLeave', payload);
-				}
-			}
-
-			this.emit('onWsMessage', {
-				packet,
-				event,
 				manager: this,
 				state: this.getState()
 			});
@@ -372,45 +287,6 @@ class RoomServerManager {
 	// ─── STT / WAV recording ───────────────────────────────────────────
 
 	/**
-	 * Build a WAV file ArrayBuffer from Int16 PCM samples.
-	 * @param {Int16Array} int16Array - raw PCM samples (mono)
-	 * @param {number} sampleRate     - sample rate in Hz (e.g. 16000)
-	 * @returns {ArrayBuffer}
-	 */
-	buildWavBuffer(int16Array, sampleRate) {
-		const numChannels = 1;
-		const bitsPerSample = 16;
-		const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
-		const blockAlign = numChannels * (bitsPerSample / 8);
-		const dataSize = int16Array.length * 2; // bytes
-		const buffer = new ArrayBuffer(44 + dataSize);
-		const view = new DataView(buffer);
-		const writeStr = (offset, str) => {
-			for (let i = 0; i < str.length; i++) {
-				view.setUint8(offset + i, str.charCodeAt(i));
-			}
-		};
-		// RIFF chunk
-		writeStr(0, 'RIFF');
-		view.setUint32(4, 36 + dataSize, true);
-		writeStr(8, 'WAVE');
-		// fmt chunk
-		writeStr(12, 'fmt ');
-		view.setUint32(16, 16, true);            // chunk size
-		view.setUint16(20, 1, true);             // PCM
-		view.setUint16(22, numChannels, true);
-		view.setUint32(24, sampleRate, true);
-		view.setUint32(28, byteRate, true);
-		view.setUint16(32, blockAlign, true);
-		view.setUint16(34, bitsPerSample, true);
-		// data chunk
-		writeStr(36, 'data');
-		view.setUint32(40, dataSize, true);
-		new Int16Array(buffer, 44).set(int16Array);
-		return buffer;
-	}
-
-	/**
 	 * Nearest-neighbor downsample Float32 audio to targetRate.
 	 */
 	downsampleTo(audioData, sourceSampleRate, targetRate) {
@@ -433,10 +309,80 @@ class RoomServerManager {
 		return out;
 	}
 
+	appendSttPcmChunk(int16Chunk) {
+		if (!int16Chunk || int16Chunk.length === 0) {
+			return;
+		}
+		this._sttPcmChunks.push(int16Chunk);
+	}
+
+	collectSttPcmChunks() {
+		const totalSamples = this._sttPcmChunks.reduce((acc, chunk) => acc + chunk.length, 0);
+		const fullPcm = new Int16Array(totalSamples);
+		let offset = 0;
+		for (const chunk of this._sttPcmChunks) {
+			fullPcm.set(chunk, offset);
+			offset += chunk.length;
+		}
+		this._sttPcmChunks = [];
+		return fullPcm;
+	}
+
+	releaseSttResources() {
+		if (this._sttWorklet) {
+			this._sttWorklet.disconnect();
+			this._sttWorklet = null;
+		}
+		if (this._sttStream) {
+			this._sttStream.getTracks().forEach((track) => track.stop());
+			this._sttStream = null;
+		}
+		if (this._sttAudioCtx) {
+			this._sttAudioCtx.close();
+			this._sttAudioCtx = null;
+		}
+	}
+
+	sendSttControlMessage(type, extra = {}) {
+		if (!this.isConnected()) {
+			return false;
+		}
+		this.wsSocket.send(JSON.stringify(Object.assign({ type }, extra)));
+		return true;
+	}
+
+	sendSttPcmChunks(fullPcm) {
+		const samplesPerSlice = Math.floor(this.sttChunkMaxBytes / 2);
+		let sentCount = 0;
+		let totalBytesSent = 0;
+
+		if (samplesPerSlice <= 0) {
+			console.error('[STT] invalid sttChunkMaxBytes:', this.sttChunkMaxBytes);
+			return { sentCount: 0, totalBytesSent: 0 };
+		}
+
+		for (let i = 0; i < fullPcm.length; i += samplesPerSlice) {
+			const slice = fullPcm.subarray(i, i + samplesPerSlice);
+			const pcmBuffer = slice.buffer.slice(slice.byteOffset, slice.byteOffset + slice.byteLength);
+
+			if (!this.isConnected()) {
+				console.error('[STT] WebSocket disconnected mid-transmission');
+				break;
+			}
+
+			this.wsSocket.send(pcmBuffer);
+			sentCount++;
+			totalBytesSent += pcmBuffer.byteLength;
+			console.log(`[STT] pcm chunk ${sentCount}: ${pcmBuffer.byteLength} bytes sent`);
+		}
+
+		return { sentCount, totalBytesSent };
+	}
+
 	/**
 	 * Start microphone capture.
-	 * Collects PCM data in memory; call stopSttRecording() to send WAV.
-	 * @param {number} targetSampleRate - target Hz for WAV (default 16000)
+	 * Collects PCM data in memory; call stopSttRecording() to send PCM chunks.
+	 * @param {number} targetSampleRate - target Hz for PCM (default 16000)
 	 */
 	async startSttRecording(targetSampleRate = 16000) {
 		if (this._sttRecording) {
@@ -478,17 +424,22 @@ registerProcessor('pcm-capture', PcmCapture);
 			if (!this._sttRecording) return;
 			const f32 = new Float32Array(e.data);
 			const resampled = this.downsampleTo(f32, this._sttAudioCtx.sampleRate, this._sttTargetRate);
-			this._sttPcmChunks.push(this.floatToInt16(resampled));
+			this.appendSttPcmChunk(this.floatToInt16(resampled));
 		};
 
 		source.connect(this._sttWorklet);
 		this._sttRecording = true;
+		this.sendSttControlMessage('stt_init', {
+			sample_rate: this._sttTargetRate,
+			channels: 1,
+			bits_per_sample: 16
+		});
 		this.emit('onSttStart', { manager: this, state: this.getState() });
 		console.log(`[STT] recording started (target: ${targetSampleRate} Hz)`);
 	}
 
 	/**
-	 * Stop recording and send the captured audio as a WAV binary WebSocket message.
+	 * Stop recording and send the captured audio as raw PCM binary chunks.
 	 * @returns {number} bytes sent, or 0 on error
 	 */
 	stopSttRecording() {
@@ -498,34 +449,26 @@ registerProcessor('pcm-capture', PcmCapture);
 		}
 		this._sttRecording = false;
 
-		if (this._sttWorklet) { this._sttWorklet.disconnect(); this._sttWorklet = null; }
-		if (this._sttStream) { this._sttStream.getTracks().forEach(t => t.stop()); this._sttStream = null; }
-		if (this._sttAudioCtx) { this._sttAudioCtx.close(); this._sttAudioCtx = null; }
+		const fullPcm = this.collectSttPcmChunks();
+		this.releaseSttResources();
 
-		// Concatenate all PCM chunks
-		const totalSamples = this._sttPcmChunks.reduce((s, c) => s + c.length, 0);
-		const pcm = new Int16Array(totalSamples);
-		let offset = 0;
-		for (const chunk of this._sttPcmChunks) {
-			pcm.set(chunk, offset);
-			offset += chunk.length;
-		}
-		this._sttPcmChunks = [];
-
-		if (totalSamples === 0) {
+		if (fullPcm.length === 0) {
 			console.warn('[STT] no audio captured');
+			this.sendSttControlMessage('stt_stop');
+			this.emit('onSttStop', { bytesSent: 0, chunkCount: 0, manager: this, state: this.getState() });
 			return 0;
 		}
 
-		const wavBuffer = this.buildWavBuffer(pcm, this._sttTargetRate);
-		if (this.isConnected()) {
-			this.wsSocket.send(wavBuffer);
-			console.log(`[STT] WAV sent: ${wavBuffer.byteLength} bytes`);
-			this.emit('onSttStop', { bytesSent: wavBuffer.byteLength, manager: this, state: this.getState() });
-			return wavBuffer.byteLength;
-		}
-		console.error('[STT] WebSocket disconnected, WAV not sent');
-		return 0;
+		const result = this.sendSttPcmChunks(fullPcm);
+		this.sendSttControlMessage('stt_stop');
+		console.log(`[STT] Finished: Sent ${result.sentCount} PCM chunks, total ${result.totalBytesSent} bytes.`);
+		this.emit('onSttStop', {
+			bytesSent: result.totalBytesSent,
+			chunkCount: result.sentCount,
+			manager: this,
+			state: this.getState()
+		});
+		return result.totalBytesSent;
 	}
 }
 
