@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <math.h>
+#include <time.h>
 #include "qs_api.h"
 #include "qs_io.h"
 #include "whisper.h"
@@ -19,9 +20,13 @@ typedef struct STT_CONNECTION_DATA_STRUCT
 	int32_t write_pos;
 	int32_t read_pos;
 	int32_t samples_count;
+	uint64_t total_samples_received;
 	int16_t overlap_buffer[(16000 * 200) / 1000];
 	int32_t overlap_samples;
 	uint32_t window_count;
+	int64_t last_inference_time_ms;
+	uint64_t last_probe_total_samples;
+	char last_logged_text[1024];
 	FILE* wav_file;
 	uint32_t sample_rate;
 	uint16_t channels;
@@ -41,11 +46,20 @@ typedef struct STT_CONNECTION_DATA_STRUCT
 #define STT_KEEP_MS 200
 #define STT_STEP_SAMPLES ((STT_TARGET_SAMPLE_RATE * STT_STEP_MS) / 1000)
 #define STT_KEEP_SAMPLES ((STT_TARGET_SAMPLE_RATE * STT_KEEP_MS) / 1000)
+#define STT_VAD_COOLDOWN_MS 2000
+#define STT_VAD_PROBE_LENGTH_MS 2000
+#define STT_VAD_INFERENCE_LENGTH_MS 5000
+#define STT_VAD_PROBE_SAMPLES ((STT_TARGET_SAMPLE_RATE * STT_VAD_PROBE_LENGTH_MS) / 1000)
+#define STT_VAD_INFERENCE_SAMPLES ((STT_TARGET_SAMPLE_RATE * STT_VAD_INFERENCE_LENGTH_MS) / 1000)
 #define STT_VAD_THRESHOLD 0.15f
 #define STT_VAD_N_FRAMES 20
 #define STT_VAD_FRAME_MS 100
 #define STT_VAD_MIN_ENERGY 0.02f
 #define STT_VAD_MEDIAN_THRESHOLD 1e-6f
+#define STT_WINDOW_MIN_RMS 0.010f
+#define STT_WINDOW_MIN_PEAK 0.050f
+#define STT_WHISPER_NO_SPEECH_THOLD 0.60f
+#define STT_WHISPER_LOGPROB_THOLD -0.80f
 
 int on_connect(QS_EVENT_PARAMETER params);
 int on_http_event(QS_EVENT_PARAMETER params);
@@ -66,8 +80,13 @@ static int stt_append_pcm_to_ring_buffer(STT_CONNECTION_DATA* con_data, const in
 static void stt_process_connections(void);
 static int stt_init_whisper(void);
 static void stt_shutdown_whisper(void);
+static int64_t stt_now_ms(void);
 static int stt_vad_simple(const float* pcm, int n_samples, float thold_prob, float* prob_out);
+static void stt_measure_signal_stats(const float* pcm, int n_samples, float* rms_out, float* peak_out);
+static int stt_is_non_speech_text(const char* text);
+static const char* stt_extract_incremental_text(STT_CONNECTION_DATA* con_data, const char* full_text);
 static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_t* samples, int32_t sample_count);
+static void stt_copy_recent_samples(const STT_CONNECTION_DATA* con_data, int16_t* dst, int32_t sample_count);
 static void stt_send_json_message(QS_EVENT_PARAMETER params, const char* type, const char* path, uint32_t bytes, uint32_t chunks);
 
 QS_MEMORY_CONTEXT g_temporary_memory;
@@ -77,6 +96,13 @@ QS_KVS_CONTEXT g_kvs;
 static uint32_t g_stt_session_counter = 0;
 static STT_CONNECTION_DATA g_stt_connections[STT_CONNECTION_MAX];
 static struct whisper_context* g_whisper_ctx = NULL;
+
+static int64_t stt_now_ms(void)
+{
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	return (int64_t)ts.tv_sec * 1000LL + (int64_t)(ts.tv_nsec / 1000000LL);
+}
 
 static int stt_vad_simple(const float* pcm, int n_samples, float thold_prob, float* prob_out)
 {
@@ -165,13 +191,131 @@ static int stt_init_whisper(void)
 		return 0;
 	}
 	cparams = whisper_context_default_params();
-	g_whisper_ctx = whisper_init_from_file_with_params("../../stt/models/ggml-small.bin", cparams);
+	g_whisper_ctx = whisper_init_from_file_with_params("../../stt/models/ggml-medium.bin", cparams);
 	if (!g_whisper_ctx) {
-		printf("[STT][whisper] init failed: ../../stt/models/ggml-small.bin\n");
+		printf("[STT][whisper] init failed: ../../stt/models/ggml-medium.bin\n");
 		return -1;
 	}
-	printf("[STT][whisper] initialized: ggml-small.bin\n");
+	printf("[STT][whisper] initialized: ggml-medium.bin\n");
 	return 0;
+}
+
+static void stt_measure_signal_stats(const float* pcm, int n_samples, float* rms_out, float* peak_out)
+{
+	double sum = 0.0;
+	float peak = 0.0f;
+	int i;
+
+	if (rms_out) {
+		*rms_out = 0.0f;
+	}
+	if (peak_out) {
+		*peak_out = 0.0f;
+	}
+	if (!pcm || n_samples <= 0) {
+		return;
+	}
+
+	for (i = 0; i < n_samples; i++) {
+		float abs_sample = pcm[i] < 0.0f ? -pcm[i] : pcm[i];
+		sum += (double)pcm[i] * (double)pcm[i];
+		if (abs_sample > peak) {
+			peak = abs_sample;
+		}
+	}
+
+	if (rms_out) {
+		*rms_out = (float)sqrt(sum / n_samples);
+	}
+	if (peak_out) {
+		*peak_out = peak;
+	}
+}
+
+static int stt_is_non_speech_text(const char* text)
+{
+	const char* normalized;
+	if (!text) {
+		return 1;
+	}
+	while (*text == ' ' || *text == '\t' || *text == '\n' || *text == '\r') {
+		text++;
+	}
+	if (*text == '\0') {
+		return 1;
+	}
+	normalized = text;
+	if (strstr(normalized, "ご視聴ありがとうございました") != NULL ||
+		strstr(normalized, "ありがとうございました") != NULL ||
+		strstr(normalized, "(音楽)") != NULL ||
+		strstr(normalized, "[音楽]") != NULL ||
+		strstr(normalized, "(拍手)") != NULL ||
+		strstr(normalized, "[拍手]") != NULL ||
+		strstr(normalized, "♪") != NULL) {
+		return 1;
+	}
+	return 0;
+}
+
+static const char* stt_extract_incremental_text(STT_CONNECTION_DATA* con_data, const char* full_text)
+{
+	const char* delta_text;
+
+	if (!con_data || !full_text) {
+		return NULL;
+	}
+	if (full_text[0] == '\0') {
+		return NULL;
+	}
+	if (con_data->last_logged_text[0] == '\0') {
+		strncpy(con_data->last_logged_text, full_text, sizeof(con_data->last_logged_text) - 1);
+		return full_text;
+	}
+	if (!strcmp(con_data->last_logged_text, full_text)) {
+		return NULL;
+	}
+	if (strstr(full_text, con_data->last_logged_text) == full_text) {
+		delta_text = full_text + strlen(con_data->last_logged_text);
+		while (*delta_text != '\0') {
+			if (*delta_text == ' ' || *delta_text == '\t' || *delta_text == '\n' || *delta_text == '\r' || *delta_text == ',' || *delta_text == '.' || *delta_text == '!' || *delta_text == '?') {
+				delta_text++;
+				continue;
+			}
+			if (strncmp(delta_text, "、", strlen("、")) == 0) {
+				delta_text += strlen("、");
+				continue;
+			}
+			if (strncmp(delta_text, "。", strlen("。")) == 0) {
+				delta_text += strlen("。");
+				continue;
+			}
+			break;
+		}
+		strncpy(con_data->last_logged_text, full_text, sizeof(con_data->last_logged_text) - 1);
+		if (*delta_text == '\0') {
+			return NULL;
+		}
+		return delta_text;
+	}
+	strncpy(con_data->last_logged_text, full_text, sizeof(con_data->last_logged_text) - 1);
+	return full_text;
+}
+
+static void stt_copy_recent_samples(const STT_CONNECTION_DATA* con_data, int16_t* dst, int32_t sample_count)
+{
+	int32_t start_pos;
+	int32_t i;
+
+	if (!con_data || !dst || !con_data->ring_buffer || sample_count <= 0 || sample_count > con_data->ring_capacity_samples) {
+		return;
+	}
+	start_pos = con_data->write_pos - sample_count;
+	while (start_pos < 0) {
+		start_pos += con_data->ring_capacity_samples;
+	}
+	for (i = 0; i < sample_count; i++) {
+		dst[i] = con_data->ring_buffer[(start_pos + i) % con_data->ring_capacity_samples];
+	}
 }
 
 static void stt_shutdown_whisper(void)
@@ -188,11 +332,15 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 	float* pcmf32;
 	struct whisper_full_params wparams;
 	float vad_prob = 0.0f;
+	float window_rms = 0.0f;
+	float window_peak = 0.0f;
+	float max_no_speech_prob = 0.0f;
 	int has_speech;
 	int i;
 	int ret;
 	int n_segments;
 	char full_text[1024];
+	const char* emit_text;
 
 	if (!con_data || !samples || sample_count <= 0 || !g_whisper_ctx) {
 		return;
@@ -207,19 +355,34 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 		pcmf32[i] = (float)samples[i] / 32768.0f;
 	}
 
-	has_speech = stt_vad_simple(pcmf32, sample_count, STT_VAD_THRESHOLD, &vad_prob);
-	if (!has_speech) {
-		printf("[STT][vad] connection_id=%s window=%u speech_ratio=%.2f [SILENT]\n",
-			con_data->connection_id,
-			con_data->window_count,
-			vad_prob);
+	stt_measure_signal_stats(pcmf32, sample_count, &window_rms, &window_peak);
+	if (window_rms < STT_WINDOW_MIN_RMS && window_peak < STT_WINDOW_MIN_PEAK) {
+		// printf("[STT][gate] connection_id=%s window=%u rms=%.4f peak=%.4f [TOO_QUIET]\n",
+		// 	con_data->connection_id,
+		// 	con_data->window_count,
+		// 	window_rms,
+		// 	window_peak);
 		free(pcmf32);
 		return;
 	}
-	printf("[STT][vad] connection_id=%s window=%u speech_ratio=%.2f [SPEECH]\n",
-		con_data->connection_id,
-		con_data->window_count,
-		vad_prob);
+
+	has_speech = stt_vad_simple(pcmf32, sample_count, STT_VAD_THRESHOLD, &vad_prob);
+	if (!has_speech) {
+		printf("[STT][vad] connection_id=%s window=%u speech_ratio=%.2f rms=%.4f peak=%.4f [SILENT]\n",
+			con_data->connection_id,
+			con_data->window_count,
+			vad_prob,
+			window_rms,
+			window_peak);
+		free(pcmf32);
+		return;
+	}
+	// printf("[STT][vad] connection_id=%s window=%u speech_ratio=%.2f rms=%.4f peak=%.4f [SPEECH]\n",
+	// 	con_data->connection_id,
+	// 	con_data->window_count,
+	// 	vad_prob,
+	// 	window_rms,
+	// 	window_peak);
 
 	wparams = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
 	wparams.language = "ja";
@@ -227,7 +390,14 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 	wparams.print_progress = false;
 	wparams.print_realtime = false;
 	wparams.print_timestamps = true;
+	wparams.no_context = true;
 	wparams.single_segment = true;
+	wparams.suppress_blank = true;
+	wparams.suppress_nst = true;
+	wparams.temperature = 0.0f;
+	wparams.temperature_inc = 0.0f;
+	wparams.logprob_thold = STT_WHISPER_LOGPROB_THOLD;
+	wparams.no_speech_thold = STT_WHISPER_NO_SPEECH_THOLD;
 
 	ret = whisper_full(g_whisper_ctx, wparams, pcmf32, sample_count);
 	if (ret != 0) {
@@ -240,14 +410,44 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 	n_segments = whisper_full_n_segments(g_whisper_ctx);
 	for (i = 0; i < n_segments; i++) {
 		const char* seg_text = whisper_full_get_segment_text(g_whisper_ctx, i);
+		float no_speech_prob = whisper_full_get_segment_no_speech_prob(g_whisper_ctx, i);
+		if (no_speech_prob > max_no_speech_prob) {
+			max_no_speech_prob = no_speech_prob;
+		}
 		if (seg_text) {
 			strncat(full_text, seg_text, sizeof(full_text) - strlen(full_text) - 1);
 		}
 	}
+	if (max_no_speech_prob >= STT_WHISPER_NO_SPEECH_THOLD) {
+		printf("[STT][infer] connection_id=%s window=%u skipped by no_speech_prob=%.2f text=%s\n",
+			con_data->connection_id,
+			con_data->window_count,
+			max_no_speech_prob,
+			full_text[0] != '\0' ? full_text : "[empty]");
+		free(pcmf32);
+		return;
+	}
+	if (stt_is_non_speech_text(full_text)) {
+		printf("[STT][infer] connection_id=%s window=%u filtered non-speech text=%s\n",
+			con_data->connection_id,
+			con_data->window_count,
+			full_text[0] != '\0' ? full_text : "[empty]");
+		free(pcmf32);
+		return;
+	}
+	emit_text = stt_extract_incremental_text(con_data, full_text);
+	if (!emit_text) {
+		printf("[STT][infer] connection_id=%s window=%u skipped duplicate text=%s\n",
+			con_data->connection_id,
+			con_data->window_count,
+			full_text[0] != '\0' ? full_text : "[empty]");
+		free(pcmf32);
+		return;
+	}
 	printf("[STT][infer] connection_id=%s window=%u text=%s\n",
 		con_data->connection_id,
 		con_data->window_count,
-		full_text[0] != '\0' ? full_text : "[empty]");
+		emit_text);
 	free(pcmf32);
 }
 
@@ -267,8 +467,12 @@ static void stt_reset_connection_data(STT_CONNECTION_DATA* con_data)
 	con_data->write_pos = 0;
 	con_data->read_pos = 0;
 	con_data->samples_count = 0;
+	con_data->total_samples_received = 0;
 	con_data->overlap_samples = 0;
 	con_data->window_count = 0;
+	con_data->last_inference_time_ms = 0;
+	con_data->last_probe_total_samples = 0;
+	memset(con_data->last_logged_text, 0, sizeof(con_data->last_logged_text));
 	memset(con_data->wav_path, 0, sizeof(con_data->wav_path));
 	memset(con_data->overlap_buffer, 0, sizeof(con_data->overlap_buffer));
 }
@@ -366,6 +570,7 @@ static int stt_append_pcm_to_ring_buffer(STT_CONNECTION_DATA* con_data, const in
 	for (i = 0; i < sample_count; i++) {
 		con_data->ring_buffer[con_data->write_pos] = samples[i];
 		con_data->write_pos = (con_data->write_pos + 1) % con_data->ring_capacity_samples;
+		con_data->total_samples_received++;
 		if (con_data->samples_count < con_data->ring_capacity_samples) {
 			con_data->samples_count++;
 		} else {
@@ -380,39 +585,89 @@ static void stt_process_connections(void)
 	int i;
 	for (i = 0; i < STT_CONNECTION_MAX; i++) {
 		STT_CONNECTION_DATA* con_data = &g_stt_connections[i];
-		while (con_data->connection_id[0] != '\0' && con_data->ring_buffer && con_data->samples_count >= STT_STEP_SAMPLES) {
-			int32_t sample_index;
-			int32_t window_samples = con_data->overlap_samples + STT_STEP_SAMPLES;
-			int16_t infer_window[STT_KEEP_SAMPLES + STT_STEP_SAMPLES];
+		uint64_t new_samples;
+		int64_t now_ms;
+		int64_t elapsed_ms;
+		float vad_prob = 0.0f;
+		float* probe_f32;
+		int has_speech;
+		int32_t sample_index;
+		int32_t inference_samples;
+		int16_t probe_window[STT_VAD_PROBE_SAMPLES];
+		int16_t infer_window[STT_VAD_INFERENCE_SAMPLES];
 
-			if (con_data->overlap_samples > 0) {
-				memcpy(infer_window, con_data->overlap_buffer, sizeof(int16_t) * con_data->overlap_samples);
-			}
-			for (sample_index = 0; sample_index < STT_STEP_SAMPLES; sample_index++) {
-				infer_window[con_data->overlap_samples + sample_index] = con_data->ring_buffer[con_data->read_pos];
-				con_data->read_pos = (con_data->read_pos + 1) % con_data->ring_capacity_samples;
-			}
-			con_data->samples_count -= STT_STEP_SAMPLES;
-			con_data->window_count += 1;
-
-			con_data->overlap_samples = window_samples < STT_KEEP_SAMPLES ? window_samples : STT_KEEP_SAMPLES;
-			memcpy(
-				con_data->overlap_buffer,
-				infer_window + (window_samples - con_data->overlap_samples),
-				sizeof(int16_t) * con_data->overlap_samples
-			);
-
-			printf(
-				"[STT][window] connection_id=%s window=%u step_samples=%d total_samples=%d remain=%d overlap=%d\n",
-				con_data->connection_id,
-				con_data->window_count,
-				STT_STEP_SAMPLES,
-				window_samples,
-				con_data->samples_count,
-				con_data->overlap_samples
-			);
-			stt_run_inference_window(con_data, infer_window, window_samples);
+		if (con_data->connection_id[0] == '\0' || !con_data->ring_buffer) {
+			continue;
 		}
+
+		/* Need minimum audio for VAD probe */
+		if (con_data->total_samples_received < STT_VAD_PROBE_SAMPLES) {
+			continue;
+		}
+
+		/* Advance one step at a time: only process when STEP_SAMPLES of new audio
+		 * have arrived since the last probe. This matches stt/main.cpp VAD mode
+		 * where the probe window advances with real incoming audio, preventing
+		 * the same 5-second window from being inferred repeatedly. */
+		new_samples = con_data->total_samples_received - con_data->last_probe_total_samples;
+		if (new_samples < (uint64_t)STT_STEP_SAMPLES) {
+			continue;
+		}
+		con_data->last_probe_total_samples += STT_STEP_SAMPLES;
+		con_data->window_count++;
+
+		// printf(
+		// 	"[STT][window] connection_id=%s window=%u total_received=%llu new_since_probe=%llu\n",
+		// 	con_data->connection_id,
+		// 	con_data->window_count,
+		// 	(unsigned long long)con_data->total_samples_received,
+		// 	(unsigned long long)new_samples
+		// );
+
+		/* VAD probe: check last STT_VAD_PROBE_LENGTH_MS of audio */
+		stt_copy_recent_samples(con_data, probe_window, STT_VAD_PROBE_SAMPLES);
+		probe_f32 = (float*)malloc(sizeof(float) * STT_VAD_PROBE_SAMPLES);
+		if (!probe_f32) {
+			printf("[STT][vad] probe alloc failed connection_id=%s\n", con_data->connection_id);
+			continue;
+		}
+		for (sample_index = 0; sample_index < STT_VAD_PROBE_SAMPLES; sample_index++) {
+			probe_f32[sample_index] = (float)probe_window[sample_index] / 32768.0f;
+		}
+		has_speech = stt_vad_simple(probe_f32, STT_VAD_PROBE_SAMPLES, STT_VAD_THRESHOLD, &vad_prob);
+		free(probe_f32);
+
+		if (!has_speech) {
+			// printf("[STT][probe] connection_id=%s window=%u speech_ratio=%.2f [SILENT]\n",
+			// 	con_data->connection_id,
+			// 	con_data->window_count,
+			// 	vad_prob);
+			continue;
+		}
+
+		/* Cooldown: prevent inference more often than STT_VAD_COOLDOWN_MS
+		 * (matches stt/main.cpp: t_last_detection cooldown) */
+		now_ms = stt_now_ms();
+		elapsed_ms = now_ms - con_data->last_inference_time_ms;
+		if (con_data->last_inference_time_ms > 0 && elapsed_ms < STT_VAD_COOLDOWN_MS) {
+			// printf("[STT][cooldown] connection_id=%s window=%u elapsed_ms=%lld\n",
+			// 	con_data->connection_id,
+			// 	con_data->window_count,
+			// 	(long long)elapsed_ms);
+			continue;
+		}
+
+		/* Grab inference window: last STT_VAD_INFERENCE_LENGTH_MS (or all available) */
+		inference_samples = (int32_t)(con_data->total_samples_received < STT_VAD_INFERENCE_SAMPLES
+			? con_data->total_samples_received : STT_VAD_INFERENCE_SAMPLES);
+		stt_copy_recent_samples(con_data, infer_window, inference_samples);
+		// printf("[STT][probe] connection_id=%s window=%u speech_ratio=%.2f [SPEECH] inference_samples=%d\n",
+		// 	con_data->connection_id,
+		// 	con_data->window_count,
+		// 	vad_prob,
+		// 	inference_samples);
+		stt_run_inference_window(con_data, infer_window, inference_samples);
+		con_data->last_inference_time_ms = stt_now_ms();
 	}
 }
 
@@ -842,13 +1097,13 @@ int on_ws_event(QS_EVENT_PARAMETER params)
 		return 0;
 	}
 
-	printf("[STT][ws] connection_id=%s opcode=%u size=%zd recording=%d chunks=%u bytes=%u\n",
-		connection_id,
-		opcode,
-		size,
-		con_data->is_recording,
-		con_data->chunk_count,
-		con_data->pcm_data_bytes);
+	// printf("[STT][ws] connection_id=%s opcode=%u size=%zd recording=%d chunks=%u bytes=%u\n",
+	// 	connection_id,
+	// 	opcode,
+	// 	size,
+	// 	con_data->is_recording,
+	// 	con_data->chunk_count,
+	// 	con_data->pcm_data_bytes);
 
 	if (opcode == 1 && message != NULL && size > 0) {
 		QS_JSON_ELEMENT_OBJECT object;
@@ -869,7 +1124,7 @@ int on_ws_event(QS_EVENT_PARAMETER params)
 			api_qs_memory_clean(&g_temporary_memory);
 			return 0;
 		}
-		printf("[STT][ws] text type=%s connection_id=%s\n", msg_type, connection_id);
+		//printf("[STT][ws] text type=%s connection_id=%s\n", msg_type, connection_id);
 
 		if (!strcmp(msg_type, "stt_init")) {
 			sample_rate = api_qs_object_get_integer_val(&object, "sample_rate");
@@ -910,11 +1165,11 @@ int on_ws_event(QS_EVENT_PARAMETER params)
 				printf("[STT] failed to append pcm chunk: connection_id=%s size=%zd\n", connection_id, size);
 			}
 			else {
-				printf("[STT] pcm chunk: connection_id=%s chunk=%u size=%zd total=%u\n",
-					connection_id,
-					con_data->chunk_count,
-					size,
-					con_data->pcm_data_bytes);
+				// printf("[STT] pcm chunk: connection_id=%s chunk=%u size=%zd total=%u\n",
+				// 	connection_id,
+				// 	con_data->chunk_count,
+				// 	size,
+				// 	con_data->pcm_data_bytes);
 			}
 			return 0;
 		}
@@ -923,7 +1178,7 @@ int on_ws_event(QS_EVENT_PARAMETER params)
 			// Legacy fallback: save one binary message as one WAV file.
 			char filepath[256];
 			snprintf(filepath, sizeof(filepath), "./recv_%s_%d.wav", connection_id, file_counter++);
-			qs_fwrite_bin(filepath, (char*)message, (size_t)size);
+			//qs_fwrite_bin(filepath, (char*)message, (size_t)size);
 			printf("[on_ws_event] binary recv: connection_id=%s, size=%zd, saved to %s\n",
 				connection_id, size, filepath);
 		}
