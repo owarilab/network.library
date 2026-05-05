@@ -1146,9 +1146,21 @@ ssize_t qs_parse_websocket_binary( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psock
 	int i, j, startpos;
 	uint64_t cnt = 0;
 	uint64_t tmppayloadlen = 0;
+	size_t tmp_continue_pos = psockparam->continue_pos;
+	size_t parse_size = size;
 	uint8_t* msg = (uint8_t*)qs_upointer( option->memory_pool,basebuf_munit );
 	ssize_t retsize = -1;
 	do{
+		if( psockparam->continue_pos > 0 ){
+			if( psockparam->continue_pos >= size ){
+				psockparam->payloadlen = -1;
+				break;
+			}
+			u8buf += psockparam->continue_pos;
+			size -= psockparam->continue_pos;
+			parse_size = size;
+			psockparam->continue_pos = 0;
+		}
 		if( psockparam->fin == 0 || ( psockparam->fin == 1 && psockparam->tmpmsglen == 0 ) )
 		{
 			if( psockparam->fin == 0 ){
@@ -1201,19 +1213,23 @@ ssize_t qs_parse_websocket_binary( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psock
 			psockparam->payloadmask |= u8buf[psockparam->maskindex+2] << 8;
 			psockparam->payloadmask |= u8buf[psockparam->maskindex+3] << 0;
 			startpos = psockparam->maskindex+4;
+			if( (uint64_t)( size - startpos ) > tmppayloadlen ){
+				parse_size = startpos + (size_t)tmppayloadlen;
+				psockparam->continue_pos = tmp_continue_pos + parse_size;
+			}
 		}
 		else{
 			startpos = 0;
 			cnt = psockparam->tmpmsglen;
 		}
-		for( i = startpos; i < size; i++ )
+		for( i = startpos; i < parse_size; i++ )
 		{
 			if( psockparam->tmpbitsift < 0 ){
 				psockparam->tmpbitsift = 24;
 			}
 			for( j = (psockparam->tmpbitsift/8); j >= 0; j-- )
 			{
-				if( i >= size )
+				if( i >= parse_size )
 				{
 					if( psockparam->fin == 0 || cnt + (3-j) >= psockparam->payloadlen )
 					{
