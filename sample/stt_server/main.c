@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include "qs_api.h"
 #include "qs_io.h"
+#include "whisper.h"
 
 typedef struct STT_CONNECTION_DATA_STRUCT
 {
@@ -57,6 +58,9 @@ static int stt_append_pcm_chunk(STT_CONNECTION_DATA* con_data, const void* data,
 static int stt_finalize_recording(STT_CONNECTION_DATA* con_data, const char* connection_id, int discard_empty);
 static int stt_append_pcm_to_ring_buffer(STT_CONNECTION_DATA* con_data, const int16_t* samples, int32_t sample_count);
 static void stt_process_connections(void);
+static int stt_init_whisper(void);
+static void stt_shutdown_whisper(void);
+static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_t* samples, int32_t sample_count);
 static void stt_send_json_message(QS_EVENT_PARAMETER params, const char* type, const char* path, uint32_t bytes, uint32_t chunks);
 
 QS_MEMORY_CONTEXT g_temporary_memory;
@@ -65,6 +69,84 @@ QS_KVS_CONTEXT g_kvs;
 
 static uint32_t g_stt_session_counter = 0;
 static STT_CONNECTION_DATA g_stt_connections[STT_CONNECTION_MAX];
+static struct whisper_context* g_whisper_ctx = NULL;
+
+static int stt_init_whisper(void)
+{
+	struct whisper_context_params cparams;
+	if (g_whisper_ctx) {
+		return 0;
+	}
+	cparams = whisper_context_default_params();
+	g_whisper_ctx = whisper_init_from_file_with_params("../../stt/models/ggml-tiny.bin", cparams);
+	if (!g_whisper_ctx) {
+		printf("[STT][whisper] init failed: ../../stt/models/ggml-tiny.bin\n");
+		return -1;
+	}
+	printf("[STT][whisper] initialized: ggml-tiny.bin\n");
+	return 0;
+}
+
+static void stt_shutdown_whisper(void)
+{
+	if (g_whisper_ctx) {
+		whisper_free(g_whisper_ctx);
+		g_whisper_ctx = NULL;
+		printf("[STT][whisper] freed\n");
+	}
+}
+
+static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_t* samples, int32_t sample_count)
+{
+	float* pcmf32;
+	struct whisper_full_params wparams;
+	int i;
+	int ret;
+	int n_segments;
+	char full_text[1024];
+
+	if (!con_data || !samples || sample_count <= 0 || !g_whisper_ctx) {
+		return;
+	}
+
+	pcmf32 = (float*)malloc(sizeof(float) * (size_t)sample_count);
+	if (!pcmf32) {
+		printf("[STT][infer] float buffer alloc failed connection_id=%s samples=%d\n", con_data->connection_id, sample_count);
+		return;
+	}
+	for (i = 0; i < sample_count; i++) {
+		pcmf32[i] = (float)samples[i] / 32768.0f;
+	}
+
+	wparams = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
+	wparams.language = "ja";
+	wparams.translate = false;
+	wparams.print_progress = false;
+	wparams.print_realtime = false;
+	wparams.print_timestamps = true;
+	wparams.single_segment = true;
+
+	ret = whisper_full(g_whisper_ctx, wparams, pcmf32, sample_count);
+	if (ret != 0) {
+		printf("[STT][infer] whisper_full failed connection_id=%s ret=%d samples=%d\n", con_data->connection_id, ret, sample_count);
+		free(pcmf32);
+		return;
+	}
+
+	full_text[0] = '\0';
+	n_segments = whisper_full_n_segments(g_whisper_ctx);
+	for (i = 0; i < n_segments; i++) {
+		const char* seg_text = whisper_full_get_segment_text(g_whisper_ctx, i);
+		if (seg_text) {
+			strncat(full_text, seg_text, sizeof(full_text) - strlen(full_text) - 1);
+		}
+	}
+	printf("[STT][infer] connection_id=%s window=%u text=%s\n",
+		con_data->connection_id,
+		con_data->window_count,
+		full_text[0] != '\0' ? full_text : "[empty]");
+	free(pcmf32);
+}
 
 static void stt_reset_connection_data(STT_CONNECTION_DATA* con_data)
 {
@@ -226,6 +308,7 @@ static void stt_process_connections(void)
 				con_data->samples_count,
 				con_data->overlap_samples
 			);
+			stt_run_inference_window(con_data, infer_window, window_samples);
 		}
 	}
 }
@@ -467,6 +550,7 @@ int main( int argc, char *argv[], char *envp[] )
 		return -1;
 	}
 	if(-1==api_qs_kvs_create_b256mb(&g_kvs_memory, &g_kvs)){return -1;}
+	if(-1==stt_init_whisper()){return -1;}
 	int server_port = 8080;
 	int scheduler_mode = QS_SCHEDULER_MODE_LOW;
 	int32_t max_connection = 10;
@@ -579,6 +663,7 @@ int main( int argc, char *argv[], char *envp[] )
 		api_qs_sleep(context);
 	}
 	api_qs_free(context);
+	stt_shutdown_whisper();
 	api_qs_memory_free(&g_temporary_memory);
 	api_qs_memory_free(&g_kvs_memory);
 	return 0;
