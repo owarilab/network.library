@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <math.h>
 #include "qs_api.h"
 #include "qs_io.h"
 #include "whisper.h"
@@ -40,6 +41,11 @@ typedef struct STT_CONNECTION_DATA_STRUCT
 #define STT_KEEP_MS 200
 #define STT_STEP_SAMPLES ((STT_TARGET_SAMPLE_RATE * STT_STEP_MS) / 1000)
 #define STT_KEEP_SAMPLES ((STT_TARGET_SAMPLE_RATE * STT_KEEP_MS) / 1000)
+#define STT_VAD_THRESHOLD 0.15f
+#define STT_VAD_N_FRAMES 20
+#define STT_VAD_FRAME_MS 100
+#define STT_VAD_MIN_ENERGY 0.02f
+#define STT_VAD_MEDIAN_THRESHOLD 1e-6f
 
 int on_connect(QS_EVENT_PARAMETER params);
 int on_http_event(QS_EVENT_PARAMETER params);
@@ -60,6 +66,7 @@ static int stt_append_pcm_to_ring_buffer(STT_CONNECTION_DATA* con_data, const in
 static void stt_process_connections(void);
 static int stt_init_whisper(void);
 static void stt_shutdown_whisper(void);
+static int stt_vad_simple(const float* pcm, int n_samples, float thold_prob, float* prob_out);
 static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_t* samples, int32_t sample_count);
 static void stt_send_json_message(QS_EVENT_PARAMETER params, const char* type, const char* path, uint32_t bytes, uint32_t chunks);
 
@@ -71,6 +78,86 @@ static uint32_t g_stt_session_counter = 0;
 static STT_CONNECTION_DATA g_stt_connections[STT_CONNECTION_MAX];
 static struct whisper_context* g_whisper_ctx = NULL;
 
+static int stt_vad_simple(const float* pcm, int n_samples, float thold_prob, float* prob_out)
+{
+	const int frame_len = STT_TARGET_SAMPLE_RATE * STT_VAD_FRAME_MS / 1000;
+	const int n_frames_total = n_samples / frame_len;
+	float* energies;
+	float* sorted;
+	float energy_median;
+	float prob;
+	int n_check;
+	int speech_frames = 0;
+	int i;
+
+	if (n_frames_total < 1) {
+		if (prob_out) {
+			*prob_out = 0.0f;
+		}
+		return 0;
+	}
+
+	energies = (float*)malloc((size_t)n_frames_total * sizeof(float));
+	if (!energies) {
+		if (prob_out) {
+			*prob_out = 0.0f;
+		}
+		return 0;
+	}
+
+	for (i = 0; i < n_frames_total; i++) {
+		double energy = 0.0;
+		int j;
+		for (j = 0; j < frame_len; j++) {
+			const float sample = pcm[i * frame_len + j];
+			energy += (double)sample * (double)sample;
+		}
+		energies[i] = (float)sqrt(energy / frame_len);
+	}
+
+	sorted = (float*)malloc((size_t)n_frames_total * sizeof(float));
+	if (!sorted) {
+		free(energies);
+		if (prob_out) {
+			*prob_out = 0.0f;
+		}
+		return 0;
+	}
+	memcpy(sorted, energies, (size_t)n_frames_total * sizeof(float));
+	for (i = 1; i < n_frames_total; i++) {
+		float key = sorted[i];
+		int j = i - 1;
+		while (j >= 0 && sorted[j] > key) {
+			sorted[j + 1] = sorted[j];
+			j--;
+		}
+		sorted[j + 1] = key;
+	}
+	if ((n_frames_total % 2) == 0) {
+		int mid = n_frames_total / 2;
+		energy_median = (sorted[mid - 1] + sorted[mid]) * 0.5f;
+	} else {
+		energy_median = sorted[n_frames_total / 2];
+	}
+	free(sorted);
+
+	n_check = STT_VAD_N_FRAMES < n_frames_total ? STT_VAD_N_FRAMES : n_frames_total;
+	for (i = n_frames_total - n_check; i < n_frames_total; i++) {
+		if (energy_median > STT_VAD_MEDIAN_THRESHOLD && energies[i] > energy_median * thold_prob) {
+			speech_frames++;
+		} else if (energies[i] > STT_VAD_MIN_ENERGY) {
+			speech_frames++;
+		}
+	}
+	free(energies);
+
+	prob = (float)speech_frames / (float)n_check;
+	if (prob_out) {
+		*prob_out = prob;
+	}
+	return prob >= thold_prob ? 1 : 0;
+}
+
 static int stt_init_whisper(void)
 {
 	struct whisper_context_params cparams;
@@ -78,12 +165,12 @@ static int stt_init_whisper(void)
 		return 0;
 	}
 	cparams = whisper_context_default_params();
-	g_whisper_ctx = whisper_init_from_file_with_params("../../stt/models/ggml-tiny.bin", cparams);
+	g_whisper_ctx = whisper_init_from_file_with_params("../../stt/models/ggml-small.bin", cparams);
 	if (!g_whisper_ctx) {
-		printf("[STT][whisper] init failed: ../../stt/models/ggml-tiny.bin\n");
+		printf("[STT][whisper] init failed: ../../stt/models/ggml-small.bin\n");
 		return -1;
 	}
-	printf("[STT][whisper] initialized: ggml-tiny.bin\n");
+	printf("[STT][whisper] initialized: ggml-small.bin\n");
 	return 0;
 }
 
@@ -100,6 +187,8 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 {
 	float* pcmf32;
 	struct whisper_full_params wparams;
+	float vad_prob = 0.0f;
+	int has_speech;
 	int i;
 	int ret;
 	int n_segments;
@@ -117,6 +206,20 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 	for (i = 0; i < sample_count; i++) {
 		pcmf32[i] = (float)samples[i] / 32768.0f;
 	}
+
+	has_speech = stt_vad_simple(pcmf32, sample_count, STT_VAD_THRESHOLD, &vad_prob);
+	if (!has_speech) {
+		printf("[STT][vad] connection_id=%s window=%u speech_ratio=%.2f [SILENT]\n",
+			con_data->connection_id,
+			con_data->window_count,
+			vad_prob);
+		free(pcmf32);
+		return;
+	}
+	printf("[STT][vad] connection_id=%s window=%u speech_ratio=%.2f [SPEECH]\n",
+		con_data->connection_id,
+		con_data->window_count,
+		vad_prob);
 
 	wparams = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
 	wparams.language = "ja";
