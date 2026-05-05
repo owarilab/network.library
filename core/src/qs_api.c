@@ -1123,11 +1123,12 @@ void api_qs_exec_websocket(QS_RECV_INFO *rinfo)
 	QS_MEMORY_POOL * temporary_memory = ( QS_MEMORY_POOL* )QS_GET_POINTER( option->memory_pool, context->memid_temporary_memory );
 	qs_memory_clean( temporary_memory );
 	QS_SOCKPARAM* psockparam = &tinfo->sockparam;
-	// Save opcode from raw frame header before parsing resets it
+	size_t ws_frame_offset = psockparam->continue_pos;
+	// Save opcode from the current frame header before parsing resets it.
 	uint8_t* rawbuf = (uint8_t*)qs_upointer(option->memory_pool, rinfo->recvbuf_munit);
 	if (psockparam->tmpmsglen == 0) {
 		// First (or only) frame: save the opcode (1=text, 2=binary)
-		context->ws_opcode = rawbuf[0] & 0x0f;
+		context->ws_opcode = rawbuf[ws_frame_offset] & 0x0f;
 	}
 	context->ws_message_size = 0;
 	ssize_t _tmpmsglen = qs_parse_websocket_binary( option, psockparam, rawbuf, rinfo->recvlen, tinfo->recvmsg_munit );

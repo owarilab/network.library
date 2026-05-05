@@ -1221,6 +1221,10 @@ ssize_t qs_parse_websocket_binary( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psock
 		else{
 			startpos = 0;
 			cnt = psockparam->tmpmsglen;
+			if( size > (size_t)( psockparam->payloadlen - psockparam->tmpmsglen ) ){
+				parse_size = (size_t)( psockparam->payloadlen - psockparam->tmpmsglen );
+				psockparam->continue_pos = tmp_continue_pos + parse_size;
+			}
 		}
 		for( i = startpos; i < parse_size; i++ )
 		{
