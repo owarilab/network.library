@@ -76,6 +76,10 @@ typedef struct QS_SERVER_CONTEXT
 	void* kvs_memory;
 	int32_t memid_kvs_memory;
 	int32_t memid_kvs;
+
+	// websocket binary support
+	uint8_t ws_opcode;		// last received WS opcode (1:text, 2:binary)
+	ssize_t ws_message_size;	// last received WS payload size in bytes
 } QS_SERVER_CONTEXT;
 
 typedef struct QS_CLIENT_CONTEXT
@@ -207,6 +211,8 @@ void api_qs_sleep(QS_SERVER_CONTEXT* context);
 void api_qs_free(QS_SERVER_CONTEXT* context);
 
 char* api_qs_get_ws_message(QS_EVENT_PARAMETER params);
+ssize_t api_qs_get_ws_message_size(QS_EVENT_PARAMETER params);
+uint8_t api_qs_get_ws_opcode(QS_EVENT_PARAMETER params);
 int api_qs_send_ws_message(QS_EVENT_PARAMETER params,const char* message);
 int api_qs_send_ws_message_plane(QS_EVENT_PARAMETER params,const char* message);
 

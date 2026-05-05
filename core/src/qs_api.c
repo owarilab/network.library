@@ -1123,7 +1123,14 @@ void api_qs_exec_websocket(QS_RECV_INFO *rinfo)
 	QS_MEMORY_POOL * temporary_memory = ( QS_MEMORY_POOL* )QS_GET_POINTER( option->memory_pool, context->memid_temporary_memory );
 	qs_memory_clean( temporary_memory );
 	QS_SOCKPARAM* psockparam = &tinfo->sockparam;
-	ssize_t _tmpmsglen = qs_parse_websocket_binary( option, psockparam, (uint8_t*)qs_upointer( option->memory_pool, rinfo->recvbuf_munit ), rinfo->recvlen, tinfo->recvmsg_munit );
+	// Save opcode from raw frame header before parsing resets it
+	uint8_t* rawbuf = (uint8_t*)qs_upointer(option->memory_pool, rinfo->recvbuf_munit);
+	if (psockparam->tmpmsglen == 0) {
+		// First (or only) frame: save the opcode (1=text, 2=binary)
+		context->ws_opcode = rawbuf[0] & 0x0f;
+	}
+	context->ws_message_size = 0;
+	ssize_t _tmpmsglen = qs_parse_websocket_binary( option, psockparam, rawbuf, rinfo->recvlen, tinfo->recvmsg_munit );
 	if( _tmpmsglen < 0 ){
 		qs_disconnect( psockparam );
 		return;
@@ -1134,6 +1141,7 @@ void api_qs_exec_websocket(QS_RECV_INFO *rinfo)
 		}
 		char* msgpbuf = (char*)qs_upointer(option->memory_pool, tinfo->recvmsg_munit);
 		msgpbuf[_tmpmsglen] = '\0';
+		context->ws_message_size = _tmpmsglen;
 
 		if(context->on_ws_event!=NULL){
 			context->system_data = (void*)(msgpbuf);
@@ -1421,6 +1429,22 @@ char* api_qs_get_ws_message(QS_EVENT_PARAMETER params)
 	QS_SERVER_CONTEXT* context = (QS_SERVER_CONTEXT*)option->application_data;
 	char* message = (char*)context->system_data;
 	return message;
+}
+ssize_t api_qs_get_ws_message_size(QS_EVENT_PARAMETER params)
+{
+	QS_RECV_INFO *rinfo = (QS_RECV_INFO *)params->params;
+	QS_SERVER_CONNECTION_INFO * tinfo = (QS_SERVER_CONNECTION_INFO *)rinfo->tinfo;
+	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
+	QS_SERVER_CONTEXT* context = (QS_SERVER_CONTEXT*)option->application_data;
+	return context->ws_message_size;
+}
+uint8_t api_qs_get_ws_opcode(QS_EVENT_PARAMETER params)
+{
+	QS_RECV_INFO *rinfo = (QS_RECV_INFO *)params->params;
+	QS_SERVER_CONNECTION_INFO * tinfo = (QS_SERVER_CONNECTION_INFO *)rinfo->tinfo;
+	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
+	QS_SERVER_CONTEXT* context = (QS_SERVER_CONTEXT*)option->application_data;
+	return context->ws_opcode;
 }
 int api_qs_send_ws_message(QS_EVENT_PARAMETER params,const char* message)
 {
