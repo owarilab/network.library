@@ -1,0 +1,35 @@
+# Build artifacts
+build/
+*.o
+*.a
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Shared libraries (built locally from whisper.cpp)
+libs/
+
+# Executables
+myproj
+*.exe
+*.out
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.clangd
+compile_commands.json
+
+# Model files (large binary - optionally ignore)
+models/*.bin
+models/*.ggml
+
+# Temporary files
+*.log
+.tmp/
+
