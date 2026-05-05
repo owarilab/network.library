@@ -15,6 +15,8 @@ class RoomServerManager {
 		this._sttStream = null;
 		this._sttAudioCtx = null;
 		this._sttWorklet = null;
+		this._sttFlushIntervalMs = opts.sttFlushIntervalMs || 500;
+		this._sttFlushTimer = null;
 		this.callbacks = {};
 		this.setCallbacks(opts.callbacks || {});
 	}
@@ -329,6 +331,10 @@ class RoomServerManager {
 	}
 
 	releaseSttResources() {
+		if (this._sttFlushTimer) {
+			clearInterval(this._sttFlushTimer);
+			this._sttFlushTimer = null;
+		}
 		if (this._sttWorklet) {
 			this._sttWorklet.disconnect();
 			this._sttWorklet = null;
@@ -341,6 +347,33 @@ class RoomServerManager {
 			this._sttAudioCtx.close();
 			this._sttAudioCtx = null;
 		}
+	}
+
+	startSttFlushTimer() {
+		if (this._sttFlushTimer) {
+			clearInterval(this._sttFlushTimer);
+		}
+		this._sttFlushTimer = setInterval(() => {
+			this.flushSttPcmChunks();
+		}, this._sttFlushIntervalMs);
+	}
+
+	flushSttPcmChunks() {
+		let totalBytesSent = 0;
+		let chunkCount = 0;
+		const fullPcm = this.collectSttPcmChunks();
+
+		if (fullPcm.length === 0) {
+			return { sentCount: 0, totalBytesSent: 0 };
+		}
+
+		const result = this.sendSttPcmChunks(fullPcm);
+		totalBytesSent += result.totalBytesSent;
+		chunkCount += result.sentCount;
+		if (result.sentCount > 0) {
+			console.log(`[STT] flush sent ${result.sentCount} chunks, ${result.totalBytesSent} bytes`);
+		}
+		return { sentCount: chunkCount, totalBytesSent };
 	}
 
 	sendSttControlMessage(type, extra = {}) {
@@ -434,6 +467,7 @@ registerProcessor('pcm-capture', PcmCapture);
 			channels: 1,
 			bits_per_sample: 16
 		});
+		this.startSttFlushTimer();
 		this.emit('onSttStart', { manager: this, state: this.getState() });
 		console.log(`[STT] recording started (target: ${targetSampleRate} Hz)`);
 	}
@@ -443,23 +477,14 @@ registerProcessor('pcm-capture', PcmCapture);
 	 * @returns {number} bytes sent, or 0 on error
 	 */
 	stopSttRecording() {
+		let result;
 		if (!this._sttRecording) {
 			console.warn('[STT] not recording');
 			return 0;
 		}
 		this._sttRecording = false;
-
-		const fullPcm = this.collectSttPcmChunks();
 		this.releaseSttResources();
-
-		if (fullPcm.length === 0) {
-			console.warn('[STT] no audio captured');
-			this.sendSttControlMessage('stt_stop');
-			this.emit('onSttStop', { bytesSent: 0, chunkCount: 0, manager: this, state: this.getState() });
-			return 0;
-		}
-
-		const result = this.sendSttPcmChunks(fullPcm);
+		result = this.flushSttPcmChunks();
 		this.sendSttControlMessage('stt_stop');
 		console.log(`[STT] Finished: Sent ${result.sentCount} PCM chunks, total ${result.totalBytesSent} bytes.`);
 		this.emit('onSttStop', {

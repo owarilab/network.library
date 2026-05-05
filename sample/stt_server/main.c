@@ -12,6 +12,14 @@
 typedef struct STT_CONNECTION_DATA_STRUCT
 {
 	char connection_id[256];
+	int16_t* ring_buffer;
+	int32_t ring_capacity_samples;
+	int32_t write_pos;
+	int32_t read_pos;
+	int32_t samples_count;
+	int16_t overlap_buffer[(16000 * 200) / 1000];
+	int32_t overlap_samples;
+	uint32_t window_count;
 	FILE* wav_file;
 	uint32_t sample_rate;
 	uint16_t channels;
@@ -24,6 +32,13 @@ typedef struct STT_CONNECTION_DATA_STRUCT
 } STT_CONNECTION_DATA;
 
 #define STT_CONNECTION_MAX 128
+#define STT_TARGET_SAMPLE_RATE 16000
+#define STT_RING_BUFFER_SECONDS 30
+#define STT_RING_BUFFER_SAMPLES (STT_TARGET_SAMPLE_RATE * STT_RING_BUFFER_SECONDS)
+#define STT_STEP_MS 500
+#define STT_KEEP_MS 200
+#define STT_STEP_SAMPLES ((STT_TARGET_SAMPLE_RATE * STT_STEP_MS) / 1000)
+#define STT_KEEP_SAMPLES ((STT_TARGET_SAMPLE_RATE * STT_KEEP_MS) / 1000)
 
 int on_connect(QS_EVENT_PARAMETER params);
 int on_http_event(QS_EVENT_PARAMETER params);
@@ -31,13 +46,17 @@ int on_ws_event(QS_EVENT_PARAMETER params);
 int on_close(QS_EVENT_PARAMETER params);
 
 static void stt_reset_connection_data(STT_CONNECTION_DATA* con_data);
+static void stt_clear_connection_slot(STT_CONNECTION_DATA* con_data);
 static STT_CONNECTION_DATA* stt_get_or_create_connection_data(const char* connection_id);
 static STT_CONNECTION_DATA* stt_find_connection_data(const char* connection_id);
 static void stt_remove_connection_data(const char* connection_id);
+static int stt_ensure_connection_buffers(STT_CONNECTION_DATA* con_data);
 static int stt_write_wav_header(FILE* fp, uint32_t sample_rate, uint16_t channels, uint16_t bits_per_sample, uint32_t pcm_data_bytes);
 static int stt_begin_recording(STT_CONNECTION_DATA* con_data, const char* connection_id, uint32_t sample_rate, uint16_t channels, uint16_t bits_per_sample);
 static int stt_append_pcm_chunk(STT_CONNECTION_DATA* con_data, const void* data, size_t size);
 static int stt_finalize_recording(STT_CONNECTION_DATA* con_data, const char* connection_id, int discard_empty);
+static int stt_append_pcm_to_ring_buffer(STT_CONNECTION_DATA* con_data, const int16_t* samples, int32_t sample_count);
+static void stt_process_connections(void);
 static void stt_send_json_message(QS_EVENT_PARAMETER params, const char* type, const char* path, uint32_t bytes, uint32_t chunks);
 
 QS_MEMORY_CONTEXT g_temporary_memory;
@@ -52,16 +71,52 @@ static void stt_reset_connection_data(STT_CONNECTION_DATA* con_data)
 	if (!con_data) {
 		return;
 	}
-	memset(con_data->connection_id, 0, sizeof(con_data->connection_id));
 	con_data->wav_file = NULL;
-	con_data->sample_rate = 16000;
+	con_data->sample_rate = STT_TARGET_SAMPLE_RATE;
 	con_data->channels = 1;
 	con_data->bits_per_sample = 16;
 	con_data->pcm_data_bytes = 0;
 	con_data->chunk_count = 0;
 	con_data->session_id = 0;
 	con_data->is_recording = 0;
+	con_data->write_pos = 0;
+	con_data->read_pos = 0;
+	con_data->samples_count = 0;
+	con_data->overlap_samples = 0;
+	con_data->window_count = 0;
 	memset(con_data->wav_path, 0, sizeof(con_data->wav_path));
+	memset(con_data->overlap_buffer, 0, sizeof(con_data->overlap_buffer));
+}
+
+static void stt_clear_connection_slot(STT_CONNECTION_DATA* con_data)
+{
+	if (!con_data) {
+		return;
+	}
+	if (con_data->wav_file) {
+		fclose(con_data->wav_file);
+	}
+	if (con_data->ring_buffer) {
+		free(con_data->ring_buffer);
+	}
+	memset(con_data, 0, sizeof(*con_data));
+}
+
+static int stt_ensure_connection_buffers(STT_CONNECTION_DATA* con_data)
+{
+	if (!con_data) {
+		return -1;
+	}
+	if (!con_data->ring_buffer) {
+		con_data->ring_buffer = (int16_t*)malloc(sizeof(int16_t) * STT_RING_BUFFER_SAMPLES);
+		if (!con_data->ring_buffer) {
+			printf("[STT][ring] alloc failed samples=%d\n", STT_RING_BUFFER_SAMPLES);
+			return -1;
+		}
+		con_data->ring_capacity_samples = STT_RING_BUFFER_SAMPLES;
+		memset(con_data->ring_buffer, 0, sizeof(int16_t) * STT_RING_BUFFER_SAMPLES);
+	}
+	return 0;
 }
 
 static STT_CONNECTION_DATA* stt_find_connection_data(const char* connection_id)
@@ -92,6 +147,9 @@ static STT_CONNECTION_DATA* stt_get_or_create_connection_data(const char* connec
 	}
 	for (i = 0; i < STT_CONNECTION_MAX; i++) {
 		if (g_stt_connections[i].connection_id[0] == '\0') {
+			if (-1 == stt_ensure_connection_buffers(&g_stt_connections[i])) {
+				return NULL;
+			}
 			stt_reset_connection_data(&g_stt_connections[i]);
 			strncpy(g_stt_connections[i].connection_id, connection_id, sizeof(g_stt_connections[i].connection_id) - 1);
 			printf("[STT][map] create slot=%d connection_id=%s\n", i, connection_id);
@@ -108,8 +166,68 @@ static void stt_remove_connection_data(const char* connection_id)
 	if (!con_data) {
 		return;
 	}
-	stt_reset_connection_data(con_data);
+	stt_clear_connection_slot(con_data);
 	printf("[STT][map] remove connection_id=%s\n", connection_id ? connection_id : "");
+}
+
+static int stt_append_pcm_to_ring_buffer(STT_CONNECTION_DATA* con_data, const int16_t* samples, int32_t sample_count)
+{
+	int32_t i;
+
+	if (!con_data || !samples || sample_count <= 0 || !con_data->ring_buffer || con_data->ring_capacity_samples <= 0) {
+		return -1;
+	}
+
+	for (i = 0; i < sample_count; i++) {
+		con_data->ring_buffer[con_data->write_pos] = samples[i];
+		con_data->write_pos = (con_data->write_pos + 1) % con_data->ring_capacity_samples;
+		if (con_data->samples_count < con_data->ring_capacity_samples) {
+			con_data->samples_count++;
+		} else {
+			con_data->read_pos = (con_data->read_pos + 1) % con_data->ring_capacity_samples;
+		}
+	}
+	return 0;
+}
+
+static void stt_process_connections(void)
+{
+	int i;
+	for (i = 0; i < STT_CONNECTION_MAX; i++) {
+		STT_CONNECTION_DATA* con_data = &g_stt_connections[i];
+		while (con_data->connection_id[0] != '\0' && con_data->ring_buffer && con_data->samples_count >= STT_STEP_SAMPLES) {
+			int32_t sample_index;
+			int32_t window_samples = con_data->overlap_samples + STT_STEP_SAMPLES;
+			int16_t infer_window[STT_KEEP_SAMPLES + STT_STEP_SAMPLES];
+
+			if (con_data->overlap_samples > 0) {
+				memcpy(infer_window, con_data->overlap_buffer, sizeof(int16_t) * con_data->overlap_samples);
+			}
+			for (sample_index = 0; sample_index < STT_STEP_SAMPLES; sample_index++) {
+				infer_window[con_data->overlap_samples + sample_index] = con_data->ring_buffer[con_data->read_pos];
+				con_data->read_pos = (con_data->read_pos + 1) % con_data->ring_capacity_samples;
+			}
+			con_data->samples_count -= STT_STEP_SAMPLES;
+			con_data->window_count += 1;
+
+			con_data->overlap_samples = window_samples < STT_KEEP_SAMPLES ? window_samples : STT_KEEP_SAMPLES;
+			memcpy(
+				con_data->overlap_buffer,
+				infer_window + (window_samples - con_data->overlap_samples),
+				sizeof(int16_t) * con_data->overlap_samples
+			);
+
+			printf(
+				"[STT][window] connection_id=%s window=%u step_samples=%d total_samples=%d remain=%d overlap=%d\n",
+				con_data->connection_id,
+				con_data->window_count,
+				STT_STEP_SAMPLES,
+				window_samples,
+				con_data->samples_count,
+				con_data->overlap_samples
+			);
+		}
+	}
 }
 
 static int stt_write_wav_header(FILE* fp, uint32_t sample_rate, uint16_t channels, uint16_t bits_per_sample, uint32_t pcm_data_bytes)
@@ -193,6 +311,9 @@ static int stt_begin_recording(STT_CONNECTION_DATA* con_data, const char* connec
 
 	stt_reset_connection_data(con_data);
 	strncpy(con_data->connection_id, connection_id, sizeof(con_data->connection_id) - 1);
+	if (-1 == stt_ensure_connection_buffers(con_data)) {
+		return -1;
+	}
 	con_data->sample_rate = sample_rate > 0 ? sample_rate : 16000;
 	con_data->channels = channels > 0 ? channels : 1;
 	con_data->bits_per_sample = bits_per_sample > 0 ? bits_per_sample : 16;
@@ -229,6 +350,7 @@ static int stt_begin_recording(STT_CONNECTION_DATA* con_data, const char* connec
 
 static int stt_append_pcm_chunk(STT_CONNECTION_DATA* con_data, const void* data, size_t size)
 {
+	int32_t sample_count;
 	if (!con_data || !con_data->is_recording || !con_data->wav_file || !data || size == 0) {
 		printf("[STT][append] invalid state con_data=%p recording=%d file=%p data=%p size=%zu\n",
 			(void*)con_data,
@@ -236,6 +358,15 @@ static int stt_append_pcm_chunk(STT_CONNECTION_DATA* con_data, const void* data,
 			con_data ? (void*)con_data->wav_file : NULL,
 			(void*)data,
 			size);
+		return -1;
+	}
+	if ((size % sizeof(int16_t)) != 0) {
+		printf("[STT][append] invalid pcm byte count=%zu\n", size);
+		return -1;
+	}
+	sample_count = (int32_t)(size / sizeof(int16_t));
+	if (-1 == stt_append_pcm_to_ring_buffer(con_data, (const int16_t*)data, sample_count)) {
+		printf("[STT][append] ring buffer append failed samples=%d connection_id=%s\n", sample_count, con_data->connection_id);
 		return -1;
 	}
 	if (size != fwrite(data, 1, size, con_data->wav_file)) {
@@ -444,6 +575,7 @@ int main( int argc, char *argv[], char *envp[] )
 
 	for(;;){
 		api_qs_update(context);
+		stt_process_connections();
 		api_qs_sleep(context);
 	}
 	api_qs_free(context);
