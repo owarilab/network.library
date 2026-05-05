@@ -95,10 +95,14 @@ ls -lh libs/
 
 ## モデルをダウンロード（small が推奨）
 cd ~/whisper.cpp/models
+bash download-ggml-model.sh large
+bash download-ggml-model.sh medium
 bash download-ggml-model.sh small
 bash download-ggml-model.sh tiny
 
 mkdir ./stt/models/
+cp ~/whisper.cpp/models/ggml-large.bin ./stt/models/
+cp ~/whisper.cpp/models/ggml-medium.bin ./stt/models/
 cp ~/whisper.cpp/models/ggml-small.bin ./stt/models/
 cp ~/whisper.cpp/models/ggml-tiny.bin ./stt/models/
 
