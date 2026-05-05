@@ -1,0 +1,241 @@
+/*
+ * Copyright (c) Katsuya Owari
+ */
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include "qs_api.h"
+#include "qs_io.h"
+
+int on_connect(QS_EVENT_PARAMETER params);
+int on_http_event(QS_EVENT_PARAMETER params);
+int on_ws_event(QS_EVENT_PARAMETER params);
+int on_close(QS_EVENT_PARAMETER params);
+
+QS_MEMORY_CONTEXT g_temporary_memory;
+QS_MEMORY_CONTEXT g_kvs_memory;
+QS_KVS_CONTEXT g_kvs;
+
+int main( int argc, char *argv[], char *envp[] )
+{
+#ifdef __WINDOWS__
+	SetConsoleOutputCP(CP_UTF8);
+#endif
+	if(-1==api_qs_memory_alloc(&g_temporary_memory,1024*1024*4))
+	{
+		printf("api_qs_memory_alloc failed\n");
+		return -1;
+	}
+	if(-1==api_qs_memory_alloc(&g_kvs_memory, (size_t)(1024 * 1024) * (size_t)(256 + 16)))
+	{
+		printf("api_qs_memory_alloc failed\n");
+		return -1;
+	}
+	if(-1==api_qs_kvs_create_b256mb(&g_kvs_memory, &g_kvs)){return -1;}
+	int server_port = 8080;
+	int scheduler_mode = QS_SCHEDULER_MODE_LOW;
+	int32_t max_connection = 10;
+	{
+		QS_SERVER_SCRIPT_CONTEXT script;
+		if(-1==api_qs_script_read_file(&g_temporary_memory, &script, "./server.conf")){return -1;}
+		if(-1==api_qs_script_run(&script)){return -1;}
+		if(0!=api_qs_script_get_parameter(&script,"server_port")){
+			server_port = atoi(api_qs_script_get_parameter(&script,"server_port"));
+		}
+		if(0!=api_qs_script_get_parameter(&script,"scheduler_mode")){
+			const char* sm = api_qs_script_get_parameter(&script,"scheduler_mode");
+			if(!strcmp(sm,"high"))       scheduler_mode = QS_SCHEDULER_MODE_HIGH;
+			else if(!strcmp(sm,"middle")) scheduler_mode = QS_SCHEDULER_MODE_MIDDLE;
+			else                          scheduler_mode = QS_SCHEDULER_MODE_LOW;
+		}
+		if(0!=api_qs_script_get_parameter(&script,"max_connection")){
+			int v = atoi(api_qs_script_get_parameter(&script,"max_connection"));
+			if(v < 10) v = 10;
+			if(v > 1000) v = 1000;
+			max_connection = (int32_t)v;
+		}
+		api_qs_memory_clean(&g_temporary_memory);
+	}
+	QS_SERVER_CONTEXT* context = 0;
+	if(0 > api_qs_server_init(&context,server_port,max_connection,QS_SERVER_TYPE_HTTP)){return -1;}
+	if(-1==api_qs_set_scheduler(context,scheduler_mode)){return -1;}
+	if(-1==api_qs_server_create_router(context)){return -1;}
+	if(-1==api_qs_server_create_kvs(context,QS_KVS_MEMORY_TYPE_B1MB)){return -1;}
+	//if(-1==api_qs_server_create_logger_access(context,"./access_log.txt")){return -1;}
+	//if(-1==api_qs_server_create_logger_debug(context,"./debug_log.txt")){return -1;}
+	//if(-1==api_qs_server_create_logger_error(context,"./error_log.txt")){return -1;}
+	api_qs_set_on_connect_event(context, on_connect );
+	api_qs_set_on_http_event(context, on_http_event );
+	api_qs_set_on_websocket_event(context, on_ws_event );
+	api_qs_set_on_close_event(context, on_close );
+
+	// router test
+	if(0)
+	{
+		for(int i=0;i<1000;i++){
+			char* room_name = api_qs_uniqid(&g_temporary_memory,32);
+			QS_JSON_ELEMENT_OBJECT object;
+			api_qs_room_create(context,room_name,&g_temporary_memory,&object);
+			char* json = api_qs_json_encode_object(&object,1024);
+			printf("room_info : %s\n",json);
+			api_qs_memory_clean(&g_temporary_memory);
+		}
+		api_qs_router_memory_info(context);
+	}
+
+	// kvs test
+	if(0)
+	{
+		QS_KVS_CONTEXT kvs;
+		if(-1!=api_qs_server_get_kvs(context,&kvs)){
+			for(int i=0;i<10;i++){
+				char* key = api_qs_uniqid(&g_temporary_memory,32);
+				char value[128];
+				memset(value,0,sizeof(value));
+				int is_create_buffer = 1;
+				if(is_create_buffer){
+					// create buffer (size sizeof(value) bytes)
+					memset(value,' ',sizeof(value)-1);
+					if(-1 != api_qs_kvs_set(&kvs,key,value,0)){
+						char* cache_value = api_qs_kvs_get(&kvs,key);
+						size_t buffer_size = api_qs_kvs_get_buffer_size(&kvs,key);
+						char* random_value = api_qs_uniqid(&g_temporary_memory,128);
+						snprintf(cache_value,buffer_size,"value_%d_%s",i, random_value);
+						char* after_cache_value = api_qs_kvs_get(&kvs,key);
+						size_t after_buffer_size = api_qs_kvs_get_buffer_size(&kvs,key);
+						printf("key : %s , value : %s , buffer_size : %d, strlen(%d)\n",key,after_cache_value,(int)after_buffer_size,(int)strlen(after_cache_value));
+					}
+				}else{
+					char* random_value = api_qs_uniqid(&g_temporary_memory,16);
+					snprintf(value,sizeof(value),"value_%d_%s",i, random_value);
+					api_qs_kvs_set(&kvs,key,value,0);
+				}
+				api_qs_memory_clean(&g_temporary_memory);
+			}
+
+			QS_JSON_ELEMENT_OBJECT object;
+			QS_JSON_ELEMENT_ARRAY array;
+			api_qs_object_create(&g_temporary_memory,&object);
+			api_qs_array_create(&g_temporary_memory,&array);
+			int32_t key_length = api_qs_kvs_keys(&array,&kvs);
+			api_qs_object_push_integer(&object,"len",key_length);
+			api_qs_object_push_array(&object,"keys",&array);
+			char* json = api_qs_json_encode_object(&object,1024 * 512);
+			printf("kvs_info : %s\n",json);
+			for(int i=0;i<api_qs_array_get_length(&array);i++){
+				char* key = api_qs_array_get_string(&array,i);
+				char* value = api_qs_kvs_get(&kvs,key);
+				printf("key : %s , value : %s\n",key,value);
+			}
+			printf("key_length : %d\n",key_length);
+			api_qs_memory_clean(&g_temporary_memory);
+		}
+	}
+
+	//api_qs_memory_info(&g_temporary_memory);
+	//api_qs_memory_info(&g_kvs_memory);
+	//api_qs_router_memory_info(context);
+	//api_qs_kvs_memory_info(context);
+	//api_qs_server_memory_info(context);
+
+	for(;;){
+		api_qs_update(context);
+		api_qs_sleep(context);
+	}
+	api_qs_free(context);
+	api_qs_memory_free(&g_temporary_memory);
+	api_qs_memory_free(&g_kvs_memory);
+	return 0;
+}
+
+int on_connect(QS_EVENT_PARAMETER params)
+{
+	return 0;
+}
+
+int on_http_event(QS_EVENT_PARAMETER params)
+{
+	int http_status_code = 404;
+	//QS_SERVER_CONTEXT* context = api_qs_get_server_context(params);
+	api_qs_memory_clean(&g_temporary_memory);
+	// curl -X POST  -H "Content-Type: application/json" -d '{"arr1":[{"id":1,"value":"arr1_v1"},{"id":2,"value":"arr1_v2"}],"arr2":[{"id":1,"value":"arr2_v1"},{"id":2,"value":"arr2_v2"}]}' "http://localhost:4444/api/json_test"
+	if(!strcmp(api_qs_get_http_method(params),"POST")){
+		if(!strcmp(api_qs_get_http_path(params),"/api/json_test")){
+			printf("body : %s\n",api_qs_get_http_post_body(params));
+			QS_JSON_ELEMENT_OBJECT object;
+			api_qs_json_decode_object(&g_temporary_memory,&object,api_qs_get_http_post_body(params));
+			QS_JSON_ELEMENT_ARRAY arr1;
+			QS_JSON_ELEMENT_ARRAY arr2;
+			api_qs_object_get_array(&object,"arr1",&arr1);
+			api_qs_object_get_array(&object,"arr2",&arr2);
+			printf("arr1 length : %d\n",api_qs_array_get_length(&arr1));
+			printf("arr2 length : %d\n",api_qs_array_get_length(&arr2));
+			int i;
+			printf("<<<show arr1\n");
+			for(i=0;i<api_qs_array_get_length(&arr1);i++){
+				QS_JSON_ELEMENT_OBJECT tmpobj;
+				api_qs_array_get_object(&arr1,i,&tmpobj);
+				int32_t* id = api_qs_object_get_integer(&tmpobj,"id");
+				printf("id : %d\n",*id);
+				printf("value : %s\n",api_qs_object_get_string(&tmpobj,"value"));
+			}
+			printf("<<<show arr2\n");
+			for(i=0;i<api_qs_array_get_length(&arr2);i++){
+				QS_JSON_ELEMENT_OBJECT tmpobj;
+				api_qs_array_get_object(&arr2,i,&tmpobj);
+				int32_t* id = api_qs_object_get_integer(&tmpobj,"id");
+				printf("id : %d\n",*id);
+				printf("value : %s\n",api_qs_object_get_string(&tmpobj,"value"));
+			}
+		}
+	}
+
+	return http_status_code;
+}
+
+int on_ws_event(QS_EVENT_PARAMETER params)
+{
+	uint8_t opcode = api_qs_get_ws_opcode(params);
+
+	if (opcode == 2) {
+		// Binary frame: save as WAV file
+		char* data = api_qs_get_ws_message(params);
+		ssize_t size = api_qs_get_ws_message_size(params);
+		char* connection_id = api_qs_get_connection_id(params);
+		if (data != NULL && size > 0) {
+			char filepath[256];
+			snprintf(filepath, sizeof(filepath), "./recv_%s.wav", connection_id);
+			qs_fwrite_bin(filepath, (char*)data, (size_t)size);
+			printf("[on_ws_event] binary recv: connection_id=%s, size=%zd, saved to %s\n",
+				connection_id, size, filepath);
+			// Echo back a simple text acknowledgement
+			api_qs_send_ws_message(params, "{\"type\":\"wav_received\",\"ok\":true}");
+		}
+		return 0;
+	}
+
+	// Text frame: existing echo behaviour
+	char* message = api_qs_get_ws_message(params);
+
+	int is_debug = 1;
+	if(is_debug)
+	{
+		uint8_t* con_data = api_qs_get_connection_data(params);
+		size_t con_data_size = api_qs_get_connection_data_size(params);
+		char* connection_id = api_qs_get_connection_id(params);
+		if(con_data != NULL){
+			uint64_t* send_counter = (uint64_t*)con_data;
+			(*send_counter)++;
+			printf("[on_ws_event] connection_id=%s, size=%zu, count=%llu\n", connection_id, con_data_size, (unsigned long long)*send_counter);
+		}
+	}
+
+	api_qs_send_ws_message(params,message);
+	return 0;
+}
+
+int on_close(QS_EVENT_PARAMETER params)
+{
+	return 0;
+}

@@ -1,0 +1,179 @@
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=0">
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta http-equiv="Content-Style-Type" content="text/css">
+<meta http-equiv="Content-Script-Type" content="text/javascript">
+<title>ws sample</title>
+<script type="text/javascript" src="/js/room.js"></script>
+<script type="text/javascript">
+var ws_socket = null;
+var self_uuid = '';
+var self_con_id = '';
+var current_join_room_id = '';
+var http_base = window.location.origin;
+var ws_base = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host;
+var room_manager = null;
+window.onload=function()
+{
+	room_manager = new RoomServerManager({
+		httpBase: http_base,
+		wsBase: ws_base,
+		callbacks: {
+			onWsOpen: function() {
+				ws_socket = room_manager.wsSocket;
+				self_uuid = room_manager.selfUuid;
+			},
+			onWsRawMessage: function(payload) {
+				console.log('recv : ', payload.data);
+			},
+			onSelfConnectionId: function(payload) {
+				self_con_id = payload.connectionId;
+			},
+			onJoin: function(payload) {
+				if (payload.connectionId !== self_con_id) {
+					console.log('join : ', payload.connectionId);
+					room_manager.send('hello ' + payload.connectionId + ' my con id is ' + self_con_id);
+				}
+			},
+			onLeave: function(payload) {
+				console.log('leave : ', payload.connectionId);
+			},
+			onWsClose: function() {
+				console.log('ws closed');
+				current_join_room_id = '';
+			},
+			onSttStart: function() {
+				document.getElementById('stt_start').disabled = true;
+				document.getElementById('stt_stop').disabled = false;
+				document.getElementById('stt_status').textContent = '録音中...';
+			},
+			onSttStop: function(payload) {
+				document.getElementById('stt_start').disabled = false;
+				document.getElementById('stt_stop').disabled = true;
+				document.getElementById('stt_status').textContent = '送信完了 (' + payload.bytesSent + ' bytes)';
+			},
+			onParseError: function(payload) {
+				console.log('error : ', payload.error);
+			},
+			onHttpError: function(payload) {
+				console.log('http error : ', payload.error);
+			},
+			onCallbackError: function(payload) {
+				console.log('callback error : ', payload.error);
+			}
+		}
+	});
+
+	ws_socket = room_manager.connect();
+}
+function room_list(con_id)
+{
+	if (!room_manager) return;
+	room_manager.listRooms()
+		.then(function(json) {
+			console.log('room list response : ', JSON.stringify(json));
+			if(json.list !== undefined)
+			{
+				let room_list_div = document.getElementById('room_list');
+				let room_join_id = '';
+				room_list_div.innerHTML = '';
+				for(let i=0; i<json.list.length; i++)
+				{
+					let room_id = json.list[i].id;
+					room_list_div.innerHTML += 'Room ID: ' + room_id + '<br>';
+					room_join_id = room_id;
+				}
+				let room_join_id_input = document.getElementById('join_room_id');
+				room_join_id_input.value = room_join_id;
+			}
+		})
+		.catch(function(error) {
+			console.log('room list error : ', error);
+		});
+}
+function room_create(room_name, con_id)
+{
+	if (!room_manager) return;
+	room_manager.createRoom(room_name)
+		.then(function(json) {
+			console.log('room create response : ', JSON.stringify(json));
+			let room_id = json.id;
+			console.log('created room id : ', room_id);
+			let room_join_id_input = document.getElementById('join_room_id');
+			room_join_id_input.value = room_id;
+		})
+		.catch(function(error) {
+			console.log('room create error : ', error);
+		});
+}
+function room_join(room_id,con_id)
+{
+	if (!room_manager) return;
+	room_manager.joinRoom(room_id, con_id)
+		.then(function(json) {
+			console.log('room join response : ', JSON.stringify(json));
+			current_join_room_id = room_id;
+		})
+		.catch(function(error) {
+			console.log('room join error : ', error);
+		});
+}
+function room_leave(room_id,con_id)
+{
+	if (!room_manager) return;
+	room_manager.leaveRoom(room_id, con_id)
+		.then(function(json) {
+			console.log('room leave response : ', JSON.stringify(json));
+			current_join_room_id = '';
+		})
+		.catch(function(error) {
+			console.log('room leave error : ', error);
+		});
+}
+function send_ws_message()
+{
+	if (!room_manager) return;
+	room_manager.send(document.getElementById('send_message').value);
+}
+async function stt_start()
+{
+	if (!room_manager) return;
+	await room_manager.startSttRecording(16000);
+}
+function stt_stop()
+{
+	if (!room_manager) return;
+	room_manager.stopSttRecording();
+}
+</script>
+</head>
+<body style="padding:0;margin:0">
+	<button onclick="room_list(self_con_id)">room list</button>
+	<form id="send_message_form">
+		Message: <input type="text" id="send_message" value="hello server">
+		<button type="button" onclick="send_ws_message()">send</button>
+	</form>
+	<form id="room_create_form">
+		Room ID: <input type="text" id="room_id" value="test_room">
+		<button type="button" onclick="room_create(document.getElementById('room_id').value, self_con_id)">room create</button>
+	</form>
+	<form id="room_join_form">
+		Room ID: <input type="text" id="join_room_id" value="">
+		<button type="button" onclick="room_join(document.getElementById('join_room_id').value, self_con_id)">room join</button>
+	</form>
+	<button onclick="room_leave(current_join_room_id, self_con_id)">room leave</button>
+	<br><br>
+	<div>
+		<b>STT / WAV録音</b><br>
+		<button id="stt_start" onclick="stt_start()">マイク開始</button>
+		<button id="stt_stop" onclick="stt_stop()" disabled>録音停止 &amp; 送信</button>
+		<span id="stt_status" style="margin-left:8px;color:#555">待機中</span>
+	</div>
+	<br>
+	<div>
+		Room List:<br>
+		<div id="room_list"></div>
+	</div>
+</body>
+</html>
