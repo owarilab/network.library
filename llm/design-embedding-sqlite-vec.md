@@ -92,6 +92,10 @@ make QS_EMBEDDING_MODULE_ENABLED=1
 sqlite-vec の取得:
 ```bash
 git clone https://github.com/asg017/sqlite-vec third_party/sqlite-vec
+
+# header生成
+cd sqlite-vec/llm/third_party/sqlite-vec
+make sqlite-vec.h
 ```
 
 ## sqlite-vec の組み込み方法
