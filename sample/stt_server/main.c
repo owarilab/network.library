@@ -278,6 +278,12 @@ static const char* stt_extract_incremental_text(STT_CONNECTION_DATA* con_data, c
 	if (!strcmp(con_data->last_logged_text, full_text)) {
 		return NULL;
 	}
+	/* Reverse containment: new text is a subset of what was already logged.
+	 * Handles hallucinations where Whisper produces fewer repetitions than the
+	 * previous window (e.g. last="はい。×6", full="はい。×4" -> skip). */
+	if (strstr(con_data->last_logged_text, full_text) != NULL) {
+		return NULL;
+	}
 	/* Prefix-based delta extraction: new text starts with last text */
 	if (strstr(full_text, con_data->last_logged_text) == full_text) {
 		delta_text = full_text + strlen(con_data->last_logged_text);
@@ -363,11 +369,11 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 	wparams.print_progress = false;
 	wparams.print_realtime = false;
 	wparams.print_timestamps = true;
-	wparams.no_context = false;
+	wparams.no_context = true;
 	wparams.single_segment = true;
 	wparams.suppress_blank = true;
 	wparams.suppress_nst = true;
-	wparams.temperature = 0.1f;
+	wparams.temperature = 0.4f; // default 0.0f
 	wparams.temperature_inc = 0.0f;
 	wparams.logprob_thold = STT_WHISPER_LOGPROB_THOLD;
 	wparams.no_speech_thold = STT_WHISPER_NO_SPEECH_THOLD;
@@ -439,10 +445,18 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 			abs_end = ts_end;
 		}
 	}
+	int64_t old_processed = con_data->processed_samples;
 	con_data->processed_samples = abs_end;
 	if (con_data->processed_samples > con_data->total_samples_received) {
 		con_data->processed_samples = con_data->total_samples_received;
 	}
+	printf("[STT][debug] connection_id=%s window=%u total=%llu old_processed=%lu new_processed=%lu advance=%ld last_seg_t1_ms=%lld\n",
+		con_data->connection_id, con_data->window_count,
+		(unsigned long long)con_data->total_samples_received,
+		(unsigned long)old_processed,
+		(unsigned long)con_data->processed_samples,
+		(long)(con_data->processed_samples - old_processed),
+		(long long)last_seg_t1_ms);
 	free(pcmf32);
 }
 
@@ -671,9 +685,24 @@ static void stt_process_connections(void)
 			window_start = (int64_t)con_data->processed_samples;
 		}
 		inference_samples = (int32_t)(con_data->total_samples_received - window_start);
+
+		/* DEBUG: log if we're stuck */
 		if (inference_samples <= 0) {
+			printf("[STT][debug] connection_id=%s window=%u total=%llu processed=%lu probe_total=%lu SKIP_ZERO\n",
+				con_data->connection_id, con_data->window_count,
+				(unsigned long long)con_data->total_samples_received,
+				(unsigned long)con_data->processed_samples,
+				(unsigned long)con_data->last_probe_total_samples);
 			continue;
 		}
+
+		/* DEBUG: log window params */
+		printf("[STT][debug] connection_id=%s window=%u total=%llu processed=%lu window_start=%ld inference_samples=%d\n",
+			con_data->connection_id, con_data->window_count,
+			(unsigned long long)con_data->total_samples_received,
+			(unsigned long)con_data->processed_samples,
+			(long)window_start, inference_samples);
+
 		stt_copy_recent_samples(con_data, infer_window, inference_samples);
 		stt_run_inference_window(con_data, infer_window, inference_samples, window_start);
 		con_data->last_inference_time_ms = stt_now_ms();
@@ -786,12 +815,14 @@ static int stt_begin_recording(STT_CONNECTION_DATA* con_data, const char* connec
 		printf("[STT] failed to open txt file: %s\n", con_data->txt_path);
 	}
 	if (-1 == stt_write_wav_header(con_data->wav_file, con_data->sample_rate, con_data->channels, con_data->bits_per_sample, 0)) {
+		if (con_data->txt_file) { fclose(con_data->txt_file); con_data->txt_file = NULL; }
 		fclose(con_data->wav_file);
 		remove(con_data->wav_path);
 		stt_reset_connection_data(con_data);
 		return -1;
 	}
 	if (0 != fseek(con_data->wav_file, 0, SEEK_END)) {
+		if (con_data->txt_file) { fclose(con_data->txt_file); con_data->txt_file = NULL; }
 		fclose(con_data->wav_file);
 		remove(con_data->wav_path);
 		stt_reset_connection_data(con_data);
