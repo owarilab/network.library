@@ -26,6 +26,7 @@ typedef struct STT_CONNECTION_DATA_STRUCT
 	uint32_t window_count;
 	int64_t last_inference_time_ms;
 	uint64_t last_probe_total_samples;
+	uint64_t processed_samples;
 	char last_logged_text[1024];
 	FILE* wav_file;
 	FILE* txt_file;
@@ -88,7 +89,7 @@ static int stt_vad_simple(const float* pcm, int n_samples, float thold_prob, flo
 static void stt_measure_signal_stats(const float* pcm, int n_samples, float* rms_out, float* peak_out);
 static int stt_is_non_speech_text(const char* text);
 static const char* stt_extract_incremental_text(STT_CONNECTION_DATA* con_data, const char* full_text);
-static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_t* samples, int32_t sample_count);
+static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_t* samples, int32_t sample_count, int64_t window_start_samples);
 static void stt_copy_recent_samples(const STT_CONNECTION_DATA* con_data, int16_t* dst, int32_t sample_count);
 static void stt_send_json_message(QS_EVENT_PARAMETER params, const char* type, const char* path, uint32_t bytes, uint32_t chunks);
 
@@ -331,20 +332,17 @@ static void stt_shutdown_whisper(void)
 	}
 }
 
-static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_t* samples, int32_t sample_count)
+static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_t* samples, int32_t sample_count, int64_t window_start_samples)
 {
 	float* pcmf32;
 	struct whisper_full_params wparams;
-	float vad_prob = 0.0f;
-	float window_rms = 0.0f;
-	float window_peak = 0.0f;
 	float max_no_speech_prob = 0.0f;
-	int has_speech;
 	int i;
 	int ret;
 	int n_segments;
 	char full_text[1024];
 	const char* emit_text;
+	int64_t last_seg_t1_ms = -1;
 
 	if (!con_data || !samples || sample_count <= 0 || !g_whisper_ctx) {
 		return;
@@ -359,46 +357,17 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 		pcmf32[i] = (float)samples[i] / 32768.0f;
 	}
 
-	stt_measure_signal_stats(pcmf32, sample_count, &window_rms, &window_peak);
-	if (window_rms < STT_WINDOW_MIN_RMS && window_peak < STT_WINDOW_MIN_PEAK) {
-		// printf("[STT][gate] connection_id=%s window=%u rms=%.4f peak=%.4f [TOO_QUIET]\n",
-		// 	con_data->connection_id,
-		// 	con_data->window_count,
-		// 	window_rms,
-		// 	window_peak);
-		free(pcmf32);
-		return;
-	}
-
-	has_speech = stt_vad_simple(pcmf32, sample_count, STT_VAD_THRESHOLD, &vad_prob);
-	if (!has_speech) {
-		printf("[STT][vad] connection_id=%s window=%u speech_ratio=%.2f rms=%.4f peak=%.4f [SILENT]\n",
-			con_data->connection_id,
-			con_data->window_count,
-			vad_prob,
-			window_rms,
-			window_peak);
-		free(pcmf32);
-		return;
-	}
-	// printf("[STT][vad] connection_id=%s window=%u speech_ratio=%.2f rms=%.4f peak=%.4f [SPEECH]\n",
-	// 	con_data->connection_id,
-	// 	con_data->window_count,
-	// 	vad_prob,
-	// 	window_rms,
-	// 	window_peak);
-
 	wparams = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
 	wparams.language = "ja";
 	wparams.translate = false;
 	wparams.print_progress = false;
 	wparams.print_realtime = false;
 	wparams.print_timestamps = true;
-	wparams.no_context = true;
+	wparams.no_context = false;
 	wparams.single_segment = true;
 	wparams.suppress_blank = true;
 	wparams.suppress_nst = true;
-	wparams.temperature = 0.0f;
+	wparams.temperature = 0.1f;
 	wparams.temperature_inc = 0.0f;
 	wparams.logprob_thold = STT_WHISPER_LOGPROB_THOLD;
 	wparams.no_speech_thold = STT_WHISPER_NO_SPEECH_THOLD;
@@ -417,6 +386,10 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 		float no_speech_prob = whisper_full_get_segment_no_speech_prob(g_whisper_ctx, i);
 		if (no_speech_prob > max_no_speech_prob) {
 			max_no_speech_prob = no_speech_prob;
+		}
+		int64_t seg_t1_ms = whisper_full_get_segment_t1(g_whisper_ctx, i);
+		if (seg_t1_ms > last_seg_t1_ms) {
+			last_seg_t1_ms = seg_t1_ms;
 		}
 		if (seg_text) {
 			strncat(full_text, seg_text, sizeof(full_text) - strlen(full_text) - 1);
@@ -456,6 +429,20 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 		fprintf(con_data->txt_file, "%s\n", emit_text);
 		fflush(con_data->txt_file);
 	}
+	/* Update processed_samples using Whisper's segment timestamp.
+	 * Always advance by at least INFERENCE_SAMPLES to prevent re-inference loops
+	 * when Whisper hallucinates (produces long text with small timestamps). */
+	int64_t abs_end = window_start_samples + STT_VAD_INFERENCE_SAMPLES;
+	if (last_seg_t1_ms > 0) {
+		int64_t ts_end = window_start_samples + last_seg_t1_ms * STT_TARGET_SAMPLE_RATE / 1000;
+		if (ts_end > abs_end) {
+			abs_end = ts_end;
+		}
+	}
+	con_data->processed_samples = abs_end;
+	if (con_data->processed_samples > con_data->total_samples_received) {
+		con_data->processed_samples = con_data->total_samples_received;
+	}
 	free(pcmf32);
 }
 
@@ -480,6 +467,7 @@ static void stt_reset_connection_data(STT_CONNECTION_DATA* con_data)
 	con_data->window_count = 0;
 	con_data->last_inference_time_ms = 0;
 	con_data->last_probe_total_samples = 0;
+	con_data->processed_samples = 0;
 	memset(con_data->last_logged_text, 0, sizeof(con_data->last_logged_text));
 	memset(con_data->wav_path, 0, sizeof(con_data->wav_path));
 	memset(con_data->txt_path, 0, sizeof(con_data->txt_path));
@@ -676,11 +664,18 @@ static void stt_process_connections(void)
 			memset(con_data->last_logged_text, 0, sizeof(con_data->last_logged_text));
 		}
 
-		/* Grab inference window: last STT_VAD_INFERENCE_LENGTH_MS (or all available) */
-		inference_samples = (int32_t)(con_data->total_samples_received < STT_VAD_INFERENCE_SAMPLES
-			? con_data->total_samples_received : STT_VAD_INFERENCE_SAMPLES);
+		/* Grab inference window: from max(processed, total - INFERENCE) to total.
+	 * This ensures we only infer on audio that hasn't been processed yet. */
+		int64_t window_start = (int64_t)con_data->total_samples_received - STT_VAD_INFERENCE_SAMPLES;
+		if ((uint64_t)window_start < con_data->processed_samples) {
+			window_start = (int64_t)con_data->processed_samples;
+		}
+		inference_samples = (int32_t)(con_data->total_samples_received - window_start);
+		if (inference_samples <= 0) {
+			continue;
+		}
 		stt_copy_recent_samples(con_data, infer_window, inference_samples);
-		stt_run_inference_window(con_data, infer_window, inference_samples);
+		stt_run_inference_window(con_data, infer_window, inference_samples, window_start);
 		con_data->last_inference_time_ms = stt_now_ms();
 		/* Advance probe baseline to current position so the NEXT probe is driven
 		 * by fresh incoming audio, not residual queued steps over the same window. */
