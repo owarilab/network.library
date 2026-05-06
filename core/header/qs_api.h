@@ -215,6 +215,8 @@ ssize_t api_qs_get_ws_message_size(QS_EVENT_PARAMETER params);
 uint8_t api_qs_get_ws_opcode(QS_EVENT_PARAMETER params);
 int api_qs_send_ws_message(QS_EVENT_PARAMETER params,const char* message);
 int api_qs_send_ws_message_plane(QS_EVENT_PARAMETER params,const char* message);
+int api_qs_send_ws_binary(QS_EVENT_PARAMETER params,const void* data,size_t size);
+void api_qs_send_ws_binary_by_connection_offset(QS_SERVER_CONTEXT* context,uint32_t connection_offset,const void* data,size_t size);
 
 char* api_qs_get_http_method(QS_EVENT_PARAMETER params);
 char* api_qs_get_http_path(QS_EVENT_PARAMETER params);
