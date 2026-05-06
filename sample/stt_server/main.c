@@ -48,7 +48,7 @@ typedef struct STT_CONNECTION_DATA_STRUCT
 #define STT_KEEP_MS 200
 #define STT_STEP_SAMPLES ((STT_TARGET_SAMPLE_RATE * STT_STEP_MS) / 1000)
 #define STT_KEEP_SAMPLES ((STT_TARGET_SAMPLE_RATE * STT_KEEP_MS) / 1000)
-#define STT_VAD_COOLDOWN_MS 2000
+#define STT_VAD_COOLDOWN_MS 3000
 #define STT_VAD_PROBE_LENGTH_MS 2000
 #define STT_VAD_INFERENCE_LENGTH_MS 5000
 #define STT_VAD_PROBE_SAMPLES ((STT_TARGET_SAMPLE_RATE * STT_VAD_PROBE_LENGTH_MS) / 1000)
@@ -277,6 +277,7 @@ static const char* stt_extract_incremental_text(STT_CONNECTION_DATA* con_data, c
 	if (!strcmp(con_data->last_logged_text, full_text)) {
 		return NULL;
 	}
+	/* Prefix-based delta extraction: new text starts with last text */
 	if (strstr(full_text, con_data->last_logged_text) == full_text) {
 		delta_text = full_text + strlen(con_data->last_logged_text);
 		while (*delta_text != '\0') {
