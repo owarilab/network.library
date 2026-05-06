@@ -13,6 +13,13 @@ class SttManager {
 		this._sttFlushIntervalMs = opts.sttFlushIntervalMs || 500;
 		this._sttFlushTimer = null;
 		this.callbacks = {};
+
+		// transfer rate tracking
+		this._sendBytesThisSecond = 0;
+		this._sendTotalBytes = 0;
+		this._sendRateBps = 0;
+		this._sendRateTimer = null;
+
 		this.setCallbacks(opts.callbacks || {});
 	}
 
@@ -20,6 +27,32 @@ class SttManager {
 		const nextCallbacks = callbacks || {};
 		this.callbacks = Object.assign({}, this.callbacks, nextCallbacks);
 		return this;
+	}
+
+	// ─── Transfer rate tracking ────────────────────────────────────────
+
+	resetSendStats() {
+		if (this._sendRateTimer) clearInterval(this._sendRateTimer);
+		this._sendBytesThisSecond = 0;
+		this._sendTotalBytes = 0;
+		this._sendRateBps = 0;
+		this._sendRateTimer = setInterval(() => {
+			this._sendRateBps = this._sendBytesThisSecond;
+			this._sendBytesThisSecond = 0;
+			this.emit('onSendRate', { rateBps: this._sendRateBps });
+		}, 1000);
+	}
+
+	recordSendBytes(byteLength) {
+		this._sendBytesThisSecond += byteLength;
+		this._sendTotalBytes += byteLength;
+	}
+
+	getSendStats() {
+		return {
+			rateBps: this._sendRateBps,
+			totalBytes: this._sendTotalBytes
+		};
 	}
 
 	isConnected() {
@@ -59,7 +92,14 @@ class SttManager {
 
 	send(message) {
 		if (!this.isConnected()) return false;
+		let byteLength = 0;
+		if (typeof message === 'string') {
+			byteLength = new TextEncoder().encode(message).length;
+		} else if (message instanceof ArrayBuffer) {
+			byteLength = message.byteLength;
+		}
 		this.wsSocket.send(message);
+		if (byteLength > 0) this.recordSendBytes(byteLength);
 		return true;
 	}
 
@@ -148,7 +188,9 @@ class SttManager {
 
 	sendSttControlMessage(type, extra = {}) {
 		if (!this.isConnected()) return false;
-		this.wsSocket.send(JSON.stringify(Object.assign({ type }, extra)));
+		const msg = JSON.stringify(Object.assign({ type }, extra));
+		this.wsSocket.send(msg);
+		this.recordSendBytes(new TextEncoder().encode(msg).length);
 		return true;
 	}
 
@@ -174,6 +216,7 @@ class SttManager {
 			this.wsSocket.send(pcmBuffer);
 			sentCount++;
 			totalBytesSent += pcmBuffer.byteLength;
+			this.recordSendBytes(pcmBuffer.byteLength);
 		}
 
 		return { sentCount, totalBytesSent };
@@ -235,6 +278,7 @@ registerProcessor('pcm-capture', PcmCapture);
 			bits_per_sample: 16
 		});
 		this.startSttFlushTimer();
+		this.resetSendStats();
 		this.emit('onSttStart');
 		console.log(`[STT] recording started (target: ${targetSampleRate} Hz)`);
 	}
