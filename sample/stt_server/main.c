@@ -972,75 +972,6 @@ int main( int argc, char *argv[], char *envp[] )
 	api_qs_set_on_websocket_event(context, on_ws_event );
 	api_qs_set_on_close_event(context, on_close );
 
-	// router test
-	if(0)
-	{
-		for(int i=0;i<1000;i++){
-			char* room_name = api_qs_uniqid(&g_temporary_memory,32);
-			QS_JSON_ELEMENT_OBJECT object;
-			api_qs_room_create(context,room_name,&g_temporary_memory,&object);
-			char* json = api_qs_json_encode_object(&object,1024);
-			printf("room_info : %s\n",json);
-			api_qs_memory_clean(&g_temporary_memory);
-		}
-		api_qs_router_memory_info(context);
-	}
-
-	// kvs test
-	if(0)
-	{
-		QS_KVS_CONTEXT kvs;
-		if(-1!=api_qs_server_get_kvs(context,&kvs)){
-			for(int i=0;i<10;i++){
-				char* key = api_qs_uniqid(&g_temporary_memory,32);
-				char value[128];
-				memset(value,0,sizeof(value));
-				int is_create_buffer = 1;
-				if(is_create_buffer){
-					// create buffer (size sizeof(value) bytes)
-					memset(value,' ',sizeof(value)-1);
-					if(-1 != api_qs_kvs_set(&kvs,key,value,0)){
-						char* cache_value = api_qs_kvs_get(&kvs,key);
-						size_t buffer_size = api_qs_kvs_get_buffer_size(&kvs,key);
-						char* random_value = api_qs_uniqid(&g_temporary_memory,128);
-						snprintf(cache_value,buffer_size,"value_%d_%s",i, random_value);
-						char* after_cache_value = api_qs_kvs_get(&kvs,key);
-						size_t after_buffer_size = api_qs_kvs_get_buffer_size(&kvs,key);
-						printf("key : %s , value : %s , buffer_size : %d, strlen(%d)\n",key,after_cache_value,(int)after_buffer_size,(int)strlen(after_cache_value));
-					}
-				}else{
-					char* random_value = api_qs_uniqid(&g_temporary_memory,16);
-					snprintf(value,sizeof(value),"value_%d_%s",i, random_value);
-					api_qs_kvs_set(&kvs,key,value,0);
-				}
-				api_qs_memory_clean(&g_temporary_memory);
-			}
-
-			QS_JSON_ELEMENT_OBJECT object;
-			QS_JSON_ELEMENT_ARRAY array;
-			api_qs_object_create(&g_temporary_memory,&object);
-			api_qs_array_create(&g_temporary_memory,&array);
-			int32_t key_length = api_qs_kvs_keys(&array,&kvs);
-			api_qs_object_push_integer(&object,"len",key_length);
-			api_qs_object_push_array(&object,"keys",&array);
-			char* json = api_qs_json_encode_object(&object,1024 * 512);
-			printf("kvs_info : %s\n",json);
-			for(int i=0;i<api_qs_array_get_length(&array);i++){
-				char* key = api_qs_array_get_string(&array,i);
-				char* value = api_qs_kvs_get(&kvs,key);
-				printf("key : %s , value : %s\n",key,value);
-			}
-			printf("key_length : %d\n",key_length);
-			api_qs_memory_clean(&g_temporary_memory);
-		}
-	}
-
-	//api_qs_memory_info(&g_temporary_memory);
-	//api_qs_memory_info(&g_kvs_memory);
-	//api_qs_router_memory_info(context);
-	//api_qs_kvs_memory_info(context);
-	//api_qs_server_memory_info(context);
-
 	for(;;){
 		api_qs_update(context);
 		stt_process_connections();
@@ -1068,40 +999,6 @@ int on_connect(QS_EVENT_PARAMETER params)
 int on_http_event(QS_EVENT_PARAMETER params)
 {
 	int http_status_code = 404;
-	//QS_SERVER_CONTEXT* context = api_qs_get_server_context(params);
-	api_qs_memory_clean(&g_temporary_memory);
-	// curl -X POST  -H "Content-Type: application/json" -d '{"arr1":[{"id":1,"value":"arr1_v1"},{"id":2,"value":"arr1_v2"}],"arr2":[{"id":1,"value":"arr2_v1"},{"id":2,"value":"arr2_v2"}]}' "http://localhost:4444/api/json_test"
-	if(!strcmp(api_qs_get_http_method(params),"POST")){
-		if(!strcmp(api_qs_get_http_path(params),"/api/json_test")){
-			printf("body : %s\n",api_qs_get_http_post_body(params));
-			QS_JSON_ELEMENT_OBJECT object;
-			api_qs_json_decode_object(&g_temporary_memory,&object,api_qs_get_http_post_body(params));
-			QS_JSON_ELEMENT_ARRAY arr1;
-			QS_JSON_ELEMENT_ARRAY arr2;
-			api_qs_object_get_array(&object,"arr1",&arr1);
-			api_qs_object_get_array(&object,"arr2",&arr2);
-			printf("arr1 length : %d\n",api_qs_array_get_length(&arr1));
-			printf("arr2 length : %d\n",api_qs_array_get_length(&arr2));
-			int i;
-			printf("<<<show arr1\n");
-			for(i=0;i<api_qs_array_get_length(&arr1);i++){
-				QS_JSON_ELEMENT_OBJECT tmpobj;
-				api_qs_array_get_object(&arr1,i,&tmpobj);
-				int32_t* id = api_qs_object_get_integer(&tmpobj,"id");
-				printf("id : %d\n",*id);
-				printf("value : %s\n",api_qs_object_get_string(&tmpobj,"value"));
-			}
-			printf("<<<show arr2\n");
-			for(i=0;i<api_qs_array_get_length(&arr2);i++){
-				QS_JSON_ELEMENT_OBJECT tmpobj;
-				api_qs_array_get_object(&arr2,i,&tmpobj);
-				int32_t* id = api_qs_object_get_integer(&tmpobj,"id");
-				printf("id : %d\n",*id);
-				printf("value : %s\n",api_qs_object_get_string(&tmpobj,"value"));
-			}
-		}
-	}
-
 	return http_status_code;
 }
 
