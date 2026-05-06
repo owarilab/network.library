@@ -11,6 +11,19 @@
 	font-size: 13px;
 	color: #555;
 }
+#stt_output {
+	margin-top: 12px;
+	padding: 8px;
+	background: #f5f5f5;
+	border: 1px solid #ddd;
+	min-height: 40px;
+	max-height: 300px;
+	overflow-y: auto;
+	font-family: monospace;
+	font-size: 14px;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
 </style>
 <script type="text/javascript" src="/js/room.js"></script>
 <script type="text/javascript">
@@ -35,6 +48,16 @@ window.onload = function() {
 			},
 			onWsRawMessage: function(payload) {
 				console.log('recv len : ', payload.data.length);
+			},
+			onWsBinaryMessage: function(payload) {
+				var el = document.getElementById('stt_output');
+				if (el && payload.text) {
+					el.textContent += payload.text;
+					el.scrollTop = el.scrollHeight;
+				}
+			},
+			onWsTextMessage: function(payload) {
+				console.log('[STT text recv] ' + payload.data);
 			},
 			onWsClose: function() {
 				console.log('ws closed');
@@ -88,6 +111,7 @@ function stt_stop() {
 		<button id="stt_stop" onclick="stt_stop()" disabled>録音停止 &amp; 送信</button>
 		<span id="stt_status" style="margin-left:8px;color:#555">待機中</span>
 		<span id="send_rate"></span>
+		<div id="stt_output"></div>
 	</div>
 </body>
 </html>

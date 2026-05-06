@@ -37,6 +37,8 @@ typedef struct STT_CONNECTION_DATA_STRUCT
 	uint32_t chunk_count;
 	uint32_t session_id;
 	int is_recording;
+	QS_SERVER_CONTEXT* server_context;
+	uint32_t connection_offset;
 	char wav_path[256];
 	char txt_path[256];
 } STT_CONNECTION_DATA;
@@ -373,7 +375,7 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 	wparams.single_segment = true;
 	wparams.suppress_blank = true;
 	wparams.suppress_nst = true;
-	wparams.temperature = 0.4f; // default 0.0f
+	wparams.temperature = 0.0f; // default 0.0f
 	wparams.temperature_inc = 0.0f;
 	wparams.logprob_thold = STT_WHISPER_LOGPROB_THOLD;
 	wparams.no_speech_thold = STT_WHISPER_NO_SPEECH_THOLD;
@@ -390,6 +392,14 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 	for (i = 0; i < n_segments; i++) {
 		const char* seg_text = whisper_full_get_segment_text(g_whisper_ctx, i);
 		float no_speech_prob = whisper_full_get_segment_no_speech_prob(g_whisper_ctx, i);
+
+		printf("[STT][infer] connection_id=%s window=%u segment=%d no_speech_prob=%.2f text=%s\n",
+			con_data->connection_id,
+			con_data->window_count,
+			i,
+			no_speech_prob,
+			seg_text ? seg_text : "[null]");
+
 		if (no_speech_prob > max_no_speech_prob) {
 			max_no_speech_prob = no_speech_prob;
 		}
@@ -431,7 +441,13 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 		con_data->connection_id,
 		con_data->window_count,
 		emit_text);
-	if (con_data->txt_file) {
+	if (con_data->server_context != NULL && emit_text != NULL) {
+		// Send the incremental text as a WebSocket binary message to the client
+		char linebuf[1024];
+		int len = snprintf(linebuf, sizeof(linebuf), "%s\n", emit_text);
+		api_qs_send_ws_binary_by_connection_offset(con_data->server_context, con_data->connection_offset, linebuf, (size_t)len);
+
+		// Also log to text file if enabled
 		fprintf(con_data->txt_file, "%s\n", emit_text);
 		fflush(con_data->txt_file);
 	}
@@ -487,6 +503,8 @@ static void stt_reset_connection_data(STT_CONNECTION_DATA* con_data)
 	memset(con_data->txt_path, 0, sizeof(con_data->txt_path));
 	con_data->txt_file = NULL;
 	memset(con_data->overlap_buffer, 0, sizeof(con_data->overlap_buffer));
+	con_data->server_context = NULL;
+	con_data->connection_offset = 0;
 }
 
 static void stt_clear_connection_slot(STT_CONNECTION_DATA* con_data)
@@ -1111,6 +1129,8 @@ int on_ws_event(QS_EVENT_PARAMETER params)
 
 	if (opcode == 2) {
 		if (con_data->is_recording && message != NULL && size > 0) {
+			con_data->server_context = api_qs_get_server_context(params);
+			con_data->connection_offset = api_qs_get_connection_offset(params);
 			if (-1 == stt_append_pcm_chunk(con_data, message, (size_t)size)) {
 				printf("[STT] failed to append pcm chunk: connection_id=%s size=%zd\n", connection_id, size);
 			}

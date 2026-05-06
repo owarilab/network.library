@@ -71,7 +71,22 @@ class SttManager {
 		});
 
 		this.wsSocket.addEventListener('message', (event) => {
-			this.emit('onWsRawMessage', { data: event.data });
+			if (event.data instanceof ArrayBuffer) {
+				const uint8 = new Uint8Array(event.data);
+				const text = new TextDecoder('utf-8').decode(uint8);
+				console.log('[STT recv binary] len=' + event.data.byteLength + ' text="' + text.replace(/\n$/, '') + '"');
+				this.emit('onWsBinaryMessage', { data: uint8, text: text });
+			} else if (event.data instanceof Blob) {
+				event.data.arrayBuffer().then((buf) => {
+					const uint8 = new Uint8Array(buf);
+					const text = new TextDecoder('utf-8').decode(uint8);
+					console.log('[STT recv binary blob] len=' + buf.byteLength + ' text="' + text.replace(/\n$/, '') + '"');
+					this.emit('onWsBinaryMessage', { data: uint8, text: text });
+				});
+			} else {
+				console.log('[STT recv text] ' + event.data);
+				this.emit('onWsTextMessage', { data: event.data });
+			}
 		});
 
 		this.wsSocket.addEventListener('close', () => {
