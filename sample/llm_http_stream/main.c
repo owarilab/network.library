@@ -445,6 +445,77 @@ static int on_http_event(QS_EVENT_PARAMETER params)
 		return 200;
 	}
 
+	if (strcmp(method, "POST") == 0 && strcmp(path, "/api/llm") == 0) {
+		const char* prompt = api_qs_get_http_post_parameter(params, "q");
+		if (prompt == NULL || prompt[0] == '\0') {
+			prompt = api_qs_get_http_post_body(params);
+		}
+		if (prompt == NULL || prompt[0] == '\0') {
+			prompt = "hello from llm";
+		}
+
+		char* effective_prompt = make_effective_prompt(prompt);
+		if (effective_prompt == NULL) {
+			return 500;
+		}
+
+		JSON_GEN_CONTEXT* ctx = (JSON_GEN_CONTEXT*)malloc(sizeof(JSON_GEN_CONTEXT));
+		if (ctx == NULL) {
+			free(effective_prompt);
+			send_json_http_response(params, 500, "{\"ok\":false,\"error\":\"memory allocation failed\"}");
+			return 500;
+		}
+		ctx->capacity = 4096;
+		ctx->length = 0;
+		ctx->buffer = (char*)malloc(ctx->capacity);
+		if (ctx->buffer == NULL) {
+			free(ctx);
+			free(effective_prompt);
+			send_json_http_response(params, 500, "{\"ok\":false,\"error\":\"memory allocation failed\"}");
+			return 500;
+		}
+		ctx->buffer[0] = '\0';
+
+		int stream_result = qs_llama_module_stream_text(effective_prompt, on_json_token, ctx);
+		free(effective_prompt);
+
+		if (stream_result == -1) {
+			free(ctx->buffer);
+			free(ctx);
+			send_json_http_response(params, 500, "{\"ok\":false,\"error\":\"generation failed\"}");
+			return 500;
+		}
+
+		const char* status_text = "OK";
+		char header[512];
+		snprintf(
+			header,
+			sizeof(header),
+			"HTTP/1.1 200 %s\r\n"
+			"Content-Type: text/plain; charset=utf-8\r\n"
+			"Content-Length: %zu\r\n"
+			"Connection: close\r\n"
+			"\r\n",
+			status_text,
+			ctx->length
+		);
+		size_t response_size = strlen(header) + ctx->length + 1;
+		char* response = (char*)malloc(response_size);
+		if (response == NULL) {
+			free(ctx->buffer);
+			free(ctx);
+			return -1;
+		}
+		response[0] = '\0';
+		strcat(response, header);
+		memcpy(response + strlen(header), ctx->buffer, ctx->length);
+		api_qs_send_response(params, response);
+		free(response);
+		free(ctx->buffer);
+		free(ctx);
+		return 200;
+	}
+
 	if (strcmp(method, "POST") == 0 && strcmp(path, "/api/llm/json") == 0) {
 		const char* prompt = api_qs_get_http_post_parameter(params, "q");
 		if (prompt == NULL || prompt[0] == '\0') {
