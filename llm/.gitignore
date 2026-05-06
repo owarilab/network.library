@@ -1,2 +1,3 @@
 third_party/llama.cpp
 third_party/stable-diffusion.cpp
+third_party/sqlite-vec

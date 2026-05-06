@@ -86,12 +86,58 @@ make QS_EMBEDDING_MODULE_ENABLED=1
 |---|---|---|
 | llama.cpp | latest | `third_party/llama.cpp/` |
 | sqlite-vec | latest | `third_party/sqlite-vec/` |
-| SQLite3 | 3.35+ (システム) | システム / third_party |
+| SQLite3 | 3.45.1 (システムランタイム) | システム (`/usr/bin/sqlite3`) |
+| libsqlite3-dev | 必須 | **未インストール** (`sudo apt-get install libsqlite3-dev`) |
 
 sqlite-vec の取得:
 ```bash
 git clone https://github.com/asg017/sqlite-vec third_party/sqlite-vec
 ```
+
+## sqlite-vec の組み込み方法
+
+### 単一Cファイル方式（推奨）
+
+sqlite-vec は **依存なしの単一Cファイル** (`sqlite-vec.c`, 約10K行) で構成される。シェアードライブラリ化不要で、プロジェクトの他のCファイルと一緒に直接コンパイルして静的ライブラリに含める。
+
+```makefile
+# Makefileでの組み込み例
+EMBEDDING_OBJS += third_party/sqlite-vec/sqlite-vec.o
+
+$(PROGRAM): $(OBJGROUP) $(EMBEDDING_OBJS)
+	$(AR) r $(PROGRAMOUT)$(PROGRAM) $(OBJGROUP) $(EMBEDDING_OBJS)
+
+third_party/sqlite-vec/sqlite-vec.o: third_party/sqlite-vec/sqlite-vec.c
+	$(CC) $(CFLAG) -c $< -o $@
+```
+
+### sqlite-vec の API 仕様
+
+sqlite-vec に独立の C API は存在しない。すべての操作は標準 SQLite3 C API (`sqlite3_*` 関数) で行う。
+
+**ベクトル値の表現形式**: JSON配列文字列（`[v1,v2,...]`）。`(v1,v2,...)` ではない。
+
+```c
+// データベースを開く
+sqlite3_open(db_path, &db);
+
+// vec0 virtual table作成
+sqlite3_exec(db, "CREATE VIRTUAL TABLE t USING vec0(embedding float[768])", NULL, NULL, NULL);
+
+// INSERT (ベクトルは JSON配列形式の文字列)
+sqlite3_prepare_v2(db, "INSERT INTO t(rowid, embedding) VALUES (?, ?)", -1, &stmt, NULL);
+sqlite3_bind_int64(stmt, 1, id);
+sqlite3_bind_text(stmt, 2, "[0.1,-0.2,...]", -1, SQLITE_STATIC);
+sqlite3_step(stmt);
+
+// KNN検索 (cosine distance) — MATCH句 + ORDER BY distance LIMIT
+const char* sql = "SELECT rowid, distance FROM t WHERE embedding MATCH ? ORDER BY distance LIMIT ?";
+sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+sqlite3_bind_text(stmt, 1, "[0.1,-0.2,...]", -1, SQLITE_STATIC); // クエリベクトル
+sqlite3_bind_int(stmt, 2, top_k);                                 // K値
+```
+
+**重要**: 誤って `<->` operator を使わない。正しくは `WHERE embedding MATCH ? ORDER BY distance LIMIT N` 形式。
 
 ## API 設計
 
@@ -163,26 +209,29 @@ CREATE VIRTUAL TABLE embedding_vecs USING vec0(
 
 -- インデックスは不要。sqlite-vec が内部的に HNSW を構築する。
 
--- INSERT (embedding はカンマ区切り文字列で渡す)
-INSERT INTO embedding_vecs(rowid, embedding)
-VALUES (?, ?);
+-- INSERT (embedding は JSON配列形式 "[v1,v2,...]" で渡す)
+INSERT INTO embedding_vecs(rowid, embedding) VALUES (?, ?);
 
--- 類似検索（cosine distance）
-SELECT rowid, vec_distance_cosine(embedding, ?) AS score
-FROM embedding_vecs
-ORDER BY embedding <-> ?
-LIMIT ?;
+-- KNN検索: MATCH句 + ORDER BY distance LIMIT
+SELECT rowid, distance FROM embedding_vecs
+WHERE embedding MATCH '[q1,q2,...]'
+ORDER BY distance LIMIT 5;
 ```
-
-sqlite-vec の C API は SQLite の `sqlite3_prepare_v2` / `sqlite3_bind_*` で操作する。ベクトル値は `(v1,v2,v3,...)` 形式の文字列またはバイナリバインドで渡す。
 
 ### sqlite-vec INSERT/SELECT の呼び出し例
 
 ```c
 static int store_vector(sqlite3* db, int64_t id, const float* embd, int n_embd) {
-    //ベクトルをカンマ区切り文字列に変換
-    char* vec_str = malloc(n_embd * 12);  // "0.123," ≈ 6byte/token
-    // ... sprintf で "(v1,v2,...)" フォーマットに整形
+    // ベクトルを JSON配列形式 "[0.123,-0.456,...]" に変換
+    char* vec_str = malloc(n_embd * 10 + 4);  // "[v,v,...]" ≈ 9byte/token + brackets
+    vec_str[0] = '[';
+    for (int i = 0; i < n_embd; i++) {
+        if (i > 0) vec_str[i*9+1] = ',';
+        int written = snprintf(vec_str + i*9, 10, "%.7g", embd[i]);
+        // ※簡易実装では固定幅が安全でないため、sprintf_s/snprintfで動的調整が必要
+    }
+    vec_str[n_embd * 9] = ']';
+    vec_str[n_embd * 9 + 1] = '\0';
 
     const char* sql = "INSERT INTO embedding_vecs(rowid, embedding) VALUES (?, ?)";
     sqlite3_stmt* stmt;
@@ -197,20 +246,25 @@ static int store_vector(sqlite3* db, int64_t id, const float* embd, int n_embd) 
 
 static int search_vectors(sqlite3* db, const float* query_embd, int n_embd,
                           int top_k, int64_t* out_ids, float* out_scores, int max_results) {
-    // query ベクトルも同様に文字列化してバインド
-    char* vec_str = malloc(n_embd * 12);
-    // ...
+    // クエリベクトルも同様に JSON配列形式に変換
+    char* vec_str = malloc(n_embd * 10 + 4);
+    vec_str[0] = '[';
+    for (int i = 0; i < n_embd; i++) {
+        if (i > 0) vec_str[i*9+1] = ',';
+        snprintf(vec_str + i*9, 10, "%.7g", query_embd[i]);
+    }
+    vec_str[n_embd * 9] = ']';
+    vec_str[n_embd * 9 + 1] = '\0';
 
+    // MATCH句 + ORDER BY distance LIMIT（<-> operatorは使わない）
     const char* sql =
-        "SELECT rowid, vec_distance_cosine(embedding, ?) AS score "
-        "FROM embedding_vecs ORDER BY embedding <-> ? LIMIT ?";
+        "SELECT rowid, distance FROM embedding_vecs "
+        "WHERE embedding MATCH ? ORDER BY distance LIMIT ?";
     sqlite3_stmt* stmt;
     sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
 
-    // query ベクトルを 2 つのバインドパラメータに設定（sqlite-vec の仕様）
     sqlite3_bind_text(stmt, 1, vec_str, -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 2, vec_str, -1, SQLITE_STATIC);
-    sqlite3_bind_int(stmt, 3, max_results);
+    sqlite3_bind_int(stmt, 2, max_results);
 
     int count = 0;
     while (sqlite3_step(stmt) == SQLITE_ROW && count < max_results) {
@@ -224,11 +278,29 @@ static int search_vectors(sqlite3* db, const float* query_embd, int n_embd,
 }
 ```
 
+### vec0 の内部構造（参考）
+
+sqlite-vec は `vec0` virtual table を作成すると、以下の shadow tables も自動生成する:
+
+| Shadow Table | 内容 |
+|---|---|
+| `xyz_chunks` | チャンク管理（rowidのバッチ単位） |
+| `xyz_rowids` | rowid → chunk_id/chunk_offset のマッピング |
+| `xyz_vector_chunksNN` | ベクトルデータ本体（BLOB形式で保存） |
+
+ベクトルはメモリ上で HNSW インデックスを保持し、KNN検索時は近似最近傍探索を行う。正確な全件検索ではないが、「fast enough」の設計思想。
+
 ## 実装計画
 
-### Step 1: sqlite-vec の組み込み
+### Step 0: sqlite3-dev のインストール
 
-`third_party/sqlite-vec/` に取得。C API（`sqlite_vec.h`）を include path に追加。Makefile に `-DSQLITE_ENABLE_VEC=1` や extension のリンク設定を追加。
+```bash
+sudo apt-get install libsqlite3-dev
+```
+
+### Step 1: sqlite-vec.c の直接コンパイル
+
+`third_party/sqlite-vec/sqlite-vec.c` をプロジェクトのオブジェクトに追加。独立ヘッダは不要（`sqlite-vec.h` は内部用）。Makefile に `EMBEDDING_OBJS` を追加。
 
 ### Step 2: qs_embedding_module.c の実装
 
@@ -247,14 +319,27 @@ static int search_vectors(sqlite3* db, const float* query_embd, int n_embd,
 
 ### Step 4: Makefile の更新
 
-```makefile
-# sqlite-vec の include path とリンク
-SQLITE_VEC_DIR := third_party/sqlite-vec
-CFLAGS += -I$(SQLITE_VEC_DIR) -DSQLITE_HAS_CODEC
-LDFLAGS += -lsqlite3 -lm
+`src/Makefile` を修正。sqlite-vec.c は直接コンパイルして静的ライブラリに含むため、LDFLAGSでの `-lsqlite3` は不要（sqlite3はランタイム時の動的リンクで十分）。
 
-# 既存の llama.cpp も含めてビルド
-OBJS += qs_embedding_module.o
+```makefile
+# embedding モジュール有効化時
+ifeq ($(QS_EMBEDDING_MODULE_ENABLED),1)
+DEFINE  += -DQS_EMBEDDING_MODULE_ENABLED=1 -DQS_EMBEDDING_WITH_LLAMA_CPP=1
+EMBEDDING_OBJS += third_party/sqlite-vec/sqlite-vec.o
+OBJGROUP += qs_embedding_module.o
+INCDIR += -I$(LLAMA_CPP_DIR) -I$(LLAMA_CPP_DIR)/include -I$(LLAMA_CPP_DIR)/ggml/include
+endif
+
+build: $(LLAMA_RUNTIME_TARGET) $(PROGRAM)
+
+$(PROGRAM): $(OBJGROUP) $(EMBEDDING_OBJS)
+	$(AR) r  $(PROGRAMOUT)$(PROGRAM) $(OBJGROUP) $(EMBEDDING_OBJS)
+
+third_party/sqlite-vec/sqlite-vec.o: third_party/sqlite-vec/sqlite-vec.c
+	$(CC) $(CFLAG) -c $< -o $@
+
+qs_embedding_module.o: qs_embedding_module.c
+	$(CC) $(DEFINE) $(CFLAG) $(INCDIR) -c $< -o $@
 ```
 
 ## 考慮事項
