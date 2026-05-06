@@ -102,6 +102,7 @@ bash download-ggml-model.sh tiny
 
 mkdir ./stt/models/
 cp ~/whisper.cpp/models/ggml-large-v3-turbo.bin ./stt/models/
+cp ~/whisper.cpp/models/ggml-large-v3.bin ./stt/models/
 cp ~/whisper.cpp/models/ggml-medium.bin ./stt/models/
 cp ~/whisper.cpp/models/ggml-small.bin ./stt/models/
 cp ~/whisper.cpp/models/ggml-tiny.bin ./stt/models/
