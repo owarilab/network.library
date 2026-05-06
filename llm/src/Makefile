@@ -44,7 +44,7 @@ $(PROGRAM): $(OBJGROUP) $(EMBEDDING_OBJS)
 	$(AR) r  $(PROGRAMOUT)$(PROGRAM) $(OBJGROUP) $(EMBEDDING_OBJS)
 
 ../third_party/sqlite-vec/sqlite-vec.o: ../third_party/sqlite-vec/sqlite-vec.c
-	$(CC) $(CFLAG) -c $< -o $@
+	$(CC) $(CFLAG) -DSQLITE_CORE -c $< -o $@
 
 qs_llama_module.o: qs_llama_module.c
 	$(CC) $(DEFINE) $(CFLAG) $(INCDIR) -c qs_llama_module.c -o qs_llama_module.o

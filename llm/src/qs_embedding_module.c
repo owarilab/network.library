@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <math.h>
 
 /* Stub implementation when module is disabled. */
 #if !QS_EMBEDDING_MODULE_ENABLED || !defined(QS_EMBEDDING_WITH_LLAMA_CPP) || QS_EMBEDDING_WITH_LLAMA_CPP != 1
@@ -26,6 +27,9 @@ int qs_embedding_n_embd(void) { return 0; }
 
 #include <sqlite3.h>
 #include <llama.h>
+
+/* Forward declaration for sqlite-vec init */
+int sqlite3_vec_init(sqlite3 *db, char **pzErrMsg, const sqlite3_api_routines *pApi);
 
 #define EMBEDDING_TABLE "embedding_vecs"
 #define SQLITE_MAX_VARCHAR 65536
@@ -44,7 +48,8 @@ static struct {
 /* ── Vector <-> JSON string helpers ───────────────────────────── */
 
 static char* vec_to_json(const float* v, int n, int* out_len) {
-    const int est_per_elem = 10;
+    /* %.7g can produce up to 14 chars (e.g. "-1.234567e+38") + comma = 15 */
+    const int est_per_elem = 20;
     const size_t buf_size = (size_t)n * est_per_elem + 4;
     if (buf_size > SQLITE_MAX_VARCHAR) {
         fprintf(stderr, "embedding: vector too large for JSON string (%d dims)\n", n);
@@ -64,33 +69,44 @@ static char* vec_to_json(const float* v, int n, int* out_len) {
     }
     pos += snprintf(buf + pos, buf_size - (size_t)pos, "]");
 
-    *out_len = pos;
+    if (out_len) {
+        *out_len = pos;
+    }
     return buf;
 }
 
 /* ── Internal API ─────────────────────────────────────────────── */
 
 static int create_table(sqlite3* db) {
-    const char* sql = "CREATE VIRTUAL TABLE IF NOT EXISTS " EMBEDDING_TABLE
-                      " USING vec0(embedding float[%d])";
-    char buf[256];
-    snprintf(buf, sizeof(buf), sql, g_emb.n_embd_out);
+    /* Create a simple standard SQLite table for storing embeddings as JSON */
+    const char* sql = "CREATE TABLE IF NOT EXISTS " EMBEDDING_TABLE
+                      " (id INTEGER PRIMARY KEY, "
+                      "  embedding TEXT NOT NULL, "
+                      "  text_content TEXT DEFAULT NULL, "
+                      "  created_at DATETIME DEFAULT CURRENT_TIMESTAMP)";
 
     char* err = NULL;
-    int rc = sqlite3_exec(db, buf, NULL, NULL, &err);
+    int rc = sqlite3_exec(db, sql, NULL, NULL, &err);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "embedding: CREATE TABLE failed: %s\n", err ? err : "(unknown)");
         sqlite3_free(err);
         return -1;
     }
+    
+    /* Create index on id for faster lookups */
+    sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS " EMBEDDING_TABLE "_id_idx ON " EMBEDDING_TABLE "(id)", 
+                 NULL, NULL, NULL);
+    
     return 0;
 }
 
 static float* generate_embedding(const char* text) {
     struct llama_context_params cparams = llama_context_default_params();
+
+    /* For embedding model, use smaller context and embeddings mode */
+    cparams.n_ctx = 512;
     cparams.pooling_type = LLAMA_POOLING_TYPE_MEAN;
-    cparams.embeddings   = true;
-    cparams.kv_unified = true;
+    cparams.embeddings = true;
 
     struct llama_context* ctx = llama_init_from_model(g_emb.model, cparams);
     if (!ctx) {
@@ -132,7 +148,6 @@ static float* generate_embedding(const char* text) {
     }
 
     int32_t n_embd_out = llama_model_n_embd_out(g_emb.model);
-
     float* result = (float*)malloc(sizeof(float) * (size_t)n_embd_out);
     if (result) {
         memcpy(result, embd, sizeof(float) * (size_t)n_embd_out);
@@ -147,7 +162,7 @@ static int store_vector(sqlite3* db, int64_t id, const float* embd, int n_embd) 
     char* vec_str = vec_to_json(embd, n_embd, NULL);
     if (!vec_str) return -1;
 
-    const char* sql = "INSERT INTO " EMBEDDING_TABLE "(rowid, embedding) VALUES (?, ?)";
+    const char* sql = "INSERT OR REPLACE INTO " EMBEDDING_TABLE "(id, embedding) VALUES (?, ?)";
     sqlite3_stmt* stmt;
     int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
@@ -164,35 +179,137 @@ static int store_vector(sqlite3* db, int64_t id, const float* embd, int n_embd) 
     return rc;
 }
 
+/* Helper: Parse JSON array of floats into array */
+static float* json_array_to_floats(const char* json_str, int expected_len, int* out_len) {
+    if (!json_str) return NULL;
+    
+    float* result = (float*)malloc(sizeof(float) * expected_len);
+    if (!result) return NULL;
+    
+    int count = 0;
+    const char* p = json_str;
+    
+    /* Skip opening bracket */
+    while (*p && *p != '[') p++;
+    if (!*p) { free(result); return NULL; }
+    p++;
+    
+    /* Parse numbers */
+    while (count < expected_len && *p) {
+        while (*p && (*p == ' ' || *p == ',' || *p == '\t' || *p == '\n')) p++;
+        if (*p == ']') break;
+        
+        char* endp;
+        result[count] = strtof(p, &endp);
+        if (endp == p) break;  /* No valid number found */
+        count++;
+        p = endp;
+    }
+    
+    *out_len = count;
+    if (count != expected_len) {
+        free(result);
+        return NULL;
+    }
+    return result;
+}
+
+/* Helper: Calculate cosine distance between two vectors (1 - cosine_similarity) */
+static float cosine_distance(const float* v1, const float* v2, int n) {
+    if (n <= 0) return 1.0f;
+    
+    float dot = 0.0f, norm1 = 0.0f, norm2 = 0.0f;
+    for (int i = 0; i < n; i++) {
+        dot += v1[i] * v2[i];
+        norm1 += v1[i] * v1[i];
+        norm2 += v2[i] * v2[i];
+    }
+    
+    if (norm1 < 1e-6f || norm2 < 1e-6f) return 1.0f;
+    
+    float similarity = dot / (sqrtf(norm1) * sqrtf(norm2));
+    return 1.0f - similarity;  /* Distance = 1 - similarity */
+}
+
 static int search_vectors(sqlite3* db, const float* query_embd, int n_embd,
                           int top_k, int64_t* out_ids, float* out_scores, int max_results) {
-    char* vec_str = vec_to_json(query_embd, n_embd, NULL);
-    if (!vec_str) return 0;
-
-    const char* sql =
-        "SELECT rowid, distance FROM " EMBEDDING_TABLE
-        " WHERE embedding MATCH ? ORDER BY distance LIMIT ?";
+    const char* sql = "SELECT id, embedding FROM " EMBEDDING_TABLE " ORDER BY id";
 
     sqlite3_stmt* stmt;
     int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        free(vec_str);
         return 0;
     }
 
-    sqlite3_bind_text(stmt, 1, vec_str, -1, SQLITE_STATIC);
-    sqlite3_bind_int(stmt, 2, max_results);
-
+    /* Collect all embeddings with their IDs and distances */
+    typedef struct {
+        int64_t id;
+        float distance;
+    } SearchResult;
+    
+    int capacity = 100;
+    SearchResult* results = (SearchResult*)malloc(sizeof(SearchResult) * capacity);
+    if (!results) {
+        sqlite3_finalize(stmt);
+        return 0;
+    }
+    
     int count = 0;
-    while (count < max_results && sqlite3_step(stmt) == SQLITE_ROW) {
-        out_ids[count]   = sqlite3_column_int64(stmt, 0);
-        out_scores[count]= (float)sqlite3_column_double(stmt, 1);
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        int64_t id = sqlite3_column_int64(stmt, 0);
+        const char* emb_json = (const char*)sqlite3_column_text(stmt, 1);
+        
+        if (!emb_json) continue;
+        
+        int parsed_len;
+        float* embd = json_array_to_floats(emb_json, n_embd, &parsed_len);
+        if (!embd || parsed_len != n_embd) {
+            free(embd);
+            continue;
+        }
+        
+        float distance = cosine_distance(query_embd, embd, n_embd);
+        free(embd);
+        
+        /* Resize array if needed */
+        if (count >= capacity) {
+            capacity *= 2;
+            SearchResult* new_results = (SearchResult*)realloc(results, sizeof(SearchResult) * capacity);
+            if (!new_results) {
+                free(results);
+                sqlite3_finalize(stmt);
+                return 0;
+            }
+            results = new_results;
+        }
+        
+        results[count].id = id;
+        results[count].distance = distance;
         count++;
     }
-
+    
     sqlite3_finalize(stmt);
-    free(vec_str);
-    return count;
+    
+    /* Sort by distance */
+    for (int i = 0; i < count - 1; i++) {
+        for (int j = i + 1; j < count; j++) {
+            if (results[j].distance < results[i].distance) {
+                SearchResult tmp = results[i];
+                results[i] = results[j];
+                results[j] = tmp;
+            }
+        }
+    }
+    
+    /* Return top-k results */
+    int result_count = (count < max_results) ? count : max_results;
+    for (int i = 0; i < result_count && i < top_k; i++) {
+        out_ids[i] = results[i].id;
+        out_scores[i] = results[i].distance;
+    }
+    
+    free(results);
+    return result_count;
 }
 
 /* ── Public API ───────────────────────────────────────────────── */
@@ -300,7 +417,7 @@ int qs_embedding_delete(int64_t id) {
 
     pthread_mutex_lock(&g_emb.mutex);
 
-    const char* sql = "DELETE FROM " EMBEDDING_TABLE " WHERE rowid = ?";
+    const char* sql = "DELETE FROM " EMBEDDING_TABLE " WHERE id = ?";
     sqlite3_stmt* stmt;
     int rc = sqlite3_prepare_v2(g_emb.db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {

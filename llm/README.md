@@ -368,7 +368,93 @@ export QS_LLM_MODEL_PATH=/path/to/model.gguf
 export QS_LLM_MAX_TOKENS=128
 ```
 
-### Ubuntu 24.04 で NVIDIA GPU を使う（CUDA Toolkit）
+## Embedding モジュールの有効化
+
+テキストから embedding ベクトルを生成し、sqlite-vec で保存・検索する機能です。`QS_EMBEDDING_MODULE_ENABLED=1` を指定した場合のみビルドされます。
+
+### 事前準備
+
+#### SQLite3 dev パッケージのインストール
+
+```bash
+sudo apt-get install -y libsqlite3-dev
+```
+
+#### sqlite-vec の取得
+
+```bash
+git clone https://github.com/asg017/sqlite-vec llm/third_party/sqlite-vec
+```
+
+#### ヘッダファイルの生成
+
+sqlite-vec.c はヘッダ `sqlite-vec.h` を必要とします。以下で生成します：
+
+```bash
+cd llm/third_party/sqlite-vec
+make sqlite-vec.h
+```
+
+### ビルド
+
+#### LLM + Embedding 両有効（推奨・一般的な構成）
+
+LLM のストリーミング機能と embedding 機能を同時に有効にするには以下のように指定します：
+
+```bash
+cd llm/src
+make build LLAMA_ENABLE=1 LLAMA_CUDA=1 QS_EMBEDDING_MODULE_ENABLED=1
+```
+
+CPU のみの場合：
+
+```bash
+cd llm/src
+make build LLAMA_ENABLE=1 QS_EMBEDDING_MODULE_ENABLED=1
+```
+
+生成物:
+- `llm/libqs_llm_module.a`（ストリーミング + embedding 両機能含む）
+
+#### Embedding のみ有効（実推論なし）
+
+```bash
+cd llm/src
+make build QS_EMBEDDING_MODULE_ENABLED=1
+```
+
+生成物:
+- `llm/libqs_llm_module.a`（embedding 機能のみ）
+
+#### デフォルト（スタブ、機能無効）
+
+従来通りフラグなし：
+
+```bash
+cd llm/src
+make build
+```
+
+### API
+
+ヘッダ: `header/qs_embedding_module.h`
+
+| 関数 | 説明 |
+|---|---|
+| `qs_embedding_prepare(model_path, db_path)` | モデルとデータベースを初期化 |
+| `qs_embedding_shutdown()` | リソース解放 |
+| `qs_embedding_store(text, id)` | テキストを embedding 生成して保存 |
+| `qs_embedding_search(query, top_k, out_ids, out_scores, max_results)` | 類似検索 |
+| `qs_embedding_delete(id)` | 埋め込みベクトルを削除 |
+| `qs_embedding_n_embd()` | ベクトル次元数の取得 |
+
+### 実行時の環境変数
+
+```bash
+export QS_EMBEDDING_DB_PATH=/path/to/embeddings.db
+```
+
+## Ubuntu 24.04 で NVIDIA GPU を使う（CUDA Toolkit）
 
 `LLAMA_ENABLE=1` で GPU 実行するには、NVIDIA Driver に加えて CUDA Toolkit（`nvcc`）が必要です。
 

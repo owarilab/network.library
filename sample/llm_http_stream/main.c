@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include "qs_api.h"
 #include "qs_llama_module.h"
+#include "qs_embedding_module.h"
 
 static int on_http_event(QS_EVENT_PARAMETER params);
 static int load_system_prompt(void);
@@ -13,6 +14,9 @@ static int send_json_http_response(QS_EVENT_PARAMETER params, int status_code, c
 static int validate_json_object_text(const char* json_text);
 static char* extract_json_object_text(const char* text);
 static char* json_escape_string(const char* text);
+static int handle_embed_store(QS_EVENT_PARAMETER params);
+static int handle_embed_search(QS_EVENT_PARAMETER params);
+static int handle_embed_delete(QS_EVENT_PARAMETER params);
 
 typedef struct JSON_GEN_CONTEXT {
 	char* buffer;
@@ -23,6 +27,7 @@ typedef struct JSON_GEN_CONTEXT {
 static int on_json_token(void* user_data, const char* token, int is_last);
 
 static char* g_system_prompt = NULL;
+static int g_embedding_enabled = 0;
 
 static int on_stream_token(void* user_data, const char* token, int is_last)
 {
@@ -53,13 +58,35 @@ int main(int argc, char* argv[], char* envp[])
 		return -1;
 	}
 
+	/* Initialize embedding module if model and database paths are provided */
+	const char* embedding_model = getenv("QS_EMBEDDING_MODEL_PATH");
+	const char* embedding_db = getenv("QS_EMBEDDING_DB_PATH");
+	if (embedding_model != NULL && embedding_model[0] != '\0' && 
+	    embedding_db != NULL && embedding_db[0] != '\0') {
+		int embed_result = qs_embedding_prepare(embedding_model, embedding_db);
+		if (0 == embed_result) {
+			g_embedding_enabled = 1;
+			printf("[Main] Embedding module initialized: model=%s db=%s\n", embedding_model, embedding_db);
+		} else {
+			printf("[Main] Failed to initialize embedding module\n");
+		}
+	}
+
+	printf("[Main] Starting server on port 8080...\n");
+
 	QS_SERVER_CONTEXT* context = 0;
 	if (0 > api_qs_server_init(&context, 8080, 100, QS_SERVER_TYPE_HTTP)) {
 		qs_llama_module_shutdown();
+		if (g_embedding_enabled) {
+			qs_embedding_shutdown();
+		}
 		return -1;
 	}
 	if (-1 == api_qs_server_create_router(context)) {
 		qs_llama_module_shutdown();
+		if (g_embedding_enabled) {
+			qs_embedding_shutdown();
+		}
 		return -1;
 	}
 
@@ -72,6 +99,9 @@ int main(int argc, char* argv[], char* envp[])
 
 	api_qs_free(context);
 	qs_llama_module_shutdown();
+	if (g_embedding_enabled) {
+		qs_embedding_shutdown();
+	}
 	if (g_system_prompt != NULL) {
 		free(g_system_prompt);
 		g_system_prompt = NULL;
@@ -399,6 +429,127 @@ static int on_json_token(void* user_data, const char* token, int is_last)
 	return 0;
 }
 
+static int handle_embed_store(QS_EVENT_PARAMETER params)
+{
+	if (!g_embedding_enabled) {
+		send_json_http_response(params, 400, "{\"ok\":false,\"error\":\"embedding module not enabled\"}");
+		return 400;
+	}
+
+	const char* text = api_qs_get_http_post_parameter(params, "text");
+	if (text == NULL || text[0] == '\0') {
+		text = api_qs_get_http_post_body(params);
+	}
+	if (text == NULL || text[0] == '\0') {
+		send_json_http_response(params, 400, "{\"ok\":false,\"error\":\"missing text parameter\"}");
+		return 400;
+	}
+
+	const char* id_str = api_qs_get_http_post_parameter(params, "id");
+	if (id_str == NULL || id_str[0] == '\0') {
+		send_json_http_response(params, 400, "{\"ok\":false,\"error\":\"missing id parameter\"}");
+		return 400;
+	}
+
+	int64_t id = (int64_t)atoll(id_str);
+	if (id <= 0) {
+		send_json_http_response(params, 400, "{\"ok\":false,\"error\":\"invalid id (must be positive integer)\"}");
+		return 400;
+	}
+
+	int result = qs_embedding_store(text, id);
+	if (result == 0) {
+		char response[256];
+		snprintf(response, sizeof(response), "{\"ok\":true,\"id\":%lld,\"text_length\":%zu}", (long long)id, strlen(text));
+		send_json_http_response(params, 200, response);
+		return 200;
+	} else {
+		send_json_http_response(params, 500, "{\"ok\":false,\"error\":\"failed to store embedding\"}");
+		return 500;
+	}
+}
+
+static int handle_embed_search(QS_EVENT_PARAMETER params)
+{
+	if (!g_embedding_enabled) {
+		send_json_http_response(params, 400, "{\"ok\":false,\"error\":\"embedding module not enabled\"}");
+		return 400;
+	}
+
+	const char* query = api_qs_get_http_post_parameter(params, "q");
+	if (query == NULL || query[0] == '\0') {
+		query = api_qs_get_http_post_body(params);
+	}
+	if (query == NULL || query[0] == '\0') {
+		send_json_http_response(params, 400, "{\"ok\":false,\"error\":\"missing query parameter\"}");
+		return 400;
+	}
+
+	const char* top_k_str = api_qs_get_http_post_parameter(params, "top_k");
+	int top_k = 5;
+	if (top_k_str != NULL && top_k_str[0] != '\0') {
+		int val = atoi(top_k_str);
+		if (val > 0 && val <= 100) {
+			top_k = val;
+		}
+	}
+
+	int64_t result_ids[100];
+	float result_scores[100];
+	int count = qs_embedding_search(query, top_k, result_ids, result_scores, 100);
+
+	char* response = (char*)malloc(2048);
+	if (response == NULL) {
+		send_json_http_response(params, 500, "{\"ok\":false,\"error\":\"memory allocation failed\"}");
+		return 500;
+	}
+
+	int pos = snprintf(response, 2048, "{\"ok\":true,\"query\":\"%s\",\"results\":[", query);
+	for (int i = 0; i < count; i++) {
+		if (i > 0) {
+			pos += snprintf(response + pos, 2048 - (size_t)pos, ",");
+		}
+		pos += snprintf(response + pos, 2048 - (size_t)pos, "{\"id\":%lld,\"distance\":%.6f}", 
+		                 (long long)result_ids[i], result_scores[i]);
+	}
+	pos += snprintf(response + pos, 2048 - (size_t)pos, "],\"count\":%d}", count);
+
+	send_json_http_response(params, 200, response);
+	free(response);
+	return 200;
+}
+
+static int handle_embed_delete(QS_EVENT_PARAMETER params)
+{
+	if (!g_embedding_enabled) {
+		send_json_http_response(params, 400, "{\"ok\":false,\"error\":\"embedding module not enabled\"}");
+		return 400;
+	}
+
+	const char* id_str = api_qs_get_http_post_parameter(params, "id");
+	if (id_str == NULL || id_str[0] == '\0') {
+		send_json_http_response(params, 400, "{\"ok\":false,\"error\":\"missing id parameter\"}");
+		return 400;
+	}
+
+	int64_t id = (int64_t)atoll(id_str);
+	if (id <= 0) {
+		send_json_http_response(params, 400, "{\"ok\":false,\"error\":\"invalid id (must be positive integer)\"}");
+		return 400;
+	}
+
+	int result = qs_embedding_delete(id);
+	if (result == 0) {
+		char response[256];
+		snprintf(response, sizeof(response), "{\"ok\":true,\"id\":%lld}", (long long)id);
+		send_json_http_response(params, 200, response);
+		return 200;
+	} else {
+		send_json_http_response(params, 500, "{\"ok\":false,\"error\":\"failed to delete embedding\"}");
+		return 500;
+	}
+}
+
 static int on_http_event(QS_EVENT_PARAMETER params)
 {
 	const char* method = api_qs_get_http_method(params);
@@ -406,6 +557,19 @@ static int on_http_event(QS_EVENT_PARAMETER params)
 
 	if (method == NULL || path == NULL) {
 		return 404;
+	}
+
+	/* Embedding endpoints */
+	if (strcmp(method, "POST") == 0 && strcmp(path, "/api/embed") == 0) {
+		return handle_embed_store(params);
+	}
+
+	if (strcmp(method, "POST") == 0 && strcmp(path, "/api/embed/search") == 0) {
+		return handle_embed_search(params);
+	}
+
+	if (strcmp(method, "POST") == 0 && strcmp(path, "/api/embed/delete") == 0) {
+		return handle_embed_delete(params);
 	}
 
 	if (strcmp(method, "POST") == 0 && strcmp(path, "/api/llm/stream") == 0) {
@@ -621,6 +785,15 @@ static int on_http_event(QS_EVENT_PARAMETER params)
 
 	if (strcmp(method, "GET") == 0 && strcmp(path, "/healthz") == 0) {
 		api_qs_send_response(params, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n\r\nok");
+		return 200;
+	}
+
+	if (strcmp(method, "GET") == 0 && strcmp(path, "/api/status") == 0) {
+		char response[256];
+		snprintf(response, sizeof(response), 
+			"{\"ok\":true,\"llm_enabled\":true,\"embedding_enabled\":%s}", 
+			g_embedding_enabled ? "true" : "false");
+		send_json_http_response(params, 200, response);
 		return 200;
 	}
 

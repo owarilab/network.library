@@ -18,6 +18,15 @@ make build LLAMA_ENABLE=1
 
 `LLAMA_ENABLE=1` 時は `llm/third_party/llama.cpp` を CMake で自動ビルドします。
 
+Embedding 機能を有効にする場合:
+
+```bash
+cd sample/llm_http_stream
+make build LLAMA_ENABLE=1 LLAMA_CUDA=1 QS_EMBEDDING_MODULE_ENABLED=1
+```
+
+`QS_EMBEDDING_MODULE_ENABLED=1` 時は embedding モジュールと sqlite-vec をビルドし、テキスト埋め込み・ベクトル検索機能が利用可能になります。
+
 NVIDIA GPU を使う場合（デフォルト有効）:
 
 ```bash
@@ -49,10 +58,35 @@ export QS_LLM_N_GPU_LAYERS=999
 ./qs_llm_http_stream_server
 ```
 
+Embedding 機能を使う場合は起動前に以下も指定:
+
+```bash
+export QS_EMBEDDING_MODEL_PATH=/path/to/embedding-model.gguf
+export QS_EMBEDDING_DB_PATH=./embeddings.db
+./qs_llm_http_stream_server
+```
+
+LLM と Embedding の両方を有効にして起動する場合:
+
+```bash
+export QS_LLM_MODEL_PATH=~/.cache/huggingface/hub/models--unsloth--gemma-3-270m-it-GGUF/snapshots/c90975dbd40c0c7b275fefaae758c3415c906238/gemma-3-270m-it-Q4_K_M.gguf
+export QS_LLM_N_CTX=4096
+export QS_LLM_MAX_TOKENS=128
+export QS_LLM_SYSTEM_PROMPT_FILE=./system_prompt.md
+export QS_LLM_N_GPU_LAYERS=999
+export QS_EMBEDDING_MODEL_PATH=~/.cache/huggingface/hub/models--unsloth--embeddinggemma-300m-GGUF/snapshots/6661a6504c30d8304af13455cb4a5d4f5bc6011f/embeddinggemma-300M-BF16.gguf
+export QS_EMBEDDING_DB_PATH=./embeddings.db
+./qs_llm_http_stream_server
+```
+
 `QS_LLM_SYSTEM_PROMPT_FILE` は省略可能です。未指定時は `./system_prompt.md` を読み込みます（互換のため `./system_prompt.txt` もフォールバックで対応）。
 `QS_LLM_N_CTX` は推論コンテキスト長です。長いプロンプトや JSON 修復タスクでは `2048` 以上（推奨 `4096`）を指定してください。
 `QS_LLM_N_GPU_LAYERS` は GPU オフロード層数です。`0` で CPU のみ、`999` など大きい値で可能な限り GPU を使います（未指定時は `999`）。
 `QS_LLM_MAX_TOKENS` は最大生成トークン数です。未指定時はモジュール既定値（`128`）、`run.sh` 既定値は `512` です。
+
+`QS_EMBEDDING_MODEL_PATH` と `QS_EMBEDDING_DB_PATH` は Embedding 機能を使う場合の指定です（省略可）。
+`QS_EMBEDDING_MODEL_PATH` は embedding モデルファイルのパス、`QS_EMBEDDING_DB_PATH` は SQLite データベースの保存先です。
+両方指定されている場合のみ Embedding モジュールが初期化され、後述の `/api/embed` エンドポイントが利用可能になります。
 
 `LLAMA_ENABLE=1` かつ `QS_LLM_MODEL_PATH` 指定時は、サーバ起動時にモデルを1回だけロードし、その後のリクエストで再利用します。
 
@@ -108,6 +142,60 @@ curl -s -X POST "http://localhost:8080/api/llm/json" -H "Content-Type: applicati
 JSON mode は JSON オブジェクトの生成を促し、サーバ側で JSON 検証を行います。
 モデル出力が JSON にならない場合は、`mode: fallback_raw_text` 付きの JSON オブジェクトで返します。
 
+## Embedding API requests
+
+Embedding 機能が有効な場合（`QS_EMBEDDING_MODULE_ENABLED=1` でビルド、かつ `QS_EMBEDDING_MODEL_PATH` 指定）、以下の API が利用可能です。
+
+テキストの embedding を生成して DB に保存:
+
+```bash
+curl -X POST "http://localhost:8080/api/embed" \
+  -d "text=This is a sample text to embed&id=1"
+
+curl -X POST "http://localhost:8080/api/embed" \
+  -d "text=Another document with similar content&id=2"
+
+curl -X POST "http://localhost:8080/api/embed" \
+  -d "text=Completely different topic here&id=3"
+```
+
+クエリーテキストの embedding を生成して、DB 内で類似検索:
+
+```bash
+# top_k（返す結果数）はオプション、デフォルト 5
+curl -X POST "http://localhost:8080/api/embed/search" \
+  -d "q=sample text query&top_k=5"
+```
+
+Embedding を削除:
+
+```bash
+curl -X POST "http://localhost:8080/api/embed/delete" \
+  -d "id=1"
+```
+
+サーバーの状態確認（LLM・Embedding 有効化状態を表示）:
+
+```bash
+curl "http://localhost:8080/api/status"
+```
+
+期待される Embedding API レスポンス例:
+
+```json
+# POST /api/embed (保存成功時)
+{"ok":true,"id":1,"text_length":30}
+
+# POST /api/embed/search (検索結果)
+{"ok":true,"query":"sample text query","results":[
+  {"id":1,"distance":0.150234},
+  {"id":2,"distance":0.425678}
+],"count":2}
+
+# GET /api/status
+{"ok":true,"llm_enabled":true,"embedding_enabled":true}
+```
+
 期待される出力（SSE形式）:
 
 ```text
@@ -128,3 +216,4 @@ data: [DONE]
 備考:
 - デフォルトビルドはスタブ応答です。
 - `LLAMA_ENABLE=1` でビルドし、`QS_LLM_MODEL_PATH` を設定すると llama.cpp 推論トークンを逐次送信します。
+- `QS_EMBEDDING_MODULE_ENABLED=1` でビルドし、`QS_EMBEDDING_MODEL_PATH` と `QS_EMBEDDING_DB_PATH` を設定すると embedding・ベクトル検索機能が有効になります。

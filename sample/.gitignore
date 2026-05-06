@@ -1,4 +1,8 @@
 qs_tool_server/qs_tool_server
+llm_http_stream/qs_llm_http_stream_server
+llm_http_stream/embeddings.db
+llm_http_stream/embeddings.db-shm
+llm_http_stream/embeddings.db-wal
 
 # Python
 __pycache__/
