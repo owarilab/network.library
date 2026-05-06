@@ -5,12 +5,25 @@
 <meta http-equiv="Content-Style-Type" content="text/css">
 <meta http-equiv="Content-Script-Type" content="text/javascript">
 <title>STT sample</title>
+<style>
+#send_rate {
+	margin-left: 16px;
+	font-size: 13px;
+	color: #555;
+}
+</style>
 <script type="text/javascript" src="/js/room.js"></script>
 <script type="text/javascript">
 var ws_socket = null;
 var http_base = window.location.origin;
 var ws_base = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host;
 var stt_manager = null;
+
+function formatBytes(b) {
+	if (b >= 1024 * 1024) return (b / (1024 * 1024)).toFixed(1) + ' MB';
+	if (b >= 1024) return (b / 1024).toFixed(1) + ' KB';
+	return b + ' B';
+}
 
 window.onload = function() {
 	stt_manager = new SttManager({
@@ -25,6 +38,12 @@ window.onload = function() {
 			},
 			onWsClose: function() {
 				console.log('ws closed');
+			},
+			onSendRate: function(payload) {
+				var el = document.getElementById('send_rate');
+				if (el) {
+					el.textContent = '送信中: ' + formatBytes(payload.rateBps) + '/s  (' + formatBytes(stt_manager.getSendStats().totalBytes) + ' total)';
+				}
 			},
 			onSttStart: function() {
 				document.getElementById('stt_start').disabled = true;
@@ -68,6 +87,7 @@ function stt_stop() {
 		<button id="stt_start" onclick="stt_start()">マイク開始</button>
 		<button id="stt_stop" onclick="stt_stop()" disabled>録音停止 &amp; 送信</button>
 		<span id="stt_status" style="margin-left:8px;color:#555">待機中</span>
+		<span id="send_rate"></span>
 	</div>
 </body>
 </html>
