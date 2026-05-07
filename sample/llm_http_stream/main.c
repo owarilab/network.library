@@ -62,7 +62,7 @@ int main(int argc, char* argv[], char* envp[])
 	const char* embedding_model = getenv("QS_EMBEDDING_MODEL_PATH");
 	const char* embedding_db = getenv("QS_EMBEDDING_DB_PATH");
 	if (embedding_model != NULL && embedding_model[0] != '\0' && 
-	    embedding_db != NULL && embedding_db[0] != '\0') {
+		embedding_db != NULL && embedding_db[0] != '\0') {
 		int embed_result = qs_embedding_prepare(embedding_model, embedding_db);
 		if (0 == embed_result) {
 			g_embedding_enabled = 1;
@@ -457,7 +457,7 @@ static int handle_embed_store(QS_EVENT_PARAMETER params)
 		return 400;
 	}
 
-	int result = qs_embedding_store(text, id);
+	int result = qs_embedding_store(text, text, id);
 	if (result == 0) {
 		char response[256];
 		snprintf(response, sizeof(response), "{\"ok\":true,\"id\":%lld,\"text_length\":%zu}", (long long)id, strlen(text));
@@ -496,26 +496,32 @@ static int handle_embed_search(QS_EVENT_PARAMETER params)
 
 	int64_t result_ids[100];
 	float result_scores[100];
-	int count = qs_embedding_search(query, top_k, result_ids, result_scores, 100);
+	char* result_texts[100] = {NULL};
+	int count = qs_embedding_search(query, top_k, result_ids, result_scores, result_texts, 100);
 
-	char* response = (char*)malloc(2048);
+	size_t resp_cap = 4096;
+	char* response = (char*)malloc(resp_cap);
 	if (response == NULL) {
+		for (int i = 0; i < count; i++) free(result_texts[i]);
 		send_json_http_response(params, 500, "{\"ok\":false,\"error\":\"memory allocation failed\"}");
 		return 500;
 	}
 
-	int pos = snprintf(response, 2048, "{\"ok\":true,\"query\":\"%s\",\"results\":[", query);
+	int pos = snprintf(response, resp_cap, "{\"ok\":true,\"query\":\"%s\",\"results\":[", query);
 	for (int i = 0; i < count; i++) {
 		if (i > 0) {
-			pos += snprintf(response + pos, 2048 - (size_t)pos, ",");
+			pos += snprintf(response + pos, resp_cap - (size_t)pos, ",");
 		}
-		pos += snprintf(response + pos, 2048 - (size_t)pos, "{\"id\":%lld,\"distance\":%.6f}", 
-		                 (long long)result_ids[i], result_scores[i]);
+		char* escaped_text = json_escape_string(result_texts[i] ? result_texts[i] : "");
+		pos += snprintf(response + pos, resp_cap - (size_t)pos, "{\"id\":%lld,\"distance\":%.6f,\"text\":\"%s\"}",
+						 (long long)result_ids[i], result_scores[i], escaped_text);
+		free(escaped_text);
 	}
-	pos += snprintf(response + pos, 2048 - (size_t)pos, "],\"count\":%d}", count);
+	pos += snprintf(response + pos, resp_cap - (size_t)pos, "],\"count\":%d}", count);
 
 	send_json_http_response(params, 200, response);
 	free(response);
+	for (int i = 0; i < count; i++) free(result_texts[i]);
 	return 200;
 }
 

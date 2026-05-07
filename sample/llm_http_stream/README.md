@@ -157,6 +157,15 @@ curl -X POST "http://localhost:8080/api/embed" \
 
 curl -X POST "http://localhost:8080/api/embed" \
   -d "text=Completely different topic here&id=3"
+
+curl -X POST "http://localhost:8080/api/embed" \
+  -d "text=Sample1&id=4"
+
+curl -X POST "http://localhost:8080/api/embed" \
+  -d "text=other text&id=5"
+
+curl -X POST "http://localhost:8080/api/embed" \
+  -d "text=simple sample&id=6"
 ```
 
 クエリーテキストの embedding を生成して、DB 内で類似検索:

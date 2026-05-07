@@ -24,10 +24,10 @@ int qs_embedding_prepare(const char* model_path, const char* db_path);
 void qs_embedding_shutdown(void);
 
 /* embedding 生成 + 保存 */
-int qs_embedding_store(const char* text, int64_t id);
+int qs_embedding_store(const char* text, const char* content, int64_t id);
 
 /* 類似検索 (top_k) */
-int qs_embedding_search(const char* query, int top_k, int64_t* out_ids, float* out_scores, int max_results);
+int qs_embedding_search(const char* query, int top_k, int64_t* out_ids, float* out_scores, char** out_texts, int max_results);
 
 /* 削除 */
 int qs_embedding_delete(int64_t id);

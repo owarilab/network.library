@@ -18,8 +18,8 @@
 
 int qs_embedding_prepare(const char* model_path, const char* db_path) { (void)model_path; (void)db_path; return 0; }
 void qs_embedding_shutdown(void) {}
-int qs_embedding_store(const char* text, int64_t id) { (void)text; (void)id; return 0; }
-int qs_embedding_search(const char* query, int top_k, int64_t* out_ids, float* out_scores, int max_results) { (void)query; (void)top_k; (void)out_ids; (void)out_scores; (void)max_results; return 0; }
+int qs_embedding_store(const char* text, const char* content, int64_t id) { (void)text; (void)content; (void)id; return 0; }
+int qs_embedding_search(const char* query, int top_k, int64_t* out_ids, float* out_scores, char** out_texts, int max_results) { (void)query; (void)top_k; (void)out_ids; (void)out_scores; (void)out_texts; (void)max_results; return 0; }
 int qs_embedding_delete(int64_t id) { (void)id; return 0; }
 int qs_embedding_n_embd(void) { return 0; }
 
@@ -158,11 +158,11 @@ static float* generate_embedding(const char* text) {
     return result;
 }
 
-static int store_vector(sqlite3* db, int64_t id, const float* embd, int n_embd) {
+static int store_vector(sqlite3* db, int64_t id, const float* embd, int n_embd, const char* text_content) {
     char* vec_str = vec_to_json(embd, n_embd, NULL);
     if (!vec_str) return -1;
 
-    const char* sql = "INSERT OR REPLACE INTO " EMBEDDING_TABLE "(id, embedding) VALUES (?, ?)";
+    const char* sql = "INSERT OR REPLACE INTO " EMBEDDING_TABLE "(id, embedding, text_content) VALUES (?, ?, ?)";
     sqlite3_stmt* stmt;
     int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
@@ -172,6 +172,7 @@ static int store_vector(sqlite3* db, int64_t id, const float* embd, int n_embd) 
 
     sqlite3_bind_int64(stmt, 1, id);
     sqlite3_bind_text(stmt, 2, vec_str, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 3, text_content ? text_content : "", -1, SQLITE_TRANSIENT);
 
     rc = (sqlite3_step(stmt) == SQLITE_DONE) ? 0 : -1;
     sqlite3_finalize(stmt);
@@ -232,8 +233,8 @@ static float cosine_distance(const float* v1, const float* v2, int n) {
 }
 
 static int search_vectors(sqlite3* db, const float* query_embd, int n_embd,
-                          int top_k, int64_t* out_ids, float* out_scores, int max_results) {
-    const char* sql = "SELECT id, embedding FROM " EMBEDDING_TABLE " ORDER BY id";
+                          int top_k, int64_t* out_ids, float* out_scores, char** out_texts, int max_results) {
+    const char* sql = "SELECT id, embedding, text_content FROM " EMBEDDING_TABLE " ORDER BY id";
 
     sqlite3_stmt* stmt;
     int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
@@ -245,6 +246,7 @@ static int search_vectors(sqlite3* db, const float* query_embd, int n_embd,
     typedef struct {
         int64_t id;
         float distance;
+        char* text_content;
     } SearchResult;
     
     int capacity = 100;
@@ -285,9 +287,11 @@ static int search_vectors(sqlite3* db, const float* query_embd, int n_embd,
         
         results[count].id = id;
         results[count].distance = distance;
+        const char* txt = (const char*)sqlite3_column_text(stmt, 2);
+        results[count].text_content = txt ? strdup(txt) : NULL;
         count++;
     }
-    
+
     sqlite3_finalize(stmt);
     
     /* Sort by distance */
@@ -307,6 +311,12 @@ static int search_vectors(sqlite3* db, const float* query_embd, int n_embd,
     for (int i = 0; i < n; i++) {
         out_ids[i] = results[i].id;
         out_scores[i] = results[i].distance;
+        out_texts[i] = results[i].text_content;
+    }
+
+    /* Free unused text_content entries */
+    for (int i = n; i < count; i++) {
+        free(results[i].text_content);
     }
 
     free(results);
@@ -378,7 +388,7 @@ void qs_embedding_shutdown(void) {
     llama_backend_free();
 }
 
-int qs_embedding_store(const char* text, int64_t id) {
+int qs_embedding_store(const char* text, const char* content, int64_t id) {
     if (!g_emb.db || !g_emb.model) return -1;
 
     pthread_mutex_lock(&g_emb.mutex);
@@ -389,7 +399,7 @@ int qs_embedding_store(const char* text, int64_t id) {
         return -1;
     }
 
-    int rc = store_vector(g_emb.db, id, embd, g_emb.n_embd_out);
+    int rc = store_vector(g_emb.db, id, embd, g_emb.n_embd_out, content);
     free(embd);
 
     pthread_mutex_unlock(&g_emb.mutex);
@@ -397,7 +407,7 @@ int qs_embedding_store(const char* text, int64_t id) {
 }
 
 int qs_embedding_search(const char* query, int top_k, int64_t* out_ids,
-                        float* out_scores, int max_results) {
+                        float* out_scores, char** out_texts, int max_results) {
     if (!g_emb.db || !g_emb.model) return 0;
 
     float* query_embd = generate_embedding(query);
@@ -406,7 +416,7 @@ int qs_embedding_search(const char* query, int top_k, int64_t* out_ids,
     pthread_mutex_lock(&g_emb.mutex);
 
     int count = search_vectors(g_emb.db, query_embd, g_emb.n_embd_out,
-                               top_k, out_ids, out_scores, max_results);
+                               top_k, out_ids, out_scores, out_texts, max_results);
 
     pthread_mutex_unlock(&g_emb.mutex);
     free(query_embd);
