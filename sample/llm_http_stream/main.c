@@ -840,7 +840,7 @@ static int handle_rag_stream(QS_EVENT_PARAMETER params)
 	/* Build effective prompt with context injected into SYSTEM portion */
 	const char* prefix = "[SYSTEM]\n";
 
-	size_t base_size = strlen(prefix) + 32;
+	size_t base_size = strlen(prefix) + 200;
 	if (g_system_prompt != NULL && g_system_prompt[0] != '\0') {
 		base_size += strlen(g_system_prompt) + 8;
 	}
