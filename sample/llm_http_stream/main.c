@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <errno.h>
+#include <limits.h>
 #include "qs_api.h"
 #include "qs_llama_module.h"
 #include "qs_embedding_module.h"
@@ -14,6 +16,7 @@ static int send_json_http_response(QS_EVENT_PARAMETER params, int status_code, c
 static int validate_json_object_text(const char* json_text);
 static char* extract_json_object_text(const char* text);
 static char* json_escape_string(const char* text);
+static void strip_markdown_code_fences_in_place(char* text);
 static int handle_embed_store(QS_EVENT_PARAMETER params);
 static int handle_embed_search(QS_EVENT_PARAMETER params);
 static int handle_embed_delete(QS_EVENT_PARAMETER params);
@@ -37,6 +40,7 @@ typedef struct RAG_GEN_CONTEXT {
 
 static int on_json_token(void* user_data, const char* token, int is_last);
 static int on_rag_token(void* user_data, const char* token, int is_last);
+static int on_rag_stream_token(void* user_data, const char* token, int is_last);
 
 static char* g_system_prompt = NULL;
 static int g_embedding_enabled = 0;
@@ -48,6 +52,18 @@ static int on_stream_token(void* user_data, const char* token, int is_last)
 		return qs_llm_http_stream_send_done(stream);
 	}
 	if (token == NULL || token[0] == '\0') {
+		return 0;
+	}
+	if (-1 == qs_llm_http_stream_send_token(stream, token)) {
+		return -1;
+	}
+	return 0;
+}
+
+static int on_rag_stream_token(void* user_data, const char* token, int is_last)
+{
+	QS_LLM_HTTP_STREAM_CONTEXT* stream = (QS_LLM_HTTP_STREAM_CONTEXT*)user_data;
+	if (is_last || token == NULL || token[0] == '\0') {
 		return 0;
 	}
 	if (-1 == qs_llm_http_stream_send_token(stream, token)) {
@@ -412,6 +428,84 @@ static char* json_escape_string(const char* text)
 	return out;
 }
 
+static void strip_markdown_code_fences_in_place(char* text)
+{
+	char* content_start;
+	char* end;
+
+	if (text == NULL || strncmp(text, "```", 3) != 0) {
+		return;
+	}
+
+	content_start = strchr(text, '\n');
+	if (content_start == NULL) {
+		return;
+	}
+	content_start++;
+	end = strstr(content_start, "```");
+	if (end != NULL) {
+		size_t content_len = (size_t)(end - content_start);
+		memmove(text, content_start, content_len);
+		text[content_len] = '\0';
+	} else {
+		memmove(text, content_start, strlen(content_start) + 1);
+	}
+}
+
+static int parse_positive_int64_strict(const char* text, int64_t* out_value)
+{
+	char* end_ptr;
+	long long value;
+
+	if (text == NULL || out_value == NULL || text[0] == '\0') {
+		return -1;
+	}
+	errno = 0;
+	value = strtoll(text, &end_ptr, 10);
+	if (errno != 0 || end_ptr == text || end_ptr[0] != '\0' || value <= 0) {
+		return -1;
+	}
+	*out_value = (int64_t)value;
+	return 0;
+}
+
+static int parse_int_in_range_strict(const char* text, int min_value, int max_value, int* out_value)
+{
+	char* end_ptr;
+	long value;
+
+	if (text == NULL || out_value == NULL || text[0] == '\0') {
+		return -1;
+	}
+	errno = 0;
+	value = strtol(text, &end_ptr, 10);
+	if (errno != 0 || end_ptr == text || end_ptr[0] != '\0') {
+		return -1;
+	}
+	if (value < (long)min_value || value > (long)max_value) {
+		return -1;
+	}
+	*out_value = (int)value;
+	return 0;
+}
+
+#ifdef QS_LLM_HTTP_STREAM_TESTING
+int qs_test_parse_positive_int64_strict(const char* text, int64_t* out_value)
+{
+	return parse_positive_int64_strict(text, out_value);
+}
+
+int qs_test_parse_int_in_range_strict(const char* text, int min_value, int max_value, int* out_value)
+{
+	return parse_int_in_range_strict(text, min_value, max_value, out_value);
+}
+
+void qs_test_strip_markdown_code_fences_in_place(char* text)
+{
+	strip_markdown_code_fences_in_place(text);
+}
+#endif
+
 static int on_json_token(void* user_data, const char* token, int is_last)
 {
 	JSON_GEN_CONTEXT* context = (JSON_GEN_CONTEXT*)user_data;
@@ -488,8 +582,8 @@ static int handle_embed_store(QS_EVENT_PARAMETER params)
 		return 400;
 	}
 
-	int64_t id = (int64_t)atoll(id_str);
-	if (id <= 0) {
+	int64_t id;
+	if (parse_positive_int64_strict(id_str, &id) != 0) {
 		send_json_http_response(params, 400, "{\"ok\":false,\"error\":\"invalid id (must be positive integer)\"}");
 		return 400;
 	}
@@ -525,8 +619,8 @@ static int handle_embed_search(QS_EVENT_PARAMETER params)
 	const char* top_k_str = api_qs_get_http_post_parameter(params, "top_k");
 	int top_k = 5;
 	if (top_k_str != NULL && top_k_str[0] != '\0') {
-		int val = atoi(top_k_str);
-		if (val > 0 && val <= 100) {
+		int val;
+		if (parse_int_in_range_strict(top_k_str, 1, 100, &val) == 0) {
 			top_k = val;
 		}
 	}
@@ -587,8 +681,8 @@ static int handle_embed_delete(QS_EVENT_PARAMETER params)
 		return 400;
 	}
 
-	int64_t id = (int64_t)atoll(id_str);
-	if (id <= 0) {
+	int64_t id;
+	if (parse_positive_int64_strict(id_str, &id) != 0) {
 		send_json_http_response(params, 400, "{\"ok\":false,\"error\":\"invalid id (must be positive integer)\"}");
 		return 400;
 	}
@@ -652,8 +746,8 @@ static int handle_rag(QS_EVENT_PARAMETER params)
 	const char* top_k_str = api_qs_get_http_post_parameter(params, "top_k");
 	int top_k = 3;
 	if (top_k_str != NULL && top_k_str[0] != '\0') {
-		int val = atoi(top_k_str);
-		if (val > 0 && val <= 100) {
+		int val;
+		if (parse_int_in_range_strict(top_k_str, 1, 100, &val) == 0) {
 			top_k = val;
 		}
 	}
@@ -757,13 +851,7 @@ static int handle_rag(QS_EVENT_PARAMETER params)
 	answer_text[len] = '\0';
 
 	/* Strip markdown code fences */
-	if (strncmp(answer_text, "```", 3) == 0) {
-		char* end = strstr(answer_text, "```");
-		if (end != NULL) {
-			memmove(answer_text, answer_text + 3, end - answer_text);
-			end[0] = '\0';
-		}
-	}
+	strip_markdown_code_fences_in_place(answer_text);
 
 	const char* final_answer = answer_text;
 
@@ -835,8 +923,8 @@ static int handle_rag_stream(QS_EVENT_PARAMETER params)
 	const char* top_k_str = api_qs_get_http_post_parameter(params, "top_k");
 	int top_k = 3;
 	if (top_k_str != NULL && top_k_str[0] != '\0') {
-		int val = atoi(top_k_str);
-		if (val > 0 && val <= 100) {
+		int val;
+		if (parse_int_in_range_strict(top_k_str, 1, 100, &val) == 0) {
 			top_k = val;
 		}
 	}
@@ -912,9 +1000,13 @@ static int handle_rag_stream(QS_EVENT_PARAMETER params)
 		return 500;
 	}
 
-	if (-1 == qs_llama_module_stream_text(final_prompt, on_stream_token, &stream)) {
+	if (-1 == qs_llama_module_stream_text(final_prompt, on_rag_stream_token, &stream)) {
 		qs_llm_http_stream_send_event(&stream, "error", "stream failed");
 		qs_llm_http_stream_send_done(&stream);
+		qs_llm_http_stream_close(&stream);
+		free(final_prompt);
+		for (int i = 0; i < count; i++) free(result_texts[i]);
+		return 500;
 	}
 	free(final_prompt);
 
@@ -925,6 +1017,8 @@ static int handle_rag_stream(QS_EVENT_PARAMETER params)
 	}
 	char* src_json = (char*)malloc(src_cap);
 	if (!src_json) {
+		qs_llm_http_stream_send_event(&stream, "error", "memory allocation failed");
+		qs_llm_http_stream_send_done(&stream);
 		qs_llm_http_stream_close(&stream);
 		for (int i = 0; i < count; i++) free(result_texts[i]);
 		return 500;
@@ -943,6 +1037,7 @@ static int handle_rag_stream(QS_EVENT_PARAMETER params)
 
 	qs_llm_http_stream_send_event(&stream, "sources", src_json);
 	qs_llm_http_stream_send_done(&stream);
+	qs_llm_http_stream_close(&stream);
 	free(src_json);
 	for (int i = 0; i < count; i++) free(result_texts[i]);
 	return 200;

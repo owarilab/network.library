@@ -199,6 +199,44 @@ static int qs_llm_http_stream_send_raw(QS_LLM_HTTP_STREAM_CONTEXT* stream_contex
 	return 0;
 }
 
+static int qs_llm_http_stream_send_data_chunks(
+	QS_LLM_HTTP_STREAM_CONTEXT* stream_context,
+	const char* event_name,
+	const char* data,
+	size_t data_len,
+	int* event_sent,
+	int* wrote_data_line)
+{
+	while (data_len > 0) {
+		size_t chunk_len = data_len;
+		char line_buffer[4096];
+
+		if (chunk_len > 3800) {
+			chunk_len = 3800;
+		}
+		if (*event_sent == 0 && event_name != NULL && event_name[0] != '\0') {
+			char event_buffer[128];
+			snprintf(event_buffer, sizeof(event_buffer), "event: %s\n", event_name);
+			if (-1 == qs_llm_http_stream_send_raw(stream_context, event_buffer)) {
+				return -1;
+			}
+			*event_sent = 1;
+		}
+		memset(line_buffer, 0, sizeof(line_buffer));
+		memcpy(line_buffer, "data: ", 6);
+		memcpy(line_buffer + 6, data, chunk_len);
+		memcpy(line_buffer + 6 + chunk_len, "\n", 1);
+		if (-1 == qs_llm_http_stream_send_raw(stream_context, line_buffer)) {
+			return -1;
+		}
+		*wrote_data_line = 1;
+		data += chunk_len;
+		data_len -= chunk_len;
+	}
+
+	return 0;
+}
+
 int qs_llm_http_stream_send_event(QS_LLM_HTTP_STREAM_CONTEXT* stream_context, const char* event_name, const char* data)
 {
 	if (stream_context == NULL || data == NULL) {
@@ -210,47 +248,20 @@ int qs_llm_http_stream_send_event(QS_LLM_HTTP_STREAM_CONTEXT* stream_context, co
 	const char* current = data;
 	while (1) {
 		const char* newline = strchr(current, '\n');
-		char line_buffer[4096];
 		if (newline == NULL) {
 			if (current[0] != '\0') {
-				if (event_sent == 0 && event_name != NULL && event_name[0] != '\0') {
-					char event_buffer[128];
-					snprintf(event_buffer, sizeof(event_buffer), "event: %s\n", event_name);
-					if (-1 == qs_llm_http_stream_send_raw(stream_context, event_buffer)) {
-						return -1;
-					}
-					event_sent = 1;
-				}
-				snprintf(line_buffer, sizeof(line_buffer), "data: %s\n", current);
-				if (-1 == qs_llm_http_stream_send_raw(stream_context, line_buffer)) {
+				if (-1 == qs_llm_http_stream_send_data_chunks(stream_context, event_name, current, strlen(current), &event_sent, &wrote_data_line)) {
 					return -1;
 				}
-				wrote_data_line = 1;
 			}
 			break;
 		}
 
 		size_t line_len = (size_t)(newline - current);
 		if (line_len > 0) {
-			if (line_len > 3800) {
-				line_len = 3800;
-			}
-			if (event_sent == 0 && event_name != NULL && event_name[0] != '\0') {
-				char event_buffer[128];
-				snprintf(event_buffer, sizeof(event_buffer), "event: %s\n", event_name);
-				if (-1 == qs_llm_http_stream_send_raw(stream_context, event_buffer)) {
-					return -1;
-				}
-				event_sent = 1;
-			}
-			memset(line_buffer, 0, sizeof(line_buffer));
-			memcpy(line_buffer, "data: ", 6);
-			memcpy(line_buffer + 6, current, line_len);
-			memcpy(line_buffer + 6 + line_len, "\n", 1);
-			if (-1 == qs_llm_http_stream_send_raw(stream_context, line_buffer)) {
+			if (-1 == qs_llm_http_stream_send_data_chunks(stream_context, event_name, current, line_len, &event_sent, &wrote_data_line)) {
 				return -1;
 			}
-			wrote_data_line = 1;
 		}
 		current = newline + 1;
 	}

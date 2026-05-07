@@ -1,7 +1,9 @@
 PROGRAM = qs_llm_http_stream_server
+TEST_PROGRAM = tests/test_llm_http_stream
 CC      = gcc
 DEFINE  = -D_LINUX
 CFLAG   = -pthread -Wall -O
+TEST_CFLAG = -ffunction-sections -fdata-sections
 LLAMA_ENABLE ?= 0
 QS_EMBEDDING_MODULE_ENABLED ?= 0
 LLAMA_CUDA ?= 1
@@ -32,6 +34,9 @@ OBJGROUP = main.o $(LIBA)
 
 build: $(LLAMA_RUNTIME_TARGET) $(PROGRAM)
 
+test: $(TEST_PROGRAM)
+	./$(TEST_PROGRAM)
+
 $(LLAMA_LIB_DIR)/libllama.so:
 	cd $(LLAMA_CPP_DIR) && cmake -S . -B build -DBUILD_SHARED_LIBS=ON -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF $(LLAMA_CMAKE_ACCEL)
 	cd $(LLAMA_CPP_DIR) && cmake --build build -j4
@@ -51,7 +56,19 @@ $(PROGRAM): $(OBJGROUP)
 main.o: main.c
 	$(CC) $(DEFINE) $(CFLAG) $(INCDIR) -c main.c -o main.o
 
+
+$(TEST_PROGRAM): tests/test_llm_http_stream.c main.c ../../llm/src/qs_llama_module.c
+	mkdir -p tests
+	$(CC) $(DEFINE) $(CFLAG) $(TEST_CFLAG) $(INCDIR) -DQS_LLM_HTTP_STREAM_TESTING=1 -c tests/test_llm_http_stream.c -o tests/test_llm_http_stream.o
+	$(CC) $(DEFINE) $(CFLAG) $(TEST_CFLAG) $(INCDIR) -DQS_LLM_HTTP_STREAM_TESTING=1 -Dmain=qs_llm_http_stream_app_main -c main.c -o tests/main_testable.o
+	$(CC) $(DEFINE) $(CFLAG) $(TEST_CFLAG) $(INCDIR) -c ../../llm/src/qs_llama_module.c -o tests/qs_llama_module_test.o
+	$(CC) $(CFLAG) tests/test_llm_http_stream.o tests/main_testable.o tests/qs_llama_module_test.o -Wl,--gc-sections -o $(TEST_PROGRAM)
+
 .PHONY: clean
 clean:
 	rm -f $(PROGRAM)
+	rm -f $(TEST_PROGRAM)
+	rm -f tests/*.o
 	rm -f ./*.o
+
+.PHONY: test

@@ -781,9 +781,15 @@ ssize_t qs_send_all(QS_SOCKET_ID soc, char *buf, size_t size, int flag )
 {
 	int32_t len, lest;
 	char *ptr;
+	int send_flag = flag;
+	#ifndef __WINDOWS__
+	#ifdef MSG_NOSIGNAL
+	send_flag |= MSG_NOSIGNAL;
+	#endif
+	#endif
 	for( ptr = buf, lest = size; lest > 0; ptr += len, lest -= len )
 	{
-		if( ( len = send( soc, ptr, lest, flag ) ) == -1 )
+		if( ( len = send( soc, ptr, lest, send_flag ) ) == -1 )
 		{
 #ifdef __WINDOWS__
 			int err = WSAGetLastError();

@@ -41,6 +41,24 @@ cd sample/llm_http_stream
 make build LLAMA_ENABLE=1 LLAMA_CUDA=0
 ```
 
+## Test
+
+モデルファイル不要で、今回の回帰テストだけを実行できます。
+
+```bash
+cd sample/llm_http_stream
+make test
+```
+
+現在の `make test` は以下を検証します。
+
+- `id` パラメータの厳密パース (`12abc` のような不正値を拒否)
+- `top_k` パラメータの厳密パース (`3xyz` や範囲外の値を拒否)
+- 非ストリーミング RAG 応答の Markdown コードフェンス除去
+- SSE イベントの長文 payload が切り捨てられず、複数 `data:` 行へ分割されること
+
+テスト本体は `tests/test_llm_http_stream.c` にあります。サーバ起動や GGUF モデルは不要です。
+
 ## Run
 
 ```bash
@@ -215,6 +233,8 @@ curl -X POST "http://localhost:8080/api/embed/search" \
   -d "q=sample text query&top_k=5"
 ```
 
+`top_k` は `1` から `100` の整数のみ受け付けます。`5abc` のような不正な文字列は有効値として扱いません。
+
 RAG（Retrieval-Augmented Generation）による質問応答:
 
 ```bash
@@ -233,12 +253,16 @@ RAG API のパラメータ:
 - `context_prefix` (オプション): コンテキストのプレフィックス、デフォルト "### Doc"
 - `context_suffix` (オプション): コンテキストのサフィックス、デフォルト "---"
 
+`/api/llm/rag/stream` の SSE 応答は、長い `sources` データでも 1 行で打ち切らず、複数の `data:` 行に分割して送信します。
+
 Embedding を削除:
 
 ```bash
 curl -X POST "http://localhost:8080/api/embed/delete" \
   -d "id=1"
 ```
+
+`id` は正の整数のみ受け付けます。`1abc` や `0` は無効です。
 
 サーバーの状態確認（LLM・Embedding 有効化状態を表示）:
 

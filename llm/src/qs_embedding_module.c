@@ -43,6 +43,7 @@ static struct {
     sqlite3* db;
     int n_embd_out;
     pthread_mutex_t mutex;
+    int mutex_initialized;
 } g_emb;
 
 /* ── Vector <-> JSON string helpers ───────────────────────────── */
@@ -278,6 +279,9 @@ static int search_vectors(sqlite3* db, const float* query_embd, int n_embd,
             capacity *= 2;
             SearchResult* new_results = (SearchResult*)realloc(results, sizeof(SearchResult) * capacity);
             if (!new_results) {
+                for (int i = 0; i < count; i++) {
+                    free(results[i].text_content);
+                }
                 free(results);
                 sqlite3_finalize(stmt);
                 return 0;
@@ -368,6 +372,7 @@ int qs_embedding_prepare(const char* model_path, const char* db_path) {
     }
 
     pthread_mutex_init(&g_emb.mutex, NULL);
+    g_emb.mutex_initialized = 1;
     fprintf(stderr, "embedding: prepared successfully\n");
     return 0;
 }
@@ -375,15 +380,27 @@ int qs_embedding_prepare(const char* model_path, const char* db_path) {
 void qs_embedding_shutdown(void) {
     if (!g_emb.db && !g_emb.model) return;
 
-    pthread_mutex_destroy(&g_emb.mutex);
-
-    if (g_emb.db) {
-        sqlite3_close(g_emb.db);
-        g_emb.db = NULL;
+    if (g_emb.mutex_initialized) {
+        pthread_mutex_lock(&g_emb.mutex);
     }
-    if (g_emb.model) {
-        llama_model_free(g_emb.model);
-        g_emb.model = NULL;
+
+    sqlite3* db = g_emb.db;
+    struct llama_model* model = g_emb.model;
+    g_emb.db = NULL;
+    g_emb.model = NULL;
+    g_emb.n_embd_out = 0;
+
+    if (g_emb.mutex_initialized) {
+        pthread_mutex_unlock(&g_emb.mutex);
+        pthread_mutex_destroy(&g_emb.mutex);
+        g_emb.mutex_initialized = 0;
+    }
+
+    if (db) {
+        sqlite3_close(db);
+    }
+    if (model) {
+        llama_model_free(model);
     }
     llama_backend_free();
 }
