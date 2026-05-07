@@ -17,6 +17,11 @@ static char* json_escape_string(const char* text);
 static int handle_embed_store(QS_EVENT_PARAMETER params);
 static int handle_embed_search(QS_EVENT_PARAMETER params);
 static int handle_embed_delete(QS_EVENT_PARAMETER params);
+static char* make_rag_prompt(const char* user_query, const int64_t* source_ids,
+                             const float* source_scores, char** source_texts,
+                             int source_count, const char* ctx_prefix, const char* ctx_suffix);
+static int handle_rag(QS_EVENT_PARAMETER params);
+static int handle_rag_stream(QS_EVENT_PARAMETER params);
 
 typedef struct JSON_GEN_CONTEXT {
 	char* buffer;
@@ -24,7 +29,14 @@ typedef struct JSON_GEN_CONTEXT {
 	size_t capacity;
 } JSON_GEN_CONTEXT;
 
+typedef struct RAG_GEN_CONTEXT {
+	char* buffer;
+	size_t length;
+	size_t capacity;
+} RAG_GEN_CONTEXT;
+
 static int on_json_token(void* user_data, const char* token, int is_last);
+static int on_rag_token(void* user_data, const char* token, int is_last);
 
 static char* g_system_prompt = NULL;
 static int g_embedding_enabled = 0;
@@ -429,6 +441,31 @@ static int on_json_token(void* user_data, const char* token, int is_last)
 	return 0;
 }
 
+static int on_rag_token(void* user_data, const char* token, int is_last)
+{
+	RAG_GEN_CONTEXT* ctx = (RAG_GEN_CONTEXT*)user_data;
+	if (ctx == NULL) return -1;
+	if (is_last || token == NULL || token[0] == '\0') {
+		return 0;
+	}
+	size_t token_len = strlen(token);
+	size_t required = ctx->length + token_len + 1;
+	if (required > ctx->capacity) {
+		size_t new_capacity = ctx->capacity;
+		while (new_capacity < required) {
+			new_capacity *= 2;
+		}
+		char* resized = (char*)realloc(ctx->buffer, new_capacity);
+		if (resized == NULL) return -1;
+		ctx->buffer = resized;
+		ctx->capacity = new_capacity;
+	}
+	memcpy(ctx->buffer + ctx->length, token, token_len);
+	ctx->length += token_len;
+	ctx->buffer[ctx->length] = '\0';
+	return 0;
+}
+
 static int handle_embed_store(QS_EVENT_PARAMETER params)
 {
 	if (!g_embedding_enabled) {
@@ -556,6 +593,344 @@ static int handle_embed_delete(QS_EVENT_PARAMETER params)
 	}
 }
 
+static char* make_rag_prompt(const char* user_query, const int64_t* source_ids,
+                             const float* source_scores, char** source_texts,
+                             int source_count, const char* ctx_prefix, const char* ctx_suffix)
+{
+	(void)ctx_prefix; (void)ctx_suffix; /* use fixed format for cleaner output */
+
+	size_t total_size = 512;
+	for (int i = 0; i < source_count; i++) {
+		total_size += 64 + (source_texts[i] ? strlen(source_texts[i]) : 0);
+	}
+	total_size += strlen(user_query) + 256;
+
+	char* prompt = (char*)malloc(total_size);
+	if (!prompt) return NULL;
+
+	int pos = 0;
+	pos += snprintf(prompt + pos, total_size - (size_t)pos, "Retrieved context:\n");
+	for (int i = 0; i < source_count; i++) {
+		pos += snprintf(prompt + pos, total_size - (size_t)pos, "- Doc %d (distance=%.4f): ",
+		                i + 1, source_scores[i]);
+		if (source_texts[i]) {
+			pos += snprintf(prompt + pos, total_size - (size_t)pos, "%s", source_texts[i]);
+		}
+		pos += snprintf(prompt + pos, total_size - (size_t)pos, "\n");
+	}
+
+	return prompt;
+}
+
+static int handle_rag(QS_EVENT_PARAMETER params)
+{
+	if (!g_embedding_enabled) {
+		send_json_http_response(params, 400, "{\"ok\":false,\"error\":\"embedding module not enabled\"}");
+		return 400;
+	}
+
+	const char* query = api_qs_get_http_post_parameter(params, "q");
+	if (query == NULL || query[0] == '\0') {
+		query = api_qs_get_http_post_body(params);
+	}
+	if (query == NULL || query[0] == '\0') {
+		send_json_http_response(params, 400, "{\"ok\":false,\"error\":\"missing q parameter\"}");
+		return 400;
+	}
+
+	const char* top_k_str = api_qs_get_http_post_parameter(params, "top_k");
+	int top_k = 3;
+	if (top_k_str != NULL && top_k_str[0] != '\0') {
+		int val = atoi(top_k_str);
+		if (val > 0 && val <= 100) {
+			top_k = val;
+		}
+	}
+
+	const char* ctx_prefix = api_qs_get_http_post_parameter(params, "context_prefix");
+	if (ctx_prefix == NULL || ctx_prefix[0] == '\0') ctx_prefix = "### Doc";
+	const char* ctx_suffix = api_qs_get_http_post_parameter(params, "context_suffix");
+	if (ctx_suffix == NULL || ctx_suffix[0] == '\0') ctx_suffix = "---";
+
+	int64_t result_ids[100];
+	float result_scores[100];
+	char* result_texts[100] = {NULL};
+	int count = qs_embedding_search(query, top_k, result_ids, result_scores, result_texts, 100);
+
+	/* Build effective prompt with context injected into SYSTEM portion */
+	const char* prefix = "[SYSTEM]\n";
+
+	size_t base_size = strlen(prefix) + 200;
+	if (g_system_prompt != NULL && g_system_prompt[0] != '\0') {
+		base_size += strlen(g_system_prompt) + 8;
+	}
+
+	char* system_part = (char*)malloc(base_size);
+	if (!system_part) {
+		for (int i = 0; i < count; i++) free(result_texts[i]);
+		send_json_http_response(params, 500, "{\"ok\":false,\"error\":\"memory allocation failed\"}");
+		return 500;
+	}
+	system_part[0] = '\0';
+
+	strcat(system_part, prefix);
+	if (g_system_prompt != NULL && g_system_prompt[0] != '\0') {
+		strcat(system_part, g_system_prompt);
+		strcat(system_part, "\n\n");
+	}
+	strcat(system_part, "You are a helpful assistant. Answer questions based on the retrieved context below. Be concise and accurate.\n\nRetrieved context:");
+
+	char* rag_context = make_rag_prompt(query, result_ids, result_scores, result_texts, count, ctx_prefix, ctx_suffix);
+	if (!rag_context) {
+		free(system_part);
+		for (int i = 0; i < count; i++) free(result_texts[i]);
+		send_json_http_response(params, 500, "{\"ok\":false,\"error\":\"failed to build prompt\"}");
+		return 500;
+	}
+
+	size_t total = strlen(system_part) + strlen(rag_context) + strlen(query) + 64;
+	char* final_prompt = (char*)malloc(total);
+	if (!final_prompt) {
+		free(system_part);
+		free(rag_context);
+		for (int i = 0; i < count; i++) free(result_texts[i]);
+		send_json_http_response(params, 500, "{\"ok\":false,\"error\":\"memory allocation failed\"}");
+		return 500;
+	}
+
+	snprintf(final_prompt, total, "%s\n%s\n\n[USER]\n%s\n\n[ASSISTANT]\n", system_part, rag_context, query);
+	free(system_part);
+	free(rag_context);
+
+	/* Generate answer */
+	RAG_GEN_CONTEXT* ctx = (RAG_GEN_CONTEXT*)malloc(sizeof(RAG_GEN_CONTEXT));
+	if (ctx == NULL) {
+		free(final_prompt);
+		for (int i = 0; i < count; i++) free(result_texts[i]);
+		send_json_http_response(params, 500, "{\"ok\":false,\"error\":\"memory allocation failed\"}");
+		return 500;
+	}
+	ctx->capacity = 4096;
+	ctx->length = 0;
+	ctx->buffer = (char*)malloc(ctx->capacity);
+	if (ctx->buffer == NULL) {
+		free(ctx);
+		free(final_prompt);
+		for (int i = 0; i < count; i++) free(result_texts[i]);
+		send_json_http_response(params, 500, "{\"ok\":false,\"error\":\"memory allocation failed\"}");
+		return 500;
+	}
+	ctx->buffer[0] = '\0';
+
+	int stream_result = qs_llama_module_stream_text(final_prompt, on_rag_token, ctx);
+	free(final_prompt);
+
+	if (stream_result == -1) {
+		free(ctx->buffer);
+		free(ctx);
+		for (int i = 0; i < count; i++) free(result_texts[i]);
+		send_json_http_response(params, 500, "{\"ok\":false,\"error\":\"generation failed\"}");
+		return 500;
+	}
+
+	/* Clean up answer: strip leading/trailing whitespace and markdown code fences */
+	char* answer_text = ctx->buffer;
+	size_t len = strlen(answer_text);
+	while (len > 0 && (answer_text[0] == ' ' || answer_text[0] == '\n' || answer_text[0] == '\r' || answer_text[0] == '\t')) {
+		answer_text++;
+		len--;
+	}
+	while (len > 0 && (answer_text[len-1] == ' ' || answer_text[len-1] == '\n' || answer_text[len-1] == '\r' || answer_text[len-1] == '\t')) {
+		len--;
+	}
+	answer_text[len] = '\0';
+
+	/* Strip markdown code fences */
+	if (strncmp(answer_text, "```", 3) == 0) {
+		char* end = strstr(answer_text, "```");
+		if (end != NULL) {
+			memmove(answer_text, answer_text + 3, end - answer_text);
+			end[0] = '\0';
+		}
+	}
+
+	const char* final_answer = answer_text;
+
+	/* Build sources array */
+	size_t src_cap = 8192;
+	char* src_json = (char*)malloc(src_cap);
+	if (!src_json) {
+		free(ctx->buffer);
+		free(ctx);
+		for (int i = 0; i < count; i++) free(result_texts[i]);
+		send_json_http_response(params, 500, "{\"ok\":false,\"error\":\"memory allocation failed\"}");
+		return 500;
+	}
+	int sp = snprintf(src_json, src_cap, "[");
+	for (int i = 0; i < count; i++) {
+		char* escaped_text = json_escape_string(result_texts[i] ? result_texts[i] : "");
+		sp += snprintf(src_json + sp, src_cap - (size_t)sp, "{\"id\":%lld,\"distance\":%.6f,\"text\":\"%s\"}",
+			               (long long)result_ids[i], result_scores[i], escaped_text);
+		free(escaped_text);
+		if (i < count - 1) {
+			sp += snprintf(src_json + sp, src_cap - (size_t)sp, ",");
+		}
+	}
+	sp += snprintf(src_json + sp, src_cap - (size_t)sp, "]");
+	for (int i = 0; i < count; i++) free(result_texts[i]);
+
+	char* escaped_answer = json_escape_string(final_answer);
+
+	size_t resp_cap = strlen(escaped_answer) + src_cap + 256;
+	char* response = (char*)malloc(resp_cap);
+	if (response == NULL) {
+		free(src_json);
+		free(escaped_answer);
+		free(ctx->buffer);
+		free(ctx);
+		send_json_http_response(params, 500, "{\"ok\":false,\"error\":\"memory allocation failed\"}");
+		return 500;
+	}
+	snprintf(response, resp_cap, "{\"ok\":true,\"answer\":\"%s\",\"sources\":%s,\"count\":%d}", escaped_answer, src_json, count);
+
+	send_json_http_response(params, 200, response);
+	free(response);
+	free(src_json);
+	free(escaped_answer);
+	free(ctx->buffer);
+	free(ctx);
+	return 200;
+}
+
+static int handle_rag_stream(QS_EVENT_PARAMETER params)
+{
+	if (!g_embedding_enabled) {
+		send_json_http_response(params, 400, "{\"ok\":false,\"error\":\"embedding module not enabled\"}");
+		return 400;
+	}
+
+	const char* query = api_qs_get_http_post_parameter(params, "q");
+	if (query == NULL || query[0] == '\0') {
+		query = api_qs_get_http_post_body(params);
+	}
+	if (query == NULL || query[0] == '\0') {
+		send_json_http_response(params, 400, "{\"ok\":false,\"error\":\"missing q parameter\"}");
+		return 400;
+	}
+
+	const char* top_k_str = api_qs_get_http_post_parameter(params, "top_k");
+	int top_k = 3;
+	if (top_k_str != NULL && top_k_str[0] != '\0') {
+		int val = atoi(top_k_str);
+		if (val > 0 && val <= 100) {
+			top_k = val;
+		}
+	}
+
+	const char* ctx_prefix = api_qs_get_http_post_parameter(params, "context_prefix");
+	if (ctx_prefix == NULL || ctx_prefix[0] == '\0') ctx_prefix = "### Doc";
+	const char* ctx_suffix = api_qs_get_http_post_parameter(params, "context_suffix");
+	if (ctx_suffix == NULL || ctx_suffix[0] == '\0') ctx_suffix = "---";
+
+	int64_t result_ids[100];
+	float result_scores[100];
+	char* result_texts[100] = {NULL};
+	int count = qs_embedding_search(query, top_k, result_ids, result_scores, result_texts, 100);
+
+	/* Build effective prompt with context injected into SYSTEM portion */
+	const char* prefix = "[SYSTEM]\n";
+
+	size_t base_size = strlen(prefix) + 32;
+	if (g_system_prompt != NULL && g_system_prompt[0] != '\0') {
+		base_size += strlen(g_system_prompt) + 8;
+	}
+
+	char* system_part = (char*)malloc(base_size);
+	if (!system_part) {
+		for (int i = 0; i < count; i++) free(result_texts[i]);
+		send_json_http_response(params, 500, "{\"ok\":false,\"error\":\"memory allocation failed\"}");
+		return 500;
+	}
+	system_part[0] = '\0';
+
+	strcat(system_part, prefix);
+	if (g_system_prompt != NULL && g_system_prompt[0] != '\0') {
+		strcat(system_part, g_system_prompt);
+		strcat(system_part, "\n\n");
+	}
+	strcat(system_part, "You are a helpful assistant. Answer questions based on the retrieved context below. Be concise and accurate.\n\nRetrieved context:");
+
+	char* rag_context = make_rag_prompt(query, result_ids, result_scores, result_texts, count, ctx_prefix, ctx_suffix);
+	if (!rag_context) {
+		free(system_part);
+		for (int i = 0; i < count; i++) free(result_texts[i]);
+		send_json_http_response(params, 500, "{\"ok\":false,\"error\":\"failed to build prompt\"}");
+		return 500;
+	}
+
+	size_t total = strlen(system_part) + strlen(rag_context) + strlen(query) + 64;
+	char* final_prompt = (char*)malloc(total);
+	if (!final_prompt) {
+		free(system_part);
+		free(rag_context);
+		for (int i = 0; i < count; i++) free(result_texts[i]);
+		send_json_http_response(params, 500, "{\"ok\":false,\"error\":\"memory allocation failed\"}");
+		return 500;
+	}
+
+	snprintf(final_prompt, total, "%s\n%s\n\n[USER]\n%s\n\n[ASSISTANT]\n", system_part, rag_context, query);
+	free(system_part);
+	free(rag_context);
+
+	/* Stream answer */
+	QS_LLM_HTTP_STREAM_CONTEXT stream;
+	if (-1 == qs_llm_http_stream_open(params, &stream)) {
+		free(final_prompt);
+		for (int i = 0; i < count; i++) free(result_texts[i]);
+		return 500;
+	}
+
+	const char* meta = (g_system_prompt != NULL) ? "system_prompt=on" : "system_prompt=off";
+	if (-1 == qs_llm_http_stream_send_event(&stream, "meta", meta)) {
+		qs_llm_http_stream_close(&stream);
+		free(final_prompt);
+		for (int i = 0; i < count; i++) free(result_texts[i]);
+		return 500;
+	}
+
+	if (-1 == qs_llama_module_stream_text(final_prompt, on_stream_token, &stream)) {
+		qs_llm_http_stream_send_event(&stream, "error", "stream failed");
+		qs_llm_http_stream_send_done(&stream);
+	}
+	free(final_prompt);
+
+	/* Send sources as final event */
+	size_t src_cap = 8192;
+	char* src_json = (char*)malloc(src_cap);
+	if (!src_json) {
+		qs_llm_http_stream_close(&stream);
+		for (int i = 0; i < count; i++) free(result_texts[i]);
+		return 500;
+	}
+	int sp = snprintf(src_json, src_cap, "[");
+	for (int i = 0; i < count; i++) {
+		char* escaped_text = json_escape_string(result_texts[i] ? result_texts[i] : "");
+		sp += snprintf(src_json + sp, src_cap - (size_t)sp, "{\"id\":%lld,\"distance\":%.6f,\"text\":\"%s\"}",
+			               (long long)result_ids[i], result_scores[i], escaped_text);
+		free(escaped_text);
+		if (i < count - 1) {
+			sp += snprintf(src_json + sp, src_cap - (size_t)sp, ",");
+		}
+	}
+	sp += snprintf(src_json + sp, src_cap - (size_t)sp, "]");
+
+	qs_llm_http_stream_send_event(&stream, "sources", src_json);
+	qs_llm_http_stream_send_done(&stream);
+	free(src_json);
+	for (int i = 0; i < count; i++) free(result_texts[i]);
+	return 200;
+}
+
 static int on_http_event(QS_EVENT_PARAMETER params)
 {
 	const char* method = api_qs_get_http_method(params);
@@ -576,6 +951,15 @@ static int on_http_event(QS_EVENT_PARAMETER params)
 
 	if (strcmp(method, "POST") == 0 && strcmp(path, "/api/embed/delete") == 0) {
 		return handle_embed_delete(params);
+	}
+
+	/* RAG endpoints */
+	if (strcmp(method, "POST") == 0 && strcmp(path, "/api/llm/rag/stream") == 0) {
+		return handle_rag_stream(params);
+	}
+
+	if (strcmp(method, "POST") == 0 && strcmp(path, "/api/llm/rag") == 0) {
+		return handle_rag(params);
 	}
 
 	if (strcmp(method, "POST") == 0 && strcmp(path, "/api/llm/stream") == 0) {

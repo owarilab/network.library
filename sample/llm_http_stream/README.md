@@ -146,7 +146,7 @@ JSON mode は JSON オブジェクトの生成を促し、サーバ側で JSON �
 
 Embedding 機能が有効な場合（`QS_EMBEDDING_MODULE_ENABLED=1` でビルド、かつ `QS_EMBEDDING_MODEL_PATH` 指定）、以下の API が利用可能です。
 
-テキストの embedding を生成して DB に保存:
+テキストの embedding を生成して DB に保存（基本的なサンプル）:
 
 ```bash
 curl -X POST "http://localhost:8080/api/embed" \
@@ -168,6 +168,45 @@ curl -X POST "http://localhost:8080/api/embed" \
   -d "text=simple sample&id=6"
 ```
 
+実用的なサンプルデータセット（複数国の特色）:
+
+```bash
+# 日本
+curl -X POST "http://localhost:8080/api/embed" \
+  -d "text=日本は東アジアの島国で、首都は東京です。四季折々の自然美があり、特に春の桜と秋の紅葉が有名です。日本文化には茶道、花道、武道などの伝統芸能があります。&id=101"
+
+curl -X POST "http://localhost:8080/api/embed" \
+  -d "text=日本料理は世界的に有名で、寿司、天ぷら、味噌汁などが代表的です。最近では和食がユネスコ無形文化遺産に登録されました。日本酒も世界で高く評価されています。&id=102"
+
+# フランス
+curl -X POST "http://localhost:8080/api/embed" \
+  -d "text=フランスはヨーロッパ西部に位置し、首都はパリです。エッフェル塔、ノートルダム大聖堂、ルーヴル美術館などの有名な建造物があります。パリは芸術と文化の中心地として知られています。&id=201"
+
+curl -X POST "http://localhost:8080/api/embed" \
+  -d "text=フランスはワインの名産地で、ボルドー、ブルゴーニュなどの地域は世界的に有名です。チーズの種類も多く、フレンチ料理は高級料理の代名詞とされています。&id=202"
+
+# イタリア
+curl -X POST "http://localhost:8080/api/embed" \
+  -d "text=イタリアは南ヨーロッパの国で、首都はローマです。古代ローマ帝国の遺跡、コロッセオ、ペンテオンなど歴史的建造物が多数あります。ルネッサンスの発祥地として芸術の宝庫です。&id=301"
+
+curl -X POST "http://localhost:8080/api/embed" \
+  -d "text=イタリア料理はパスタやピザで世界的に有名です。ミラノ、ヴェネチア、フィレンツェなどの都市は観光地として人気があります。イタリアンアイスクリームも有名です。&id=302"
+
+# スペイン
+curl -X POST "http://localhost:8080/api/embed" \
+  -d "text=スペインはイベリア半島の西部に位置し、首都はマドリードです。アントニ・ガウディの建築作品、サグラダ・ファミリア教会は世界遺産です。フラメンコはスペインを代表する舞踊です。&id=401"
+
+curl -X POST "http://localhost:8080/api/embed" \
+  -d "text=スペイン料理のパエリアはスペイン東部の代表的な米料理です。タパスという小皿料理も人気があります。スペインはハモン（生ハム）の名産地としても知られています。&id=402"
+
+# 中国
+curl -X POST "http://localhost:8080/api/embed" \
+  -d "text=中国は世界最大の人口を持つ国で、首都は北京です。万里の城壁、故宮、兵馬俑などの歴史的遺産があります。中国文明は世界で最も古い文明の一つです。&id=501"
+
+curl -X POST "http://localhost:8080/api/embed" \
+  -d "text=中国料理は地域ごとに特色があり、四大料理として四川料理、広東料理、山東料理、淮揚料理が有名です。餃子やラーメンも世界的に知られています。&id=502"
+```
+
 クエリーテキストの embedding を生成して、DB 内で類似検索:
 
 ```bash
@@ -175,6 +214,24 @@ curl -X POST "http://localhost:8080/api/embed" \
 curl -X POST "http://localhost:8080/api/embed/search" \
   -d "q=sample text query&top_k=5"
 ```
+
+RAG（Retrieval-Augmented Generation）による質問応答:
+
+```bash
+# クエリに対して、検索結果をコンテキストとして含めて LLM が回答
+curl -X POST "http://localhost:8080/api/llm/rag" \
+  -d "q=sample text query&top_k=3"
+
+# ストリーミングで回答を受け取る場合
+curl -N -X POST "http://localhost:8080/api/llm/rag/stream" \
+  -d "q=sample text query&top_k=3"
+```
+
+RAG API のパラメータ:
+- `q` (必須): クエリテキスト
+- `top_k` (オプション): 検索結果の件数、デフォルト 3（最大 100）
+- `context_prefix` (オプション): コンテキストのプレフィックス、デフォルト "### Doc"
+- `context_suffix` (オプション): コンテキストのサフィックス、デフォルト "---"
 
 Embedding を削除:
 
@@ -199,6 +256,12 @@ curl "http://localhost:8080/api/status"
 {"ok":true,"query":"sample text query","results":[
   {"id":1,"distance":0.150234},
   {"id":2,"distance":0.425678}
+],"count":2}
+
+# POST /api/llm/rag (RAG応答)
+{"ok":true,"answer":"...LLM generated answer based on retrieved context...","sources":[
+  {"id":1,"distance":0.150234,"text":"This is a sample text to embed"},
+  {"id":4,"distance":0.207580,"text":"Sample1"}
 ],"count":2}
 
 # GET /api/status
