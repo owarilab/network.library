@@ -448,8 +448,10 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 		api_qs_send_ws_binary_by_connection_offset(con_data->server_context, con_data->connection_offset, linebuf, (size_t)len);
 
 		// Also log to text file if enabled
-		fprintf(con_data->txt_file, "%s\n", emit_text);
-		fflush(con_data->txt_file);
+		if (con_data->txt_file) {
+			fprintf(con_data->txt_file, "%s\n", emit_text);
+			fflush(con_data->txt_file);
+		}
 	}
 	/* Update processed_samples using Whisper's segment timestamp.
 	 * Always advance by at least INFERENCE_SAMPLES to prevent re-inference loops
