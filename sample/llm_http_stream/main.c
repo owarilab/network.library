@@ -44,6 +44,7 @@ static int on_rag_stream_token(void* user_data, const char* token, int is_last);
 
 static char* g_system_prompt = NULL;
 static int g_embedding_enabled = 0;
+static QS_EMBEDDING_STORE* g_embedding_store = NULL;
 
 static int on_stream_token(void* user_data, const char* token, int is_last)
 {
@@ -91,7 +92,7 @@ int main(int argc, char* argv[], char* envp[])
 	const char* embedding_db = getenv("QS_EMBEDDING_DB_PATH");
 	if (embedding_model != NULL && embedding_model[0] != '\0' && 
 		embedding_db != NULL && embedding_db[0] != '\0') {
-		int embed_result = qs_embedding_prepare(embedding_model, embedding_db);
+		int embed_result = qs_embedding_prepare(embedding_model, embedding_db, &g_embedding_store);
 		if (0 == embed_result) {
 			g_embedding_enabled = 1;
 			printf("[Main] Embedding module initialized: model=%s db=%s\n", embedding_model, embedding_db);
@@ -106,14 +107,16 @@ int main(int argc, char* argv[], char* envp[])
 	if (0 > api_qs_server_init(&context, 8080, 100, QS_SERVER_TYPE_HTTP)) {
 		qs_llama_module_shutdown();
 		if (g_embedding_enabled) {
-			qs_embedding_shutdown();
+			qs_embedding_shutdown(g_embedding_store);
+			g_embedding_store = NULL;
 		}
 		return -1;
 	}
 	if (-1 == api_qs_server_create_router(context)) {
 		qs_llama_module_shutdown();
 		if (g_embedding_enabled) {
-			qs_embedding_shutdown();
+			qs_embedding_shutdown(g_embedding_store);
+			g_embedding_store = NULL;
 		}
 		return -1;
 	}
@@ -128,7 +131,8 @@ int main(int argc, char* argv[], char* envp[])
 	api_qs_free(context);
 	qs_llama_module_shutdown();
 	if (g_embedding_enabled) {
-		qs_embedding_shutdown();
+		qs_embedding_shutdown(g_embedding_store);
+		g_embedding_store = NULL;
 	}
 	if (g_system_prompt != NULL) {
 		free(g_system_prompt);
@@ -588,7 +592,7 @@ static int handle_embed_store(QS_EVENT_PARAMETER params)
 		return 400;
 	}
 
-	int result = qs_embedding_store(text, text, id);
+	int result = qs_embedding_store(g_embedding_store, text, text, id);
 	if (result == 0) {
 		char response[256];
 		snprintf(response, sizeof(response), "{\"ok\":true,\"id\":%lld,\"text_length\":%zu}", (long long)id, strlen(text));
@@ -628,7 +632,7 @@ static int handle_embed_search(QS_EVENT_PARAMETER params)
 	int64_t result_ids[100];
 	float result_scores[100];
 	char* result_texts[100] = {NULL};
-	int count = qs_embedding_search(query, top_k, result_ids, result_scores, result_texts, 100);
+	int count = qs_embedding_search(g_embedding_store, query, top_k, result_ids, result_scores, result_texts, 100);
 
 	/* Calculate required buffer size based on actual content */
 	char* escaped_query = json_escape_string(query);
@@ -687,7 +691,7 @@ static int handle_embed_delete(QS_EVENT_PARAMETER params)
 		return 400;
 	}
 
-	int result = qs_embedding_delete(id);
+	int result = qs_embedding_delete(g_embedding_store, id);
 	if (result == 0) {
 		char response[256];
 		snprintf(response, sizeof(response), "{\"ok\":true,\"id\":%lld}", (long long)id);
@@ -760,7 +764,7 @@ static int handle_rag(QS_EVENT_PARAMETER params)
 	int64_t result_ids[100];
 	float result_scores[100];
 	char* result_texts[100] = {NULL};
-	int count = qs_embedding_search(query, top_k, result_ids, result_scores, result_texts, 100);
+	int count = qs_embedding_search(g_embedding_store, query, top_k, result_ids, result_scores, result_texts, 100);
 
 	/* Build effective prompt with context injected into SYSTEM portion */
 	const char* prefix = "[SYSTEM]\n";
@@ -937,7 +941,7 @@ static int handle_rag_stream(QS_EVENT_PARAMETER params)
 	int64_t result_ids[100];
 	float result_scores[100];
 	char* result_texts[100] = {NULL};
-	int count = qs_embedding_search(query, top_k, result_ids, result_scores, result_texts, 100);
+	int count = qs_embedding_search(g_embedding_store, query, top_k, result_ids, result_scores, result_texts, 100);
 
 	/* Build effective prompt with context injected into SYSTEM portion */
 	const char* prefix = "[SYSTEM]\n";

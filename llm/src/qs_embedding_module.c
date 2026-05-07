@@ -13,15 +13,17 @@
 #include <pthread.h>
 #include <math.h>
 
+#include "qs_embedding_module.h"
+
 /* Stub implementation when module is disabled. */
 #if !QS_EMBEDDING_MODULE_ENABLED || !defined(QS_EMBEDDING_WITH_LLAMA_CPP) || QS_EMBEDDING_WITH_LLAMA_CPP != 1
 
-int qs_embedding_prepare(const char* model_path, const char* db_path) { (void)model_path; (void)db_path; return 0; }
-void qs_embedding_shutdown(void) {}
-int qs_embedding_store(const char* text, const char* content, int64_t id) { (void)text; (void)content; (void)id; return 0; }
-int qs_embedding_search(const char* query, int top_k, int64_t* out_ids, float* out_scores, char** out_texts, int max_results) { (void)query; (void)top_k; (void)out_ids; (void)out_scores; (void)out_texts; (void)max_results; return 0; }
-int qs_embedding_delete(int64_t id) { (void)id; return 0; }
-int qs_embedding_n_embd(void) { return 0; }
+int qs_embedding_prepare(const char* model_path, const char* db_path, QS_EMBEDDING_STORE** out_store) { (void)model_path; (void)db_path; if (out_store) *out_store = NULL; return 0; }
+void qs_embedding_shutdown(QS_EMBEDDING_STORE* store) { (void)store; }
+int qs_embedding_store(QS_EMBEDDING_STORE* store, const char* text, const char* content, int64_t id) { (void)store; (void)text; (void)content; (void)id; return 0; }
+int qs_embedding_search(QS_EMBEDDING_STORE* store, const char* query, int top_k, int64_t* out_ids, float* out_scores, char** out_texts, int max_results) { (void)store; (void)query; (void)top_k; (void)out_ids; (void)out_scores; (void)out_texts; (void)max_results; return 0; }
+int qs_embedding_delete(QS_EMBEDDING_STORE* store, int64_t id) { (void)store; (void)id; return 0; }
+int qs_embedding_n_embd(QS_EMBEDDING_STORE* store) { (void)store; return 0; }
 
 #else
 
@@ -34,22 +36,33 @@ int sqlite3_vec_init(sqlite3 *db, char **pzErrMsg, const sqlite3_api_routines *p
 #define EMBEDDING_TABLE "embedding_vecs"
 #define SQLITE_MAX_VARCHAR 65536
 
-/* ── Global state ─────────────────────────────────────────────── */
-
-static struct {
-    const char* model_path;
-    const char* db_path;
+typedef struct {
     struct llama_model* model;
+    char model_path[1024];
+    int n_embd_out;
+    int backend_initialized;
+    int ref_count;
+    pthread_mutex_t mutex;
+} QS_EMBEDDING_RUNTIME;
+
+struct QS_EMBEDDING_STORE {
+    char db_path[1024];
     sqlite3* db;
     int n_embd_out;
     pthread_mutex_t mutex;
     int mutex_initialized;
-} g_emb;
+};
 
-/* ── Vector <-> JSON string helpers ───────────────────────────── */
+static QS_EMBEDDING_RUNTIME g_embedding_runtime = {
+    NULL,
+    {0},
+    0,
+    0,
+    0,
+    PTHREAD_MUTEX_INITIALIZER
+};
 
 static char* vec_to_json(const float* v, int n, int* out_len) {
-    /* %.7g can produce up to 14 chars (e.g. "-1.234567e+38") + comma = 15 */
     const int est_per_elem = 20;
     const size_t buf_size = (size_t)n * est_per_elem + 4;
     if (buf_size > SQLITE_MAX_VARCHAR) {
@@ -76,10 +89,7 @@ static char* vec_to_json(const float* v, int n, int* out_len) {
     return buf;
 }
 
-/* ── Internal API ─────────────────────────────────────────────── */
-
 static int create_table(sqlite3* db) {
-    /* Create a simple standard SQLite table for storing embeddings as JSON */
     const char* sql = "CREATE TABLE IF NOT EXISTS " EMBEDDING_TABLE
                       " (id INTEGER PRIMARY KEY, "
                       "  embedding TEXT NOT NULL, "
@@ -93,23 +103,103 @@ static int create_table(sqlite3* db) {
         sqlite3_free(err);
         return -1;
     }
-    
-    /* Create index on id for faster lookups */
-    sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS " EMBEDDING_TABLE "_id_idx ON " EMBEDDING_TABLE "(id)", 
-                 NULL, NULL, NULL);
-    
+
+    sqlite3_exec(db, "CREATE INDEX IF NOT EXISTS " EMBEDDING_TABLE "_id_idx ON " EMBEDDING_TABLE "(id)", NULL, NULL, NULL);
     return 0;
 }
 
-static float* generate_embedding(const char* text) {
+static void embedding_runtime_unload_model_locked(void) {
+    if (g_embedding_runtime.model) {
+        llama_model_free(g_embedding_runtime.model);
+        g_embedding_runtime.model = NULL;
+    }
+    g_embedding_runtime.model_path[0] = '\0';
+    g_embedding_runtime.n_embd_out = 0;
+}
+
+static int embedding_runtime_load_model_locked(const char* model_path) {
+    if (!model_path || model_path[0] == '\0') {
+        return -1;
+    }
+
+    if (g_embedding_runtime.model && strcmp(g_embedding_runtime.model_path, model_path) == 0) {
+        return 0;
+    }
+
+    if (g_embedding_runtime.ref_count > 0 && g_embedding_runtime.model && strcmp(g_embedding_runtime.model_path, model_path) != 0) {
+        fprintf(stderr, "embedding: model path mismatch while stores are active\n");
+        return -1;
+    }
+
+    if (!g_embedding_runtime.backend_initialized) {
+        llama_backend_init();
+        g_embedding_runtime.backend_initialized = 1;
+    }
+
+    embedding_runtime_unload_model_locked();
+
+    fprintf(stderr, "embedding: loading model '%s'\n", model_path);
+    g_embedding_runtime.model = llama_model_load_from_file(model_path, llama_model_default_params());
+    if (!g_embedding_runtime.model) {
+        fprintf(stderr, "embedding: failed to load model\n");
+        return -1;
+    }
+
+    snprintf(g_embedding_runtime.model_path, sizeof(g_embedding_runtime.model_path), "%s", model_path);
+    g_embedding_runtime.n_embd_out = (int)llama_model_n_embd_out(g_embedding_runtime.model);
+    fprintf(stderr, "embedding: model loaded, n_embd_out=%d\n", g_embedding_runtime.n_embd_out);
+    return 0;
+}
+
+static int embedding_runtime_acquire(const char* model_path, int* out_n_embd) {
+    int rc;
+
+    pthread_mutex_lock(&g_embedding_runtime.mutex);
+    rc = embedding_runtime_load_model_locked(model_path);
+    if (rc == 0) {
+        g_embedding_runtime.ref_count++;
+        if (out_n_embd) {
+            *out_n_embd = g_embedding_runtime.n_embd_out;
+        }
+    } else if (out_n_embd) {
+        *out_n_embd = 0;
+    }
+    pthread_mutex_unlock(&g_embedding_runtime.mutex);
+
+    return rc;
+}
+
+static void embedding_runtime_release(void) {
+    pthread_mutex_lock(&g_embedding_runtime.mutex);
+
+    if (g_embedding_runtime.ref_count > 0) {
+        g_embedding_runtime.ref_count--;
+    }
+    if (g_embedding_runtime.ref_count == 0) {
+        embedding_runtime_unload_model_locked();
+        if (g_embedding_runtime.backend_initialized) {
+            llama_backend_free();
+            g_embedding_runtime.backend_initialized = 0;
+        }
+    }
+
+    pthread_mutex_unlock(&g_embedding_runtime.mutex);
+}
+
+static float* generate_embedding_locked(const char* text) {
+    struct llama_model* model = g_embedding_runtime.model;
+    int32_t n_embd_out = (int32_t)g_embedding_runtime.n_embd_out;
     struct llama_context_params cparams = llama_context_default_params();
 
-    /* For embedding model, use smaller context and embeddings mode */
     cparams.n_ctx = 512;
     cparams.pooling_type = LLAMA_POOLING_TYPE_MEAN;
     cparams.embeddings = true;
 
-    struct llama_context* ctx = llama_init_from_model(g_emb.model, cparams);
+    if (!model) {
+        return NULL;
+    }
+
+    struct llama_context* ctx = llama_init_from_model(model, cparams);
     if (!ctx) {
         fprintf(stderr, "embedding: failed to create context\n");
         return NULL;
@@ -122,8 +212,7 @@ static float* generate_embedding(const char* text) {
         return NULL;
     }
 
-    int32_t n_tokens = llama_tokenize(llama_model_get_vocab(g_emb.model), text, strlen(text),
-                                       tokens, n_ctx, true, true);
+    int32_t n_tokens = llama_tokenize(llama_model_get_vocab(model), text, strlen(text), tokens, n_ctx, true, true);
     if (n_tokens < 0) {
         fprintf(stderr, "embedding: tokenization failed (%d)\n", n_tokens);
         free(tokens);
@@ -132,7 +221,6 @@ static float* generate_embedding(const char* text) {
     }
 
     struct llama_batch batch = llama_batch_get_one(tokens, (int32_t)n_tokens);
-
     if (llama_decode(ctx, batch) != 0) {
         fprintf(stderr, "embedding: decode failed\n");
         free(tokens);
@@ -148,7 +236,6 @@ static float* generate_embedding(const char* text) {
         return NULL;
     }
 
-    int32_t n_embd_out = llama_model_n_embd_out(g_emb.model);
     float* result = (float*)malloc(sizeof(float) * (size_t)n_embd_out);
     if (result) {
         memcpy(result, embd, sizeof(float) * (size_t)n_embd_out);
@@ -181,33 +268,29 @@ static int store_vector(sqlite3* db, int64_t id, const float* embd, int n_embd, 
     return rc;
 }
 
-/* Helper: Parse JSON array of floats into array */
 static float* json_array_to_floats(const char* json_str, int expected_len, int* out_len) {
     if (!json_str) return NULL;
-    
-    float* result = (float*)malloc(sizeof(float) * expected_len);
+
+    float* result = (float*)malloc(sizeof(float) * (size_t)expected_len);
     if (!result) return NULL;
-    
+
     int count = 0;
     const char* p = json_str;
-    
-    /* Skip opening bracket */
     while (*p && *p != '[') p++;
     if (!*p) { free(result); return NULL; }
     p++;
-    
-    /* Parse numbers */
+
     while (count < expected_len && *p) {
         while (*p && (*p == ' ' || *p == ',' || *p == '\t' || *p == '\n')) p++;
         if (*p == ']') break;
-        
+
         char* endp;
         result[count] = strtof(p, &endp);
-        if (endp == p) break;  /* No valid number found */
+        if (endp == p) break;
         count++;
         p = endp;
     }
-    
+
     *out_len = count;
     if (count != expected_len) {
         free(result);
@@ -216,68 +299,63 @@ static float* json_array_to_floats(const char* json_str, int expected_len, int* 
     return result;
 }
 
-/* Helper: Calculate cosine distance between two vectors (1 - cosine_similarity) */
 static float cosine_distance(const float* v1, const float* v2, int n) {
     if (n <= 0) return 1.0f;
-    
-    float dot = 0.0f, norm1 = 0.0f, norm2 = 0.0f;
+
+    float dot = 0.0f;
+    float norm1 = 0.0f;
+    float norm2 = 0.0f;
     for (int i = 0; i < n; i++) {
         dot += v1[i] * v2[i];
         norm1 += v1[i] * v1[i];
         norm2 += v2[i] * v2[i];
     }
-    
+
     if (norm1 < 1e-6f || norm2 < 1e-6f) return 1.0f;
-    
-    float similarity = dot / (sqrtf(norm1) * sqrtf(norm2));
-    return 1.0f - similarity;  /* Distance = 1 - similarity */
+    return 1.0f - (dot / (sqrtf(norm1) * sqrtf(norm2)));
 }
 
 static int search_vectors(sqlite3* db, const float* query_embd, int n_embd,
                           int top_k, int64_t* out_ids, float* out_scores, char** out_texts, int max_results) {
     const char* sql = "SELECT id, embedding, text_content FROM " EMBEDDING_TABLE " ORDER BY id";
-
     sqlite3_stmt* stmt;
     int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
         return 0;
     }
 
-    /* Collect all embeddings with their IDs and distances */
     typedef struct {
         int64_t id;
         float distance;
         char* text_content;
     } SearchResult;
-    
+
     int capacity = 100;
-    SearchResult* results = (SearchResult*)malloc(sizeof(SearchResult) * capacity);
+    SearchResult* results = (SearchResult*)malloc(sizeof(SearchResult) * (size_t)capacity);
     if (!results) {
         sqlite3_finalize(stmt);
         return 0;
     }
-    
+
     int count = 0;
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         int64_t id = sqlite3_column_int64(stmt, 0);
         const char* emb_json = (const char*)sqlite3_column_text(stmt, 1);
-        
         if (!emb_json) continue;
-        
-        int parsed_len;
+
+        int parsed_len = 0;
         float* embd = json_array_to_floats(emb_json, n_embd, &parsed_len);
         if (!embd || parsed_len != n_embd) {
             free(embd);
             continue;
         }
-        
+
         float distance = cosine_distance(query_embd, embd, n_embd);
         free(embd);
-        
-        /* Resize array if needed */
+
         if (count >= capacity) {
             capacity *= 2;
-            SearchResult* new_results = (SearchResult*)realloc(results, sizeof(SearchResult) * capacity);
+            SearchResult* new_results = (SearchResult*)realloc(results, sizeof(SearchResult) * (size_t)capacity);
             if (!new_results) {
                 for (int i = 0; i < count; i++) {
                     free(results[i].text_content);
@@ -288,7 +366,7 @@ static int search_vectors(sqlite3* db, const float* query_embd, int n_embd,
             }
             results = new_results;
         }
-        
+
         results[count].id = id;
         results[count].distance = distance;
         const char* txt = (const char*)sqlite3_column_text(stmt, 2);
@@ -297,8 +375,7 @@ static int search_vectors(sqlite3* db, const float* query_embd, int n_embd,
     }
 
     sqlite3_finalize(stmt);
-    
-    /* Sort by distance */
+
     for (int i = 0; i < count - 1; i++) {
         for (int j = i + 1; j < count; j++) {
             if (results[j].distance < results[i].distance) {
@@ -308,8 +385,7 @@ static int search_vectors(sqlite3* db, const float* query_embd, int n_embd,
             }
         }
     }
-    
-    /* Return top-k results */
+
     int n = (count < max_results) ? count : max_results;
     if (n > top_k) n = top_k;
     for (int i = 0; i < n; i++) {
@@ -317,8 +393,6 @@ static int search_vectors(sqlite3* db, const float* query_embd, int n_embd,
         out_scores[i] = results[i].distance;
         out_texts[i] = results[i].text_content;
     }
-
-    /* Free unused text_content entries */
     for (int i = n; i < count; i++) {
         free(results[i].text_content);
     }
@@ -327,145 +401,155 @@ static int search_vectors(sqlite3* db, const float* query_embd, int n_embd,
     return n;
 }
 
-/* ── Public API ───────────────────────────────────────────────── */
+int qs_embedding_prepare(const char* model_path, const char* db_path, QS_EMBEDDING_STORE** out_store) {
+    QS_EMBEDDING_STORE* store;
+    int n_embd_out = 0;
+    int rc;
 
-int qs_embedding_prepare(const char* model_path, const char* db_path) {
-    if (g_emb.db) {
-        return 0;
+    if (!out_store) {
+        return -1;
     }
+    *out_store = NULL;
 
-    memset(&g_emb, 0, sizeof(g_emb));
-    g_emb.model_path = model_path;
-    g_emb.db_path = db_path;
-
-    fprintf(stderr, "embedding: loading model '%s'\n", model_path);
-    llama_backend_init();
-    g_emb.model = llama_model_load_from_file(model_path,
-        llama_model_default_params());
-    if (!g_emb.model) {
-        fprintf(stderr, "embedding: failed to load model\n");
-        llama_backend_free();
+    if (!db_path || db_path[0] == '\0') {
         return -1;
     }
 
-    g_emb.n_embd_out = (int)llama_model_n_embd_out(g_emb.model);
-    fprintf(stderr, "embedding: model loaded, n_embd_out=%d\n", g_emb.n_embd_out);
+    if (embedding_runtime_acquire(model_path, &n_embd_out) != 0) {
+        return -1;
+    }
 
-    int rc = sqlite3_open(db_path, &g_emb.db);
+    store = (QS_EMBEDDING_STORE*)calloc(1, sizeof(*store));
+    if (!store) {
+        embedding_runtime_release();
+        return -1;
+    }
+
+    snprintf(store->db_path, sizeof(store->db_path), "%s", db_path);
+    store->n_embd_out = n_embd_out;
+
+    rc = sqlite3_open(db_path, &store->db);
     if (rc != SQLITE_OK) {
-        fprintf(stderr, "embedding: cannot open database: %s\n", sqlite3_errmsg(g_emb.db));
-        llama_model_free(g_emb.model);
-        g_emb.model = NULL;
-        llama_backend_free();
+        fprintf(stderr, "embedding: cannot open database: %s\n", sqlite3_errmsg(store->db));
+        if (store->db) {
+            sqlite3_close(store->db);
+        }
+        free(store);
+        embedding_runtime_release();
         return -1;
     }
 
-    sqlite3_exec(g_emb.db, "PRAGMA journal_mode=WAL", NULL, NULL, NULL);
-
-    if (create_table(g_emb.db) != 0) {
-        sqlite3_close(g_emb.db);
-        g_emb.db = NULL;
-        llama_model_free(g_emb.model);
-        g_emb.model = NULL;
-        llama_backend_free();
+    sqlite3_exec(store->db, "PRAGMA journal_mode=WAL", NULL, NULL, NULL);
+    if (create_table(store->db) != 0) {
+        sqlite3_close(store->db);
+        free(store);
+        embedding_runtime_release();
         return -1;
     }
 
-    pthread_mutex_init(&g_emb.mutex, NULL);
-    g_emb.mutex_initialized = 1;
-    fprintf(stderr, "embedding: prepared successfully\n");
+    pthread_mutex_init(&store->mutex, NULL);
+    store->mutex_initialized = 1;
+    *out_store = store;
+    fprintf(stderr, "embedding: store prepared successfully: db=%s\n", db_path);
     return 0;
 }
 
-void qs_embedding_shutdown(void) {
-    if (!g_emb.db && !g_emb.model) return;
+void qs_embedding_shutdown(QS_EMBEDDING_STORE* store) {
+    sqlite3* db;
 
-    if (g_emb.mutex_initialized) {
-        pthread_mutex_lock(&g_emb.mutex);
+    if (!store) return;
+
+    if (store->mutex_initialized) {
+        pthread_mutex_lock(&store->mutex);
     }
 
-    sqlite3* db = g_emb.db;
-    struct llama_model* model = g_emb.model;
-    g_emb.db = NULL;
-    g_emb.model = NULL;
-    g_emb.n_embd_out = 0;
+    db = store->db;
+    store->db = NULL;
+    store->n_embd_out = 0;
 
-    if (g_emb.mutex_initialized) {
-        pthread_mutex_unlock(&g_emb.mutex);
-        pthread_mutex_destroy(&g_emb.mutex);
-        g_emb.mutex_initialized = 0;
+    if (store->mutex_initialized) {
+        pthread_mutex_unlock(&store->mutex);
+        pthread_mutex_destroy(&store->mutex);
+        store->mutex_initialized = 0;
     }
 
     if (db) {
         sqlite3_close(db);
     }
-    if (model) {
-        llama_model_free(model);
-    }
-    llama_backend_free();
+
+    embedding_runtime_release();
+    free(store);
 }
 
-int qs_embedding_store(const char* text, const char* content, int64_t id) {
-    if (!g_emb.db || !g_emb.model) return -1;
+int qs_embedding_store(QS_EMBEDDING_STORE* store, const char* text, const char* content, int64_t id) {
+    float* embd;
+    int rc;
 
-    pthread_mutex_lock(&g_emb.mutex);
+    if (!store || !store->db) return -1;
 
-    float* embd = generate_embedding(text);
+    pthread_mutex_lock(&store->mutex);
+    pthread_mutex_lock(&g_embedding_runtime.mutex);
+    embd = generate_embedding_locked(text);
+    pthread_mutex_unlock(&g_embedding_runtime.mutex);
     if (!embd) {
-        pthread_mutex_unlock(&g_emb.mutex);
+        pthread_mutex_unlock(&store->mutex);
         return -1;
     }
 
-    int rc = store_vector(g_emb.db, id, embd, g_emb.n_embd_out, content);
+    rc = store_vector(store->db, id, embd, store->n_embd_out, content);
     free(embd);
-
-    pthread_mutex_unlock(&g_emb.mutex);
+    pthread_mutex_unlock(&store->mutex);
     return rc;
 }
 
-int qs_embedding_search(const char* query, int top_k, int64_t* out_ids,
+int qs_embedding_search(QS_EMBEDDING_STORE* store, const char* query, int top_k, int64_t* out_ids,
                         float* out_scores, char** out_texts, int max_results) {
-    if (!g_emb.db || !g_emb.model) return 0;
+    float* query_embd;
+    int count;
 
-    pthread_mutex_lock(&g_emb.mutex);
+    if (!store || !store->db) return 0;
 
-    float* query_embd = generate_embedding(query);
+    pthread_mutex_lock(&store->mutex);
+    pthread_mutex_lock(&g_embedding_runtime.mutex);
+    query_embd = generate_embedding_locked(query);
+    pthread_mutex_unlock(&g_embedding_runtime.mutex);
     if (!query_embd) {
-        pthread_mutex_unlock(&g_emb.mutex);
+        pthread_mutex_unlock(&store->mutex);
         return 0;
     }
 
-    int count = search_vectors(g_emb.db, query_embd, g_emb.n_embd_out,
-                               top_k, out_ids, out_scores, out_texts, max_results);
-
-    pthread_mutex_unlock(&g_emb.mutex);
+    count = search_vectors(store->db, query_embd, store->n_embd_out, top_k, out_ids, out_scores, out_texts, max_results);
+    pthread_mutex_unlock(&store->mutex);
     free(query_embd);
     return count;
 }
 
-int qs_embedding_delete(int64_t id) {
-    if (!g_emb.db) return -1;
-
-    pthread_mutex_lock(&g_emb.mutex);
-
+int qs_embedding_delete(QS_EMBEDDING_STORE* store, int64_t id) {
     const char* sql = "DELETE FROM " EMBEDDING_TABLE " WHERE id = ?";
     sqlite3_stmt* stmt;
-    int rc = sqlite3_prepare_v2(g_emb.db, sql, -1, &stmt, NULL);
+    int rc;
+
+    if (!store || !store->db) return -1;
+
+    pthread_mutex_lock(&store->mutex);
+    rc = sqlite3_prepare_v2(store->db, sql, -1, &stmt, NULL);
     if (rc != SQLITE_OK) {
-        pthread_mutex_unlock(&g_emb.mutex);
+        pthread_mutex_unlock(&store->mutex);
         return -1;
     }
 
     sqlite3_bind_int64(stmt, 1, id);
     rc = (sqlite3_step(stmt) == SQLITE_DONE) ? 0 : -1;
     sqlite3_finalize(stmt);
-
-    pthread_mutex_unlock(&g_emb.mutex);
+    pthread_mutex_unlock(&store->mutex);
     return rc;
 }
 
-int qs_embedding_n_embd(void) {
-    return g_emb.n_embd_out;
+int qs_embedding_n_embd(QS_EMBEDDING_STORE* store) {
+    if (!store) {
+        return 0;
+    }
+    return store->n_embd_out;
 }
 
 #endif /* QS_EMBEDDING_MODULE_ENABLED */

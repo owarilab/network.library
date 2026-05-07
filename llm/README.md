@@ -441,12 +441,26 @@ make build
 
 | 関数 | 説明 |
 |---|---|
-| `qs_embedding_prepare(model_path, db_path)` | モデルとデータベースを初期化 |
-| `qs_embedding_shutdown()` | リソース解放 |
-| `qs_embedding_store(text, id)` | テキストを embedding 生成して保存 |
-| `qs_embedding_search(query, top_k, out_ids, out_scores, max_results)` | 類似検索 |
-| `qs_embedding_delete(id)` | 埋め込みベクトルを削除 |
-| `qs_embedding_n_embd()` | ベクトル次元数の取得 |
+| `qs_embedding_prepare(model_path, db_path, &store)` | 共有モデルを準備し、DBごとの store ハンドルを生成 |
+| `qs_embedding_shutdown(store)` | store を閉じる。最後の store 解放時に共有モデルも解放 |
+| `qs_embedding_store(store, text, content, id)` | テキストを embedding 生成して保存 |
+| `qs_embedding_search(store, query, top_k, out_ids, out_scores, out_texts, max_results)` | 類似検索 |
+| `qs_embedding_delete(store, id)` | 埋め込みベクトルを削除 |
+| `qs_embedding_n_embd(store)` | ベクトル次元数の取得 |
+
+`QS_EMBEDDING_STORE*` は DB ごとのハンドルです。現状の `sample/llm_http_stream` では 1 つだけ保持するシンプルな使い方をしていますが、将来は複数の store を開いて用途別 DB を分けられます。モデルはモジュール内部で共有されます。
+
+単一DBでの利用例:
+
+```c
+QS_EMBEDDING_STORE* store = NULL;
+
+if (qs_embedding_prepare(model_path, db_path, &store) == 0) {
+	qs_embedding_store(store, text, text, id);
+	qs_embedding_search(store, query, top_k, out_ids, out_scores, out_texts, max_results);
+	qs_embedding_shutdown(store);
+}
+```
 
 ### 実行時の環境変数
 

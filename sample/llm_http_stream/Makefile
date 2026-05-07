@@ -45,7 +45,7 @@ $(LLAMA_LIB_DIR)/libllama.so:
 	cd ../../core/src && make
 
 ../../llm/libqs_llm_module.a:
-	cd ../../llm/src && make build LLAMA_ENABLE=$(LLAMA_ENABLE)
+	cd ../../llm/src && make build LLAMA_ENABLE=$(LLAMA_ENABLE) QS_EMBEDDING_MODULE_ENABLED=$(QS_EMBEDDING_MODULE_ENABLED)
 
 ../../llm/libqs_embedding_module.a:
 	cd ../../llm/src && make build LLAMA_ENABLE=$(LLAMA_ENABLE) QS_EMBEDDING_MODULE_ENABLED=$(QS_EMBEDDING_MODULE_ENABLED)
