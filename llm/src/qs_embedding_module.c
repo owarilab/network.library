@@ -302,14 +302,15 @@ static int search_vectors(sqlite3* db, const float* query_embd, int n_embd,
     }
     
     /* Return top-k results */
-    int result_count = (count < max_results) ? count : max_results;
-    for (int i = 0; i < result_count && i < top_k; i++) {
+    int n = (count < max_results) ? count : max_results;
+    if (n > top_k) n = top_k;
+    for (int i = 0; i < n; i++) {
         out_ids[i] = results[i].id;
         out_scores[i] = results[i].distance;
     }
-    
+
     free(results);
-    return result_count;
+    return n;
 }
 
 /* ── Public API ───────────────────────────────────────────────── */
