@@ -410,10 +410,13 @@ int qs_embedding_search(const char* query, int top_k, int64_t* out_ids,
                         float* out_scores, char** out_texts, int max_results) {
     if (!g_emb.db || !g_emb.model) return 0;
 
-    float* query_embd = generate_embedding(query);
-    if (!query_embd) return 0;
-
     pthread_mutex_lock(&g_emb.mutex);
+
+    float* query_embd = generate_embedding(query);
+    if (!query_embd) {
+        pthread_mutex_unlock(&g_emb.mutex);
+        return 0;
+    }
 
     int count = search_vectors(g_emb.db, query_embd, g_emb.n_embd_out,
                                top_k, out_ids, out_scores, out_texts, max_results);

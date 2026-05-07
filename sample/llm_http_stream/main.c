@@ -536,15 +536,27 @@ static int handle_embed_search(QS_EVENT_PARAMETER params)
 	char* result_texts[100] = {NULL};
 	int count = qs_embedding_search(query, top_k, result_ids, result_scores, result_texts, 100);
 
-	size_t resp_cap = 4096;
+	/* Calculate required buffer size based on actual content */
+	char* escaped_query = json_escape_string(query);
+	if (!escaped_query) {
+		for (int i = 0; i < count; i++) free(result_texts[i]);
+		send_json_http_response(params, 500, "{\"ok\":false,\"error\":\"memory allocation failed\"}");
+		return 500;
+	}
+	size_t resp_cap = strlen(escaped_query) + 64;
+	for (int i = 0; i < count; i++) {
+		resp_cap += 64 + (result_texts[i] ? strlen(result_texts[i]) * 2 : 0);
+	}
 	char* response = (char*)malloc(resp_cap);
 	if (response == NULL) {
+		free(escaped_query);
 		for (int i = 0; i < count; i++) free(result_texts[i]);
 		send_json_http_response(params, 500, "{\"ok\":false,\"error\":\"memory allocation failed\"}");
 		return 500;
 	}
 
-	int pos = snprintf(response, resp_cap, "{\"ok\":true,\"query\":\"%s\",\"results\":[", query);
+	int pos = snprintf(response, resp_cap, "{\"ok\":true,\"query\":\"%s\",\"results\":[", escaped_query);
+	free(escaped_query);
 	for (int i = 0; i < count; i++) {
 		if (i > 0) {
 			pos += snprintf(response + pos, resp_cap - (size_t)pos, ",");
@@ -603,7 +615,6 @@ static char* make_rag_prompt(const char* user_query, const int64_t* source_ids,
 	for (int i = 0; i < source_count; i++) {
 		total_size += 64 + (source_texts[i] ? strlen(source_texts[i]) : 0);
 	}
-	total_size += strlen(user_query) + 256;
 
 	char* prompt = (char*)malloc(total_size);
 	if (!prompt) return NULL;
@@ -756,8 +767,11 @@ static int handle_rag(QS_EVENT_PARAMETER params)
 
 	const char* final_answer = answer_text;
 
-	/* Build sources array */
-	size_t src_cap = 8192;
+	/* Build sources array: calculate required size from actual content */
+	size_t src_cap = 16;
+	for (int i = 0; i < count; i++) {
+		src_cap += 64 + (result_texts[i] ? strlen(result_texts[i]) * 2 : 0);
+	}
 	char* src_json = (char*)malloc(src_cap);
 	if (!src_json) {
 		free(ctx->buffer);
@@ -904,8 +918,11 @@ static int handle_rag_stream(QS_EVENT_PARAMETER params)
 	}
 	free(final_prompt);
 
-	/* Send sources as final event */
-	size_t src_cap = 8192;
+	/* Send sources as final event: calculate required size from actual content */
+	size_t src_cap = 16;
+	for (int i = 0; i < count; i++) {
+		src_cap += 64 + (result_texts[i] ? strlen(result_texts[i]) * 2 : 0);
+	}
 	char* src_json = (char*)malloc(src_cap);
 	if (!src_json) {
 		qs_llm_http_stream_close(&stream);
