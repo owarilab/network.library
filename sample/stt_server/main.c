@@ -196,13 +196,15 @@ static int stt_init_whisper(void)
 	if (g_whisper_ctx) {
 		return 0;
 	}
+	char model_path[256];
+	snprintf(model_path, sizeof(model_path), "../../stt/models/ggml-large-v3.bin");
 	cparams = whisper_context_default_params();
-	g_whisper_ctx = whisper_init_from_file_with_params("../../stt/models/ggml-large-v3.bin", cparams);
+	g_whisper_ctx = whisper_init_from_file_with_params(model_path, cparams);
 	if (!g_whisper_ctx) {
-		printf("[STT][whisper] init failed: ../../stt/models/ggml-large-v3.bin\n");
+		printf("[STT][whisper] init failed: %s\n", model_path);
 		return -1;
 	}
-	printf("[STT][whisper] initialized: ggml-large-v3.bin\n");
+	printf("[STT][whisper] initialized: %s\n", model_path);
 	return 0;
 }
 
@@ -393,12 +395,12 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 		const char* seg_text = whisper_full_get_segment_text(g_whisper_ctx, i);
 		float no_speech_prob = whisper_full_get_segment_no_speech_prob(g_whisper_ctx, i);
 
-		printf("[STT][infer] connection_id=%s window=%u segment=%d no_speech_prob=%.2f text=%s\n",
-			con_data->connection_id,
-			con_data->window_count,
-			i,
-			no_speech_prob,
-			seg_text ? seg_text : "[null]");
+		// printf("[STT][infer] connection_id=%s window=%u segment=%d no_speech_prob=%.2f text=%s\n",
+		// 	con_data->connection_id,
+		// 	con_data->window_count,
+		// 	i,
+		// 	no_speech_prob,
+		// 	seg_text ? seg_text : "[null]");
 
 		if (no_speech_prob > max_no_speech_prob) {
 			max_no_speech_prob = no_speech_prob;
@@ -468,13 +470,13 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 	if (con_data->processed_samples > con_data->total_samples_received) {
 		con_data->processed_samples = con_data->total_samples_received;
 	}
-	printf("[STT][debug] connection_id=%s window=%u total=%llu old_processed=%lu new_processed=%lu advance=%ld last_seg_t1_ms=%lld\n",
-		con_data->connection_id, con_data->window_count,
-		(unsigned long long)con_data->total_samples_received,
-		(unsigned long)old_processed,
-		(unsigned long)con_data->processed_samples,
-		(long)(con_data->processed_samples - old_processed),
-		(long long)last_seg_t1_ms);
+	// printf("[STT][debug] connection_id=%s window=%u total=%llu old_processed=%lu new_processed=%lu advance=%ld last_seg_t1_ms=%lld\n",
+	// 	con_data->connection_id, con_data->window_count,
+	// 	(unsigned long long)con_data->total_samples_received,
+	// 	(unsigned long)old_processed,
+	// 	(unsigned long)con_data->processed_samples,
+	// 	(long)(con_data->processed_samples - old_processed),
+	// 	(long long)last_seg_t1_ms);
 	free(pcmf32);
 }
 
@@ -699,7 +701,7 @@ static void stt_process_connections(void)
 		}
 
 		/* Grab inference window: from max(processed, total - INFERENCE) to total.
-	 * This ensures we only infer on audio that hasn't been processed yet. */
+	 	* This ensures we only infer on audio that hasn't been processed yet. */
 		int64_t window_start = (int64_t)con_data->total_samples_received - STT_VAD_INFERENCE_SAMPLES;
 		if ((uint64_t)window_start < con_data->processed_samples) {
 			window_start = (int64_t)con_data->processed_samples;
@@ -716,12 +718,12 @@ static void stt_process_connections(void)
 			continue;
 		}
 
-		/* DEBUG: log window params */
-		printf("[STT][debug] connection_id=%s window=%u total=%llu processed=%lu window_start=%ld inference_samples=%d\n",
-			con_data->connection_id, con_data->window_count,
-			(unsigned long long)con_data->total_samples_received,
-			(unsigned long)con_data->processed_samples,
-			(long)window_start, inference_samples);
+		// /* DEBUG: log window params */
+		// printf("[STT][debug] connection_id=%s window=%u total=%llu processed=%lu window_start=%ld inference_samples=%d\n",
+		// 	con_data->connection_id, con_data->window_count,
+		// 	(unsigned long long)con_data->total_samples_received,
+		// 	(unsigned long)con_data->processed_samples,
+		// 	(long)window_start, inference_samples);
 
 		stt_copy_recent_samples(con_data, infer_window, inference_samples);
 		stt_run_inference_window(con_data, infer_window, inference_samples, window_start);
