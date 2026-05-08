@@ -46,6 +46,8 @@ static char* g_system_prompt = NULL;
 static int g_embedding_enabled = 0;
 static QS_EMBEDDING_STORE* g_embedding_store = NULL;
 
+QS_MEMORY_CONTEXT g_temporary_memory;
+
 static int on_stream_token(void* user_data, const char* token, int is_last)
 {
 	QS_LLM_HTTP_STREAM_CONTEXT* stream = (QS_LLM_HTTP_STREAM_CONTEXT*)user_data;
@@ -79,6 +81,36 @@ int main(int argc, char* argv[], char* envp[])
 	(void)argv;
 	(void)envp;
 
+	if(-1==api_qs_memory_alloc(&g_temporary_memory,1024*1024*8)){
+		printf("api_qs_memory_alloc failed\n");
+		return -1;
+	}
+
+	int server_port = 8080;
+	int scheduler_mode = QS_SCHEDULER_MODE_LOW;
+	int32_t max_connection = 10;
+	{
+		QS_SERVER_SCRIPT_CONTEXT script;
+		if(-1==api_qs_script_read_file(&g_temporary_memory, &script, "./settings.conf")){return -1;}
+		if(-1==api_qs_script_run(&script)){return -1;}
+		if(0!=api_qs_script_get_parameter(&script,"server_port")){
+			server_port = atoi(api_qs_script_get_parameter(&script,"server_port"));
+		}
+		if(0!=api_qs_script_get_parameter(&script,"scheduler_mode")){
+			const char* sm = api_qs_script_get_parameter(&script,"scheduler_mode");
+			if(!strcmp(sm,"high"))       scheduler_mode = QS_SCHEDULER_MODE_HIGH;
+			else if(!strcmp(sm,"middle")) scheduler_mode = QS_SCHEDULER_MODE_MIDDLE;
+			else                          scheduler_mode = QS_SCHEDULER_MODE_LOW;
+		}
+		if(0!=api_qs_script_get_parameter(&script,"max_connection")){
+			int v = atoi(api_qs_script_get_parameter(&script,"max_connection"));
+			if(v < 10) v = 10;
+			if(v > 1000) v = 1000;
+			max_connection = (int32_t)v;
+		}
+		api_qs_memory_clean(&g_temporary_memory);
+	}
+
 	if (-1 == load_system_prompt()) {
 		return -1;
 	}
@@ -101,18 +133,19 @@ int main(int argc, char* argv[], char* envp[])
 		}
 	}
 
-	printf("[Main] Starting server on port 8080...\n");
+	printf("[Main] Starting server on port %d...\n", server_port);
 
 	QS_SERVER_CONTEXT* context = 0;
-	if (0 > api_qs_server_init(&context, 8080, 100, QS_SERVER_TYPE_HTTP)) {
-		qs_llama_module_shutdown();
-		if (g_embedding_enabled) {
-			qs_embedding_shutdown(g_embedding_store);
-			g_embedding_store = NULL;
-		}
-		return -1;
-	}
-	if (-1 == api_qs_server_create_router(context)) {
+	int init_error = 1;
+	do{
+		if (0 > api_qs_server_init(&context, server_port, max_connection, QS_SERVER_TYPE_HTTP)) { break; }
+		if(-1==api_qs_set_scheduler(context,scheduler_mode)){ break; }
+		if (-1 == api_qs_server_create_router(context)) { break; }
+		init_error = 0;
+	}while(0);
+
+	if(init_error){
+		printf("[Main] Server initialization failed\n");
 		qs_llama_module_shutdown();
 		if (g_embedding_enabled) {
 			qs_embedding_shutdown(g_embedding_store);
@@ -138,6 +171,7 @@ int main(int argc, char* argv[], char* envp[])
 		free(g_system_prompt);
 		g_system_prompt = NULL;
 	}
+	api_qs_memory_free(&g_temporary_memory);
 	return 0;
 }
 
