@@ -197,12 +197,12 @@ static int stt_init_whisper(void)
 		return 0;
 	}
 	cparams = whisper_context_default_params();
-	g_whisper_ctx = whisper_init_from_file_with_params("../../stt/models/ggml-large-v3-turbo.bin", cparams);
+	g_whisper_ctx = whisper_init_from_file_with_params("../../stt/models/ggml-large-v3.bin", cparams);
 	if (!g_whisper_ctx) {
-		printf("[STT][whisper] init failed: ../../stt/models/ggml-large-v3-turbo.bin\n");
+		printf("[STT][whisper] init failed: ../../stt/models/ggml-large-v3.bin\n");
 		return -1;
 	}
-	printf("[STT][whisper] initialized: ggml-large-v3-turbo.bin\n");
+	printf("[STT][whisper] initialized: ggml-large-v3.bin\n");
 	return 0;
 }
 

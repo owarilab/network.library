@@ -36,6 +36,16 @@ int sqlite3_vec_init(sqlite3 *db, char **pzErrMsg, const sqlite3_api_routines *p
 #define EMBEDDING_TABLE "embedding_vecs"
 #define SQLITE_MAX_VARCHAR 65536
 
+typedef float (*QS_EMBEDDING_DISTANCE_FN)(const float* v1, const float* v2, int n);
+
+typedef struct {
+    const char* name;
+    const char* query_prefix;
+    const char* document_prefix;
+    enum llama_pooling_type pooling_type;
+    QS_EMBEDDING_DISTANCE_FN distance_fn;
+} QS_EMBEDDING_PROFILE;
+
 typedef struct {
     struct llama_model* model;
     char model_path[1024];
@@ -61,6 +71,18 @@ static QS_EMBEDDING_RUNTIME g_embedding_runtime = {
     0,
     PTHREAD_MUTEX_INITIALIZER
 };
+
+static float cosine_distance(const float* v1, const float* v2, int n);
+
+static const QS_EMBEDDING_PROFILE g_embedding_profile_embeddinggemma = {
+    "embeddinggemma",
+    "task: search result | query: ",
+    "title: none | text: ",
+    LLAMA_POOLING_TYPE_MEAN,
+    cosine_distance
+};
+
+static const QS_EMBEDDING_PROFILE* g_embedding_profile = &g_embedding_profile_embeddinggemma;
 
 static char* vec_to_json(const float* v, int n, int* out_len) {
     const int est_per_elem = 20;
@@ -147,7 +169,8 @@ static int embedding_runtime_load_model_locked(const char* model_path) {
 
     snprintf(g_embedding_runtime.model_path, sizeof(g_embedding_runtime.model_path), "%s", model_path);
     g_embedding_runtime.n_embd_out = (int)llama_model_n_embd_out(g_embedding_runtime.model);
-    fprintf(stderr, "embedding: model loaded, n_embd_out=%d\n", g_embedding_runtime.n_embd_out);
+    fprintf(stderr, "embedding: model loaded, profile=%s, n_embd_out=%d\n",
+            g_embedding_profile->name, g_embedding_runtime.n_embd_out);
     return 0;
 }
 
@@ -186,13 +209,28 @@ static void embedding_runtime_release(void) {
     pthread_mutex_unlock(&g_embedding_runtime.mutex);
 }
 
+static char* build_embedding_input(const char* prefix, const char* text) {
+    const char* safe_text = text ? text : "";
+    size_t prefix_len = strlen(prefix);
+    size_t text_len = strlen(safe_text);
+    char* input = (char*)malloc(prefix_len + text_len + 1);
+
+    if (!input) {
+        return NULL;
+    }
+
+    memcpy(input, prefix, prefix_len);
+    memcpy(input + prefix_len, safe_text, text_len + 1);
+    return input;
+}
+
 static float* generate_embedding_locked(const char* text) {
     struct llama_model* model = g_embedding_runtime.model;
     int32_t n_embd_out = (int32_t)g_embedding_runtime.n_embd_out;
     struct llama_context_params cparams = llama_context_default_params();
 
-    cparams.n_ctx = 512;
-    cparams.pooling_type = LLAMA_POOLING_TYPE_MEAN;
+    cparams.n_ctx = 0;
+    cparams.pooling_type = g_embedding_profile->pooling_type;
     cparams.embeddings = true;
 
     if (!model) {
@@ -244,6 +282,27 @@ static float* generate_embedding_locked(const char* text) {
     free(tokens);
     llama_free(ctx);
     return result;
+}
+
+static float* generate_prefixed_embedding_locked(const char* prefix, const char* text) {
+    char* input = build_embedding_input(prefix, text);
+    float* result;
+
+    if (!input) {
+        return NULL;
+    }
+
+    result = generate_embedding_locked(input);
+    free(input);
+    return result;
+}
+
+static float* generate_query_embedding_locked(const char* query) {
+    return generate_prefixed_embedding_locked(g_embedding_profile->query_prefix, query);
+}
+
+static float* generate_document_embedding_locked(const char* text) {
+    return generate_prefixed_embedding_locked(g_embedding_profile->document_prefix, text);
 }
 
 static int store_vector(sqlite3* db, int64_t id, const float* embd, int n_embd, const char* text_content) {
@@ -350,7 +409,7 @@ static int search_vectors(sqlite3* db, const float* query_embd, int n_embd,
             continue;
         }
 
-        float distance = cosine_distance(query_embd, embd, n_embd);
+        float distance = g_embedding_profile->distance_fn(query_embd, embd, n_embd);
         free(embd);
 
         if (count >= capacity) {
@@ -484,12 +543,15 @@ void qs_embedding_shutdown(QS_EMBEDDING_STORE* store) {
 int qs_embedding_store(QS_EMBEDDING_STORE* store, const char* text, const char* content, int64_t id) {
     float* embd;
     int rc;
+    const char* source_text;
 
     if (!store || !store->db) return -1;
 
+    source_text = (text && text[0] != '\0') ? text : content;
+
     pthread_mutex_lock(&store->mutex);
     pthread_mutex_lock(&g_embedding_runtime.mutex);
-    embd = generate_embedding_locked(text);
+    embd = generate_document_embedding_locked(source_text);
     pthread_mutex_unlock(&g_embedding_runtime.mutex);
     if (!embd) {
         pthread_mutex_unlock(&store->mutex);
@@ -511,7 +573,7 @@ int qs_embedding_search(QS_EMBEDDING_STORE* store, const char* query, int top_k,
 
     pthread_mutex_lock(&store->mutex);
     pthread_mutex_lock(&g_embedding_runtime.mutex);
-    query_embd = generate_embedding_locked(query);
+    query_embd = generate_query_embedding_locked(query);
     pthread_mutex_unlock(&g_embedding_runtime.mutex);
     if (!query_embd) {
         pthread_mutex_unlock(&store->mutex);
