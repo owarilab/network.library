@@ -89,16 +89,19 @@ int tool_file_read_execute(const char* json_args, char* output, size_t output_si
         snprintf(output, output_size, "{\"error\":\"path is required\"}");
         return -1;
     }
-    if (strstr(path, "..")) {
-        snprintf(output, output_size, "{\"error\":\"path traversal not allowed\"}");
-        return -1;
-    }
     if (start_line < 1) start_line = 1;
     if (end_line < start_line) end_line = start_line + AGENT_FILE_READ_DEFAULT_LINES - 1;
     if (max_size <= 0 || max_size > (int)AGENT_FILE_READ_MAX_SIZE)
         max_size = (int)AGENT_FILE_READ_MAX_SIZE;
 
-    FILE* fp = fopen(path, "r");
+    char resolved_path[AGENT_PATH_MAX];
+    if (agent_resolve_workspace_path(path, resolved_path, sizeof(resolved_path)) != 0) {
+        snprintf(output, output_size,
+                 "{\"error\":\"path is outside workspace or does not exist\"}");
+        return -1;
+    }
+
+    FILE* fp = fopen(resolved_path, "r");
     if (!fp) {
         snprintf(output, output_size, "{\"error\":\"cannot open file: %s\"}", path);
         return -1;

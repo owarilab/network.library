@@ -57,6 +57,7 @@ export QS_LLM_N_CTX=4096
 ```
 
 ポートは `settings.conf` の `server_port` で変更できます。
+ファイルツールの参照ルートは `settings.conf` の `agent_workspace_root` で変更できます。
 
 ### 環境変数一覧
 
@@ -219,6 +220,9 @@ curl -s -X POST http://localhost:4445/api/agent/run \
 
 > **注意:** サーバーの CWD (`sample/llm_agent/`) が起点です。`..` を含むパスはセキュリティ上拒否されます。
 > サブディレクトリのファイルは `tools/tool_file_list.c` のように相対パスで指定できます。
+
+`settings.conf` で `agent_workspace_root` を設定すると、`file_list` / `file_read` はそのディレクトリ配下だけを参照します。
+例: `agent_workspace_root='/home/owari/network.library';`
 
 ---
 

@@ -6,6 +6,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <limits.h>
+#include <unistd.h>
+
+char g_agent_workspace_root[AGENT_PATH_MAX] = ".";
 
 /* ---------------------------------------------------------------
  * Tool registry (static table — add new tools here)
@@ -15,6 +19,56 @@ static TOOL_ENTRY g_tool_registry[] = {
     { "file_read", tool_file_read_execute },
     { NULL,        NULL                   }
 };
+
+int agent_set_workspace_root(const char* path)
+{
+    const char* src = (path && path[0]) ? path : ".";
+    char resolved[AGENT_PATH_MAX];
+
+    if (realpath(src, resolved) == NULL) return -1;
+
+    strncpy(g_agent_workspace_root, resolved, sizeof(g_agent_workspace_root) - 1);
+    g_agent_workspace_root[sizeof(g_agent_workspace_root) - 1] = '\0';
+    return 0;
+}
+
+const char* agent_get_workspace_root(void)
+{
+    return (g_agent_workspace_root[0] != '\0') ? g_agent_workspace_root : ".";
+}
+
+int agent_resolve_workspace_path(const char* user_path, char* out, size_t out_size)
+{
+    if (out == NULL || out_size == 0) return -1;
+
+    const char* root = agent_get_workspace_root();
+    const char* rel  = (user_path && user_path[0]) ? user_path : ".";
+
+    if (rel[0] == '/') return -1;
+    if (strstr(rel, "..") != NULL) return -1;
+
+    while (rel[0] == '.' && rel[1] == '/') rel += 2;
+
+    char joined[AGENT_PATH_MAX * 2];
+    if (rel[0] == '\0' || (rel[0] == '.' && rel[1] == '\0')) {
+        snprintf(joined, sizeof(joined), "%s", root);
+    } else {
+        snprintf(joined, sizeof(joined), "%s/%s", root, rel);
+    }
+
+    char resolved[AGENT_PATH_MAX];
+    if (realpath(joined, resolved) == NULL) return -1;
+
+    size_t root_len = strlen(root);
+    if (strncmp(resolved, root, root_len) != 0 ||
+        !((resolved[root_len] == '\0') || (resolved[root_len] == '/'))) {
+        return -1;
+    }
+
+    strncpy(out, resolved, out_size - 1);
+    out[out_size - 1] = '\0';
+    return 0;
+}
 
 /* ---------------------------------------------------------------
  * agent_conversation_generate_id

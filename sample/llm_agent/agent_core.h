@@ -13,6 +13,7 @@
 #define AGENT_FILE_READ_MAX_SIZE   (1024 * 1024)    /* 1 MB */
 #define AGENT_FILE_READ_DEFAULT_LINES 300
 #define AGENT_CONV_ID_LEN          64
+#define AGENT_PATH_MAX             4096
 
 /* ---------------------------------------------------------------
  * Action types returned by LLM
@@ -100,5 +101,13 @@ int agent_parse_think_result(const char* llm_json, AGENT_THINK_RESULT* out);
 
 /* Increment the tool usage counter for the given tool name */
 void agent_conversation_count_tool(AGENT_CONVERSATION* conv, const char* tool_name);
+
+/* Workspace root used by file tools. Defaults to current directory. */
+extern char g_agent_workspace_root[AGENT_PATH_MAX];
+int         agent_set_workspace_root(const char* path);
+const char* agent_get_workspace_root(void);
+
+/* Resolve a user-provided relative path inside the configured workspace root. */
+int agent_resolve_workspace_path(const char* user_path, char* out, size_t out_size);
 
 #endif /* AGENT_CORE_H */

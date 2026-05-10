@@ -67,6 +67,7 @@ int main(int argc, char* argv[], char* envp[])
     int     server_port    = 4445;
     int     scheduler_mode = QS_SCHEDULER_MODE_LOW;
     int32_t max_connection = 10;
+    const char* workspace_root = ".";
 
     QS_SERVER_SCRIPT_CONTEXT script;
     if (-1 == api_qs_script_read_file(&g_temporary_memory, &script, "./settings.conf")) {
@@ -89,6 +90,14 @@ int main(int argc, char* argv[], char* envp[])
         if (v > 1000) v = 1000;
         max_connection = (int32_t)v;
     }
+    if (0 != api_qs_script_get_parameter(&script, "agent_workspace_root")) {
+        workspace_root = api_qs_script_get_parameter(&script, "agent_workspace_root");
+    }
+
+    if (-1 == agent_set_workspace_root(workspace_root)) {
+        printf("[Main] invalid agent_workspace_root: %s\n", workspace_root);
+        return -1;
+    }
 
     if (-1 == qs_llama_module_prepare()) { return -1; }
 
@@ -97,6 +106,7 @@ int main(int argc, char* argv[], char* envp[])
         return -1;
     }
 
+    printf("[Main] Workspace root: %s\n", agent_get_workspace_root());
     printf("[Main] Starting agent server on port %d...\n", server_port);
 
     QS_SERVER_CONTEXT* context = NULL;

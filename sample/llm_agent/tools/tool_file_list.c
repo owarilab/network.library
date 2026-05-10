@@ -1,4 +1,5 @@
 #include "tool_file_list.h"
+#include "../agent_core.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -169,16 +170,19 @@ int tool_file_list_execute(const char* json_args, char* output, size_t output_si
         recursive = extract_int(json_args, "recursive", 0);
     }
 
-    /* Validate path — reject traversal attempts */
-    if (strstr(path, "..")) {
-        snprintf(output, output_size, "{\"error\":\"path traversal not allowed\"}");
-        return -1;
-    }
+    /* Validate path and resolve inside configured workspace */
     if (path[0] == '\0') {
         path[0] = '.'; path[1] = '\0';
     }
     if (pattern[0] == '\0') {
         pattern[0] = '*'; pattern[1] = '\0';
+    }
+
+    char resolved_path[AGENT_PATH_MAX];
+    if (agent_resolve_workspace_path(path, resolved_path, sizeof(resolved_path)) != 0) {
+        snprintf(output, output_size,
+                 "{\"error\":\"path is outside workspace or does not exist\"}");
+        return -1;
     }
 
     /* Allocate working buffers */
@@ -197,7 +201,7 @@ int tool_file_list_execute(const char* json_args, char* output, size_t output_si
     int    count       = 0;
     (void)max_entries;
 
-    int ret = list_dir_recursive(path, "", pattern, recursive,
+    int ret = list_dir_recursive(resolved_path, "", pattern, recursive,
                                  entries_buf, entries_size,
                                  &entries_pos, is_dir_buf, &count);
 
