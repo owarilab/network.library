@@ -89,26 +89,24 @@ int main(int argc, char* argv[], char* envp[])
 	int server_port = 8080;
 	int scheduler_mode = QS_SCHEDULER_MODE_LOW;
 	int32_t max_connection = 10;
-	{
-		QS_SERVER_SCRIPT_CONTEXT script;
-		if(-1==api_qs_script_read_file(&g_temporary_memory, &script, "./settings.conf")){return -1;}
-		if(-1==api_qs_script_run(&script)){return -1;}
-		if(0!=api_qs_script_get_parameter(&script,"server_port")){
-			server_port = atoi(api_qs_script_get_parameter(&script,"server_port"));
-		}
-		if(0!=api_qs_script_get_parameter(&script,"scheduler_mode")){
-			const char* sm = api_qs_script_get_parameter(&script,"scheduler_mode");
-			if(!strcmp(sm,"high"))       scheduler_mode = QS_SCHEDULER_MODE_HIGH;
-			else if(!strcmp(sm,"middle")) scheduler_mode = QS_SCHEDULER_MODE_MIDDLE;
-			else                          scheduler_mode = QS_SCHEDULER_MODE_LOW;
-		}
-		if(0!=api_qs_script_get_parameter(&script,"max_connection")){
-			int v = atoi(api_qs_script_get_parameter(&script,"max_connection"));
-			if(v < 10) v = 10;
-			if(v > 1000) v = 1000;
-			max_connection = (int32_t)v;
-		}
-		api_qs_memory_clean(&g_temporary_memory);
+
+	QS_SERVER_SCRIPT_CONTEXT script;
+	if(-1==api_qs_script_read_file(&g_temporary_memory, &script, "./settings.conf")){return -1;}
+	if(-1==api_qs_script_run(&script)){return -1;}
+	if(0!=api_qs_script_get_parameter(&script,"server_port")){
+		server_port = atoi(api_qs_script_get_parameter(&script,"server_port"));
+	}
+	if(0!=api_qs_script_get_parameter(&script,"scheduler_mode")){
+		const char* sm = api_qs_script_get_parameter(&script,"scheduler_mode");
+		if(!strcmp(sm,"high"))       scheduler_mode = QS_SCHEDULER_MODE_HIGH;
+		else if(!strcmp(sm,"middle")) scheduler_mode = QS_SCHEDULER_MODE_MIDDLE;
+		else                          scheduler_mode = QS_SCHEDULER_MODE_LOW;
+	}
+	if(0!=api_qs_script_get_parameter(&script,"max_connection")){
+		int v = atoi(api_qs_script_get_parameter(&script,"max_connection"));
+		if(v < 10) v = 10;
+		if(v > 1000) v = 1000;
+		max_connection = (int32_t)v;
 	}
 
 	if (-1 == load_system_prompt()) {
@@ -155,6 +153,8 @@ int main(int argc, char* argv[], char* envp[])
 	}
 
 	api_qs_set_on_http_event(context, on_http_event);
+
+	api_qs_memory_clean(&g_temporary_memory);
 
 	for (;;) {
 		api_qs_update(context);
