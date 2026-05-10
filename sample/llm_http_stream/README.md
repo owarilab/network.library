@@ -111,7 +111,15 @@ export QS_EMBEDDING_DB_PATH=./embeddings.db
 ## Streaming request
 
 ```bash
+curl -N -X POST "http://localhost:8080/api/llm" -d "q=hello streaming world"
 curl -N -X POST "http://localhost:8080/api/llm/stream" -d "q=hello streaming world"
+```
+
+## raw request
+```bash
+
+curl -s -X POST "http://localhost:8080/api/llm/raw" --data-urlencode "q=都道府県を1つ選び、nameとpopulationをJSONで返して"
+
 ```
 
 ## JSON mode request

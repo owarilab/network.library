@@ -1323,6 +1323,67 @@ static int on_http_event(QS_EVENT_PARAMETER params)
 		return 200;
 	}
 
+	if (strcmp(method, "POST") == 0 && strcmp(path, "/api/llm/raw") == 0) {
+		const char* prompt = api_qs_get_http_post_parameter(params, "q");
+		if (prompt == NULL || prompt[0] == '\0') {
+			prompt = api_qs_get_http_post_body(params);
+		}
+		if (prompt == NULL || prompt[0] == '\0') {
+			prompt = "hello from llm test";
+		}
+
+		QS_SERVER_SCRIPT_CONTEXT script;
+		if(-1==api_qs_script_read_file(&g_temporary_memory, &script, "./prompt.conf")){return -1;}
+		if(-1==api_qs_script_set_argv_string(&script, "user_prompt", prompt)){return -1;}
+		if(-1==api_qs_script_run(&script)){return -1;}
+		if(0!=api_qs_script_get_parameter(&script,"prompt")){
+			prompt = api_qs_script_get_parameter(&script,"prompt");
+		}
+
+		JSON_GEN_CONTEXT context;
+		context.capacity = 1024 * 4;
+		context.length = 0;
+		context.buffer = (char*)malloc(context.capacity);
+		if (context.buffer == NULL) {
+			send_json_http_response(params, 500, "{\"ok\":false,\"error\":\"memory allocation failed\"}");
+			return 500;
+		}
+		context.buffer[0] = '\0';
+		int stream_result = qs_llama_module_stream_text(prompt, on_json_token, &context);
+		if (stream_result == -1) {
+			free(context.buffer);
+			send_json_http_response(params, 500, "{\"ok\":false,\"error\":\"generation failed\"}");
+			return 500;
+		}
+		char* response = context.buffer;
+		char header[512];
+		snprintf(
+			header,
+			sizeof(header),
+			"HTTP/1.1 200 OK\r\n"
+			"Content-Type: text/plain; charset=utf-8\r\n"
+			"Content-Length: %zu\r\n"
+			"Connection: close\r\n"
+			"\r\n",
+			strlen(response)
+		);
+		size_t response_size = strlen(header) + strlen(response) + 1;
+		char* full_response = (char*)malloc(response_size);
+		if (full_response == NULL) {
+			free(response);
+			send_json_http_response(params, 500, "{\"ok\":false,\"error\":\"memory allocation failed\"}");
+			return 500;
+		}
+		full_response[0] = '\0';
+		strcat(full_response, header);
+		strcat(full_response, response);
+		api_qs_send_response(params, full_response);
+		free(full_response);
+		free(response);
+		api_qs_memory_clean(&g_temporary_memory);
+		return 200;
+	}
+
 	if (strcmp(method, "GET") == 0 && strcmp(path, "/healthz") == 0) {
 		api_qs_send_response(params, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n\r\nok");
 		return 200;
