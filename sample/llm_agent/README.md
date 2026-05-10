@@ -11,15 +11,18 @@ Client (curl / browser)
     ▼
 qs_llm_agent_server (port 4445)
     │
-    ├── /api/agent/init    → 会話ID生成
-    ├── /api/agent/think   → LLM推論（1ステップ）
-    ├── /api/agent/execute → ツール実行（1回）
-    ├── /api/agent/loop    → think + execute（1サイクル）
-    └── /api/agent/run     → フルReActループ（最終回答まで）
+    ├── /api/agent/init        → 会話ID生成
+    ├── /api/agent/think       → LLM推論（1ステップ）
+    ├── /api/agent/execute     → ツール実行（1回）
+    ├── /api/agent/loop        → think + execute（1サイクル）
+    ├── /api/agent/run         → フルReActループ（最終回答まで）
+    └── /api/agent/run/stream  → フルReActループ（SSEストリーミング）
 
 利用可能ツール:
-    ├── file_list  opendir/readdir でディレクトリ一覧取得
-    └── file_read  fopen/fgets でファイル内容読み取り（行範囲指定可）
+    ├── file_list    opendir/readdir でディレクトリ一覧取得
+    ├── file_read    fopen/fgets でファイル内容読み取り（行範囲指定可）
+    ├── file_search  fnmatch でファイル名パターン検索（再帰対応）
+    └── grep_search  ファイル内容をリテラル文字列で検索（行番号付き）
 ```
 
 ## ビルド
@@ -102,6 +105,16 @@ curl -X POST http://localhost:4445/api/agent/execute \
 curl -X POST http://localhost:4445/api/agent/execute \
   -H "Content-Type: application/json" \
   -d '{"tool_name":"file_read","tool_args":{"path":"./main.c","start_line":1,"end_line":20}}'
+
+# ファイル名パターン検索
+curl -X POST http://localhost:4445/api/agent/execute \
+  -H "Content-Type: application/json" \
+  -d '{"tool_name":"file_search","tool_args":{"path":".","pattern":"*.c","recursive":1,"max_results":50}}'
+
+# ファイル内容テキスト検索
+curl -X POST http://localhost:4445/api/agent/execute \
+  -H "Content-Type: application/json" \
+  -d '{"tool_name":"grep_search","tool_args":{"pattern":"TODO","path":".","file_pattern":"*.c","recursive":1}}'
 ```
 
 **file_list レスポンス例:**
@@ -114,9 +127,56 @@ curl -X POST http://localhost:4445/api/agent/execute \
 {"status":"ok","tool_name":"file_read","result":{"content":"#include <stdio.h>\n...","lines_read":10,"start_line":1,"end_line":10,"file_size":3120,"truncated":false,"path":"./main.c"}}
 ```
 
+**file_search レスポンス例:**
+```json
+{"status":"ok","tool_name":"file_search","result":{"matches":["tools/tool_file_list.c","tools/tool_file_read.c"],"count":2,"truncated":false,"query_path":".","query_pattern":"*.c"}}
+```
+
+**grep_search レスポンス例:**
+```json
+{"status":"ok","tool_name":"grep_search","result":{"matches":[{"file":"main.c","line":12,"text":"#include \"agent_core.h\""}],"count":1,"truncated":false,"query_pattern":"agent_core","query_path":".","query_file_pattern":"*.c"}}
+```
+
 ---
 
-### `POST /api/agent/think`
+### `POST /api/agent/run/stream`
+
+フルReActループを実行し、各ステップをSSEイベントとしてストリーミングします。
+
+```bash
+curl -X POST http://localhost:4445/api/agent/run/stream \
+  -H "Content-Type: application/json" \
+  -d '{"query":"main.cの関数を教えて","max_iterations":5}'
+```
+
+**SSEイベント一覧:**
+
+| event | データ例 |
+|-------|---------|
+| `thought` | `{"iteration":1,"thought":"まずディレクトリを確認する"}` |
+| `tool_call` | `{"iteration":1,"tool":"file_list","args":{"path":"."}}` |
+| `tool_result` | `{"iteration":1,"tool":"file_list","result":{...}}` |
+| `answer` | `{"status":"completed","answer":"...","iterations":2}` |
+| `done` | `[DONE]` |
+
+```
+event: thought
+data: {"iteration":1,"thought":"まずディレクトリを確認する"}
+
+event: tool_call
+data: {"iteration":1,"tool":"file_list","args":{"path":"."}}
+
+event: tool_result
+data: {"iteration":1,"tool":"file_list","result":{"entries":[...]}}
+
+event: answer
+data: {"status":"completed","answer":"main.c には ...","iterations":2}
+
+event: done
+data: [DONE]
+```
+
+---
 
 LLM にプロンプトを送り、次のアクション（ツール使用 or 最終回答）を決定させます。
 
@@ -256,22 +316,25 @@ LLM なしでも `/api/agent/init` と `/api/agent/execute` のテストは通�
 ```
 sample/llm_agent/
 ├── Makefile
-├── settings.conf        サーバー設定（ポート、スケジューラ等）
+├── settings.conf        サーバー設定（ポート、agent_workspace_root 等）
 ├── prompt.conf          エージェント思考プロンプトテンプレート
 ├── main.c               サーバーエントリポイント・ルーティング
 ├── agent_core.h / .c    会話管理・ツールレジストリ・LLM出力パーサ
 ├── tools/
-│   ├── tool_file_list.h / .c   file_list ツール実装
-│   └── tool_file_read.h / .c   file_read ツール実装
+│   ├── tool_file_list.h / .c    file_list ツール実装
+│   ├── tool_file_read.h / .c    file_read ツール実装
+│   ├── tool_file_search.h / .c  file_search ツール実装
+│   └── tool_grep_search.h / .c  grep_search ツール実装
 ├── handlers/
-│   ├── agent_handlers.h        ハンドラ宣言
-│   ├── handler_common.h / .c   共通ユーティリティ
+│   ├── agent_handlers.h         ハンドラ宣言
+│   ├── handler_common.h / .c    共通ユーティリティ
 │   ├── handler_init.c
 │   ├── handler_think.c
 │   ├── handler_execute.c
 │   ├── handler_loop.c
-│   └── handler_run.c
+│   ├── handler_run.c
+│   └── handler_run_stream.c     SSEストリーミング対応版
 ├── test/
 │   └── test_api.sh      API テストスクリプト
-└── www/                 静的ファイル置き場（フロントエンド用）
+└── www/                 静的ファイル（index.html など）— http://localhost:4445/ で配信
 ```
