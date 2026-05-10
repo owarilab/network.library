@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LLM Agent</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e0e0e0; height: 100vh; display: flex; flex-direction: column; }
+
+  header { background: #1a1d27; border-bottom: 1px solid #2a2d3a; padding: 14px 24px; display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 18px; font-weight: 600; color: #fff; }
+  .badge { font-size: 11px; background: #2d5a9e; color: #9bb8e8; padding: 2px 8px; border-radius: 10px; }
+
+  .mode-tabs { display: flex; gap: 4px; margin-left: auto; }
+  .mode-tab { background: none; border: 1px solid #3a3d4a; color: #888; padding: 5px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all .15s; }
+  .mode-tab.active { background: #2d5a9e; border-color: #2d5a9e; color: #fff; }
+
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 16px 24px; gap: 12px; }
+
+  .input-row { display: flex; gap: 8px; }
+  .input-row textarea { flex: 1; background: #1a1d27; border: 1px solid #2a2d3a; color: #e0e0e0; border-radius: 8px; padding: 10px 14px; font-size: 14px; resize: none; height: 52px; line-height: 1.5; outline: none; transition: border .15s; }
+  .input-row textarea:focus { border-color: #2d5a9e; }
+  .input-row button { background: #2d5a9e; border: none; color: #fff; padding: 0 22px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; white-space: nowrap; transition: background .15s; }
+  .input-row button:hover { background: #3a6fbf; }
+  .input-row button:disabled { background: #2a2d3a; color: #555; cursor: not-allowed; }
+
+  .output { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+
+  .msg { border-radius: 8px; padding: 10px 14px; font-size: 13px; line-height: 1.6; border: 1px solid transparent; }
+  .msg-thought { background: #1a1d27; border-color: #2a2d3a; }
+  .msg-thought .label { color: #6b8cba; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px; }
+  .msg-tool-call { background: #1a2430; border-color: #1e3a50; }
+  .msg-tool-call .label { color: #4a9eca; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px; }
+  .msg-tool-result { background: #1a2418; border-color: #1e4025; }
+  .msg-tool-result .label { color: #4caf76; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px; }
+  .msg-answer { background: #1e1a2e; border-color: #3a2d5a; }
+  .msg-answer .label { color: #a07ee8; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
+  .msg-answer .answer-text { color: #d0c8f0; font-size: 14px; white-space: pre-wrap; }
+  .msg-error { background: #2a1a1a; border-color: #5a2020; }
+  .msg-error .label { color: #e07070; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+  .msg-info { color: #555; font-size: 12px; text-align: center; padding: 8px; }
+
+  .iter-badge { display: inline-block; background: #2a2d3a; color: #888; font-size: 10px; padding: 1px 6px; border-radius: 4px; margin-right: 6px; }
+
+  pre { background: #12141a; border-radius: 4px; padding: 6px 8px; overflow-x: auto; font-size: 12px; color: #b0c0d0; margin-top: 4px; }
+
+  .meta-row { display: flex; gap: 12px; margin-top: 6px; font-size: 11px; color: #666; }
+  .meta-row span { display: flex; align-items: center; gap: 4px; }
+
+  .spinner { display: inline-block; width: 10px; height: 10px; border: 2px solid #2d5a9e; border-top-color: #6b9ee8; border-radius: 50%; animation: spin .6s linear infinite; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>LLM Agent</h1>
+  <span class="badge">ReAct</span>
+  <div class="mode-tabs">
+    <button class="mode-tab active" id="tab-stream" onclick="setMode('stream')">Streaming</button>
+    <button class="mode-tab" id="tab-batch"  onclick="setMode('batch')">Batch</button>
+  </div>
+</header>
+
+<div class="main">
+  <div class="input-row">
+    <textarea id="query" placeholder="質問を入力してください…" rows="2"></textarea>
+    <button id="send-btn" onclick="send()">送信</button>
+  </div>
+  <div class="output" id="output">
+    <p class="msg-info">クエリを入力して送信してください。</p>
+  </div>
+</div>
+
+<script>
+let mode = 'stream';
+
+function setMode(m) {
+  mode = m;
+  document.getElementById('tab-stream').classList.toggle('active', m === 'stream');
+  document.getElementById('tab-batch').classList.toggle('active',  m === 'batch');
+}
+
+document.getElementById('query').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) send();
+});
+
+function send() {
+  const query = document.getElementById('query').value.trim();
+  if (!query) return;
+  clearOutput();
+  document.getElementById('send-btn').disabled = true;
+  if (mode === 'stream') runStream(query);
+  else runBatch(query);
+}
+
+function clearOutput() {
+  document.getElementById('output').innerHTML = '';
+}
+
+function appendMsg(html) {
+  const out = document.getElementById('output');
+  out.insertAdjacentHTML('beforeend', html);
+  out.scrollTop = out.scrollHeight;
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function iterBadge(n) {
+  return `<span class="iter-badge">#${n}</span>`;
+}
+
+/* ---- Streaming mode ---- */
+async function runStream(query) {
+  appendMsg(`<div class="msg msg-info"><span class="spinner"></span>推論中…</div>`);
+
+  let resp;
+  try {
+    resp = await fetch('/api/agent/run/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query })
+    });
+  } catch(e) {
+    clearOutput();
+    appendMsg(`<div class="msg msg-error"><div class="label">Error</div>${esc(e)}</div>`);
+    document.getElementById('send-btn').disabled = false;
+    return;
+  }
+
+  clearOutput();
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '';
+  let eventName = '';
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+
+    const lines = buf.split('\n');
+    buf = lines.pop(); // 未完行を残す
+
+    for (const line of lines) {
+      if (line.startsWith('event:')) {
+        eventName = line.slice(6).trim();
+      } else if (line.startsWith('data:')) {
+        const data = line.slice(5).trim();
+        handleEvent(eventName, data);
+        eventName = '';
+      }
+    }
+  }
+  document.getElementById('send-btn').disabled = false;
+}
+
+function handleEvent(name, data) {
+  if (name === 'done' || data === '[DONE]') return;
+
+  let obj;
+  try { obj = JSON.parse(data); } catch { return; }
+
+  const out = document.getElementById('output');
+
+  if (name === 'thought') {
+    appendMsg(`<div class="msg msg-thought">
+      <div class="label">${iterBadge(obj.iteration)}Thought</div>
+      <div>${esc(obj.thought)}</div>
+    </div>`);
+  } else if (name === 'tool_call') {
+    const argsStr = typeof obj.args === 'object' ? JSON.stringify(obj.args, null, 2) : String(obj.args);
+    appendMsg(`<div class="msg msg-tool-call">
+      <div class="label">${iterBadge(obj.iteration)}Tool Call — ${esc(obj.tool)}</div>
+      <pre>${esc(argsStr)}</pre>
+    </div>`);
+  } else if (name === 'tool_result') {
+    const resStr = typeof obj.result === 'object' ? JSON.stringify(obj.result, null, 2) : String(obj.result);
+    appendMsg(`<div class="msg msg-tool-result">
+      <div class="label">${iterBadge(obj.iteration)}Tool Result — ${esc(obj.tool)}</div>
+      <pre>${esc(resStr)}</pre>
+    </div>`);
+  } else if (name === 'answer') {
+    appendMsg(`<div class="msg msg-answer">
+      <div class="label">Answer</div>
+      <div class="answer-text">${esc(obj.answer)}</div>
+      <div class="meta-row">
+        <span>Status: ${esc(obj.status)}</span>
+        <span>Iterations: ${obj.iterations}</span>
+        <span>file_list: ${obj.tool_use_file_list}</span>
+        <span>file_read: ${obj.tool_use_file_read}</span>
+      </div>
+    </div>`);
+  } else if (name === 'error') {
+    appendMsg(`<div class="msg msg-error"><div class="label">Error</div>${esc(obj.message || data)}</div>`);
+  }
+}
+
+/* ---- Batch mode ---- */
+async function runBatch(query) {
+  appendMsg(`<div class="msg msg-info"><span class="spinner"></span>推論中（バッチモード）…</div>`);
+
+  let result;
+  try {
+    const resp = await fetch('/api/agent/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query })
+    });
+    result = await resp.json();
+  } catch(e) {
+    clearOutput();
+    appendMsg(`<div class="msg msg-error"><div class="label">Error</div>${esc(e)}</div>`);
+    document.getElementById('send-btn').disabled = false;
+    return;
+  }
+
+  clearOutput();
+
+  if (result.thought) {
+    appendMsg(`<div class="msg msg-thought">
+      <div class="label">Thought (accumulated)</div>
+      <div>${esc(result.thought)}</div>
+    </div>`);
+  }
+
+  appendMsg(`<div class="msg msg-answer">
+    <div class="label">Answer</div>
+    <div class="answer-text">${esc(result.answer || '(no answer)')}</div>
+    <div class="meta-row">
+      <span>Status: ${esc(result.status)}</span>
+      <span>Iterations: ${result.iterations}</span>
+      <span>file_list: ${result.tool_use_file_list}</span>
+      <span>file_read: ${result.tool_use_file_read}</span>
+    </div>
+  </div>`);
+
+  document.getElementById('send-btn').disabled = false;
+}
+</script>
+</body>
+</html>

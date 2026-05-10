@@ -50,7 +50,8 @@ static int on_http_event(QS_EVENT_PARAMETER params)
     if (strcmp(path, "/api/agent/think")   == 0) return handler_think(params);
     if (strcmp(path, "/api/agent/execute") == 0) return handler_execute(params);
     if (strcmp(path, "/api/agent/loop")    == 0) return handler_loop(params);
-    if (strcmp(path, "/api/agent/run")     == 0) return handler_run(params);
+    if (strcmp(path, "/api/agent/run")        == 0) return handler_run(params);
+    if (strcmp(path, "/api/agent/run/stream") == 0) return handler_run_stream(params);
 
     return 404;
 }

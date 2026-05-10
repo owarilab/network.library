@@ -26,7 +26,7 @@ OBJGROUP = main.o agent_core.o \
            handlers/handler_common.o \
            handlers/handler_init.o handlers/handler_think.o \
            handlers/handler_execute.o handlers/handler_loop.o \
-           handlers/handler_run.o \
+           handlers/handler_run.o handlers/handler_run_stream.o \
            $(LIBA)
 
 build: $(LLAMA_RUNTIME_TARGET) $(PROGRAM)
@@ -73,6 +73,9 @@ handlers/handler_loop.o: handlers/handler_loop.c
 
 handlers/handler_run.o: handlers/handler_run.c
 	$(CC) $(DEFINE) $(CFLAG) $(INCDIR) -c handlers/handler_run.c -o handlers/handler_run.o
+
+handlers/handler_run_stream.o: handlers/handler_run_stream.c
+	$(CC) $(DEFINE) $(CFLAG) $(INCDIR) -c handlers/handler_run_stream.c -o handlers/handler_run_stream.o
 
 .PHONY: clean
 clean:
