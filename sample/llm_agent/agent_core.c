@@ -1,6 +1,7 @@
 #include "agent_core.h"
 #include "tools/tool_file_list.h"
 #include "tools/tool_file_read.h"
+#include "tools/tool_file_search.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,9 +16,10 @@ char g_agent_workspace_root[AGENT_PATH_MAX] = ".";
  * Tool registry (static table — add new tools here)
  * --------------------------------------------------------------- */
 static TOOL_ENTRY g_tool_registry[] = {
-    { "file_list", tool_file_list_execute },
-    { "file_read", tool_file_read_execute },
-    { NULL,        NULL                   }
+    { "file_list",   tool_file_list_execute   },
+    { "file_read",   tool_file_read_execute   },
+    { "file_search", tool_file_search_execute },
+    { NULL,          NULL                     }
 };
 
 int agent_set_workspace_root(const char* path)
