@@ -2,6 +2,7 @@
 #include "tools/tool_file_list.h"
 #include "tools/tool_file_read.h"
 #include "tools/tool_file_write.h"
+#include "tools/tool_file_edit.h"
 #include "tools/tool_file_search.h"
 #include "tools/tool_grep_search.h"
 
@@ -21,6 +22,7 @@ static TOOL_ENTRY g_tool_registry[] = {
     { "file_list",   tool_file_list_execute   },
     { "file_read",   tool_file_read_execute   },
     { "file_write",  tool_file_write_execute  },
+    { "file_edit",   tool_file_edit_execute   },
     { "file_search", tool_file_search_execute },
     { "grep_search", tool_grep_search_execute },
     { NULL,          NULL                     }
