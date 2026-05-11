@@ -1,4 +1,5 @@
 #include "tool_file_list.h"
+#include "tool_common.h"
 #include "../agent_core.h"
 
 #include <stdio.h>
@@ -7,78 +8,6 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <fnmatch.h>
-
-/* ---------------------------------------------------------------
- * Minimal JSON string field extractor.
- * Finds "key":"value" and copies value into out.
- * Returns 1 if found, 0 if not.
- * --------------------------------------------------------------- */
-static int extract_str(const char* json, const char* key, char* out, size_t out_size)
-{
-    if (!json || !key || !out || out_size == 0) return 0;
-    char pattern[128];
-    snprintf(pattern, sizeof(pattern), "\"%s\"", key);
-    const char* p = strstr(json, pattern);
-    if (!p) return 0;
-    p += strlen(pattern);
-    while (*p == ' ' || *p == '\t' || *p == ':' || *p == ' ') {
-        if (*p == ':') { p++; break; }
-        p++;
-    }
-    while (*p == ' ' || *p == '\t') p++;
-    if (*p != '"') return 0;
-    p++;
-    size_t i = 0;
-    while (*p && i < out_size - 1) {
-        if (*p == '\\' && *(p+1)) { p++; out[i++] = *p++; }
-        else if (*p == '"') break;
-        else out[i++] = *p++;
-    }
-    out[i] = '\0';
-    return 1;
-}
-
-/* Extract integer field: "key": N  Returns defaultval if not found. */
-static int extract_int(const char* json, const char* key, int defaultval)
-{
-    if (!json || !key) return defaultval;
-    char pattern[128];
-    snprintf(pattern, sizeof(pattern), "\"%s\"", key);
-    const char* p = strstr(json, pattern);
-    if (!p) return defaultval;
-    p += strlen(pattern);
-    while (*p == ' ' || *p == '\t') p++;
-    if (*p != ':') return defaultval;
-    p++;
-    while (*p == ' ' || *p == '\t') p++;
-    if (*p == '"') return defaultval; /* string, not int */
-    return atoi(p);
-}
-
-/* Append text to output buffer, returns 0 on success, -1 if overflow. */
-static int buf_append(char* buf, size_t buf_size, size_t* pos, const char* text)
-{
-    size_t len = strlen(text);
-    if (*pos + len >= buf_size - 1) return -1;
-    memcpy(buf + *pos, text, len);
-    *pos += len;
-    buf[*pos] = '\0';
-    return 0;
-}
-
-/* JSON-escape src into dst (caller must ensure dst is large enough: len*2+1). */
-static void json_escape_name(const char* src, char* dst, size_t dst_size)
-{
-    size_t w = 0;
-    for (size_t i = 0; src[i] && w < dst_size - 2; i++) {
-        char c = src[i];
-        if (c == '"' || c == '\\') { dst[w++] = '\\'; dst[w++] = c; }
-        else if (c == '\n')        { dst[w++] = '\\'; dst[w++] = 'n'; }
-        else if (c == '\r')        { dst[w++] = '\\'; dst[w++] = 'r'; }
-        else                        { dst[w++] = c; }
-    }
-    dst[w] = '\0';
-}
 
 /* Recursive directory listing into output buffer. */
 static int list_dir_recursive(
@@ -128,15 +57,15 @@ static int list_dir_recursive(
 
         /* Append to entries JSON array */
         if (*count > 0) {
-            buf_append(entries_buf, entries_size, entries_pos, ",");
+            tool_buf_append(entries_buf, entries_size, entries_pos, ",");
         }
 
         char escaped[512];
-        json_escape_name(rel_name, escaped, sizeof(escaped));
+        tool_json_escape(rel_name, escaped, sizeof(escaped));
 
         char item[600];
         snprintf(item, sizeof(item), "\"%s\"", escaped);
-        if (buf_append(entries_buf, entries_size, entries_pos, item) != 0) {
+        if (tool_buf_append(entries_buf, entries_size, entries_pos, item) != 0) {
             closedir(d);
             return -1; /* overflow */
         }
@@ -165,9 +94,9 @@ int tool_file_list_execute(const char* json_args, char* output, size_t output_si
     int  recursive     = 0;
 
     if (json_args && json_args[0]) {
-        extract_str(json_args, "path",    path,    sizeof(path));
-        extract_str(json_args, "pattern", pattern, sizeof(pattern));
-        recursive = extract_int(json_args, "recursive", 0);
+        tool_json_extract_str(json_args, "path",    path,    sizeof(path));
+        tool_json_extract_str(json_args, "pattern", pattern, sizeof(pattern));
+        recursive = tool_json_extract_int(json_args, "recursive", 0);
     }
 
     /* Validate path and resolve inside configured workspace */

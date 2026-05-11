@@ -1,71 +1,10 @@
 #include "tool_file_read.h"
+#include "tool_common.h"
 #include "../agent_core.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-/* Minimal JSON field extractors (same pattern as tool_file_list.c) */
-static int extract_str(const char* json, const char* key, char* out, size_t out_size)
-{
-    if (!json || !key || !out || out_size == 0) return 0;
-    char pattern[128];
-    snprintf(pattern, sizeof(pattern), "\"%s\"", key);
-    const char* p = strstr(json, pattern);
-    if (!p) return 0;
-    p += strlen(pattern);
-    while (*p == ' ' || *p == '\t') p++;
-    if (*p != ':') return 0;
-    p++;
-    while (*p == ' ' || *p == '\t') p++;
-    if (*p != '"') return 0;
-    p++;
-    size_t i = 0;
-    while (*p && i < out_size - 1) {
-        if (*p == '\\' && *(p+1)) { p++; out[i++] = *p++; }
-        else if (*p == '"') break;
-        else out[i++] = *p++;
-    }
-    out[i] = '\0';
-    return 1;
-}
-
-static int extract_int(const char* json, const char* key, int defaultval)
-{
-    if (!json || !key) return defaultval;
-    char pattern[128];
-    snprintf(pattern, sizeof(pattern), "\"%s\"", key);
-    const char* p = strstr(json, pattern);
-    if (!p) return defaultval;
-    p += strlen(pattern);
-    while (*p == ' ' || *p == '\t') p++;
-    if (*p != ':') return defaultval;
-    p++;
-    while (*p == ' ' || *p == '\t') p++;
-    if (*p == '"') return defaultval;
-    return atoi(p);
-}
-
-/* JSON-escape src into a newly malloc'd string. Caller must free(). */
-static char* json_escape_alloc(const char* src, size_t src_len)
-{
-    /* Worst case: every char becomes 2 chars (\n -> \n) */
-    char* out = (char*)malloc(src_len * 2 + 1);
-    if (!out) return NULL;
-    size_t w = 0;
-    for (size_t i = 0; i < src_len; i++) {
-        unsigned char c = (unsigned char)src[i];
-        if      (c == '"')  { out[w++] = '\\'; out[w++] = '"';  }
-        else if (c == '\\') { out[w++] = '\\'; out[w++] = '\\'; }
-        else if (c == '\n') { out[w++] = '\\'; out[w++] = 'n';  }
-        else if (c == '\r') { out[w++] = '\\'; out[w++] = 'r';  }
-        else if (c == '\t') { out[w++] = '\\'; out[w++] = 't';  }
-        else if (c < 0x20)  { /* skip other control chars */ }
-        else                { out[w++] = (char)c; }
-    }
-    out[w] = '\0';
-    return out;
-}
 
 int tool_file_read_execute(const char* json_args, char* output, size_t output_size)
 {
@@ -78,10 +17,10 @@ int tool_file_read_execute(const char* json_args, char* output, size_t output_si
     int  max_size   = (int)AGENT_FILE_READ_MAX_SIZE;
 
     if (json_args && json_args[0]) {
-        extract_str(json_args, "path", path, sizeof(path));
-        start_line = extract_int(json_args, "start_line", 1);
-        end_line   = extract_int(json_args, "end_line",   AGENT_FILE_READ_DEFAULT_LINES);
-        max_size   = extract_int(json_args, "max_size",   (int)AGENT_FILE_READ_MAX_SIZE);
+        tool_json_extract_str(json_args, "path", path, sizeof(path));
+        start_line = tool_json_extract_int(json_args, "start_line", 1);
+        end_line   = tool_json_extract_int(json_args, "end_line",   AGENT_FILE_READ_DEFAULT_LINES);
+        max_size   = tool_json_extract_int(json_args, "max_size",   (int)AGENT_FILE_READ_MAX_SIZE);
     }
 
     /* Validate */
@@ -146,7 +85,7 @@ int tool_file_read_execute(const char* json_args, char* output, size_t output_si
     fclose(fp);
 
     /* JSON-escape content */
-    char* escaped = json_escape_alloc(content, content_len);
+    char* escaped = tool_json_escape_alloc(content, content_len);
     free(content);
     if (!escaped) {
         snprintf(output, output_size, "{\"error\":\"out of memory\"}");

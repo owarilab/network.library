@@ -22,7 +22,7 @@ INCDIR  = -I ../../core/header -I ../../llm/header -I $(LLAMA_CPP_DIR)/include
 LIBA    = ../../core/libqs_core.a ../../llm/libqs_llm_module.a
 
 OBJGROUP = main.o agent_core.o \
-           tools/tool_file_list.o tools/tool_file_read.o tools/tool_file_search.o tools/tool_grep_search.o \
+           tools/tool_common.o tools/tool_file_list.o tools/tool_file_read.o tools/tool_file_search.o tools/tool_grep_search.o \
            handlers/handler_common.o \
            handlers/handler_init.o handlers/handler_think.o \
            handlers/handler_execute.o handlers/handler_loop.o \
@@ -49,6 +49,9 @@ main.o: main.c
 
 agent_core.o: agent_core.c agent_core.h
 	$(CC) $(DEFINE) $(CFLAG) $(INCDIR) -c agent_core.c -o agent_core.o
+
+tools/tool_common.o: tools/tool_common.c tools/tool_common.h
+	$(CC) $(DEFINE) $(CFLAG) $(INCDIR) -c tools/tool_common.c -o tools/tool_common.o
 
 tools/tool_file_list.o: tools/tool_file_list.c tools/tool_file_list.h
 	$(CC) $(DEFINE) $(CFLAG) $(INCDIR) -c tools/tool_file_list.c -o tools/tool_file_list.o

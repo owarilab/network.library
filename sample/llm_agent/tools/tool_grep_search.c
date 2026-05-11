@@ -1,4 +1,5 @@
 #include "tool_grep_search.h"
+#include "tool_common.h"
 #include "../agent_core.h"
 
 #include <stdio.h>
@@ -8,77 +9,6 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <fnmatch.h>
-
-/* ---------------------------------------------------------------
- * Minimal JSON field extractors (same pattern as other tools)
- * --------------------------------------------------------------- */
-static int extract_str(const char* json, const char* key, char* out, size_t out_size)
-{
-    if (!json || !key || !out || out_size == 0) return 0;
-    char pat[128];
-    snprintf(pat, sizeof(pat), "\"%s\"", key);
-    const char* p = strstr(json, pat);
-    if (!p) return 0;
-    p += strlen(pat);
-    while (*p == ' ' || *p == '\t') p++;
-    if (*p != ':') return 0;
-    p++;
-    while (*p == ' ' || *p == '\t') p++;
-    if (*p != '"') return 0;
-    p++;
-    size_t i = 0;
-    while (*p && i < out_size - 1) {
-        if (*p == '\\' && *(p+1)) { p++; out[i++] = *p++; }
-        else if (*p == '"') break;
-        else out[i++] = *p++;
-    }
-    out[i] = '\0';
-    return 1;
-}
-
-static int extract_int(const char* json, const char* key, int defaultval)
-{
-    if (!json || !key) return defaultval;
-    char pat[128];
-    snprintf(pat, sizeof(pat), "\"%s\"", key);
-    const char* p = strstr(json, pat);
-    if (!p) return defaultval;
-    p += strlen(pat);
-    while (*p == ' ' || *p == '\t') p++;
-    if (*p != ':') return defaultval;
-    p++;
-    while (*p == ' ' || *p == '\t') p++;
-    if (*p == '"') return defaultval;
-    return atoi(p);
-}
-
-/* JSON-escape src into dst. */
-static void json_escape(const char* src, char* dst, size_t dst_size)
-{
-    size_t w = 0;
-    for (size_t i = 0; src[i] && w + 2 < dst_size; i++) {
-        unsigned char c = (unsigned char)src[i];
-        if      (c == '"')  { dst[w++] = '\\'; dst[w++] = '"';  }
-        else if (c == '\\') { dst[w++] = '\\'; dst[w++] = '\\'; }
-        else if (c == '\n') { dst[w++] = '\\'; dst[w++] = 'n';  }
-        else if (c == '\r') { dst[w++] = '\\'; dst[w++] = 'r';  }
-        else if (c == '\t') { dst[w++] = '\\'; dst[w++] = 't';  }
-        else if (c < 0x20)  { /* skip other control chars */ }
-        else                { dst[w++] = (char)c; }
-    }
-    dst[w] = '\0';
-}
-
-/* Append text to output buffer. Returns 0 on success, -1 on overflow. */
-static int buf_append(char* buf, size_t buf_size, size_t* pos, const char* text)
-{
-    size_t len = strlen(text);
-    if (*pos + len >= buf_size - 1) return -1;
-    memcpy(buf + *pos, text, len);
-    *pos += len;
-    buf[*pos] = '\0';
-    return 0;
-}
 
 /* Case-insensitive strstr (simple byte scan). */
 static const char* str_istr(const char* haystack, const char* needle)
@@ -130,7 +60,7 @@ static void grep_file(GREP_CTX* ctx, const char* abs_path, const char* rel_path)
     char esc_line[sizeof(line) * 2];
     char item[sizeof(line) * 2 + AGENT_PATH_MAX * 2 + 64];
 
-    json_escape(rel_path, esc_path, sizeof(esc_path));
+    tool_json_escape(rel_path, esc_path, sizeof(esc_path));
 
     while (fgets(line, sizeof(line), f)) {
         lineno++;
@@ -147,7 +77,7 @@ static void grep_file(GREP_CTX* ctx, const char* abs_path, const char* rel_path)
 
         if (!matched) continue;
 
-        json_escape(line, esc_line, sizeof(esc_line));
+        tool_json_escape(line, esc_line, sizeof(esc_line));
         if (ctx->count > 0)
             snprintf(item, sizeof(item),
                      ",{\"file\":\"%s\",\"line\":%d,\"text\":\"%s\"}",
@@ -157,7 +87,7 @@ static void grep_file(GREP_CTX* ctx, const char* abs_path, const char* rel_path)
                      "{\"file\":\"%s\",\"line\":%d,\"text\":\"%s\"}",
                      esc_path, lineno, esc_line);
 
-        if (buf_append(ctx->out_buf, ctx->out_size, &ctx->out_pos, item) != 0) {
+        if (tool_buf_append(ctx->out_buf, ctx->out_size, &ctx->out_pos, item) != 0) {
             ctx->truncated = 1;
             break;
         }
@@ -228,12 +158,12 @@ int tool_grep_search_execute(const char* json_args, char* output, size_t output_
     int  max_results       = 50;
 
     if (json_args && json_args[0]) {
-        extract_str(json_args, "pattern",      query,        sizeof(query));
-        extract_str(json_args, "path",         path,         sizeof(path));
-        extract_str(json_args, "file_pattern", file_pattern, sizeof(file_pattern));
-        recursive      = extract_int(json_args, "recursive",      1);
-        case_sensitive = extract_int(json_args, "case_sensitive", 0);
-        max_results    = extract_int(json_args, "max_results",    50);
+        tool_json_extract_str(json_args, "pattern",      query,        sizeof(query));
+        tool_json_extract_str(json_args, "path",         path,         sizeof(path));
+        tool_json_extract_str(json_args, "file_pattern", file_pattern, sizeof(file_pattern));
+        recursive      = tool_json_extract_int(json_args, "recursive",      1);
+        case_sensitive = tool_json_extract_int(json_args, "case_sensitive", 0);
+        max_results    = tool_json_extract_int(json_args, "max_results",    50);
     }
 
     if (query[0] == '\0') {
@@ -295,9 +225,9 @@ int tool_grep_search_execute(const char* json_args, char* output, size_t output_
     char esc_query[1024];
     char esc_path[2048];
     char esc_fpat[512];
-    json_escape(query,        esc_query, sizeof(esc_query));
-    json_escape(path,         esc_path,  sizeof(esc_path));
-    json_escape(file_pattern, esc_fpat,  sizeof(esc_fpat));
+    tool_json_escape(query,        esc_query, sizeof(esc_query));
+    tool_json_escape(path,         esc_path,  sizeof(esc_path));
+    tool_json_escape(file_pattern, esc_fpat,  sizeof(esc_fpat));
 
     snprintf(output, output_size,
         "{\"matches\":[%s],"
