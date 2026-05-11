@@ -28,7 +28,29 @@ int tool_json_extract_str(const char* json, const char* key, char* out, size_t o
     while (*p && i < out_size - 1) {
         if (*p == '\\' && *(p+1)) {
             p++;
-            out[i++] = *p++;
+            /* Handle JSON escape sequences */
+            if (*p == 'n') {
+                out[i++] = '\n';
+                p++;
+            } else if (*p == 'r') {
+                out[i++] = '\r';
+                p++;
+            } else if (*p == 't') {
+                out[i++] = '\t';
+                p++;
+            } else if (*p == '\\') {
+                out[i++] = '\\';
+                p++;
+            } else if (*p == '"') {
+                out[i++] = '"';
+                p++;
+            } else if (*p == '/') {
+                out[i++] = '/';
+                p++;
+            } else {
+                /* Unknown escape, just output the char after backslash */
+                out[i++] = *p++;
+            }
         } else if (*p == '"') {
             break;
         } else {
