@@ -25,6 +25,11 @@
   .input-row button:hover { background: #3a6fbf; }
   .input-row button:disabled { background: #2a2d3a; color: #555; cursor: not-allowed; }
 
+  .input-options { display: flex; gap: 12px; align-items: center; font-size: 13px; }
+  .input-options label { color: #888; display: flex; align-items: center; gap: 6px; }
+  .input-options input[type="number"] { background: #1a1d27; border: 1px solid #2a2d3a; color: #e0e0e0; padding: 6px 10px; border-radius: 6px; width: 80px; outline: none; }
+  .input-options input[type="number"]:focus { border-color: #2d5a9e; }
+
   .output { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
 
   .msg { border-radius: 8px; padding: 10px 14px; font-size: 13px; line-height: 1.6; border: 1px solid transparent; }
@@ -68,6 +73,11 @@
     <textarea id="query" placeholder="質問を入力してください…" rows="2"></textarea>
     <button id="send-btn" onclick="send()">送信</button>
   </div>
+  <div class="input-options">
+    <label>思考回数:
+      <input type="number" id="max-iterations" value="10" min="1" max="50">
+    </label>
+  </div>
   <div class="output" id="output">
     <p class="msg-info">クエリを入力して送信してください。</p>
   </div>
@@ -89,10 +99,11 @@ document.getElementById('query').addEventListener('keydown', function(e) {
 function send() {
   const query = document.getElementById('query').value.trim();
   if (!query) return;
+  const maxIterations = parseInt(document.getElementById('max-iterations').value) || 10;
   clearOutput();
   document.getElementById('send-btn').disabled = true;
-  if (mode === 'stream') runStream(query);
-  else runBatch(query);
+  if (mode === 'stream') runStream(query, maxIterations);
+  else runBatch(query, maxIterations);
 }
 
 function clearOutput() {
@@ -114,15 +125,16 @@ function iterBadge(n) {
 }
 
 /* ---- Streaming mode ---- */
-async function runStream(query) {
+async function runStream(query, maxIterations) {
   appendMsg(`<div class="msg msg-info"><span class="spinner"></span>推論中…</div>`);
 
+  let queryJson = JSON.stringify({ query, max_iterations: maxIterations });
   let resp;
   try {
     resp = await fetch('/api/agent/run/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query })
+      body: queryJson
     });
   } catch(e) {
     clearOutput();
@@ -200,7 +212,7 @@ function handleEvent(name, data) {
 }
 
 /* ---- Batch mode ---- */
-async function runBatch(query) {
+async function runBatch(query, maxIterations) {
   appendMsg(`<div class="msg msg-info"><span class="spinner"></span>推論中（バッチモード）…</div>`);
 
   let result;
@@ -208,7 +220,7 @@ async function runBatch(query) {
     const resp = await fetch('/api/agent/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query })
+      body: JSON.stringify({ query, max_iterations: maxIterations })
     });
     result = await resp.json();
   } catch(e) {
