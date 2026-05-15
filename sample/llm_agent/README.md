@@ -115,6 +115,21 @@ curl -X POST http://localhost:4445/api/agent/execute \
 curl -X POST http://localhost:4445/api/agent/execute \
   -H "Content-Type: application/json" \
   -d '{"tool_name":"grep_search","tool_args":{"pattern":"TODO","path":".","file_pattern":"*.c","recursive":1}}'
+
+# 許可済みホスト一覧
+curl -X POST http://localhost:4445/api/agent/execute \
+  -H "Content-Type: application/json" \
+  -d '{"tool_name":"url_whitelist_get","tool_args":{}}'
+
+# 許可済みホストの API 情報取得
+curl -X POST http://localhost:4445/api/agent/execute \
+  -H "Content-Type: application/json" \
+  -d '{"tool_name":"url_whitelist_info_get","tool_args":{"host":"localhost","endpoint_filter":"/api/status"}}'
+
+# HTTP リクエスト実行
+curl -X POST http://localhost:4445/api/agent/execute \
+  -H "Content-Type: application/json" \
+  -d '{"tool_name":"http_request","tool_args":{"method":"GET","url":"http://127.0.0.1:11434/","timeout_ms":2000}}'
 ```
 
 **file_list レスポンス例:**
@@ -135,6 +150,21 @@ curl -X POST http://localhost:4445/api/agent/execute \
 **grep_search レスポンス例:**
 ```json
 {"status":"ok","tool_name":"grep_search","result":{"matches":[{"file":"main.c","line":12,"text":"#include \"agent_core.h\""}],"count":1,"truncated":false,"query_pattern":"agent_core","query_path":".","query_file_pattern":"*.c"}}
+```
+
+**url_whitelist_get レスポンス例:**
+```json
+{"status":"ok","tool_name":"url_whitelist_get","result":{"ok":true,"hosts":[{"host":"localhost","description":"Local development server (same host)"},{"host":"127.0.0.1","description":"Localhost IPv4"}],"count":2}}
+```
+
+**url_whitelist_info_get レスポンス例:**
+```json
+{"status":"ok","tool_name":"url_whitelist_info_get","result":{"ok":true,"host":"localhost","endpoints":[{"description":"Check server status (LLM/Embedding enabled state)","query_params":{},"path_pattern":"/api/status","method":"GET"}]}}
+```
+
+**http_request レスポンス例:**
+```json
+{"status":"ok","tool_name":"http_request","result":{"headers":{"Content-Type":"text/plain; charset=utf-8","Date":"Fri, 15 May 2026 18:12:33 GMT","Connection":"close","Content-Length":"17"},"ok":1,"body":"Ollama is running","status_code":200,"response_time_ms":2}}
 ```
 
 ---

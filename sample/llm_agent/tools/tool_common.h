@@ -11,6 +11,11 @@
  * Returns 1 if found, 0 if not. */
 int tool_json_extract_str(const char* json, const char* key, char* out, size_t out_size);
 
+/* Extract an object field from JSON: "key": {...}
+ * Copies the raw object including braces into out.
+ * Returns 1 if found, 0 if not. */
+int tool_json_extract_object(const char* json, const char* key, char* out, size_t out_size);
+
 /* Extract an integer field from JSON: "key": N
  * Returns the value or defaultval if not found. */
 int tool_json_extract_int(const char* json, const char* key, int defaultval);

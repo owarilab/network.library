@@ -61,6 +61,51 @@ int tool_json_extract_str(const char* json, const char* key, char* out, size_t o
     return 1;
 }
 
+int tool_json_extract_object(const char* json, const char* key, char* out, size_t out_size)
+{
+    if (!json || !key || !out || out_size == 0) return 0;
+
+    char pattern[128];
+    snprintf(pattern, sizeof(pattern), "\"%s\"", key);
+    const char* p = strstr(json, pattern);
+    if (!p) return 0;
+
+    p += strlen(pattern);
+    while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
+    if (*p != ':') return 0;
+    p++;
+    while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
+    if (*p != '{') return 0;
+
+    int depth = 0;
+    size_t i = 0;
+    while (*p && i < out_size - 1) {
+        if (*p == '"') {
+            out[i++] = *p++;
+            while (*p && i < out_size - 1) {
+                out[i++] = *p;
+                if (*p == '\\' && *(p + 1) && i < out_size - 1) {
+                    p++;
+                    out[i++] = *p;
+                } else if (*p == '"') {
+                    p++;
+                    break;
+                }
+                p++;
+            }
+            continue;
+        }
+
+        if (*p == '{') depth++;
+        if (*p == '}') depth--;
+        out[i++] = *p++;
+        if (depth == 0) break;
+    }
+
+    out[i] = '\0';
+    return (i > 0 && depth == 0) ? 1 : 0;
+}
+
 /* ---------------------------------------------------------------
  * Extract integer field from JSON: "key": N
  * --------------------------------------------------------------- */

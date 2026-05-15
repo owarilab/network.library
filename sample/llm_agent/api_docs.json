@@ -1,0 +1,24 @@
+{
+    "localhost": [
+        {
+            "method": "GET",
+            "path_pattern": "/api/v1/room/list",
+            "description": "List all available rooms",
+            "query_params": {}
+        },
+        {
+            "method": "POST",
+            "path_pattern": "/api/v1/room/create",
+            "description": "Create a new room",
+            "query_params": {
+                "name": "Room name string"
+            }
+        },
+        {
+            "method": "GET",
+            "path_pattern": "/api/status",
+            "description": "Check server status (LLM/Embedding enabled state)",
+            "query_params": {}
+        }
+    ]
+}

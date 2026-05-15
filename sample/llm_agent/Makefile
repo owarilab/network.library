@@ -18,11 +18,12 @@ LLAMA_CMAKE_ACCEL += -DGGML_CUDA=ON
 endif
 endif
 
-INCDIR  = -I ../../core/header -I ../../llm/header -I $(LLAMA_CPP_DIR)/include
-LIBA    = ../../core/libqs_core.a ../../llm/libqs_llm_module.a
+INCDIR  = -I ../../core/header -I ../../llm/header -I ../../ssl/header -I /usr/include/openssl -I $(LLAMA_CPP_DIR)/include
+LIBA    = ../../core/libqs_core.a ../../llm/libqs_llm_module.a ../../ssl/libqs_ssl_module.a -lssl -lcrypto
 
 OBJGROUP = main.o agent_core.o \
            tools/tool_common.o tools/tool_file_list.o tools/tool_file_read.o tools/tool_file_write.o tools/tool_file_edit.o tools/tool_file_search.o tools/tool_grep_search.o \
+           tools/tool_http_request.o tools/tool_url_whitelist_get.o tools/tool_url_whitelist_info_get.o \
            handlers/handler_common.o \
            handlers/handler_init.o handlers/handler_think.o \
            handlers/handler_execute.o handlers/handler_loop.o \
@@ -40,6 +41,9 @@ $(LLAMA_LIB_DIR)/libllama.so:
 
 ../../llm/libqs_llm_module.a:
 	cd ../../llm/src && make build LLAMA_ENABLE=$(LLAMA_ENABLE)
+
+../../ssl/libqs_ssl_module.a:
+	cd ../../ssl/src && make build
 
 $(PROGRAM): $(OBJGROUP)
 	$(CC) $(CFLAG) $(INCDIR) -o $(PROGRAM) $(OBJGROUP) $(LLAMA_LIBS)
@@ -70,6 +74,15 @@ tools/tool_file_search.o: tools/tool_file_search.c tools/tool_file_search.h
 
 tools/tool_grep_search.o: tools/tool_grep_search.c tools/tool_grep_search.h
 	$(CC) $(DEFINE) $(CFLAG) $(INCDIR) -c tools/tool_grep_search.c -o tools/tool_grep_search.o
+
+tools/tool_http_request.o: tools/tool_http_request.c tools/tool_http_request.h
+	$(CC) $(DEFINE) $(CFLAG) $(INCDIR) -c tools/tool_http_request.c -o tools/tool_http_request.o
+
+tools/tool_url_whitelist_get.o: tools/tool_url_whitelist_get.c tools/tool_url_whitelist_get.h
+	$(CC) $(DEFINE) $(CFLAG) $(INCDIR) -c tools/tool_url_whitelist_get.c -o tools/tool_url_whitelist_get.o
+
+tools/tool_url_whitelist_info_get.o: tools/tool_url_whitelist_info_get.c tools/tool_url_whitelist_info_get.h
+	$(CC) $(DEFINE) $(CFLAG) $(INCDIR) -c tools/tool_url_whitelist_info_get.c -o tools/tool_url_whitelist_info_get.o
 
 handlers/handler_common.o: handlers/handler_common.c handlers/handler_common.h
 	$(CC) $(DEFINE) $(CFLAG) $(INCDIR) -c handlers/handler_common.c -o handlers/handler_common.o

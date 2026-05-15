@@ -110,4 +110,20 @@ const char* agent_get_workspace_root(void);
 /* Resolve a user-provided relative path inside the configured workspace root. */
 int agent_resolve_workspace_path(const char* user_path, char* out, size_t out_size);
 
+/* ---------------------------------------------------------------
+ * URL whitelist management (loaded from url_whitelist.json)
+ * --------------------------------------------------------------- */
+int         agent_load_url_whitelist(const char* json_path);
+int         agent_is_host_allowed(const char* host);
+int         agent_get_whitelist_count(void);
+const char* agent_get_whitelist_host(int index);
+const char* agent_get_whitelist_desc(int index);
+void        agent_free_url_whitelist(void);
+
+/* API documentation (loaded from api_docs.json) */
+int         agent_load_api_docs(const char* json_path);
+char*       agent_get_api_doc_for_host(const char* host, size_t* out_size);
+char*       agent_filter_api_docs(const char* host_json_str, const char* filter_pattern, size_t* out_size);
+void        agent_free_api_docs(void);
+
 #endif /* AGENT_CORE_H */

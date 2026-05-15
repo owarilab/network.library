@@ -100,6 +100,17 @@ int main(int argc, char* argv[], char* envp[])
         return -1;
     }
 
+    /* Load URL whitelist */
+    if (agent_load_url_whitelist("./url_whitelist.json") != 0) {
+        printf("[Main] Failed to load URL whitelist\n");
+        return -1;
+    }
+
+    /* Load API docs */
+    if (agent_load_api_docs("./api_docs.json") != 0) {
+        printf("[Main] Warning: failed to load api_docs.json (optional)\n");
+    }
+
     if (-1 == qs_llama_module_prepare()) { return -1; }
 
     if (-1 == load_prompt_template()) {

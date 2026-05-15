@@ -5,27 +5,361 @@
 #include "tools/tool_file_edit.h"
 #include "tools/tool_file_search.h"
 #include "tools/tool_grep_search.h"
+#include "tools/tool_http_request.h"
+#include "qs_api.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <time.h>
 #include <limits.h>
 #include <unistd.h>
 
+/* Forward declarations */
+static const char* json_find_toplevel_key(const char* json, const char* key);
+static const char* json_find_value_start(const char* json, const char* key);
+static int read_text_file(const char* path, char** out_buf, size_t* out_size);
+static int alloc_json_memory(QS_MEMORY_CONTEXT* ctx, size_t json_size);
+int tool_http_request_execute(const char* json_args, char* output, size_t output_size);
+int tool_url_whitelist_get_execute(const char* json_args, char* output, size_t output_size);
+int tool_url_whitelist_info_get_execute(const char* json_args, char* output, size_t output_size);
+
 char g_agent_workspace_root[AGENT_PATH_MAX] = ".";
+
+/* ---------------------------------------------------------------
+ * URL whitelist (loaded from url_whitelist.json)
+ * --------------------------------------------------------------- */
+#define WHITELIST_MAX_HOSTS 64
+
+typedef struct {
+    char host[1024];
+    char description[512];
+} WhitelistEntry;
+
+static WhitelistEntry g_whitelist[WHITELIST_MAX_HOSTS];
+static int g_whitelist_count = 0;
+
+/* ---------------------------------------------------------------
+ * API documentation (loaded from api_docs.json)
+ * Raw JSON string owned by this module.
+ * --------------------------------------------------------------- */
+static char* g_api_docs_raw = NULL;
+
+static int read_text_file(const char* path, char** out_buf, size_t* out_size)
+{
+    if (!path || !out_buf) return -1;
+
+    FILE* fp = fopen(path, "rb");
+    if (!fp) return -1;
+
+    if (fseek(fp, 0, SEEK_END) != 0) {
+        fclose(fp);
+        return -1;
+    }
+
+    long file_size = ftell(fp);
+    if (file_size < 0) {
+        fclose(fp);
+        return -1;
+    }
+
+    if (fseek(fp, 0, SEEK_SET) != 0) {
+        fclose(fp);
+        return -1;
+    }
+
+    char* buf = (char*)malloc((size_t)file_size + 1);
+    if (!buf) {
+        fclose(fp);
+        return -1;
+    }
+
+    size_t read_size = fread(buf, 1, (size_t)file_size, fp);
+    fclose(fp);
+    buf[read_size] = '\0';
+
+    *out_buf = buf;
+    if (out_size) *out_size = read_size;
+    return 0;
+}
+
+static int alloc_json_memory(QS_MEMORY_CONTEXT* ctx, size_t json_size)
+{
+    size_t alloc_size = json_size * 8 + (64 * 1024);
+    if (alloc_size < 256 * 1024) alloc_size = 256 * 1024;
+    return api_qs_memory_alloc(ctx, alloc_size);
+}
+
+/* ---------------------------------------------------------------
+ * agent_load_url_whitelist
+ * Reads url_whitelist.json, parses "hosts" array using inline JSON.
+ * --------------------------------------------------------------- */
+int agent_load_url_whitelist(const char* json_path)
+{
+    char* json_str = NULL;
+    size_t json_size = 0;
+    QS_MEMORY_CONTEXT memory = {0};
+    QS_JSON_ELEMENT_OBJECT root;
+    QS_JSON_ELEMENT_ARRAY hosts;
+
+    g_whitelist_count = 0;
+
+    if (!json_path || !json_path[0]) return -1;
+    if (read_text_file(json_path, &json_str, &json_size) != 0) {
+        printf("[Whitelist] Cannot open %s: %s\n", json_path, strerror(errno));
+        return -1;
+    }
+    if (alloc_json_memory(&memory, json_size) != 0) {
+        free(json_str);
+        return -1;
+    }
+    if (api_qs_json_decode_object(&memory, &root, json_str) != 0 ||
+        api_qs_object_get_array(&root, "hosts", &hosts) != 0) {
+        api_qs_memory_free(&memory);
+        free(json_str);
+        return -1;
+    }
+
+    int host_count = api_qs_array_get_length(&hosts);
+    for (int i = 0; i < host_count && g_whitelist_count < WHITELIST_MAX_HOSTS; i++) {
+        QS_JSON_ELEMENT_OBJECT host_obj;
+        if (api_qs_array_get_object(&hosts, i, &host_obj) != 0) continue;
+
+        char* host = api_qs_object_get_string(&host_obj, "host");
+        char* desc = api_qs_object_get_string(&host_obj, "description");
+        if (!host || !host[0]) continue;
+
+        strncpy(g_whitelist[g_whitelist_count].host, host,
+                sizeof(g_whitelist[g_whitelist_count].host) - 1);
+        g_whitelist[g_whitelist_count].host[sizeof(g_whitelist[g_whitelist_count].host) - 1] = '\0';
+
+        if (desc) {
+            strncpy(g_whitelist[g_whitelist_count].description, desc,
+                    sizeof(g_whitelist[g_whitelist_count].description) - 1);
+            g_whitelist[g_whitelist_count].description[sizeof(g_whitelist[g_whitelist_count].description) - 1] = '\0';
+        } else {
+            g_whitelist[g_whitelist_count].description[0] = '\0';
+        }
+
+        g_whitelist_count++;
+    }
+
+    api_qs_memory_free(&memory);
+    free(json_str);
+    printf("[Whitelist] Loaded %d hosts from %s\n", g_whitelist_count, json_path);
+    return 0;
+}
+
+int agent_is_host_allowed(const char* host)
+{
+    if (!host || !host[0]) return 0;
+    for (int i = 0; i < g_whitelist_count; i++) {
+        if (strcmp(host, g_whitelist[i].host) == 0) return 1;
+    }
+    return 0;
+}
+
+int agent_get_whitelist_count(void)
+{
+    return g_whitelist_count;
+}
+
+const char* agent_get_whitelist_host(int index)
+{
+    if (index < 0 || index >= g_whitelist_count) return NULL;
+    return g_whitelist[index].host;
+}
+
+const char* agent_get_whitelist_desc(int index)
+{
+    if (index < 0 || index >= g_whitelist_count) return "";
+    return g_whitelist[index].description;
+}
+
+void agent_free_url_whitelist(void)
+{
+    g_whitelist_count = 0;
+}
+
+/* ---------------------------------------------------------------
+ * API docs loading
+ * --------------------------------------------------------------- */
+int agent_load_api_docs(const char* json_path)
+{
+    if (!json_path || !json_path[0]) return -1;
+
+    agent_free_api_docs();
+
+    size_t json_size = 0;
+    if (read_text_file(json_path, &g_api_docs_raw, &json_size) != 0) {
+        printf("[ApiDocs] Cannot open %s: %s\n", json_path, strerror(errno));
+        return -1;
+    }
+
+    QS_MEMORY_CONTEXT memory = {0};
+    QS_JSON_ELEMENT_OBJECT root;
+    QS_JSON_ELEMENT_ARRAY keys;
+    int host_entry_count = 0;
+
+    if (alloc_json_memory(&memory, json_size) != 0) {
+        free(g_api_docs_raw);
+        g_api_docs_raw = NULL;
+        return -1;
+    }
+
+    if (api_qs_json_decode_object(&memory, &root, g_api_docs_raw) != 0) {
+        api_qs_memory_free(&memory);
+        agent_free_api_docs();
+        return -1;
+    }
+
+    if (api_qs_object_get_keys(&root, &keys) == 0) {
+        host_entry_count = api_qs_array_get_length(&keys);
+    }
+
+    api_qs_memory_free(&memory);
+    printf("[ApiDocs] Loaded %d host entries from %s\n", host_entry_count, json_path);
+    return 0;
+}
+
+char* agent_get_api_doc_for_host(const char* host, size_t* out_size)
+{
+    if (out_size) *out_size = 0;
+    if (!host || !host[0] || !g_api_docs_raw) return NULL;
+
+    QS_MEMORY_CONTEXT memory = {0};
+    QS_JSON_ELEMENT_OBJECT root;
+    QS_JSON_ELEMENT_ARRAY endpoints;
+    char* result = NULL;
+
+    size_t json_size = strlen(g_api_docs_raw);
+    if (alloc_json_memory(&memory, json_size) != 0) return NULL;
+    if (api_qs_json_decode_object(&memory, &root, g_api_docs_raw) != 0 ||
+        api_qs_object_get_array(&root, host, &endpoints) != 0) {
+        api_qs_memory_free(&memory);
+        return NULL;
+    }
+
+    size_t encode_size = json_size + 4096;
+    char* encoded = api_qs_json_encode_array(&endpoints, encode_size);
+    if (encoded) {
+        size_t len = strlen(encoded);
+        result = (char*)malloc(len + 1);
+        if (result) {
+            memcpy(result, encoded, len + 1);
+            if (out_size) *out_size = len;
+        }
+    }
+
+    api_qs_memory_free(&memory);
+    return result;
+}
+
+char* agent_filter_api_docs(const char* host_json_str, const char* filter_pattern, size_t* out_size)
+{
+    if (!host_json_str || !out_size) return NULL;
+    *out_size = 0;
+
+    QS_MEMORY_CONTEXT req_mem = {0};
+    QS_JSON_ELEMENT_OBJECT req_obj;
+    char* host = NULL;
+    char* doc = NULL;
+    char* wrapped = NULL;
+    char* result = NULL;
+
+    if (alloc_json_memory(&req_mem, strlen(host_json_str)) != 0) return NULL;
+    if (api_qs_json_decode_object(&req_mem, &req_obj, host_json_str) != 0) {
+        api_qs_memory_free(&req_mem);
+        return NULL;
+    }
+
+    host = api_qs_object_get_string(&req_obj, "host");
+    if (!host || !host[0]) {
+        api_qs_memory_free(&req_mem);
+        return NULL;
+    }
+
+    doc = agent_get_api_doc_for_host(host, out_size);
+    if (!doc) {
+        api_qs_memory_free(&req_mem);
+        return NULL;
+    }
+    if (!filter_pattern || !filter_pattern[0]) {
+        api_qs_memory_free(&req_mem);
+        return doc;
+    }
+
+    size_t wrapped_size = strlen(doc) + 32;
+    wrapped = (char*)malloc(wrapped_size);
+    if (!wrapped) {
+        free(doc);
+        api_qs_memory_free(&req_mem);
+        return NULL;
+    }
+    snprintf(wrapped, wrapped_size, "{\"endpoints\":%s}", doc);
+
+    QS_MEMORY_CONTEXT doc_mem = {0};
+    QS_JSON_ELEMENT_OBJECT doc_obj;
+    QS_JSON_ELEMENT_ARRAY endpoints;
+    QS_JSON_ELEMENT_ARRAY filtered;
+    if (alloc_json_memory(&doc_mem, strlen(wrapped)) != 0 ||
+        api_qs_json_decode_object(&doc_mem, &doc_obj, wrapped) != 0 ||
+        api_qs_object_get_array(&doc_obj, "endpoints", &endpoints) != 0 ||
+        api_qs_array_create(&doc_mem, &filtered) != 0) {
+        free(doc);
+        free(wrapped);
+        api_qs_memory_free(&req_mem);
+        if (doc_mem.memory) api_qs_memory_free(&doc_mem);
+        return NULL;
+    }
+
+    int endpoint_count = api_qs_array_get_length(&endpoints);
+    for (int i = 0; i < endpoint_count; i++) {
+        QS_JSON_ELEMENT_OBJECT endpoint;
+        if (api_qs_array_get_object(&endpoints, i, &endpoint) != 0) continue;
+
+        char* path_pattern = api_qs_object_get_string(&endpoint, "path_pattern");
+        if (!path_pattern || strstr(path_pattern, filter_pattern) == NULL) continue;
+        api_qs_array_push_object(&filtered, &endpoint);
+    }
+
+    char* encoded = api_qs_json_encode_array(&filtered, strlen(doc) + 1024);
+    if (encoded) {
+        size_t len = strlen(encoded);
+        result = (char*)malloc(len + 1);
+        if (result) {
+            memcpy(result, encoded, len + 1);
+            *out_size = len;
+        }
+    }
+
+    free(doc);
+    free(wrapped);
+    api_qs_memory_free(&doc_mem);
+    api_qs_memory_free(&req_mem);
+    return result;
+}
+
+void agent_free_api_docs(void)
+{
+    if (g_api_docs_raw) { free(g_api_docs_raw); g_api_docs_raw = NULL; }
+}
 
 /* ---------------------------------------------------------------
  * Tool registry (static table — add new tools here)
  * --------------------------------------------------------------- */
 static TOOL_ENTRY g_tool_registry[] = {
-    { "file_list",   tool_file_list_execute   },
-    { "file_read",   tool_file_read_execute   },
-    { "file_write",  tool_file_write_execute  },
-    { "file_edit",   tool_file_edit_execute   },
-    { "file_search", tool_file_search_execute },
-    { "grep_search", tool_grep_search_execute },
-    { NULL,          NULL                     }
+    { "file_list",         tool_file_list_execute        },
+    { "file_read",         tool_file_read_execute        },
+    { "file_write",        tool_file_write_execute       },
+    { "file_edit",         tool_file_edit_execute        },
+    { "file_search",       tool_file_search_execute      },
+    { "grep_search",       tool_grep_search_execute      },
+    { "http_request",      tool_http_request_execute     },
+    { "url_whitelist_get", tool_url_whitelist_get_execute },
+    { "url_whitelist_info_get", tool_url_whitelist_info_get_execute },
+    { NULL,                NULL                          }
 };
 
 int agent_set_workspace_root(const char* path)
@@ -241,8 +575,6 @@ int agent_tool_execute(const char* tool_name, const char* json_args,
     }
 
     /* Unknown tool */
-    printf("[Tool] unknown tool: %s\n", tool_name);
-    fflush(stdout);
     snprintf(output, output_size, "{\"error\":\"unknown tool: %s\"}", tool_name);
     return -1;
 }
@@ -289,6 +621,19 @@ static const char* json_find_toplevel_key(const char* json, const char* key)
     return NULL;
 }
 
+static const char* json_find_value_start(const char* json, const char* key)
+{
+    const char* p = json_find_toplevel_key(json, key);
+    if (p == NULL) return NULL;
+
+    p += strlen(key) + 2;
+    while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
+    if (*p != ':') return NULL;
+    p++;
+    while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
+    return p;
+}
+
 /* Extract the value of a JSON string field: "key":"value"
  * Writes into out (max out_size bytes incl. NUL).
  * Returns 1 if found, 0 if not. */
@@ -297,20 +642,10 @@ static int json_extract_string(const char* json, const char* key,
 {
     if (!json || !key || !out || out_size == 0) return 0;
 
-    char pattern[128];
-    snprintf(pattern, sizeof(pattern), "\"%s\"", key);
-
-    const char* p = json_find_toplevel_key(json, key);
+    const char* p = json_find_value_start(json, key);
     if (p == NULL) return 0;
-
-    p += strlen(pattern);
-    /* Skip whitespace and colon */
-    while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
-    if (*p != ':') return 0;
-    p++;
-    while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
     if (*p != '"') return 0;
-    p++; /* skip opening quote */
+    p++;
 
     size_t i = 0;
     while (*p != '\0' && i < out_size - 1) {
@@ -344,17 +679,8 @@ static int json_extract_object(const char* json, const char* key,
 {
     if (!json || !key || !out || out_size == 0) return 0;
 
-    char pattern[128];
-    snprintf(pattern, sizeof(pattern), "\"%s\"", key);
-
-    const char* p = json_find_toplevel_key(json, key);
+    const char* p = json_find_value_start(json, key);
     if (p == NULL) return 0;
-
-    p += strlen(pattern);
-    while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
-    if (*p != ':') return 0;
-    p++;
-    while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
     if (*p != '{') return 0;
 
     /* Copy balanced braces, skipping string contents */
@@ -416,13 +742,13 @@ int agent_parse_think_result(const char* llm_json, AGENT_THINK_RESULT* out)
     if (json_start == NULL) return -1;
 
     char action_str[64] = {0};
-    json_extract_string(json_start, "action",    action_str,         sizeof(action_str));
-    json_extract_string(json_start, "thought",   out->thought,       sizeof(out->thought));
-    json_extract_string(json_start, "tool_name", out->tool_call.tool_name,
-                        sizeof(out->tool_call.tool_name));
-    json_extract_object(json_start, "tool_args", out->tool_call.json_args,
-                        sizeof(out->tool_call.json_args));
-    json_extract_string(json_start, "answer",    out->answer,        sizeof(out->answer));
+    json_extract_string(json_start, "action",     action_str,          sizeof(action_str));
+    json_extract_string(json_start, "thought",    out->thought,        sizeof(out->thought));
+    json_extract_string(json_start, "tool_name",  out->tool_call.tool_name,
+                          sizeof(out->tool_call.tool_name));
+    json_extract_object(json_start, "tool_args",  out->tool_call.json_args,
+                          sizeof(out->tool_call.json_args));
+    json_extract_string(json_start, "answer",     out->answer,         sizeof(out->answer));
 
     out->action = agent_parse_action_string(action_str);
     return (out->action != AGENT_ACTION_UNKNOWN) ? 0 : -1;

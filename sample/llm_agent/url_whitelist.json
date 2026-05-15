@@ -1,0 +1,12 @@
+{
+    "hosts": [
+        {
+            "host": "localhost",
+            "description": "Local development server (same host)"
+        },
+        {
+            "host": "127.0.0.1",
+            "description": "Localhost IPv4"
+        }
+    ]
+}

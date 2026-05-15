@@ -3,7 +3,9 @@ llm_http_stream/qs_llm_http_stream_server
 llm_http_stream/embeddings.db
 llm_http_stream/embeddings.db-shm
 llm_http_stream/embeddings.db-wal
+llm_http_stream/run.sh
 llm_agent/default_workspace/
+llm_agent/run.sh
 
 # Python
 __pycache__/
