@@ -582,6 +582,9 @@ int32_t qs_json_decode_parser_hash( QS_MEMORY_POOL* _ppool, QS_NODE* node, QS_TO
 		}
 		else if( token_list[ptokens->workpos].type == ID_SIGN ){
 			if( *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos].buf_munit)) == '}' ){
+				if(working_munit==-1){
+					working_munit = qs_create_hash( _ppool, hash_size );
+				}
 				finish = 1;
 				break;
 			}
