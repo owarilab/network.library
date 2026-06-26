@@ -4,7 +4,7 @@
 
 #include "qs_base64.h"
 
-uint8_t qs_base64_char2ascii( uint8_t c )
+static uint8_t qs_base64_char2ascii( uint8_t c )
 {
 	uint8_t cnv = '\0';
 	if( c >= 0x30 && c <= 0x39 ){ // 0~9
@@ -17,10 +17,10 @@ uint8_t qs_base64_char2ascii( uint8_t c )
 		cnv = 0x1a + ( c - 0x61 );
 	}
 	else if( c == 0x2b ){// '+'
-		cnv = c - 0x62;
+		cnv = 62;
 	}
 	else if( c == 0x2f ){// '/'
-		cnv = c - 0x63;
+		cnv = 63;
 	}
 	return cnv;
 }
@@ -49,21 +49,16 @@ void qs_base64_encode(char* dest, uint16_t destlength, const void* src, uint16_t
 	do{
 		i++;
 		tmpv = i % 4;
-//		if( tmpv == 0 ){
-//			if( *ps == '\0' ){
-//				break;
-//			}
-//		}
 		switch( tmpv )
 		{
 			case 0:
 				*p = basestring[ (uint8_t)(*ps >> 2) ];
 				break;
 			case 1:
-				*p = basestring[ (uint8_t)( ( ( ( *(ps-1) << 6 ) & 0xFF ) + ( *ps >> 2 ) ) >> 2 ) & 0x3F ];
+				*p = basestring[ (uint8_t)( ( ( *(ps-1) & 0x03 ) << 4 ) | ( *ps >> 4 ) ) ];
 				break;
 			case 2:
-				*p = basestring[ (uint8_t)( ( ( ( *(ps-1) << 4 ) & 0xFF ) + ( *ps >> 4 ) ) >> 2 ) & 0x3F ];
+				*p = basestring[ (uint8_t)( ( ( *(ps-1) & 0x0F ) << 2 ) | ( *ps >> 6 ) ) ];
 				break;
 			case 3:
 				*p = basestring[ (uint8_t)(*(ps-1) & 0x3F) ];
@@ -71,8 +66,12 @@ void qs_base64_encode(char* dest, uint16_t destlength, const void* src, uint16_t
 				break;
 		}
 	}while( (++p) - dest < destlength-1 && ( (ps++) - ( (uint8_t*)src ) ) < length );
-	if( i % 4 != 0 ){
-		while( ( i % 4 ) != 3 ){ *(p++) = '='; i++; }
+	{
+		/* ps-- in case 3 can cause one extra iteration; clamp p to the correct position */
+		size_t base_chars = ( ( (size_t)length * 4 ) + 2 ) / 3;
+		if( (size_t)(p - dest) > base_chars ){ p = dest + base_chars; }
+		int padding = (3 - (length % 3)) % 3;
+		for( int j = 0; j < padding; j++ ){ *(p++) = '='; }
 	}
 	*p = '\0';
 }
