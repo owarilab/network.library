@@ -7,14 +7,63 @@
 #include <stdlib.h>
 #include <string.h>
 
+static void agent_mark_pending_verification(AGENT_CONVERSATION* conv,
+                                            const char* tool_name,
+                                            const char* tool_args)
+{
+    char user_path[AGENT_PATH_MAX] = "";
+    char resolved_path[AGENT_PATH_MAX] = "";
+    char msg[AGENT_PATH_MAX + 128];
+
+    if (conv == NULL || tool_name == NULL || tool_args == NULL) return;
+    if (agent_tool_args_extract_path(tool_args, user_path, sizeof(user_path)) != 0) return;
+    if (agent_resolve_workspace_path(user_path, resolved_path, sizeof(resolved_path)) != 0) return;
+
+    conv->pending_verification = 1;
+    strncpy(conv->pending_verification_path, resolved_path,
+            sizeof(conv->pending_verification_path) - 1);
+    conv->pending_verification_path[sizeof(conv->pending_verification_path) - 1] = '\0';
+    strncpy(conv->last_mutation_tool, tool_name, sizeof(conv->last_mutation_tool) - 1);
+    conv->last_mutation_tool[sizeof(conv->last_mutation_tool) - 1] = '\0';
+
+    snprintf(msg, sizeof(msg),
+        "Verify %s with file_read before final_answer.",
+        user_path);
+    agent_conversation_append_context(conv, "verification_required", msg);
+}
+
+static int agent_try_clear_pending_verification(AGENT_CONVERSATION* conv,
+                                                const char* tool_name,
+                                                const char* tool_args)
+{
+    char user_path[AGENT_PATH_MAX] = "";
+    char resolved_path[AGENT_PATH_MAX] = "";
+    char msg[AGENT_PATH_MAX + 96];
+
+    if (conv == NULL || !conv->pending_verification) return 0;
+    if (tool_name == NULL || strcmp(tool_name, "file_read") != 0) return 0;
+    if (tool_args == NULL) return 0;
+    if (agent_tool_args_extract_path(tool_args, user_path, sizeof(user_path)) != 0) return 0;
+    if (agent_resolve_workspace_path(user_path, resolved_path, sizeof(resolved_path)) != 0) return 0;
+    if (strcmp(resolved_path, conv->pending_verification_path) != 0) return 0;
+
+    conv->pending_verification = 0;
+    conv->pending_verification_path[0] = '\0';
+    conv->last_mutation_tool[0] = '\0';
+
+    snprintf(msg, sizeof(msg), "Verification read completed for %s.", user_path);
+    agent_conversation_append_context(conv, "verification_complete", msg);
+    return 1;
+}
+
 /*
  * POST /api/agent/run/stream
  *
  * SSE streaming version of /api/agent/run.
  * Emits server-sent events as the ReAct loop progresses:
  *
- *   event: thought
- *   data: {"iteration":1,"thought":"..."}
+ *   event: summary
+ *   data: {"iteration":1,"summary":"..."}
  *
  *   event: tool_call
  *   data: {"iteration":1,"tool":"file_list","args":{...}}
@@ -71,7 +120,6 @@ int handler_run_stream(QS_EVENT_PARAMETER params)
     const char* status          = "error";
     char        answer[16384]   = "(no answer)";
     int         done            = 0;
-    int         empty_answer_warned = 0;
 
     /* ReAct loop */
     while (!done && conv->iteration < conv->max_iterations) {
@@ -81,9 +129,7 @@ int handler_run_stream(QS_EVENT_PARAMETER params)
         fflush(stdout);
 
         /* ---- Think step ---- */
-        char* prompt = agent_build_think_prompt(
-            conv->user_query,
-            conv->accumulated_context ? conv->accumulated_context : "");
+        char* prompt = agent_build_think_prompt_from_conversation(conv);
         if (!prompt) {
             qs_llm_http_stream_send_event(&stream, "error",
                 "{\"message\":\"prompt build failed\"}");
@@ -116,56 +162,97 @@ int handler_run_stream(QS_EVENT_PARAMETER params)
         conv->iteration++;
 
         if (parse_ret != 0) {
-            /* Parse failure: emit a thought event so the client can see it */
+            /* Parse failure: emit a summary event so the client can see it */
             char ev[128];
             snprintf(ev, sizeof(ev),
-                "{\"iteration\":%d,\"thought\":\"(parse error, retrying)\"}",
+                "{\"iteration\":%d,\"summary\":\"(parse error, retrying)\"}",
                 conv->iteration);
-            qs_llm_http_stream_send_event(&stream, "thought", ev);
+            qs_llm_http_stream_send_event(&stream, "summary", ev);
             agent_conversation_append_context(conv, "parse_error",
                 "LLM response could not be parsed as valid action JSON.");
             continue;
         }
 
-        /* ---- Emit thought event ---- */
-        if (think_result.thought[0] != '\0') {
-            agent_conversation_append_context(conv, "thought", think_result.thought);
+        {
+            char validation_error[256] = "";
+            if (agent_validate_think_result(&think_result,
+                                            validation_error,
+                                            sizeof(validation_error)) != 0) {
+                char* esc_error = hc_json_escape(
+                    validation_error[0] ? validation_error : "invalid model action");
+                if (esc_error) {
+                    size_t ev_size = strlen(esc_error) + 64;
+                    char* ev = (char*)malloc(ev_size);
+                    if (ev) {
+                        snprintf(ev, ev_size,
+                            "{\"iteration\":%d,\"summary\":\"%s\"}",
+                            conv->iteration, esc_error);
+                        qs_llm_http_stream_send_event(&stream, "summary", ev);
+                        free(ev);
+                    }
+                    free(esc_error);
+                }
+                agent_conversation_append_context(conv, "validation_error",
+                    validation_error[0] ? validation_error : "invalid model action");
+                continue;
+            }
+        }
 
-            char* esc_thought = hc_json_escape(think_result.thought);
-            if (esc_thought) {
-                size_t ev_size = strlen(esc_thought) + 64;
+        /* ---- Emit summary event ---- */
+        if (think_result.summary[0] != '\0') {
+            agent_conversation_append_context(conv, "summary", think_result.summary);
+
+            char* esc_summary = hc_json_escape(think_result.summary);
+            if (esc_summary) {
+                size_t ev_size = strlen(esc_summary) + 64;
                 char*  ev      = (char*)malloc(ev_size);
                 if (ev) {
                     snprintf(ev, ev_size,
-                        "{\"iteration\":%d,\"thought\":\"%s\"}",
-                        conv->iteration, esc_thought);
-                    qs_llm_http_stream_send_event(&stream, "thought", ev);
+                        "{\"iteration\":%d,\"summary\":\"%s\"}",
+                        conv->iteration, esc_summary);
+                    qs_llm_http_stream_send_event(&stream, "summary", ev);
                     free(ev);
                 }
-                free(esc_thought);
+                free(esc_summary);
             }
         }
 
         /* ---- Final answer ---- */
         if (think_result.action == AGENT_ACTION_FINAL_ANSWER) {
-            if (think_result.answer[0] != '\0') {
-                strncpy(answer, think_result.answer, sizeof(answer) - 1);
-                answer[sizeof(answer) - 1] = '\0';
-                status = "completed";
-                done   = 1;
-            } else if (!empty_answer_warned && think_result.thought[0] != '\0') {
-                empty_answer_warned = 1;
-                agent_conversation_append_context(conv, "reminder",
-                    "You output final_answer but the 'answer' field was empty. "
-                    "Please output the complete answer in the 'answer' field.");
+            if (conv->pending_verification) {
+                char* esc_msg;
+                size_t ev_size;
+                char* ev;
+                char msg[AGENT_PATH_MAX + 160];
+
+                snprintf(msg, sizeof(msg),
+                    "final_answer rejected: verify %s with file_read first.",
+                    conv->pending_verification_path[0] ? conv->pending_verification_path : "the last mutated file");
+                agent_conversation_append_context(conv, "policy_violation", msg);
+
+                esc_msg = hc_json_escape(msg);
+                if (esc_msg) {
+                    ev_size = strlen(esc_msg) + 64;
+                    ev = (char*)malloc(ev_size);
+                    if (ev) {
+                        snprintf(ev, ev_size,
+                            "{\"iteration\":%d,\"summary\":\"%s\"}",
+                            conv->iteration, esc_msg);
+                        qs_llm_http_stream_send_event(&stream, "summary", ev);
+                        free(ev);
+                    }
+                    free(esc_msg);
+                }
                 continue;
-            } else {
-                /* Fallback: use thought as answer */
-                strncpy(answer, think_result.thought, sizeof(answer) - 1);
-                answer[sizeof(answer) - 1] = '\0';
-                status = "completed";
-                done   = 1;
             }
+            agent_conversation_append_item(conv,
+                                           AGENT_ITEM_FINAL_ANSWER,
+                                           "final_answer",
+                                           think_result.answer);
+            strncpy(answer, think_result.answer, sizeof(answer) - 1);
+            answer[sizeof(answer) - 1] = '\0';
+            status = "completed";
+            done   = 1;
             break;
         }
 
@@ -198,7 +285,16 @@ int handler_run_stream(QS_EVENT_PARAMETER params)
             }
             out_buf[0] = '\0';
 
-            agent_tool_execute(tool_name, tool_args, out_buf, out_size);
+            {
+                int tool_ret = agent_tool_execute(tool_name, tool_args, out_buf, out_size);
+
+                if (tool_ret == 0 && agent_tool_requires_verification(tool_name)) {
+                    agent_mark_pending_verification(conv, tool_name, tool_args);
+                }
+                if (tool_ret == 0) {
+                    agent_try_clear_pending_verification(conv, tool_name, tool_args);
+                }
+            }
             agent_conversation_count_tool(conv, tool_name);
 
             /* Emit tool_result event */

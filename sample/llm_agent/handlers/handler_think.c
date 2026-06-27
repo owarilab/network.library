@@ -10,7 +10,7 @@
  * POST /api/agent/think
  * Input:  {"query":"...", "context":"..."}
  * Output: {"action":"use_tool"|"final_answer",
- *           "thought":"...", "tool_name":"...",
+ *           "summary":"...", "tool_name":"...",
  *           "tool_args":{...}, "answer":"..."}
  *
  * Stateless: calls LLM and parses the result.
@@ -77,41 +77,54 @@ int handler_think(QS_EVENT_PARAMETER params)
             "{\"error\":\"failed to parse LLM response\"}");
     }
 
+    {
+        char validation_error[256] = "";
+        if (agent_validate_think_result(&think_result,
+                                        validation_error,
+                                        sizeof(validation_error)) != 0) {
+            char err_body[384];
+            snprintf(err_body, sizeof(err_body),
+                "{\"error\":\"invalid model action: %s\"}",
+                validation_error[0] ? validation_error : "validation failed");
+            return send_json_response(params, 500, err_body);
+        }
+    }
+
     /* Map action enum to string */
     const char* action_str = "unknown";
     if (think_result.action == AGENT_ACTION_USE_TOOL)     action_str = "use_tool";
     if (think_result.action == AGENT_ACTION_FINAL_ANSWER) action_str = "final_answer";
 
     /* JSON-escape free-text fields */
-    char* esc_thought = hc_json_escape(think_result.thought);
+    char* esc_summary = hc_json_escape(think_result.summary);
     char* esc_answer  = hc_json_escape(think_result.answer);
 
     const char* tool_args = think_result.tool_call.json_args;
     if (!tool_args || !tool_args[0]) tool_args = "{}";
 
-    size_t resp_size = 256 + strlen(esc_thought ? esc_thought : "") +
+    size_t resp_size = 256 + strlen(esc_summary ? esc_summary : "") +
                        strlen(esc_answer  ? esc_answer  : "") +
                        strlen(tool_args);
     char*  resp_body = (char*)malloc(resp_size);
     if (!resp_body) {
-        if (esc_thought) free(esc_thought);
+        if (esc_summary) free(esc_summary);
         if (esc_answer)  free(esc_answer);
         return send_json_response(params, 500, "{\"error\":\"out of memory\"}");
     }
 
     snprintf(resp_body, resp_size,
         "{\"action\":\"%s\","
-        "\"thought\":\"%s\","
+        "\"summary\":\"%s\","
         "\"tool_name\":\"%s\","
         "\"tool_args\":%s,"
         "\"answer\":\"%s\"}",
         action_str,
-        esc_thought ? esc_thought : "",
+        esc_summary ? esc_summary : "",
         think_result.tool_call.tool_name,
         tool_args,
         esc_answer  ? esc_answer  : "");
 
-    if (esc_thought) free(esc_thought);
+    if (esc_summary) free(esc_summary);
     if (esc_answer)  free(esc_answer);
 
     send_json_response(params, 200, resp_body);

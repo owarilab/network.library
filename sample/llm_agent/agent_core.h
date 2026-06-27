@@ -37,10 +37,28 @@ typedef struct AGENT_TOOL_CALL {
  * --------------------------------------------------------------- */
 typedef struct AGENT_THINK_RESULT {
     AGENT_ACTION   action;
-    char           thought[8192];
+    char           summary[8192];
     AGENT_TOOL_CALL tool_call;
     char           answer[16384];
 } AGENT_THINK_RESULT;
+
+/* ---------------------------------------------------------------
+ * Typed conversation items kept alongside accumulated_context.
+ * --------------------------------------------------------------- */
+typedef enum {
+    AGENT_ITEM_USER_QUERY = 0,
+    AGENT_ITEM_MODEL_ACTION,
+    AGENT_ITEM_TOOL_CALL,
+    AGENT_ITEM_TOOL_RESULT,
+    AGENT_ITEM_WARNING,
+    AGENT_ITEM_FINAL_ANSWER
+} AGENT_ITEM_TYPE;
+
+typedef struct AGENT_CONVERSATION_ITEM {
+    AGENT_ITEM_TYPE type;
+    char*           label;
+    char*           content;
+} AGENT_CONVERSATION_ITEM;
 
 /* ---------------------------------------------------------------
  * Per-conversation state
@@ -50,10 +68,17 @@ typedef struct AGENT_CONVERSATION {
     int    iteration;
     int    max_iterations;
     char   user_query[2048];
+    int    pending_verification;
+    char   pending_verification_path[AGENT_PATH_MAX];
+    char   last_mutation_tool[64];
 
     char*  accumulated_context;
     size_t context_length;
     size_t context_capacity;
+
+    AGENT_CONVERSATION_ITEM* items;
+    size_t item_count;
+    size_t item_capacity;
 
     /* tool usage counters */
     int    tool_use_file_list;
@@ -85,6 +110,11 @@ void                agent_conversation_destroy(AGENT_CONVERSATION* conv);
 int  agent_conversation_append_context(AGENT_CONVERSATION* conv,
                                        const char* label, const char* content);
 
+int  agent_conversation_append_item(AGENT_CONVERSATION* conv,
+                                    AGENT_ITEM_TYPE type,
+                                    const char* label,
+                                    const char* content);
+
 /* Generate a unique conversation ID into out (must be >= AGENT_CONV_ID_LEN bytes) */
 void agent_conversation_generate_id(char* out, size_t len);
 
@@ -98,6 +128,14 @@ int agent_tool_is_registered(const char* tool_name);
 
 /* Parse LLM JSON output into AGENT_THINK_RESULT. Returns 0 on success, -1 on error. */
 int agent_parse_think_result(const char* llm_json, AGENT_THINK_RESULT* out);
+
+/* Validate parsed model output before tool dispatch or finalization. */
+int agent_validate_think_result(const AGENT_THINK_RESULT* result,
+                                char* error, size_t error_size);
+
+/* Tool helpers used by the runtime policy layer. */
+int agent_tool_requires_verification(const char* tool_name);
+int agent_tool_args_extract_path(const char* json_args, char* out, size_t out_size);
 
 /* Increment the tool usage counter for the given tool name */
 void agent_conversation_count_tool(AGENT_CONVERSATION* conv, const char* tool_name);

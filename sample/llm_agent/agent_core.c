@@ -451,6 +451,10 @@ AGENT_CONVERSATION* agent_conversation_create(const char* user_query, int max_it
         conv->user_query[sizeof(conv->user_query) - 1] = '\0';
     }
 
+    conv->pending_verification = 0;
+    conv->pending_verification_path[0] = '\0';
+    conv->last_mutation_tool[0] = '\0';
+
     conv->context_capacity  = AGENT_CONTEXT_INIT_SIZE;
     conv->accumulated_context = (char*)calloc(1, conv->context_capacity);
     if (conv->accumulated_context == NULL) {
@@ -458,6 +462,16 @@ AGENT_CONVERSATION* agent_conversation_create(const char* user_query, int max_it
         return NULL;
     }
     conv->context_length = 0;
+
+    conv->item_capacity = 16;
+    conv->items = (AGENT_CONVERSATION_ITEM*)calloc(conv->item_capacity,
+                                                   sizeof(AGENT_CONVERSATION_ITEM));
+    if (conv->items == NULL) {
+        free(conv->accumulated_context);
+        free(conv);
+        return NULL;
+    }
+    conv->item_count = 0;
 
     conv->tool_use_file_list = 0;
     conv->tool_use_file_read = 0;
@@ -470,12 +484,83 @@ AGENT_CONVERSATION* agent_conversation_create(const char* user_query, int max_it
  * --------------------------------------------------------------- */
 void agent_conversation_destroy(AGENT_CONVERSATION* conv)
 {
+    size_t i;
+
     if (conv == NULL) return;
     if (conv->accumulated_context != NULL) {
         free(conv->accumulated_context);
         conv->accumulated_context = NULL;
     }
+    if (conv->items != NULL) {
+        for (i = 0; i < conv->item_count; i++) {
+            free(conv->items[i].label);
+            free(conv->items[i].content);
+        }
+        free(conv->items);
+        conv->items = NULL;
+    }
     free(conv);
+}
+
+static char* agent_strdup_local(const char* src)
+{
+    size_t len;
+    char* out;
+
+    if (src == NULL) src = "";
+    len = strlen(src);
+    out = (char*)malloc(len + 1);
+    if (out == NULL) return NULL;
+    memcpy(out, src, len + 1);
+    return out;
+}
+
+static AGENT_ITEM_TYPE agent_item_type_from_label(const char* label)
+{
+    if (label == NULL) return AGENT_ITEM_WARNING;
+    if (strcmp(label, "user_query") == 0) return AGENT_ITEM_USER_QUERY;
+    if (strcmp(label, "summary") == 0) return AGENT_ITEM_MODEL_ACTION;
+    if (strcmp(label, "tool_result") == 0) return AGENT_ITEM_TOOL_RESULT;
+    if (strncmp(label, "tool_call(", 10) == 0) return AGENT_ITEM_TOOL_CALL;
+    return AGENT_ITEM_WARNING;
+}
+
+int agent_conversation_append_item(AGENT_CONVERSATION* conv,
+                                   AGENT_ITEM_TYPE type,
+                                   const char* label,
+                                   const char* content)
+{
+    AGENT_CONVERSATION_ITEM* item;
+    char* label_copy;
+    char* content_copy;
+
+    if (conv == NULL) return -1;
+
+    if (conv->item_count >= conv->item_capacity) {
+        size_t new_capacity = conv->item_capacity * 2;
+        AGENT_CONVERSATION_ITEM* new_items =
+            (AGENT_CONVERSATION_ITEM*)realloc(conv->items,
+                                              new_capacity * sizeof(AGENT_CONVERSATION_ITEM));
+        if (new_items == NULL) return -1;
+        memset(new_items + conv->item_capacity, 0,
+               (new_capacity - conv->item_capacity) * sizeof(AGENT_CONVERSATION_ITEM));
+        conv->items = new_items;
+        conv->item_capacity = new_capacity;
+    }
+
+    label_copy = agent_strdup_local(label != NULL ? label : "info");
+    if (label_copy == NULL) return -1;
+    content_copy = agent_strdup_local(content != NULL ? content : "");
+    if (content_copy == NULL) {
+        free(label_copy);
+        return -1;
+    }
+
+    item = &conv->items[conv->item_count++];
+    item->type = type;
+    item->label = label_copy;
+    item->content = content_copy;
+    return 0;
 }
 
 /* ---------------------------------------------------------------
@@ -494,6 +579,13 @@ int agent_conversation_append_context(AGENT_CONVERSATION* conv,
     size_t      content_len  = strlen(content);
     /* "[label]\n" + content + "\n\n" */
     size_t      needed       = label_len + 3 + content_len + 2 + 1;
+
+    if (agent_conversation_append_item(conv,
+                                       agent_item_type_from_label(safe_label),
+                                       safe_label,
+                                       content) != 0) {
+        return -1;
+    }
 
     if (conv->context_length + needed > AGENT_CONTEXT_MAX_SIZE) {
         /* Context is full — silently skip */
@@ -583,7 +675,7 @@ int agent_tool_execute(const char* tool_name, const char* json_args,
  * agent_parse_think_result
  *
  * Minimal JSON field extractor (no external library).
- * Looks for "action", "thought", "tool_name", "tool_args", "answer"
+ * Looks for "action", "summary", "tool_name", "tool_args", "answer"
  * as top-level string / object fields.
  *
  * Returns 0 on success (action is valid), -1 otherwise.
@@ -743,7 +835,9 @@ int agent_parse_think_result(const char* llm_json, AGENT_THINK_RESULT* out)
 
     char action_str[64] = {0};
     json_extract_string(json_start, "action",     action_str,          sizeof(action_str));
-    json_extract_string(json_start, "thought",    out->thought,        sizeof(out->thought));
+    if (!json_extract_string(json_start, "summary", out->summary, sizeof(out->summary))) {
+        json_extract_string(json_start, "thought", out->summary, sizeof(out->summary));
+    }
     json_extract_string(json_start, "tool_name",  out->tool_call.tool_name,
                           sizeof(out->tool_call.tool_name));
     json_extract_object(json_start, "tool_args",  out->tool_call.json_args,
@@ -752,4 +846,73 @@ int agent_parse_think_result(const char* llm_json, AGENT_THINK_RESULT* out)
 
     out->action = agent_parse_action_string(action_str);
     return (out->action != AGENT_ACTION_UNKNOWN) ? 0 : -1;
+}
+
+int agent_validate_think_result(const AGENT_THINK_RESULT* result,
+                                char* error, size_t error_size)
+{
+    if (error != NULL && error_size > 0) {
+        error[0] = '\0';
+    }
+
+    if (result == NULL) {
+        if (error != NULL && error_size > 0) {
+            snprintf(error, error_size, "missing think result");
+        }
+        return -1;
+    }
+
+    if (result->action == AGENT_ACTION_UNKNOWN) {
+        if (error != NULL && error_size > 0) {
+            snprintf(error, error_size, "invalid action");
+        }
+        return -1;
+    }
+
+    if (result->action == AGENT_ACTION_USE_TOOL) {
+        if (result->tool_call.tool_name[0] == '\0') {
+            if (error != NULL && error_size > 0) {
+                snprintf(error, error_size, "use_tool requires tool_name");
+            }
+            return -1;
+        }
+        if (!agent_tool_is_registered(result->tool_call.tool_name)) {
+            if (error != NULL && error_size > 0) {
+                snprintf(error, error_size, "unknown tool: %s", result->tool_call.tool_name);
+            }
+            return -1;
+        }
+        if (result->tool_call.json_args[0] != '\0' &&
+            result->tool_call.json_args[0] != '{') {
+            if (error != NULL && error_size > 0) {
+                snprintf(error, error_size, "tool_args must be a JSON object");
+            }
+            return -1;
+        }
+    }
+
+    if (result->action == AGENT_ACTION_FINAL_ANSWER && result->answer[0] == '\0') {
+        if (error != NULL && error_size > 0) {
+            snprintf(error, error_size, "final_answer requires non-empty answer");
+        }
+        return -1;
+    }
+
+    return 0;
+}
+
+int agent_tool_requires_verification(const char* tool_name)
+{
+    if (tool_name == NULL) return 0;
+    return (strcmp(tool_name, "file_write") == 0 ||
+            strcmp(tool_name, "file_edit") == 0);
+}
+
+int agent_tool_args_extract_path(const char* json_args, char* out, size_t out_size)
+{
+    if (out == NULL || out_size == 0) return -1;
+    out[0] = '\0';
+
+    if (json_args == NULL || json_args[0] == '\0') return -1;
+    return json_extract_string(json_args, "path", out, out_size) ? 0 : -1;
 }

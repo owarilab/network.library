@@ -5,6 +5,8 @@
 #include "qs_llama_module.h"
 #include <stddef.h>
 
+typedef struct AGENT_CONVERSATION AGENT_CONVERSATION;
+
 /* Prompt template loaded from prompt.conf at startup (defined in main.c). */
 extern char* g_agent_prompt_template;
 
@@ -46,5 +48,6 @@ char* hc_json_escape(const char* src);
  * Returns malloc'd prompt string. Caller must free().
  * --------------------------------------------------------------- */
 char* agent_build_think_prompt(const char* query, const char* context);
+char* agent_build_think_prompt_from_conversation(const AGENT_CONVERSATION* conv);
 
 #endif /* HANDLER_COMMON_H */

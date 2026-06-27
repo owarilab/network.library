@@ -183,15 +183,15 @@ curl -X POST http://localhost:4445/api/agent/run/stream \
 
 | event | データ例 |
 |-------|---------|
-| `thought` | `{"iteration":1,"thought":"まずディレクトリを確認する"}` |
+| `summary` | `{"iteration":1,"summary":"まずディレクトリを確認する"}` |
 | `tool_call` | `{"iteration":1,"tool":"file_list","args":{"path":"."}}` |
 | `tool_result` | `{"iteration":1,"tool":"file_list","result":{...}}` |
 | `answer` | `{"status":"completed","answer":"...","iterations":2}` |
 | `done` | `[DONE]` |
 
 ```
-event: thought
-data: {"iteration":1,"thought":"まずディレクトリを確認する"}
+event: summary
+data: {"iteration":1,"summary":"まずディレクトリを確認する"}
 
 event: tool_call
 data: {"iteration":1,"tool":"file_list","args":{"path":"."}}
@@ -217,7 +217,7 @@ curl -X POST http://localhost:4445/api/agent/think \
 ```
 
 ```json
-{"action":"use_tool","thought":"まずディレクトリ内容を確認する","tool_name":"file_list","tool_args":{"path":".","pattern":"*.c"},"answer":""}
+{"action":"use_tool","summary":"まずディレクトリ内容を確認する","tool_name":"file_list","tool_args":{"path":".","pattern":"*.c"},"answer":""}
 ```
 
 ---
@@ -229,17 +229,22 @@ think + execute を1サイクル実行します。クライアントがコンテ
 ```bash
 curl -X POST http://localhost:4445/api/agent/loop \
   -H "Content-Type: application/json" \
-  -d '{"query":"Cファイルを教えて","context":"","iteration":0,"max_iterations":5}'
+  -d '{"query":"Cファイルを教えて","context":"","iteration":0,"max_iterations":5,"pending_verification":0,"pending_verification_path":""}'
 ```
 
 **ツール使用の場合:**
 ```json
-{"status":"continue","action":"use_tool","thought":"...","tool_name":"file_list","tool_result":{...},"context":"[tool_call:1]\nfile_list(...)","iteration":1}
+{"status":"continue","action":"use_tool","summary":"...","tool_name":"file_list","tool_result":{...},"context":"[tool_call:1]\nfile_list(...)","iteration":1,"pending_verification":0,"pending_verification_path":""}
 ```
 
 **最終回答の場合:**
 ```json
-{"status":"done","action":"final_answer","thought":"...","answer":"main.c, agent_core.c の2つです。","iteration":2}
+{"status":"done","action":"final_answer","summary":"...","answer":"main.c, agent_core.c の2つです。","iteration":2}
+```
+
+**verification が必要なまま最終回答しようとした場合:**
+```json
+{"status":"continue","action":"final_answer","summary":"...","warning":"final_answer rejected: verify /home/... with file_read first.","context":"[policy_violation]\n...","iteration":2,"pending_verification":1,"pending_verification_path":"/home/.../target.c"}
 ```
 
 ---
@@ -258,7 +263,7 @@ curl -X POST http://localhost:4445/api/agent/run \
 {
   "status": "completed",
   "answer": "このディレクトリには main.c, agent_core.c ... があります。",
-  "thought": "ディレクトリを一覧します。\nCファイルを確認しました。",
+  "summary": "ディレクトリを一覧します。\nCファイルを確認しました。",
   "conversation_id": "conv-6820a4b312c4ff8a",
   "iterations": 3,
   "max_iterations": 5,
@@ -267,7 +272,7 @@ curl -X POST http://localhost:4445/api/agent/run \
 }
 ```
 
-`thought` フィールドには各イテレーションの推論内容が改行区切りで連結されます（Copilot の「Thinking...」に相当）。
+`summary` フィールドには各イテレーションの短い要約が改行区切りで連結されます。
 
 ---
 

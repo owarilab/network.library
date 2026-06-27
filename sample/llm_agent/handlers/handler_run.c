@@ -6,6 +6,55 @@
 #include <stdlib.h>
 #include <string.h>
 
+static void agent_mark_pending_verification(AGENT_CONVERSATION* conv,
+                                            const char* tool_name,
+                                            const char* tool_args)
+{
+    char user_path[AGENT_PATH_MAX] = "";
+    char resolved_path[AGENT_PATH_MAX] = "";
+    char msg[AGENT_PATH_MAX + 128];
+
+    if (conv == NULL || tool_name == NULL || tool_args == NULL) return;
+    if (agent_tool_args_extract_path(tool_args, user_path, sizeof(user_path)) != 0) return;
+    if (agent_resolve_workspace_path(user_path, resolved_path, sizeof(resolved_path)) != 0) return;
+
+    conv->pending_verification = 1;
+    strncpy(conv->pending_verification_path, resolved_path,
+            sizeof(conv->pending_verification_path) - 1);
+    conv->pending_verification_path[sizeof(conv->pending_verification_path) - 1] = '\0';
+    strncpy(conv->last_mutation_tool, tool_name, sizeof(conv->last_mutation_tool) - 1);
+    conv->last_mutation_tool[sizeof(conv->last_mutation_tool) - 1] = '\0';
+
+    snprintf(msg, sizeof(msg),
+        "Verify %s with file_read before final_answer.",
+        user_path);
+    agent_conversation_append_context(conv, "verification_required", msg);
+}
+
+static int agent_try_clear_pending_verification(AGENT_CONVERSATION* conv,
+                                                const char* tool_name,
+                                                const char* tool_args)
+{
+    char user_path[AGENT_PATH_MAX] = "";
+    char resolved_path[AGENT_PATH_MAX] = "";
+    char msg[AGENT_PATH_MAX + 96];
+
+    if (conv == NULL || !conv->pending_verification) return 0;
+    if (tool_name == NULL || strcmp(tool_name, "file_read") != 0) return 0;
+    if (tool_args == NULL) return 0;
+    if (agent_tool_args_extract_path(tool_args, user_path, sizeof(user_path)) != 0) return 0;
+    if (agent_resolve_workspace_path(user_path, resolved_path, sizeof(resolved_path)) != 0) return 0;
+    if (strcmp(resolved_path, conv->pending_verification_path) != 0) return 0;
+
+    conv->pending_verification = 0;
+    conv->pending_verification_path[0] = '\0';
+    conv->last_mutation_tool[0] = '\0';
+
+    snprintf(msg, sizeof(msg), "Verification read completed for %s.", user_path);
+    agent_conversation_append_context(conv, "verification_complete", msg);
+    return 1;
+}
+
 /*
  * POST /api/agent/run
  * Input:  {"query":"...", "max_iterations": N}
@@ -47,13 +96,12 @@ int handler_run(QS_EVENT_PARAMETER params)
     const char* status    = "error";
     char        answer[16384] = "(no answer)";
     int         done      = 0;
-    int         empty_answer_warned = 0;
 
-    /* Accumulated thoughts across all iterations (newline-separated) */
-    size_t thoughts_cap = 1024 * 16;
-    size_t thoughts_len = 0;
-    char*  thoughts_buf = (char*)calloc(1, thoughts_cap);
-    if (!thoughts_buf) {
+    /* Accumulated summaries across all iterations (newline-separated) */
+    size_t summaries_cap = 1024 * 16;
+    size_t summaries_len = 0;
+    char*  summaries_buf = (char*)calloc(1, summaries_cap);
+    if (!summaries_buf) {
         agent_conversation_destroy(conv);
         return send_json_response(params, 500, "{\"error\":\"out of memory\"}");
     }
@@ -66,9 +114,7 @@ int handler_run(QS_EVENT_PARAMETER params)
         fflush(stdout);
 
         /* ---- Think step ---- */
-        char* prompt = agent_build_think_prompt(
-            conv->user_query,
-            conv->accumulated_context ? conv->accumulated_context : "");
+        char* prompt = agent_build_think_prompt_from_conversation(conv);
         if (!prompt) {
             status = "error";
             break;
@@ -117,40 +163,47 @@ int handler_run(QS_EVENT_PARAMETER params)
             continue;
         }
 
-        /* Append thought to context and accumulate for response */
-        agent_conversation_append_context(conv, "thought", think_result.thought);
-        if (think_result.thought[0] != '\0') {
-            size_t tlen = strlen(think_result.thought);
-            if (thoughts_len + tlen + 2 < thoughts_cap) {
-                if (thoughts_len > 0) thoughts_buf[thoughts_len++] = '\n';
-                memcpy(thoughts_buf + thoughts_len, think_result.thought, tlen);
-                thoughts_len += tlen;
-                thoughts_buf[thoughts_len] = '\0';
+        {
+            char validation_error[256] = "";
+            if (agent_validate_think_result(&think_result,
+                                            validation_error,
+                                            sizeof(validation_error)) != 0) {
+                agent_conversation_append_context(conv, "validation_error",
+                    validation_error[0] ? validation_error : "invalid model action");
+                continue;
+            }
+        }
+
+        /* Append summary to context and accumulate for response */
+        agent_conversation_append_context(conv, "summary", think_result.summary);
+        if (think_result.summary[0] != '\0') {
+            size_t slen = strlen(think_result.summary);
+            if (summaries_len + slen + 2 < summaries_cap) {
+                if (summaries_len > 0) summaries_buf[summaries_len++] = '\n';
+                memcpy(summaries_buf + summaries_len, think_result.summary, slen);
+                summaries_len += slen;
+                summaries_buf[summaries_len] = '\0';
             }
         }
 
         if (think_result.action == AGENT_ACTION_FINAL_ANSWER) {
-            if (think_result.answer[0] != '\0') {
-                strncpy(answer, think_result.answer, sizeof(answer) - 1);
-                answer[sizeof(answer) - 1] = '\0';
-                status = "completed";
-                done   = 1;
-                break;
-            } else if (!empty_answer_warned && think_result.thought[0] != '\0') {
-                /* First time: remind LLM to fill answer field */
-                empty_answer_warned = 1;
-                agent_conversation_append_context(conv, "reminder",
-                    "You output final_answer but the 'answer' field was empty. "
-                    "Please output the complete answer in the 'answer' field.");
+            if (conv->pending_verification) {
+                char msg[AGENT_PATH_MAX + 160];
+                snprintf(msg, sizeof(msg),
+                    "final_answer rejected: verify %s with file_read first.",
+                    conv->pending_verification_path[0] ? conv->pending_verification_path : "the last mutated file");
+                agent_conversation_append_context(conv, "policy_violation", msg);
                 continue;
-            } else {
-                /* Still empty after reminder — use thought as fallback */
-                strncpy(answer, think_result.thought, sizeof(answer) - 1);
-                answer[sizeof(answer) - 1] = '\0';
-                status = "completed";
-                done   = 1;
-                break;
             }
+            agent_conversation_append_item(conv,
+                                           AGENT_ITEM_FINAL_ANSWER,
+                                           "final_answer",
+                                           think_result.answer);
+            strncpy(answer, think_result.answer, sizeof(answer) - 1);
+            answer[sizeof(answer) - 1] = '\0';
+            status = "completed";
+            done   = 1;
+            break;
         }
 
         if (think_result.action == AGENT_ACTION_USE_TOOL) {
@@ -164,7 +217,16 @@ int handler_run(QS_EVENT_PARAMETER params)
             if (!out_buf) { status = "error"; break; }
             out_buf[0] = '\0';
 
-            agent_tool_execute(tool_name, tool_args, out_buf, out_size);
+            {
+                int tool_ret = agent_tool_execute(tool_name, tool_args, out_buf, out_size);
+
+                if (tool_ret == 0 && agent_tool_requires_verification(tool_name)) {
+                    agent_mark_pending_verification(conv, tool_name, tool_args);
+                }
+                if (tool_ret == 0) {
+                    agent_try_clear_pending_verification(conv, tool_name, tool_args);
+                }
+            }
             agent_conversation_count_tool(conv, tool_name);
 
             /* Append to context */
@@ -190,18 +252,18 @@ int handler_run(QS_EVENT_PARAMETER params)
 
     /* Build response */
     char* esc_answer  = hc_json_escape(answer);
-    char* esc_thought = hc_json_escape(thoughts_buf ? thoughts_buf : "");
+    char* esc_summary = hc_json_escape(summaries_buf ? summaries_buf : "");
     char* esc_convid  = hc_json_escape(conv->conversation_id);
-    free(thoughts_buf);
+    free(summaries_buf);
 
     size_t resp_size = 512 +
         strlen(esc_answer  ? esc_answer  : "") +
-        strlen(esc_thought ? esc_thought : "") +
+        strlen(esc_summary ? esc_summary : "") +
         AGENT_CONV_ID_LEN;
     char* resp_body = (char*)malloc(resp_size);
     if (!resp_body) {
         if (esc_answer)  free(esc_answer);
-        if (esc_thought) free(esc_thought);
+        if (esc_summary) free(esc_summary);
         if (esc_convid)  free(esc_convid);
         agent_conversation_destroy(conv);
         return send_json_response(params, 500, "{\"error\":\"out of memory\"}");
@@ -210,7 +272,7 @@ int handler_run(QS_EVENT_PARAMETER params)
     snprintf(resp_body, resp_size,
         "{\"status\":\"%s\","
         "\"answer\":\"%s\","
-        "\"thought\":\"%s\","
+        "\"summary\":\"%s\","
         "\"conversation_id\":\"%s\","
         "\"iterations\":%d,"
         "\"max_iterations\":%d,"
@@ -218,7 +280,7 @@ int handler_run(QS_EVENT_PARAMETER params)
         "\"tool_use_file_read\":%d}",
         status,
         esc_answer  ? esc_answer  : "",
-        esc_thought ? esc_thought : "",
+        esc_summary ? esc_summary : "",
         esc_convid  ? esc_convid  : "",
         conv->iteration,
         conv->max_iterations,
@@ -226,7 +288,7 @@ int handler_run(QS_EVENT_PARAMETER params)
         conv->tool_use_file_read);
 
     if (esc_answer)  free(esc_answer);
-    if (esc_thought) free(esc_thought);
+    if (esc_summary) free(esc_summary);
     if (esc_convid)  free(esc_convid);
     agent_conversation_destroy(conv);
 
