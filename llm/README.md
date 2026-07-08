@@ -10,7 +10,14 @@
 - `src/` : モジュール本体と Makefile
 - `third_party/` : 外部依存（例: llama.cpp）
 
-## CUDA Toolkit 導入( GPUを使う場合 )
+## セットアップ
+
+### llama.cpp の配置
+
+推奨: `llm/third_party/llama.cpp/` に配置（git submodule でも OK）。
+詳細は `llm/third_party/README.md` を参照してください。
+
+### CUDA Toolkit を導入する (GPU を使う場合)
 
 1) 事前確認
 
@@ -29,7 +36,7 @@ sudo dpkg -i cuda-keyring_1.1-1_all.deb
 sudo apt-get update
 ```
 
-3) Toolkit をインストール（Driver 置き換えを避けるため `cuda-toolkit` を使用）
+3) Toolkit をインストール
 
 ```bash
 sudo apt-get install -y cuda-toolkit
@@ -43,65 +50,179 @@ echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH' >> ~/.bashr
 source ~/.bashrc
 ```
 
-### CUDA Toolkit を更新する
+補足:
+- `nvidia-smi` の `CUDA Version` 表示は Driver 側の互換情報です。実際にリンクされる Toolkit は `nvcc --version` と `libcudart.so` 側を確認してください。
+- Gemma 4 系 GGUF を使う場合は、既知の品質問題があるため CUDA 13.2 ランタイムは避けてください。
 
-現状の動作に問題がないなら、先に更新せずそのまま使う方が安全です。更新が必要になった場合だけ、以下の手順で Toolkit を上げます。
+### NCCL を導入する (WSL / Ubuntu 24.04, multi-GPU を使う場合)
 
-1) 現在の状態を確認
+NCCL は `llama.cpp` を CUDA で multi-GPU 利用する場合の追加オプションです。
+
+1) パッケージを確認
 
 ```bash
-nvidia-smi
-nvcc --version
-ls -l /usr/local/cuda
+apt-cache search nccl
+apt-cache policy libnccl2 libnccl-dev
 ```
 
-2) パッケージ情報を更新
+2) インストール
 
 ```bash
 sudo apt-get update
-apt list --upgradable | grep -E 'cuda|nvidia'
+sudo apt-get install -y libnccl2 libnccl-dev
 ```
 
-3) CUDA Toolkit を更新
+3) インストール結果を確認
 
 ```bash
-sudo apt-get install -y cuda-toolkit
+dpkg -l | grep nccl
+ls -l /usr/lib/x86_64-linux-gnu/libnccl.so*
 ```
 
-特定のメジャー・マイナーバージョンを明示したい場合:
+補足:
+- WSL2 では CUDA と NCCL が入っていても、multi-GPU の挙動や性能はネイティブ Linux と完全には一致しない場合があります。最終的には実運用条件でベンチ確認してください。
+- `GGML_CUDA_NCCL=ON` は現行 `llama.cpp` では既定で有効ですが、build log を読みやすくするため明示しても構いません。
 
-```bash
-sudo apt-get install -y cuda-toolkit-13-1
-```
+## ビルド
 
-4) 更新後の反映を確認
+### プロファイル
 
-```bash
-nvcc --version
-ls -l /usr/local/cuda/lib64/libcudart.so*
-```
+- `network.library` へ組み込む最小構成: `libllama.so` を主目的にし、`llama-cli` / `llama-server` はビルドしない
+- `llama-cli` / `llama-server` 利用構成: ツール類も一緒にビルドする
 
-5) llama.cpp / network.library を再ビルド
+### `network.library` へ組み込む最小構成
+
+CPU ビルド:
 
 ```bash
 cd llm/third_party/llama.cpp
 rm -rf build
-cmake -S . -B build -DBUILD_SHARED_LIBS=ON -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DGGML_CUDA=ON
+cmake -S . -B build \
+	-DBUILD_SHARED_LIBS=ON \
+	-DLLAMA_BUILD_COMMON=OFF \
+	-DLLAMA_BUILD_TESTS=OFF \
+	-DLLAMA_BUILD_EXAMPLES=OFF \
+	-DLLAMA_BUILD_TOOLS=OFF \
+	-DLLAMA_BUILD_SERVER=OFF \
+	-DLLAMA_BUILD_APP=OFF \
+	-DLLAMA_BUILD_UI=OFF \
+	-DLLAMA_OPENSSL=OFF
 cmake --build build -j"$(nproc)"
+```
 
+CUDA ビルド:
+
+```bash
+cd llm/third_party/llama.cpp
+rm -rf build
+cmake -S . -B build \
+	-DBUILD_SHARED_LIBS=ON \
+	-DLLAMA_BUILD_COMMON=OFF \
+	-DLLAMA_BUILD_TESTS=OFF \
+	-DLLAMA_BUILD_EXAMPLES=OFF \
+	-DLLAMA_BUILD_TOOLS=OFF \
+	-DLLAMA_BUILD_SERVER=OFF \
+	-DLLAMA_BUILD_APP=OFF \
+	-DLLAMA_BUILD_UI=OFF \
+	-DLLAMA_OPENSSL=OFF \
+	-DGGML_CUDA=ON
+cmake --build build -j"$(nproc)"
+```
+
+network.library 側の再ビルド:
+
+```bash
+cd llm/src
+make clean
+make build LLAMA_ENABLE=1
+```
+
+CUDA を使う場合:
+
+```bash
 cd llm/src
 make clean
 make build LLAMA_ENABLE=1 LLAMA_CUDA=1
 ```
 
 補足:
-- `nvidia-smi` の `CUDA Version` 表示は Driver 側の互換情報です。実際にリンクされる Toolkit は `nvcc --version` と `libcudart.so` 側を確認してください。
-- Gemma 4 系 GGUF を使う場合は、既知の品質問題があるため CUDA 13.2 ランタイムは避けてください。
+- この構成では `llama-cli` と `llama-server` はビルドされません。
+- `llm/src/Makefile` は `LLAMA_ENABLE=1` 時に `llm/third_party/llama.cpp/build/bin/libllama.so` を参照します。
+- 最新の `llama.cpp` では `LLAMA_BUILD_TOOLS` / `LLAMA_BUILD_SERVER` / `LLAMA_BUILD_APP` / `LLAMA_BUILD_UI` が追加されているため、ライブラリ埋め込み用途では明示的に OFF にした方が無駄な生成物を減らせます。
 
-## llama.cpp の配置
+### `llama-cli` / `llama-server` も使う構成
 
-推奨: `llm/third_party/llama.cpp/` に配置（git submodule でも OK）。
-詳細は `llm/third_party/README.md` を参照してください。
+最新の `llama.cpp` では、`llama-cli` は `tools/cli`、`llama-server` は `tools/server` にあり、どちらも `llama-common` を使います。そのため `LLAMA_BUILD_COMMON=ON` が前提です。
+
+```bash
+cd llm/third_party/llama.cpp
+rm -rf build
+cmake -S . -B build \
+	-DBUILD_SHARED_LIBS=ON \
+	-DLLAMA_BUILD_COMMON=ON \
+	-DLLAMA_BUILD_TESTS=OFF \
+	-DLLAMA_BUILD_EXAMPLES=OFF \
+	-DLLAMA_BUILD_TOOLS=ON \
+	-DLLAMA_BUILD_SERVER=ON \
+	-DLLAMA_BUILD_APP=OFF \
+	-DLLAMA_BUILD_UI=OFF \
+	-DLLAMA_OPENSSL=OFF \
+	-DGGML_CUDA=ON \
+	-DGGML_CUDA_NCCL=ON
+cmake --build build -j"$(nproc)"
+```
+
+生成物の確認:
+
+```bash
+ls -l build/bin/llama-cli build/bin/llama-server build/bin/libllama.so
+```
+
+補足:
+- `LLAMA_BUILD_UI=ON` にすると `llama-server` 用の埋め込み Web UI もビルドされます。HTTP API だけ使うなら OFF のままで構いません。
+- `LLAMA_OPENSSL=ON` にすると HTTPS 対応を有効にできますが、`libssl-dev` が必要です。HTTP だけなら OFF で十分です。
+- `LLAMA_BUILD_APP=ON` は unified binary `llama` 用です。`llama-cli` や `llama-server` とは別物なので、不要なら OFF のままで問題ありません。
+- この環境の `CUDA 13.3 + CMake 3.28.3` では native 検出で `89-real;120a-real` が選ばれました。別マシンでも同じ GPU 構成向けに固定したい場合は `-DCMAKE_CUDA_ARCHITECTURES='89-real;120a-real'` を追加してください。
+- 2 枚の NVIDIA GPU を使う場合、NCCL が入っていないと `llama.cpp` は警告を出しつつビルドを継続します。動作はしますが multi-GPU 性能は最適化されません。
+
+### 更新して再ビルドする
+
+1) `llama.cpp` を更新
+
+通常の clone 配置:
+
+```bash
+cd llm/third_party/llama.cpp
+git pull --ff-only
+```
+
+submodule 配置:
+
+```bash
+git submodule update --remote --merge llm/third_party/llama.cpp
+```
+
+2) 旧 build を消す
+
+```bash
+cd llm/third_party/llama.cpp
+rm -rf build
+```
+
+3) 上のいずれかのビルドプロファイルで再 build
+
+4) `network.library` 側も必要に応じて再 build
+
+```bash
+cd llm/src
+make clean
+make build LLAMA_ENABLE=1 LLAMA_CUDA=1
+```
+
+補足:
+- submodule 運用の場合、親リポジトリ側にも submodule の更新差分が出るため、必要ならその状態も commit してください。
+
+## モデル管理
 
 ### `-hf` で取得した GGUF の保存場所を確認する
 
@@ -170,74 +291,11 @@ readlink -f llm/models/gemma-4-E4B-it-UD-Q4_K_XL.gguf
 - `<revision>` の部分は、直前の `refs/main` または `snapshots/` の確認結果で置き換えてください。
 - 固定名で扱いたい場合は、毎回同じリンク名に `ln -sfn` で上書きすると運用しやすくなります。
 
-### llama.cpp を更新して再ビルドする
-
-すでに `llm/third_party/llama.cpp/` でビルド済みの場合は、llama.cpp 側を更新したあとに LLM モジュールを再ビルドします。
-
-1) llama.cpp リポジトリを更新
-
-通常の clone 配置:
-
-```bash
-cd llm/third_party/llama.cpp
-git pull --ff-only
-```
-
-submodule 配置:
-
-```bash
-git submodule update --remote --merge llm/third_party/llama.cpp
-```
-
-2) 旧 build を消して llama.cpp を再ビルド
-
-CPU ビルド:
-
-```bash
-cd llm/third_party/llama.cpp
-rm -rf build
-# mv build build_old
-cmake -S . -B build -DBUILD_SHARED_LIBS=ON -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF
-cmake --build build -j"$(nproc)"
-```
-
-CUDA ビルド:
-
-```bash
-cd llm/third_party/llama.cpp
-rm -rf build
-# mv build build_old
-cmake -S . -B build -DBUILD_SHARED_LIBS=ON -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DGGML_CUDA=ON
-cmake --build build -j"$(nproc)"
-```
-
-3) network.library の LLM モジュールを再ビルド
-
-CPU:
-
-```bash
-cd llm/src
-make clean
-make build LLAMA_ENABLE=1
-```
-
-CUDA:
-
-```bash
-cd llm/src
-make clean
-make build LLAMA_ENABLE=1 LLAMA_CUDA=1
-```
-
-補足:
-- `llm/src/Makefile` は `LLAMA_ENABLE=1` 時に `llm/third_party/llama.cpp/build/bin/libllama.so` を参照します。
-- submodule 運用の場合、親リポジトリ側にも submodule の更新差分が出るため、必要ならその状態も commit してください。
-
-## stable-diffusion.cpp の導入
+## stable-diffusion.cpp
 
 `stable-diffusion.cpp` を使ったプラグインを追加する場合は、まず `llm/third_party/stable-diffusion.cpp/` に配置します。
 
-### install
+### セットアップ
 
 ```bash
 git clone --recursive https://github.com/leejet/stable-diffusion.cpp
@@ -261,7 +319,7 @@ curl -L -O https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1
 mkdir outputs
 ```
 
-### stable-diffusion.cpp を更新して再ビルドする
+### 更新して再ビルドする
 
 すでに `llm/third_party/stable-diffusion.cpp/` でビルド済みの場合は、stable-diffusion.cpp 側を更新したあとに LLM モジュールを必要に応じて再ビルドします。
 
@@ -334,7 +392,11 @@ make build DIFFUSION_CUDA=1
 - submodule 運用の場合、親リポジトリ側にも submodule の更新差分が出るため、必要ならその状態も commit してください。
 
 
-## ビルド（Linux）
+## LLM モジュール
+
+### ビルド
+
+`llama.cpp` 側の configure / build は上の「ビルド」セクションを参照してください。ここでは `llm/src` 側のモジュール build だけを示します。
 
 ```bash
 cd llm/src
@@ -348,9 +410,9 @@ make build
 - `llama.cpp` をまだ配置していない場合でも、現状の雛形は **スタブとしてビルド可能**です（`qs_llama_module_is_available()` が 0 を返します）。
 - 実際に llama.cpp を使う実装に進める場合は、`llm/src/qs_llama_module.c` を起点に拡張してください。
 
-### 実推論を有効にする
+### 実推論を有効化する
 
-実推論を有効にする場合は `LLAMA_ENABLE=1` を付けてビルドします。
+実推論を有効にする場合は `LLAMA_ENABLE=1` を付けてビルドします。GPU を使う場合の CUDA / NCCL 導入手順は上の「セットアップ」を参照してください。
 
 ```bash
 cd llm/src
@@ -368,7 +430,7 @@ export QS_LLM_MODEL_PATH=/path/to/model.gguf
 export QS_LLM_MAX_TOKENS=128
 ```
 
-## Embedding モジュールの有効化
+## Embedding モジュール
 
 テキストから embedding ベクトルを生成し、sqlite-vec で保存・検索する機能です。`QS_EMBEDDING_MODULE_ENABLED=1` を指定した場合のみビルドされます。
 
@@ -395,7 +457,7 @@ cd llm/third_party/sqlite-vec
 make sqlite-vec.h
 ```
 
-### ビルド
+### ビルド構成
 
 #### LLM + Embedding 両有効（推奨・一般的な構成）
 
@@ -435,7 +497,7 @@ cd llm/src
 make build
 ```
 
-### API
+### 公開 API
 
 ヘッダ: `header/qs_embedding_module.h`
 
@@ -468,9 +530,9 @@ if (qs_embedding_prepare(model_path, db_path, &store) == 0) {
 export QS_EMBEDDING_DB_PATH=/path/to/embeddings.db
 ```
 
-## Ubuntu 24.04 で NVIDIA GPU を使う（CUDA Toolkit）
+## GPU 実行
 
-`LLAMA_ENABLE=1` で GPU 実行するには、NVIDIA Driver に加えて CUDA Toolkit（`nvcc`）が必要です。
+詳細な CUDA Toolkit / NCCL の導入手順は上の「セットアップ」を参照してください。ここでは `network.library` 側で GPU 実行するための最小項目だけを再掲します。
 
 1) GPU 有効でビルド
 
@@ -492,7 +554,7 @@ export QS_LLM_N_GPU_LAYERS=999
 - `QS_LLM_N_GPU_LAYERS=0` で CPU のみ。
 - 大きい値（例: `999`）で可能な限り GPU にオフロードします。
 
-## HTTP 逐次ストリーミング（SSE）
+## HTTP ストリーミング（SSE）
 
 `llm/header/qs_llama_module.h` には、HTTP サーバと連携するための SSE ヘルパーを用意しています。
 
