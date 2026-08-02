@@ -12,23 +12,46 @@ extern "C"{
 #include <sys/types.h>
 #include <inttypes.h>
 
+/*
+ * Server protocol/runtime type used by server/client initialization APIs.
+ * - PLAIN  : raw payload mode
+ * - SIMPLE : framed simple protocol mode
+ * - HTTP   : HTTP/WebSocket server mode
+ */
 #define QS_SERVER_TYPE_PLAIN 100
 #define QS_SERVER_TYPE_SIMPLE 200
 #define QS_SERVER_TYPE_HTTP 300
 
+/*
+ * Update scheduler preset used by api_qs_set_scheduler().
+ * Higher modes update more aggressively, lower modes reduce update frequency.
+ */
 #define QS_SCHEDULER_MODE_HIGH 1
 #define QS_SCHEDULER_MODE_MIDDLE 2
 #define QS_SCHEDULER_MODE_LOW 3
 
+/*
+ * Built-in KVS memory size preset used by api_qs_server_create_kvs().
+ * The suffix indicates the target cache area size.
+ */
 #define QS_KVS_MEMORY_TYPE_B1MB 0
 #define QS_KVS_MEMORY_TYPE_B128MB 1
 #define QS_KVS_MEMORY_TYPE_B256MB 2
 #define QS_KVS_MEMORY_TYPE_B512MB 3
 #define QS_KVS_MEMORY_TYPE_B1024MB 4
 
+/*
+ * Event payload source type passed through QS_EVENT_PARAMETER.
+ * Handlers use this to determine whether params refers to receive data or a connection.
+ */
 #define QS_EVENT_PARAMETER_TYPE_RECV 1
 #define QS_EVENT_PARAMETER_TYPE_CONNECTION 2
 
+/*
+ * Event callback input wrapper.
+ * parameter_type identifies whether params points to receive data or connection data.
+ * User event handlers receive this through QS_EVENT_FUNCTION.
+ */
 typedef struct QS_EVENT_PARAMETER_STRUCT
 {
     int32_t parameter_type;
@@ -38,11 +61,21 @@ typedef struct QS_EVENT_PARAMETER_STRUCT
 #define QS_EVENT_PARAMETER QS_EVENT_PARAMETER_STRUCT*
 typedef int (*QS_EVENT_FUNCTION)( QS_EVENT_PARAMETER params );
 
+/*
+ * Generic memory-pool context used by memory, JSON, CSV, and helper APIs.
+ * Create it with api_qs_memory_alloc(), use it for pool-based allocations, then
+ * reset with api_qs_memory_clean() or release with api_qs_memory_free().
+ */
 typedef struct QS_MEMORY_CONTEXT
 {
 	void* memory;
 } QS_MEMORY_CONTEXT;
 
+/*
+ * Key-value store context.
+ * Obtain and use this when working with the built-in KVS APIs, including optional
+ * persistence-backed storage.
+ */
 typedef struct QS_KVS_CONTEXT
 {
 	int32_t is_persistence;
@@ -52,6 +85,11 @@ typedef struct QS_KVS_CONTEXT
 	char persistence_file_path[2048];
 } QS_KVS_CONTEXT;
 
+/*
+ * Server runtime context returned by api_qs_server_init().
+ * Holds the server memory pool, event handlers, timing state, and optional router
+ * and KVS resources used while running a server.
+ */
 typedef struct QS_SERVER_CONTEXT
 {
 	void* memory;
@@ -82,6 +120,11 @@ typedef struct QS_SERVER_CONTEXT
 	ssize_t ws_message_size;	// last received WS payload size in bytes
 } QS_SERVER_CONTEXT;
 
+/*
+ * Client runtime context returned by api_qs_client_init().
+ * Holds the client memory pool, event handlers, timing state, and optional
+ * application-specific client_data.
+ */
 typedef struct QS_CLIENT_CONTEXT
 {
 	void* memory;
@@ -96,79 +139,326 @@ typedef struct QS_CLIENT_CONTEXT
 	void* client_data;
 } QS_CLIENT_CONTEXT;
 
+/*
+ * Script execution context used by the script APIs.
+ * It binds one loaded script instance to the memory pool that owns its data.
+ */
 typedef struct QS_SERVER_SCRIPT_CONTEXT
 {
 	int32_t memid_script;
 	void* memory;
 } QS_SERVER_SCRIPT_CONTEXT;
 
+/*
+ * Handle for one JSON array stored inside a QS memory pool.
+ * Create it with api_qs_array_create() and pass it to array/JSON helper APIs.
+ */
 typedef struct QS_JSON_ELEMENT_ARRAY
 {
 	int32_t memid_array;
 	void* memory;
 } QS_JSON_ELEMENT_ARRAY;
 
+/*
+ * Handle for one JSON object stored inside a QS memory pool.
+ * Create or decode it, then use object/JSON helper APIs to access properties.
+ */
 typedef struct QS_JSON_ELEMENT_OBJECT
 {
 	int32_t memid_object;
 	void* memory;
 } QS_JSON_ELEMENT_OBJECT;
 
+/*
+ * CSV parse/load context stored in a QS memory pool.
+ * Fill it with api_qs_csv_read_file() or api_qs_csv_parse(), then read rows
+ * through the CSV accessor APIs.
+ */
 typedef struct QS_CSV_CONTEXT
 {
 	int32_t memid_csv;
 	void* memory;
 } QS_CSV_CONTEXT;
 
+/*
+ * Initialize internal library state.
+ * Currently this seeds the 32-bit and 64-bit random number generators.
+ */
 int api_qs_init();
+
+/*
+ * Return one pseudo-random 32-bit unsigned integer.
+ * Call api_qs_init() before using this function.
+ */
 uint32_t api_qs_rand();
+
+/*
+ * Allocate a memory pool and bind it to the context.
+ * alloc_size specifies the total pool size in bytes.
+ */
 int api_qs_memory_alloc(QS_MEMORY_CONTEXT* context, size_t alloc_size);
+
+/*
+ * Reset the memory pool to its initial reusable state.
+ * This clears allocations managed by the pool, but does not release the pool itself.
+ */
 int api_qs_memory_clean(QS_MEMORY_CONTEXT* context);
+
+/*
+ * Print debug information about the current memory pool usage.
+ */
 void api_qs_memory_info(QS_MEMORY_CONTEXT* context);
+
+/*
+ * Release the memory pool itself.
+ * Call this when the context is no longer needed.
+ */
 int api_qs_memory_free(QS_MEMORY_CONTEXT* context);
+
+/*
+ * Return currently available bytes in the memory pool.
+ */
 size_t api_qs_memory_available_size(QS_MEMORY_CONTEXT* context);
+
+/*
+ * Create one allocation block inside the memory pool and return its memid.
+ */
 int32_t api_qs_memory_create_block(QS_MEMORY_CONTEXT* context, size_t size);
+
+/*
+ * Get a pointer to the start address of a block identified by memid.
+ */
 void* api_qs_memory_get_pointer(QS_MEMORY_CONTEXT* context, int32_t memid);
+
+/*
+ * Get a pointer inside a block using element-based offset access.
+ * The internal address calculation is: base + (size * offset).
+ *
+ * Typical usage:
+ * - size   : size of one element (for example sizeof(MyStruct))
+ * - offset : element index (0, 1, 2, ...), not a raw byte offset
+ *
+ * This is useful when one block stores a fixed-size array such as structs.
+ */
 void* api_qs_memory_get_offset_pointer(QS_MEMORY_CONTEXT* context, int32_t memid, size_t size, int32_t offset);
+
+/*
+ * Return the allocated size of a block in bytes.
+ */
 size_t api_qs_memory_get_size(QS_MEMORY_CONTEXT* context, int32_t memid);
+
+/*
+ * Free one allocation block inside the memory pool.
+ * This does not release the memory pool itself.
+ */
 int api_qs_memory_free_block(QS_MEMORY_CONTEXT* context, int32_t* memid);
+
+/*
+ * Create a JSON-style array in the same memory pool as context.
+ * On success, array->memory is bound to the pool and array->memid_array is set.
+ */
 int api_qs_array_create(QS_MEMORY_CONTEXT* context, QS_JSON_ELEMENT_ARRAY* array);
+
+/*
+ * Append a 32-bit signed integer element to the array.
+ * Returns 0 on success, -1 on failure.
+ */
 int api_qs_array_push_integer(QS_JSON_ELEMENT_ARRAY* array,int32_t value);
+
+/*
+ * Append a 64-bit signed integer element to the array.
+ */
 int api_qs_array_push_big_integer(QS_JSON_ELEMENT_ARRAY* array,int64_t value);
+
+/*
+ * Append a 64-bit unsigned integer element to the array.
+ */
 int api_qs_array_push_unsigned_big_integer(QS_JSON_ELEMENT_ARRAY* array,uint64_t value);
+
+/*
+ * Append a string element to the array.
+ * The stored string is managed inside the same memory pool.
+ */
 int api_qs_array_push_string(QS_JSON_ELEMENT_ARRAY* array,const char* value);
+
+/*
+ * Append an object element to the array.
+ * array and object must belong to the same memory pool.
+ */
 int api_qs_array_push_object(QS_JSON_ELEMENT_ARRAY* array, QS_JSON_ELEMENT_OBJECT* object);
+
+/*
+ * Append another array as a nested array element.
+ * Both arrays must belong to the same memory pool.
+ */
 int api_qs_array_push_array(QS_JSON_ELEMENT_ARRAY* array, QS_JSON_ELEMENT_ARRAY* push_array);
+
+/*
+ * Create a JSON-style object in the same memory pool as context.
+ * On success, object->memory is bound to the pool and object->memid_object is set.
+ */
 int api_qs_object_create(QS_MEMORY_CONTEXT* context, QS_JSON_ELEMENT_OBJECT* object);
+
+/*
+ * Set a 32-bit signed integer property on the object.
+ * Returns 0 on success, -1 on failure.
+ */
 int api_qs_object_push_integer(QS_JSON_ELEMENT_OBJECT* object,const char* name,int32_t value);
+
+/*
+ * Set a 64-bit signed integer property on the object.
+ */
 int api_qs_object_push_big_integer(QS_JSON_ELEMENT_OBJECT* object,const char* name,int64_t value);
+
+/*
+ * Set a 64-bit unsigned integer property on the object.
+ */
 int api_qs_object_push_unsigned_big_integer(QS_JSON_ELEMENT_OBJECT* object,const char* name,uint64_t value);
+
+/*
+ * Set a string property on the object.
+ * The stored string is managed inside the same memory pool.
+ */
 int api_qs_object_push_string(QS_JSON_ELEMENT_OBJECT* object,const char* name,const char* value);
+
+/*
+ * Set an array property on the object.
+ * The array is referenced from the same memory pool.
+ */
 int api_qs_object_push_array(QS_JSON_ELEMENT_OBJECT* object,const char* name,QS_JSON_ELEMENT_ARRAY* array);
+
+/*
+ * Set a nested object property on the object.
+ * The nested object is referenced from the same memory pool.
+ */
 int api_qs_object_push_object(QS_JSON_ELEMENT_OBJECT* object,const char* name,QS_JSON_ELEMENT_OBJECT* push_object);
+
+/*
+ * Encode an object as JSON text in the object's memory pool.
+ * The returned pointer is pool-owned and remains valid until the pool is cleaned or freed.
+ * buffer_size is the temporary/output buffer size hint used by the encoder.
+ */
 char* api_qs_json_encode_object(QS_JSON_ELEMENT_OBJECT* object,size_t buffer_size);
+
+/*
+ * Encode an array as JSON text in the array's memory pool.
+ * The returned pointer is pool-owned and remains valid until the pool is cleaned or freed.
+ */
 char* api_qs_json_encode_array(QS_JSON_ELEMENT_ARRAY* array,size_t buffer_size);
 
+/*
+ * Decode JSON text and bind the root object to the provided context memory pool.
+ * This function succeeds only when the JSON root is an object.
+ */
 int api_qs_json_decode_object(QS_MEMORY_CONTEXT* context, QS_JSON_ELEMENT_OBJECT* object, const char* json);
+
+/*
+ * Return non-zero when the named property exists, otherwise 0.
+ */
 int api_qs_object_exist(QS_JSON_ELEMENT_OBJECT* object,const char* name);
+
+/*
+ * Get a pointer to a 32-bit signed integer property.
+ * Returns NULL if the key is missing or the stored type does not match.
+ * The returned pointer is pool-owned.
+ */
 int32_t* api_qs_object_get_integer(QS_JSON_ELEMENT_OBJECT* object,const char* name);
+
+/*
+ * Get a pointer to a 64-bit signed integer property.
+ * Returns NULL if the key is missing or the stored type does not match.
+ */
 int64_t* api_qs_object_get_big_integer(QS_JSON_ELEMENT_OBJECT* object,const char* name);
+
+/*
+ * Get a pointer to a 64-bit unsigned integer property.
+ * Returns NULL if the key is missing or the stored type does not match.
+ */
 uint64_t* api_qs_object_get_unsigned_big_integer(QS_JSON_ELEMENT_OBJECT* object,const char* name);
 
+/*
+ * Get a 32-bit signed integer property by value.
+ * Returns 0 when the key is missing or the stored type does not match.
+ */
 int32_t api_qs_object_get_integer_val(QS_JSON_ELEMENT_OBJECT* object,const char* name);
+
+/*
+ * Get a numeric property by value as int64_t.
+ * Accepts stored int32, int64, and uint64 values and converts them to int64_t.
+ * Returns 0 when the key is missing.
+ */
 int64_t api_qs_object_get_big_integer_val(QS_JSON_ELEMENT_OBJECT* object,const char* name);
+
+/*
+ * Get a numeric property by value as uint64_t.
+ * Accepts stored int32, int64, and uint64 values and converts them to uint64_t.
+ * Returns 0 when the key is missing.
+ */
 uint64_t api_qs_object_get_unsigned_big_integer_val(QS_JSON_ELEMENT_OBJECT* object,const char* name);
 
+/*
+ * Get a string property.
+ * Returns NULL if the key is missing or the stored type does not match.
+ * The returned pointer is pool-owned.
+ */
 char* api_qs_object_get_string(QS_JSON_ELEMENT_OBJECT* object,const char* name);
+
+/*
+ * Get an array property view.
+ * On success, dst_array references the existing nested array in the same memory pool.
+ */
 int api_qs_object_get_array(QS_JSON_ELEMENT_OBJECT* object,const char* name,QS_JSON_ELEMENT_ARRAY* dst_array);
+
+/*
+ * Get an object property view.
+ * On success, dst_object references the existing nested object in the same memory pool.
+ */
 int api_qs_object_get_object(QS_JSON_ELEMENT_OBJECT* object,const char* name,QS_JSON_ELEMENT_OBJECT* dst_object);
+
+/*
+ * Get object keys as a new array of strings in the same memory pool.
+ * Keys are returned in ascending sort order.
+ */
 int api_qs_object_get_keys(QS_JSON_ELEMENT_OBJECT* object,QS_JSON_ELEMENT_ARRAY* dst_array);
+
+/*
+ * Return the number of elements in the array.
+ */
 int32_t api_qs_array_get_length(QS_JSON_ELEMENT_ARRAY* object);
+
+/*
+ * Get a pointer to a 32-bit signed integer array element.
+ * Returns NULL if the index is out of range or the element type does not match.
+ */
 int32_t* api_qs_array_get_integer(QS_JSON_ELEMENT_ARRAY* object,int32_t offset);
+
+/*
+ * Get a pointer to a 64-bit signed integer array element.
+ */
 int64_t* api_qs_array_get_big_integer(QS_JSON_ELEMENT_ARRAY* object,int32_t offset);
+
+/*
+ * Get a pointer to a 64-bit unsigned integer array element.
+ */
 uint64_t* api_qs_array_get_unsigned_big_integer(QS_JSON_ELEMENT_ARRAY* object,int32_t offset);
+
+/*
+ * Get a string array element.
+ * Returns NULL if the index is out of range or the element type does not match.
+ * The returned pointer is pool-owned.
+ */
 char* api_qs_array_get_string(QS_JSON_ELEMENT_ARRAY* object,int32_t offset);
+
+/*
+ * Get a nested array element view.
+ * On success, dst_array references the existing nested array in the same memory pool.
+ */
 int api_qs_array_get_array(QS_JSON_ELEMENT_ARRAY* object,int32_t offset,QS_JSON_ELEMENT_ARRAY* dst_array);
+
+/*
+ * Get a nested object element view.
+ * On success, dst_object references the existing nested object in the same memory pool.
+ */
 int api_qs_array_get_object(QS_JSON_ELEMENT_ARRAY* object,int32_t offset,QS_JSON_ELEMENT_OBJECT* dst_object);
 
 
