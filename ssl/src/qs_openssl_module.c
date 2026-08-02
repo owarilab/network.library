@@ -6,10 +6,213 @@
 
 //#define QS_OPENSSL_MODULE_DEBUG 1
 
+static char* qs_ssl_module_http_client_get_host_buffer(QS_HTTP_CLIENT_CONTEXT* context);
+static char* qs_ssl_module_http_client_get_port_buffer(QS_HTTP_CLIENT_CONTEXT* context);
+static char* qs_ssl_module_http_client_get_read_buffer(QS_HTTP_CLIENT_CONTEXT* context);
+static char* qs_ssl_module_http_client_get_header_buffer_mutable(QS_HTTP_CLIENT_CONTEXT* context);
+static char* qs_ssl_module_http_client_get_body_buffer_mutable(QS_HTTP_CLIENT_CONTEXT* context);
+static char* qs_ssl_module_http_client_get_chunk_size_buffer_mutable(QS_HTTP_CLIENT_CONTEXT* context);
+static int qs_ssl_module_http_client_alloc_transient_buffers(QS_HTTP_CLIENT_CONTEXT* context, const char* server_host, int server_port);
+static void qs_ssl_module_http_client_free_transient_buffers(QS_HTTP_CLIENT_CONTEXT* context);
+static int qs_ssl_module_http_client_alloc_response_buffers(QS_HTTP_CLIENT_CONTEXT* context);
+static void qs_ssl_module_http_client_free_response_buffers(QS_HTTP_CLIENT_CONTEXT* context);
+static int qs_ssl_module_http_client_append_body(QS_HTTP_CLIENT_CONTEXT* context, const char* payload, size_t payload_size);
 
 int qs_ssl_module_http_client_on_connect(QS_EVENT_PARAMETER params);
 int qs_ssl_module_http_client_on_recv(QS_EVENT_PARAMETER params);
 int qs_ssl_module_http_client_on_close(QS_EVENT_PARAMETER params);
+
+static char* qs_ssl_module_http_client_get_host_buffer(QS_HTTP_CLIENT_CONTEXT* context)
+{
+    return (char*)api_qs_memory_get_pointer(&context->transient_memory_context, context->memid_host);
+}
+
+static char* qs_ssl_module_http_client_get_port_buffer(QS_HTTP_CLIENT_CONTEXT* context)
+{
+    return (char*)api_qs_memory_get_pointer(&context->transient_memory_context, context->memid_port);
+}
+
+char* qs_ssl_module_http_client_get_request_buffer(QS_HTTP_CLIENT_CONTEXT* context)
+{
+    return (char*)api_qs_memory_get_pointer(&context->transient_memory_context, context->memid_request_buffer);
+}
+
+static char* qs_ssl_module_http_client_get_header_buffer_mutable(QS_HTTP_CLIENT_CONTEXT* context)
+{
+    return (char*)api_qs_memory_get_pointer(&context->response_memory_context, context->memid_header_buffer);
+}
+
+const char* qs_ssl_module_http_client_get_header_buffer(QS_HTTP_CLIENT_CONTEXT* context)
+{
+    return (const char*)qs_ssl_module_http_client_get_header_buffer_mutable(context);
+}
+
+static char* qs_ssl_module_http_client_get_body_buffer_mutable(QS_HTTP_CLIENT_CONTEXT* context)
+{
+    return (char*)api_qs_memory_get_pointer(&context->response_memory_context, context->memid_body_buffer);
+}
+
+const char* qs_ssl_module_http_client_get_body_buffer(QS_HTTP_CLIENT_CONTEXT* context)
+{
+    return (const char*)qs_ssl_module_http_client_get_body_buffer_mutable(context);
+}
+
+static char* qs_ssl_module_http_client_get_read_buffer(QS_HTTP_CLIENT_CONTEXT* context)
+{
+    return (char*)api_qs_memory_get_pointer(&context->transient_memory_context, context->memid_read_buffer);
+}
+
+static char* qs_ssl_module_http_client_get_chunk_size_buffer_mutable(QS_HTTP_CLIENT_CONTEXT* context)
+{
+    return (char*)api_qs_memory_get_pointer(&context->response_memory_context, context->memid_chunk_size_buffer);
+}
+
+static int qs_ssl_module_http_client_alloc_transient_buffers(QS_HTTP_CLIENT_CONTEXT* context, const char* server_host, int server_port)
+{
+    char* host_buffer = NULL;
+    char* port_buffer = NULL;
+    char* request_buffer = NULL;
+    char* read_buffer = NULL;
+
+    context->transient_memory_context.memory = NULL;
+    context->memid_host = -1;
+    context->memid_port = -1;
+    context->memid_request_buffer = -1;
+    context->memid_read_buffer = -1;
+
+    if(api_qs_memory_alloc(&context->transient_memory_context, QS_HTTP_CLIENT_TRANSIENT_MEMORY_SIZE) != 0){
+        return -1;
+    }
+
+    context->memid_host = api_qs_memory_create_block(&context->transient_memory_context, QS_HTTP_CLIENT_HOST_SIZE);
+    context->memid_port = api_qs_memory_create_block(&context->transient_memory_context, QS_HTTP_CLIENT_PORT_SIZE);
+    context->memid_request_buffer = api_qs_memory_create_block(&context->transient_memory_context, QS_HTTP_CLIENT_REQUEST_BUFFER_SIZE);
+    context->memid_read_buffer = api_qs_memory_create_block(&context->transient_memory_context, QS_HTTP_CLIENT_READ_BUFFER_SIZE);
+    if(context->memid_host == -1 || context->memid_port == -1 || context->memid_request_buffer == -1 || context->memid_read_buffer == -1){
+        qs_ssl_module_http_client_free_transient_buffers(context);
+        return -1;
+    }
+
+    host_buffer = qs_ssl_module_http_client_get_host_buffer(context);
+    port_buffer = qs_ssl_module_http_client_get_port_buffer(context);
+    request_buffer = qs_ssl_module_http_client_get_request_buffer(context);
+    read_buffer = qs_ssl_module_http_client_get_read_buffer(context);
+    if(host_buffer == NULL || port_buffer == NULL || request_buffer == NULL || read_buffer == NULL){
+        qs_ssl_module_http_client_free_transient_buffers(context);
+        return -1;
+    }
+
+    memset(host_buffer, 0, QS_HTTP_CLIENT_HOST_SIZE);
+    memset(port_buffer, 0, QS_HTTP_CLIENT_PORT_SIZE);
+    memset(request_buffer, 0, QS_HTTP_CLIENT_REQUEST_BUFFER_SIZE);
+    memset(read_buffer, 0, QS_HTTP_CLIENT_READ_BUFFER_SIZE);
+
+    strncpy(host_buffer, server_host, QS_HTTP_CLIENT_HOST_SIZE - 1);
+    snprintf(port_buffer, QS_HTTP_CLIENT_PORT_SIZE, "%d", server_port);
+    return 0;
+}
+
+static void qs_ssl_module_http_client_free_transient_buffers(QS_HTTP_CLIENT_CONTEXT* context)
+{
+    if(context->transient_memory_context.memory == NULL){
+        context->memid_host = -1;
+        context->memid_port = -1;
+        context->memid_request_buffer = -1;
+        context->memid_read_buffer = -1;
+        return;
+    }
+
+    if(context->memid_host != -1){
+        api_qs_memory_free_block(&context->transient_memory_context, &context->memid_host);
+    }
+    if(context->memid_port != -1){
+        api_qs_memory_free_block(&context->transient_memory_context, &context->memid_port);
+    }
+    if(context->memid_request_buffer != -1){
+        api_qs_memory_free_block(&context->transient_memory_context, &context->memid_request_buffer);
+    }
+    if(context->memid_read_buffer != -1){
+        api_qs_memory_free_block(&context->transient_memory_context, &context->memid_read_buffer);
+    }
+    api_qs_memory_free(&context->transient_memory_context);
+    context->transient_memory_context.memory = NULL;
+}
+
+static int qs_ssl_module_http_client_alloc_response_buffers(QS_HTTP_CLIENT_CONTEXT* context)
+{
+    char* header_buffer = NULL;
+    char* body_buffer = NULL;
+    char* chunk_size_buffer = NULL;
+
+    context->response_memory_context.memory = NULL;
+    context->memid_header_buffer = -1;
+    context->memid_body_buffer = -1;
+    context->memid_chunk_size_buffer = -1;
+
+    if(api_qs_memory_alloc(&context->response_memory_context, QS_HTTP_CLIENT_RESPONSE_MEMORY_SIZE) != 0){
+        return -1;
+    }
+
+    context->memid_header_buffer = api_qs_memory_create_block(&context->response_memory_context, QS_HTTP_CLIENT_HEADER_BUFFER_SIZE);
+    context->memid_body_buffer = api_qs_memory_create_block(&context->response_memory_context, QS_HTTP_CLIENT_BODY_BUFFER_SIZE);
+    context->memid_chunk_size_buffer = api_qs_memory_create_block(&context->response_memory_context, QS_HTTP_CLIENT_CHUNK_SIZE_BUFFER_SIZE);
+    if(context->memid_header_buffer == -1 || context->memid_body_buffer == -1 || context->memid_chunk_size_buffer == -1){
+        qs_ssl_module_http_client_free_response_buffers(context);
+        return -1;
+    }
+
+    header_buffer = qs_ssl_module_http_client_get_header_buffer_mutable(context);
+    body_buffer = qs_ssl_module_http_client_get_body_buffer_mutable(context);
+    chunk_size_buffer = qs_ssl_module_http_client_get_chunk_size_buffer_mutable(context);
+    if(header_buffer == NULL || body_buffer == NULL || chunk_size_buffer == NULL){
+        qs_ssl_module_http_client_free_response_buffers(context);
+        return -1;
+    }
+
+    memset(header_buffer, 0, QS_HTTP_CLIENT_HEADER_BUFFER_SIZE);
+    memset(body_buffer, 0, QS_HTTP_CLIENT_BODY_BUFFER_SIZE);
+    memset(chunk_size_buffer, 0, QS_HTTP_CLIENT_CHUNK_SIZE_BUFFER_SIZE);
+    return 0;
+}
+
+static void qs_ssl_module_http_client_free_response_buffers(QS_HTTP_CLIENT_CONTEXT* context)
+{
+    if(context->response_memory_context.memory == NULL){
+        context->memid_header_buffer = -1;
+        context->memid_body_buffer = -1;
+        context->memid_chunk_size_buffer = -1;
+        return;
+    }
+
+    if(context->memid_header_buffer != -1){
+        api_qs_memory_free_block(&context->response_memory_context, &context->memid_header_buffer);
+    }
+    if(context->memid_body_buffer != -1){
+        api_qs_memory_free_block(&context->response_memory_context, &context->memid_body_buffer);
+    }
+    if(context->memid_chunk_size_buffer != -1){
+        api_qs_memory_free_block(&context->response_memory_context, &context->memid_chunk_size_buffer);
+    }
+    api_qs_memory_free(&context->response_memory_context);
+    context->response_memory_context.memory = NULL;
+}
+
+static int qs_ssl_module_http_client_append_body(QS_HTTP_CLIENT_CONTEXT* context, const char* payload, size_t payload_size)
+{
+    char* body_buffer = qs_ssl_module_http_client_get_body_buffer_mutable(context);
+    if(body_buffer == NULL){
+        return -1;
+    }
+    if((context->body_write_offset + payload_size) > QS_HTTP_CLIENT_BODY_BUFFER_SIZE){
+        printf("body buffer is too small %zu > %d\n", context->body_write_offset + payload_size, QS_HTTP_CLIENT_BODY_BUFFER_SIZE);
+        context->phase = QS_SSL_MODULE_PHASE_DISCONNECT;
+        return -1;
+    }
+    memcpy(body_buffer + context->body_write_offset, payload, payload_size);
+    context->body_write_offset += payload_size;
+    body_buffer[context->body_write_offset] = 0;
+    return 0;
+}
 
 int qs_ssl_module_http_client_on_connect(QS_EVENT_PARAMETER params)
 {
@@ -18,10 +221,11 @@ int qs_ssl_module_http_client_on_connect(QS_EVENT_PARAMETER params)
 #endif
     QS_CLIENT_CONTEXT* context = api_qs_client_get_context(params);
     QS_HTTP_CLIENT_CONTEXT* http_client_context = (QS_HTTP_CLIENT_CONTEXT*)context->client_data;
+    char* request_buffer = qs_ssl_module_http_client_get_request_buffer(http_client_context);
 #if QS_OPENSSL_MODULE_DEBUG
-    printf("sending request:%s\n",http_client_context->request_buffer);
+    printf("sending request:%s\n",request_buffer);
 #endif
-    api_qs_send_response(params, http_client_context->request_buffer);
+    api_qs_send_response(params, request_buffer);
     http_client_context->phase = QS_SSL_MODULE_PHASE_READ_HEADER;
 	return 0;
 }
@@ -91,10 +295,13 @@ int qs_ssl_module_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char
     context->ctx = NULL;
 #endif
     context->client_context = NULL;
-    memset(context->host, 0, sizeof(context->host));
-    memset(context->port, 0, sizeof(context->port));
-    memset(context->request_buffer, 0, sizeof(context->request_buffer));
-    memset(context->read_buffer, 0, sizeof(context->read_buffer));
+    if(qs_ssl_module_http_client_alloc_transient_buffers(context, server_host, server_port) != 0){
+        return -1;
+    }
+    if(qs_ssl_module_http_client_alloc_response_buffers(context) != 0){
+        qs_ssl_module_http_client_free_transient_buffers(context);
+        return -1;
+    }
 
     context->is_ssl = is_ssl;
 
@@ -104,16 +311,15 @@ int qs_ssl_module_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char
     context->temp_max_body_length = 0;
     context->temp_chunked_size = 0;
     context->temp_chunked_read_size = 0;
-    memset(context->header_buffer, 0, sizeof(context->header_buffer));
-    memset(context->body_buffer, 0, sizeof(context->body_buffer));
-    context->body_buffer_ptr = context->body_buffer;
-    memset(context->chunk_size_buffer, 0, sizeof(context->chunk_size_buffer));
+    context->body_write_offset = 0;
     context->chunk_size_buffer_len = 0;
     context->waiting_for_chunk_trailer = 0;
 
     int error = 0;
 	if(0 != (error=api_qs_client_init(&context->client_context,server_host,server_port,QS_SERVER_TYPE_HTTP))){
         printf("api_qs_client_init error:%d\n",error);
+        qs_ssl_module_http_client_free_transient_buffers(context);
+        qs_ssl_module_http_client_free_response_buffers(context);
         return -1;
     }
 
@@ -127,12 +333,16 @@ int qs_ssl_module_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char
         context->ctx = qs_ssl_module_http_client_ssl_create_context();
         if(context->ctx == NULL)
         {
+            qs_ssl_module_http_client_free(context);
+            qs_ssl_module_http_client_free_response_buffers(context);
             return -1;
         }
 
         context->ssl = qs_ssl_module_http_client_ssl_create(context->ctx, context->socket);
         if(context->ssl == NULL)
         {
+            qs_ssl_module_http_client_free(context);
+            qs_ssl_module_http_client_free_response_buffers(context);
             return -1;
         }
 
@@ -140,6 +350,8 @@ int qs_ssl_module_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char
         api_qs_client_update(context->client_context);
 #else
         printf("SSL module is not enabled.\n");
+    qs_ssl_module_http_client_free(context);
+    qs_ssl_module_http_client_free_response_buffers(context);
         return -1;
 #endif
     }else{
@@ -164,6 +376,7 @@ int qs_ssl_module_http_client_update(QS_HTTP_CLIENT_CONTEXT* context)
     if(context->phase == QS_SSL_MODULE_PHASE_CONNECT){
         // connect
         do{
+            char* request_buffer = qs_ssl_module_http_client_get_request_buffer(context);
             int ret = SSL_connect(context->ssl);
             if(ret == 1){
 #if QS_OPENSSL_MODULE_DEBUG
@@ -171,9 +384,9 @@ int qs_ssl_module_http_client_update(QS_HTTP_CLIENT_CONTEXT* context)
 #endif
 
 #if QS_OPENSSL_MODULE_DEBUG
-                printf("sending request:%s\n",context->request_buffer);
+                printf("sending request:%s\n",request_buffer);
 #endif
-                SSL_write(context->ssl, context->request_buffer, strlen(context->request_buffer));
+                SSL_write(context->ssl, request_buffer, strlen(request_buffer));
                 context->phase = QS_SSL_MODULE_PHASE_READ_HEADER;
                 break;
             }
@@ -186,7 +399,8 @@ int qs_ssl_module_http_client_update(QS_HTTP_CLIENT_CONTEXT* context)
             }
         }while(0);
     }else{
-        int ret = SSL_read(context->ssl, context->read_buffer, sizeof(context->read_buffer));
+        char* read_buffer = qs_ssl_module_http_client_get_read_buffer(context);
+        int ret = SSL_read(context->ssl, read_buffer, QS_HTTP_CLIENT_READ_BUFFER_SIZE);
         int err = SSL_get_error(context->ssl, ret);
         if(err != 0){
             if (err != SSL_ERROR_WANT_READ && err != SSL_ERROR_WANT_WRITE) {
@@ -203,9 +417,9 @@ int qs_ssl_module_http_client_update(QS_HTTP_CLIENT_CONTEXT* context)
         }
 
         int read_bytes = ret;
-        char* payload = context->read_buffer;
+        char* payload = read_buffer;
         int qs_ssl_module_http_client_recv_ret = qs_ssl_module_http_client_recv(context,payload,read_bytes);
-        memset(context->read_buffer, 0, sizeof(context->read_buffer));
+        memset(read_buffer, 0, QS_HTTP_CLIENT_READ_BUFFER_SIZE);
         return qs_ssl_module_http_client_recv_ret;
     }
 #endif // QS_SSL_MODULE_ENABLED
@@ -214,9 +428,15 @@ int qs_ssl_module_http_client_update(QS_HTTP_CLIENT_CONTEXT* context)
 
 int qs_ssl_module_http_client_recv(QS_HTTP_CLIENT_CONTEXT* context, char* payload, size_t payload_size)
 {
+    char* header_buffer = qs_ssl_module_http_client_get_header_buffer_mutable(context);
+    char* chunk_size_buffer = qs_ssl_module_http_client_get_chunk_size_buffer_mutable(context);
 #if QS_OPENSSL_MODULE_DEBUG
     printf("qs_ssl_module_http_client_recv. phase:%d, payload_size:%ld\n",context->phase,payload_size);
 #endif
+    if(header_buffer == NULL || chunk_size_buffer == NULL){
+        context->phase = QS_SSL_MODULE_PHASE_DISCONNECT;
+        return -1;
+    }
     if(context->phase == QS_SSL_MODULE_PHASE_READ_HEADER){
         // read header
         do{
@@ -236,24 +456,24 @@ int qs_ssl_module_http_client_recv(QS_HTTP_CLIENT_CONTEXT* context, char* payloa
             }
             if(header_end != 0){
                 int header_length = header_end - payload;
-                if(header_length > sizeof(context->header_buffer)){
-                    printf("header_length is too long %d > %d\n",header_length,(int)sizeof(context->header_buffer));
+                if(header_length > QS_HTTP_CLIENT_HEADER_BUFFER_SIZE - 1){
+                    printf("header_length is too long %d > %d\n",header_length,QS_HTTP_CLIENT_HEADER_BUFFER_SIZE - 1);
                     context->phase = QS_SSL_MODULE_PHASE_DISCONNECT;
                     break;
                 }
-                memcpy(context->header_buffer,payload,header_length);
-                context->header_buffer[header_length] = 0;
+                memcpy(header_buffer,payload,header_length);
+                header_buffer[header_length] = 0;
 #if QS_OPENSSL_MODULE_DEBUG
-                printf("header(%d):\n%.*s\n",header_length,header_length,context->header_buffer);
+                printf("header(%d):\n%.*s\n",header_length,header_length,header_buffer);
 #endif
                 char* body = header_end + new_line_size;
                 size_t body_size = payload_size - (body - payload);
                 int read_body_length = 0;
 
                 // Content-Length
-                char* content_length = strstr(context->header_buffer,"Content-Length:");
+                char* content_length = strstr(header_buffer,"Content-Length:");
                 // if Transfer-Encoding: chunked
-                char* chunked = strstr(context->header_buffer,"Transfer-Encoding: chunked");
+                char* chunked = strstr(header_buffer,"Transfer-Encoding: chunked");
                 if(chunked != 0){
 #if QS_OPENSSL_MODULE_DEBUG
                     printf("Transfer-Encoding: chunked detected\n");
@@ -292,8 +512,9 @@ int qs_ssl_module_http_client_recv(QS_HTTP_CLIENT_CONTEXT* context, char* payloa
                     fwrite(body, 1, read_body_length, stdout);
                     printf("\n<<<<<<<<<<<<<<<<<<<<\n");
 #endif
-                    memcpy(context->body_buffer_ptr,body,read_body_length);
-                    context->body_buffer_ptr += read_body_length;
+                    if(qs_ssl_module_http_client_append_body(context, body, read_body_length) != 0){
+                        return -1;
+                    }
 
                     if(context->total_read_body_length >= context->temp_max_body_length){
 #if QS_OPENSSL_MODULE_DEBUG
@@ -318,8 +539,9 @@ int qs_ssl_module_http_client_recv(QS_HTTP_CLIENT_CONTEXT* context, char* payloa
                     fwrite(body, 1, read_body_length, stdout);
                     printf("\n<<<<<<<<<<<<<<<<<<<<\n");
 #endif
-                    memcpy(context->body_buffer_ptr,body,read_body_length);
-                    context->body_buffer_ptr += read_body_length;
+                    if(qs_ssl_module_http_client_append_body(context, body, read_body_length) != 0){
+                        return -1;
+                    }
                     context->body_length = read_body_length;
                 }
             }
@@ -330,8 +552,9 @@ int qs_ssl_module_http_client_recv(QS_HTTP_CLIENT_CONTEXT* context, char* payloa
         printf("QS_SSL_MODULE_PHASE_READ_BODY\n");
 #endif
         context->total_read_body_length += payload_size;
-        memcpy(context->body_buffer_ptr,payload,payload_size);
-        context->body_buffer_ptr += payload_size;
+    if(qs_ssl_module_http_client_append_body(context, payload, payload_size) != 0){
+        return -1;
+    }
         context->body_length += payload_size;
 
         if(context->total_read_body_length >= context->temp_max_body_length){
@@ -377,7 +600,7 @@ int qs_ssl_module_http_client_recv(QS_HTTP_CLIENT_CONTEXT* context, char* payloa
                 // If we have partial chunk size from previous call, combine it
                 char combined_buffer[64];
                 if (context->chunk_size_buffer_len > 0) {
-                    memcpy(combined_buffer, context->chunk_size_buffer, context->chunk_size_buffer_len);
+                    memcpy(combined_buffer, chunk_size_buffer, context->chunk_size_buffer_len);
                     size_t copy_len = (remaining < (sizeof(combined_buffer) - context->chunk_size_buffer_len)) ? remaining : (sizeof(combined_buffer) - context->chunk_size_buffer_len);
                     memcpy(combined_buffer + context->chunk_size_buffer_len, current_pos, copy_len);
                     search_start = combined_buffer;
@@ -443,14 +666,14 @@ int qs_ssl_module_http_client_recv(QS_HTTP_CLIENT_CONTEXT* context, char* payloa
                     // Need more data to read chunk size
                     // Save what we have so far in the buffer
                     if(context->chunk_size_buffer_len == 0) {
-                        size_t to_save = (remaining < sizeof(context->chunk_size_buffer)) ? remaining : sizeof(context->chunk_size_buffer);
-                        memcpy(context->chunk_size_buffer, current_pos, to_save);
+                        size_t to_save = (remaining < QS_HTTP_CLIENT_CHUNK_SIZE_BUFFER_SIZE) ? remaining : QS_HTTP_CLIENT_CHUNK_SIZE_BUFFER_SIZE;
+                        memcpy(chunk_size_buffer, current_pos, to_save);
                         context->chunk_size_buffer_len = to_save;
                     } else {
                         // Append to existing buffer
-                        size_t space_left = sizeof(context->chunk_size_buffer) - context->chunk_size_buffer_len;
+                        size_t space_left = QS_HTTP_CLIENT_CHUNK_SIZE_BUFFER_SIZE - context->chunk_size_buffer_len;
                         size_t to_append = (remaining < space_left) ? remaining : space_left;
-                        memcpy(context->chunk_size_buffer + context->chunk_size_buffer_len, current_pos, to_append);
+                        memcpy(chunk_size_buffer + context->chunk_size_buffer_len, current_pos, to_append);
                         context->chunk_size_buffer_len += to_append;
                     }
                     return 0;
@@ -465,8 +688,9 @@ int qs_ssl_module_http_client_recv(QS_HTTP_CLIENT_CONTEXT* context, char* payloa
                 printf("Reading chunk data: %ld bytes (chunk remaining: %ld)\n", to_read, chunk_remaining);
 #endif
                 // Copy chunk data to body buffer
-                memcpy(context->body_buffer_ptr, current_pos, to_read);
-                context->body_buffer_ptr += to_read;
+                if(qs_ssl_module_http_client_append_body(context, current_pos, to_read) != 0){
+                    return -1;
+                }
                 context->total_read_body_length += to_read;
                 context->body_length += to_read;
                 context->temp_chunked_read_size += to_read;
@@ -522,16 +746,33 @@ int qs_ssl_module_http_client_free(QS_HTTP_CLIENT_CONTEXT* context)
         api_qs_client_free(context->client_context);
         context->client_context = NULL;
     }
-    memset(context->host, 0, sizeof(context->host));
-    memset(context->port, 0, sizeof(context->port));
-    memset(context->read_buffer, 0, sizeof(context->read_buffer));
+    qs_ssl_module_http_client_free_transient_buffers(context);
     context->socket = 0;
+    return 0;
+}
+
+int qs_ssl_module_http_client_dispose(QS_HTTP_CLIENT_CONTEXT* context)
+{
+    qs_ssl_module_http_client_free(context);
+    qs_ssl_module_http_client_free_response_buffers(context);
+    context->body_write_offset = 0;
+    context->body_length = 0;
+    context->total_read_body_length = 0;
+    context->temp_max_body_length = 0;
+    context->temp_chunked_size = 0;
+    context->temp_chunked_read_size = 0;
+    context->chunk_size_buffer_len = 0;
+    context->waiting_for_chunk_trailer = 0;
     return 0;
 }
 
 int qs_ssl_module_http_client_get_header(QS_HTTP_CLIENT_CONTEXT* context, const char* key, char* value, size_t value_size)
 {
-    const char* start = strstr(context->header_buffer, key);
+    const char* header_buffer = qs_ssl_module_http_client_get_header_buffer(context);
+    if(header_buffer == NULL){
+        return -1;
+    }
+    const char* start = strstr(header_buffer, key);
     if (start) {
         start += strlen(key);
         const char* end = strstr(start, "\r\n");

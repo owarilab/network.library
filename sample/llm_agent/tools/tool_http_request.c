@@ -152,38 +152,45 @@ static int http_sync_request(HTTP_SYNC_CTX* sync,
                              int timeout_ms)
 {
     memset(sync, 0, sizeof(*sync));
+    char* request_buffer = NULL;
 
     if (qs_ssl_module_http_client_connect(&sync->ctx, host, port, is_ssl) != 0) {
         return -1;
     }
 
+    request_buffer = qs_ssl_module_http_client_get_request_buffer(&sync->ctx);
+    if (request_buffer == NULL) {
+        qs_ssl_module_http_client_free(&sync->ctx);
+        return -1;
+    }
+
     size_t request_pos = 0;
     char line[4096];
-    sync->ctx.request_buffer[0] = '\0';
+    request_buffer[0] = '\0';
 
     snprintf(line, sizeof(line), "%s %s HTTP/1.1\r\n", method, path);
-    if (tool_buf_append(sync->ctx.request_buffer, sizeof(sync->ctx.request_buffer), &request_pos, line) != 0 ||
+    if (tool_buf_append(request_buffer, QS_HTTP_CLIENT_REQUEST_BUFFER_SIZE, &request_pos, line) != 0 ||
         snprintf(line, sizeof(line), "Host: %s\r\n", host) < 0 ||
-        tool_buf_append(sync->ctx.request_buffer, sizeof(sync->ctx.request_buffer), &request_pos, line) != 0 ||
-        tool_buf_append(sync->ctx.request_buffer, sizeof(sync->ctx.request_buffer), &request_pos, "Connection: close\r\n") != 0) {
+        tool_buf_append(request_buffer, QS_HTTP_CLIENT_REQUEST_BUFFER_SIZE, &request_pos, line) != 0 ||
+        tool_buf_append(request_buffer, QS_HTTP_CLIENT_REQUEST_BUFFER_SIZE, &request_pos, "Connection: close\r\n") != 0) {
         return -1;
     }
 
     if (extra_headers && extra_headers[0] &&
-        tool_buf_append(sync->ctx.request_buffer, sizeof(sync->ctx.request_buffer), &request_pos, extra_headers) != 0) {
+        tool_buf_append(request_buffer, QS_HTTP_CLIENT_REQUEST_BUFFER_SIZE, &request_pos, extra_headers) != 0) {
         return -1;
     }
 
     size_t body_len = body ? strlen(body) : 0;
     if (body_len > 0 && (strcmp(method, "POST") == 0 || strcmp(method, "PUT") == 0)) {
         snprintf(line, sizeof(line), "Content-Length: %zu\r\n", body_len);
-        if (tool_buf_append(sync->ctx.request_buffer, sizeof(sync->ctx.request_buffer), &request_pos, line) != 0 ||
-            tool_buf_append(sync->ctx.request_buffer, sizeof(sync->ctx.request_buffer), &request_pos, "\r\n") != 0 ||
-            tool_buf_append(sync->ctx.request_buffer, sizeof(sync->ctx.request_buffer), &request_pos, body) != 0) {
+        if (tool_buf_append(request_buffer, QS_HTTP_CLIENT_REQUEST_BUFFER_SIZE, &request_pos, line) != 0 ||
+            tool_buf_append(request_buffer, QS_HTTP_CLIENT_REQUEST_BUFFER_SIZE, &request_pos, "\r\n") != 0 ||
+            tool_buf_append(request_buffer, QS_HTTP_CLIENT_REQUEST_BUFFER_SIZE, &request_pos, body) != 0) {
             return -1;
         }
     } else {
-        if (tool_buf_append(sync->ctx.request_buffer, sizeof(sync->ctx.request_buffer), &request_pos, "\r\n") != 0) {
+        if (tool_buf_append(request_buffer, QS_HTTP_CLIENT_REQUEST_BUFFER_SIZE, &request_pos, "\r\n") != 0) {
             return -1;
         }
     }
@@ -215,7 +222,7 @@ static int http_sync_request(HTTP_SYNC_CTX* sync,
 
 static void http_sync_free(HTTP_SYNC_CTX* sync)
 {
-    qs_ssl_module_http_client_free(&sync->ctx);
+    qs_ssl_module_http_client_dispose(&sync->ctx);
 }
 
 static int build_headers_object(QS_MEMORY_CONTEXT* memory,
@@ -354,8 +361,16 @@ int tool_http_request_execute(const char* json_args, char* output, size_t output
         return -1;
     }
 
+    const char* header_buffer = qs_ssl_module_http_client_get_header_buffer(&sync.ctx);
+    const char* body_buffer = qs_ssl_module_http_client_get_body_buffer(&sync.ctx);
+    if (header_buffer == NULL || body_buffer == NULL) {
+        http_sync_free(&sync);
+        snprintf(output, output_size, "{\"error\":\"response buffer unavailable\"}");
+        return -1;
+    }
+
     int status_code = 0;
-    sscanf(sync.ctx.header_buffer, "HTTP/%*s %d", &status_code);
+    sscanf(header_buffer, "HTTP/%*s %d", &status_code);
 
     char location[2048] = "";
     if ((status_code >= 300 && status_code < 400) ||
@@ -372,7 +387,7 @@ int tool_http_request_execute(const char* json_args, char* output, size_t output
         return -1;
     }
 
-    size_t response_alloc = (sync.ctx.body_length * 2) + (strlen(sync.ctx.header_buffer) * 2) + (64 * 1024);
+    size_t response_alloc = (sync.ctx.body_length * 2) + (strlen(header_buffer) * 2) + (64 * 1024);
     if (response_alloc < 128 * 1024) response_alloc = 128 * 1024;
 
     QS_MEMORY_CONTEXT resp_mem = {0};
@@ -382,11 +397,11 @@ int tool_http_request_execute(const char* json_args, char* output, size_t output
 
     if (api_qs_memory_alloc(&resp_mem, response_alloc) == 0 &&
         api_qs_object_create(&resp_mem, &resp_obj) == 0 &&
-        build_headers_object(&resp_mem, sync.ctx.header_buffer, &resp_headers) == 0) {
+		build_headers_object(&resp_mem, header_buffer, &resp_headers) == 0) {
         api_qs_object_push_big_integer(&resp_obj, "ok", 1);
         api_qs_object_push_big_integer(&resp_obj, "status_code", status_code);
         api_qs_object_push_object(&resp_obj, "headers", &resp_headers);
-        api_qs_object_push_string(&resp_obj, "body", sync.ctx.body_buffer);
+		api_qs_object_push_string(&resp_obj, "body", body_buffer);
         api_qs_object_push_big_integer(&resp_obj, "response_time_ms", sync.elapsed_ms);
 
         char* encoded = api_qs_json_encode_object(&resp_obj, response_alloc / 2);

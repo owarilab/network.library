@@ -34,7 +34,13 @@ int main( int argc, char *argv[], char *envp[] )
 		return -1;
 	}
 
-	snprintf(context.request_buffer,sizeof(context.request_buffer),
+	char* request_buffer = qs_ssl_module_http_client_get_request_buffer(&context);
+	if(request_buffer == NULL){
+		qs_ssl_module_http_client_free(&context);
+		return -1;
+	}
+
+	snprintf(request_buffer,QS_HTTP_CLIENT_REQUEST_BUFFER_SIZE,
 		"GET %s HTTP/1.1\r\n"
 		"Host: %s\r\n"
 		"Connection: close\r\n"
@@ -52,14 +58,20 @@ int main( int argc, char *argv[], char *envp[] )
 		api_qs_client_sleep(context.client_context);
 	}
 	qs_ssl_module_http_client_free(&context);
+	const char* header_buffer = qs_ssl_module_http_client_get_header_buffer(&context);
+	const char* body_buffer = qs_ssl_module_http_client_get_body_buffer(&context);
+	if(header_buffer == NULL || body_buffer == NULL){
+		qs_ssl_module_http_client_dispose(&context);
+		return -1;
+	}
 
 	printf("qs_client_simple_result\n");
-	printf("header:\n%s\n\n\n",context.header_buffer);
+	printf("header:\n%s\n\n\n",header_buffer);
 
 	char http_version[16];
 	int status_code;
 	char status_message[1024];
-	sscanf(context.header_buffer,"HTTP/%s %d %s\r\n",http_version,&status_code,status_message);
+	sscanf(header_buffer,"HTTP/%s %d %s\r\n",http_version,&status_code,status_message);
 	printf("http_version:%s\n",http_version);
 	printf("status_code:%d\n",status_code);
 	printf("status_message:%s\n",status_message);
@@ -79,7 +91,7 @@ int main( int argc, char *argv[], char *envp[] )
 
 	printf("\n\n");
 	printf("body:\n");
-	printf("%s\n",context.body_buffer);
+	printf("%s\n",body_buffer);
 
 	printf("total_read_body_length: %ld bytes\n", context.total_read_body_length);
 	printf("body_length: %ld bytes\n", context.body_length);
@@ -87,12 +99,13 @@ int main( int argc, char *argv[], char *envp[] )
 	// save body to file
 	FILE* file = fopen("response_body.txt", "wb");
 	if (file) {
-		fwrite(context.body_buffer, 1, context.body_length, file);
+		fwrite(body_buffer, 1, context.body_length, file);
 		fclose(file);
 		printf("Response body saved to response_body.txt\n");
 	} else {
 		printf("Failed to open file for writing\n");
 	}
+	qs_ssl_module_http_client_dispose(&context);
 	
 	return 0;
 }
