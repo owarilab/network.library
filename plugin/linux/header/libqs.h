@@ -49,6 +49,16 @@ extern "C"{
 #define QS_SSL_MODULE_PHASE_READ_CHUNKED_BODY 3
 #define QS_SSL_MODULE_PHASE_DISCONNECT 4
 
+#define QS_HTTP_CLIENT_HOST_SIZE 1024
+#define QS_HTTP_CLIENT_PORT_SIZE 16
+#define QS_HTTP_CLIENT_REQUEST_BUFFER_SIZE (1024 * 1024)
+#define QS_HTTP_CLIENT_READ_BUFFER_SIZE (1024 * 1024)
+#define QS_HTTP_CLIENT_TRANSIENT_MEMORY_SIZE (1024 * 1024 * 3)
+#define QS_HTTP_CLIENT_HEADER_BUFFER_SIZE (1024 * 1024)
+#define QS_HTTP_CLIENT_BODY_BUFFER_SIZE (1024 * 1024 * 4)
+#define QS_HTTP_CLIENT_CHUNK_SIZE_BUFFER_SIZE 32
+#define QS_HTTP_CLIENT_RESPONSE_MEMORY_SIZE (QS_HTTP_CLIENT_HEADER_BUFFER_SIZE + QS_HTTP_CLIENT_BODY_BUFFER_SIZE + 4096)
+
 /*
  * Server protocol/runtime type used by server/client initialization APIs.
  * - PLAIN  : raw payload mode
@@ -224,10 +234,15 @@ typedef struct QS_HTTP_CLIENT_CONTEXT
     SSL *ssl;
 # endif
     QS_CLIENT_CONTEXT* client_context;
-    char host[1024];
-    char port[16];
-    char request_buffer[1024 * 1024];
-    char read_buffer[1024 * 1024];
+	QS_MEMORY_CONTEXT transient_memory_context;
+	QS_MEMORY_CONTEXT response_memory_context;
+	int32_t memid_host;
+	int32_t memid_port;
+	int32_t memid_request_buffer;
+	int32_t memid_read_buffer;
+	int32_t memid_header_buffer;
+	int32_t memid_body_buffer;
+	int32_t memid_chunk_size_buffer;
     int socket;
     int is_ssl;
     
@@ -238,10 +253,7 @@ typedef struct QS_HTTP_CLIENT_CONTEXT
     size_t temp_max_body_length;
 	size_t temp_chunked_size;
 	size_t temp_chunked_read_size;
-	char header_buffer[1024 * 1024];
-	char body_buffer[1024 * 1024 * 4];
-    char* body_buffer_ptr;
-    char chunk_size_buffer[32];
+	size_t body_write_offset;
     int chunk_size_buffer_len;
     int waiting_for_chunk_trailer;
 } QS_HTTP_CLIENT_CONTEXT;
@@ -254,7 +266,11 @@ SSL* qs_ssl_module_http_client_ssl_create(SSL_CTX* ctx, int sock);
 int qs_ssl_module_http_client_update(QS_HTTP_CLIENT_CONTEXT* context);
 int qs_ssl_module_http_client_recv(QS_HTTP_CLIENT_CONTEXT* context, char* payload, size_t payload_size);
 int qs_ssl_module_http_client_free(QS_HTTP_CLIENT_CONTEXT* context);
+int qs_ssl_module_http_client_dispose(QS_HTTP_CLIENT_CONTEXT* context);
 int qs_ssl_module_http_client_get_header(QS_HTTP_CLIENT_CONTEXT* context, const char* key, char* value, size_t value_size);
+char* qs_ssl_module_http_client_get_request_buffer(QS_HTTP_CLIENT_CONTEXT* context);
+const char* qs_ssl_module_http_client_get_header_buffer(QS_HTTP_CLIENT_CONTEXT* context);
+const char* qs_ssl_module_http_client_get_body_buffer(QS_HTTP_CLIENT_CONTEXT* context);
 
 /*
  * Initialize internal library state.
