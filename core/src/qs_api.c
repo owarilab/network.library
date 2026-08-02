@@ -77,6 +77,31 @@ int api_qs_memory_free(QS_MEMORY_CONTEXT* context)
 	qs_free(memory);
 	return 0;
 }
+int32_t api_qs_memory_create_block(QS_MEMORY_CONTEXT* context, size_t size)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	return qs_create_memory_block(memory, size);
+}
+void* api_qs_memory_get_pointer(QS_MEMORY_CONTEXT* context, int32_t memid)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	return qs_upointer(memory, memid);
+}
+void* api_qs_memory_get_offset_pointer(QS_MEMORY_CONTEXT* context, int32_t memid, size_t size, int32_t offset)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	return qs_offsetpointer(memory, memid, size, offset);
+}
+size_t api_qs_memory_get_size(QS_MEMORY_CONTEXT* context, int32_t memid)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	return qs_usize(memory, memid);
+}
+int api_qs_memory_free_block(QS_MEMORY_CONTEXT* context, int32_t* memid)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	return (qs_free_memory_block(memory, memid) == QS_SYSTEM_OK) ? 0 : -1;
+}
 int api_qs_array_create(QS_MEMORY_CONTEXT* context, QS_JSON_ELEMENT_ARRAY* array)
 {
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
