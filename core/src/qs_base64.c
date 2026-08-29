@@ -4,9 +4,9 @@
 
 #include "qs_base64.h"
 
-static uint8_t qs_base64_char2ascii( uint8_t c )
+static int qs_base64_char2ascii( uint8_t c )
 {
-	uint8_t cnv = '\0';
+	int cnv = -1;
 	if( c >= 0x30 && c <= 0x39 ){ // 0~9
 		cnv = 0x34 + ( c - 0x30 );
 	}
@@ -41,39 +41,23 @@ void qs_base64_encode(char* dest, uint16_t destlength, const void* src, uint16_t
 		return;
 	}
 
-	int i = -1;
-	int tmpv = 0;
-	char *p = dest;
-	const uint8_t *ps = (uint8_t*)src;
 	const char* basestring = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-	do{
-		i++;
-		tmpv = i % 4;
-		switch( tmpv )
-		{
-			case 0:
-				*p = basestring[ (uint8_t)(*ps >> 2) ];
-				break;
-			case 1:
-				*p = basestring[ (uint8_t)( ( ( *(ps-1) & 0x03 ) << 4 ) | ( *ps >> 4 ) ) ];
-				break;
-			case 2:
-				*p = basestring[ (uint8_t)( ( ( *(ps-1) & 0x0F ) << 2 ) | ( *ps >> 6 ) ) ];
-				break;
-			case 3:
-				*p = basestring[ (uint8_t)(*(ps-1) & 0x3F) ];
-				ps--;
-				break;
-		}
-	}while( (++p) - dest < destlength-1 && ( (ps++) - ( (uint8_t*)src ) ) < length );
-	{
-		/* ps-- in case 3 can cause one extra iteration; clamp p to the correct position */
-		size_t base_chars = ( ( (size_t)length * 4 ) + 2 ) / 3;
-		if( (size_t)(p - dest) > base_chars ){ p = dest + base_chars; }
-		int padding = (3 - (length % 3)) % 3;
-		for( int j = 0; j < padding; j++ ){ *(p++) = '='; }
+	const uint8_t *bytes = (const uint8_t*)src;
+	size_t output_length = ( ( (size_t)length + 2 ) / 3 ) * 4;
+	size_t writable = destlength - 1;
+	size_t written = 0;
+	for( size_t offset = 0; offset < length && written < writable; offset += 3 ){
+		uint32_t value = (uint32_t)bytes[offset] << 16;
+		size_t remaining = length - offset;
+		if( remaining > 1 ) value |= (uint32_t)bytes[offset + 1] << 8;
+		if( remaining > 2 ) value |= bytes[offset + 2];
+		dest[written++] = basestring[(value >> 18) & 0x3f];
+		if( written < writable ) dest[written++] = basestring[(value >> 12) & 0x3f];
+		if( written < writable ) dest[written++] = remaining > 1 ? basestring[(value >> 6) & 0x3f] : '=';
+		if( written < writable ) dest[written++] = remaining > 2 ? basestring[value & 0x3f] : '=';
 	}
-	*p = '\0';
+	if( written > output_length ) written = output_length;
+	dest[written] = '\0';
 }
 
 /*
@@ -92,30 +76,36 @@ void qs_base64_decode( char* dest, uint16_t destlength, const void* src, uint16_
 		return;
 	}
 
-	int i = -1;
-	int tmpv = 0;
-	char *p = dest;
-	const uint8_t *ps = (uint8_t*)src;
-	uint8_t c1;
-	uint8_t c2;
-	do{
-		i++;
-		tmpv = i % 3;
-		c1 = qs_base64_char2ascii( *ps );
-		c2 = qs_base64_char2ascii( *(ps+1) );
-		switch( tmpv )
-		{
-			case 0:
-				*p = (uint8_t)( ( c1 << 2 ) + ( c2 >> 4 ) );
-				break;
-			case 1:
-				*p = (uint8_t)( ( c1 << 4 ) + ( c2 >> 2 ) );
-				break;
-			case 2:
-				*p = (uint8_t)( ( c1 << 6 ) + ( c2 ) );
-				++ps;
-				break;
+	if( length % 4 != 0 ){
+		dest[0] = '\0';
+		return;
+	}
+
+	const uint8_t *encoded = (const uint8_t*)src;
+	size_t decoded_length = (length / 4) * 3;
+	if( length >= 1 && encoded[length - 1] == '=' ) decoded_length--;
+	if( length >= 2 && encoded[length - 2] == '=' ) decoded_length--;
+	size_t writable = destlength - 1;
+	size_t written = 0;
+	for( size_t offset = 0; offset < length; offset += 4 ){
+		int c1 = qs_base64_char2ascii(encoded[offset]);
+		int c2 = qs_base64_char2ascii(encoded[offset + 1]);
+		int c3 = encoded[offset + 2] == '=' ? 0 : qs_base64_char2ascii(encoded[offset + 2]);
+		int c4 = encoded[offset + 3] == '=' ? 0 : qs_base64_char2ascii(encoded[offset + 3]);
+		int last = offset + 4 == length;
+		if( c1 < 0 || c2 < 0 || c3 < 0 || c4 < 0 ||
+			(encoded[offset + 2] == '=' && encoded[offset + 3] != '=') ||
+			(!last && (encoded[offset + 2] == '=' || encoded[offset + 3] == '=')) ||
+			(encoded[offset + 2] == '=' && (c2 & 0x0f) != 0) ||
+			(encoded[offset + 3] == '=' && encoded[offset + 2] != '=' && (c3 & 0x03) != 0) ){
+			dest[0] = '\0';
+			return;
 		}
-	}while( (++p) - dest < destlength-1 && ( (++ps) - ( (uint8_t*)src ) ) < length );
-	*p = '\0';
+		uint32_t value = ((uint32_t)c1 << 18) | ((uint32_t)c2 << 12) |
+			((uint32_t)c3 << 6) | (uint32_t)c4;
+		if( written < writable && written < decoded_length ) dest[written++] = (value >> 16) & 0xff;
+		if( encoded[offset + 2] != '=' && written < writable && written < decoded_length ) dest[written++] = (value >> 8) & 0xff;
+		if( encoded[offset + 3] != '=' && written < writable && written < decoded_length ) dest[written++] = value & 0xff;
+	}
+	dest[written] = '\0';
 }
