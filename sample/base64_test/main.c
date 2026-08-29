@@ -114,6 +114,35 @@ static void check_size(const char* label, size_t actual, size_t expected)
     }
 }
 
+static void check_api_null_arguments(QS_MEMORY_CONTEXT* mem)
+{
+    QS_MEMORY_CONTEXT empty_context = { NULL };
+    const char input[] = "test";
+
+    if (api_qs_base64_encode(NULL, input, sizeof(input) - 1) == NULL &&
+        api_qs_base64_encode(mem, NULL, sizeof(input) - 1) == NULL &&
+        api_qs_base64_encode(&empty_context, input, sizeof(input) - 1) == NULL &&
+        api_qs_base64_decode(NULL, "dGVzdA==") == NULL &&
+        api_qs_base64_decode(mem, NULL) == NULL &&
+        api_qs_base64_decode(&empty_context, "dGVzdA==") == NULL) {
+        printf("[PASS] API wrapper NULL argument validation\n");
+        pass_count++;
+    } else {
+        printf("[FAIL] API wrapper NULL argument validation\n");
+        fail_count++;
+    }
+
+    char* empty_encoded = api_qs_base64_encode(mem, NULL, 0);
+    if (empty_encoded && strcmp(empty_encoded, "") == 0) {
+        printf("[PASS] API wrapper empty input\n");
+        pass_count++;
+    } else {
+        printf("[FAIL] API wrapper empty input\n");
+        fail_count++;
+    }
+    api_qs_memory_clean(mem);
+}
+
 int main(int argc, char* argv[], char* envp[])
 {
     QS_MEMORY_CONTEXT mem;
@@ -123,6 +152,7 @@ int main(int argc, char* argv[], char* envp[])
     }
 
     printf("=== Base64 encode tests ===\n");
+    check_api_null_arguments(&mem);
     check_size("encode empty", qs_base64_encode_size(0), 1);
     check_size("encode one byte", qs_base64_encode_size(1), 5);
     check_size("encode three bytes", qs_base64_encode_size(3), 5);

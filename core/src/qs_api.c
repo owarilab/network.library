@@ -2660,6 +2660,9 @@ char* api_qs_uniqid(QS_MEMORY_CONTEXT* memory_context, int32_t length)
 
 char* api_qs_base64_encode(QS_MEMORY_CONTEXT* memory_context, const void* data, size_t length)
 {
+	if( memory_context == NULL || memory_context->memory == NULL || ( data == NULL && length > 0 ) ){
+		return NULL;
+	}
 	QS_MEMORY_POOL * memory = ( QS_MEMORY_POOL* )memory_context->memory;
 	size_t encoded_size = qs_base64_encode_size(length);
 	if( encoded_size == 0 ) return NULL;
@@ -2676,6 +2679,9 @@ char* api_qs_base64_encode(QS_MEMORY_CONTEXT* memory_context, const void* data, 
 
 char* api_qs_base64_decode(QS_MEMORY_CONTEXT* memory_context, const char* data)
 {
+	if( memory_context == NULL || memory_context->memory == NULL || data == NULL ){
+		return NULL;
+	}
 	QS_MEMORY_POOL * memory = ( QS_MEMORY_POOL* )memory_context->memory;
 	int32_t memid_string = qs_create_memory_block(memory, qs_strlen(data) * 2);
 	if(-1==memid_string){
