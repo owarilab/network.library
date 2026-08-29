@@ -103,6 +103,17 @@ static void check_decode_rejected(QS_MEMORY_CONTEXT* mem, const char* label, con
     api_qs_memory_clean(mem);
 }
 
+static void check_size(const char* label, size_t actual, size_t expected)
+{
+    if (actual == expected) {
+        printf("[PASS] size %s\n", label);
+        pass_count++;
+    } else {
+        printf("[FAIL] size %s : expected=%zu got=%zu\n", label, expected, actual);
+        fail_count++;
+    }
+}
+
 int main(int argc, char* argv[], char* envp[])
 {
     QS_MEMORY_CONTEXT mem;
@@ -112,6 +123,10 @@ int main(int argc, char* argv[], char* envp[])
     }
 
     printf("=== Base64 encode tests ===\n");
+    check_size("encode empty", qs_base64_encode_size(0), 1);
+    check_size("encode one byte", qs_base64_encode_size(1), 5);
+    check_size("encode three bytes", qs_base64_encode_size(3), 5);
+    check_size("encode four bytes", qs_base64_encode_size(4), 9);
     /* RFC 4648 standard vectors */
     /* empty input (length=0) is explicitly rejected by the API; skip */
     check_encode(&mem, "\"f\"",        "f",     1, "Zg==");
@@ -136,6 +151,13 @@ int main(int argc, char* argv[], char* envp[])
     }
 
     printf("\n=== Base64 decode tests ===\n");
+    check_size("decode one byte", qs_base64_decode_size("Zg==", 4), 2);
+    check_size("decode two bytes", qs_base64_decode_size("Zm8=", 4), 3);
+    check_size("decode three bytes", qs_base64_decode_size("Zm9v", 4), 4);
+    check_size("decode invalid length", qs_base64_decode_size("Zg", 2), 0);
+    check_size("decode null input", qs_base64_decode_size(NULL, 4), 0);
+    check_size("decode invalid characters", qs_base64_decode_size("!!!!", 4), 0);
+    check_size("decode invalid padding", qs_base64_decode_size("Zm=8", 4), 0);
     check_decode(&mem, "\"Zg==\"",   "Zg==",   "f",      1);
     check_decode(&mem, "\"Zm8=\"",   "Zm8=",   "fo",     2);
     check_decode(&mem, "\"Zm9v\"",   "Zm9v",   "foo",    3);

@@ -4,6 +4,41 @@
 
 #include "qs_base64.h"
 
+static int qs_base64_char2ascii( uint8_t c );
+
+size_t qs_base64_encode_size(size_t input_length)
+{
+	if( input_length > ( SIZE_MAX - 1 ) / 4 * 3 ) return 0;
+	return ( ( input_length + 2 ) / 3 ) * 4 + 1;
+}
+
+size_t qs_base64_decode_size(const void* src, size_t length)
+{
+	if( !src || length == 0 || length % 4 != 0 ) return 0;
+	if( length / 4 > ( SIZE_MAX - 1 ) / 3 ) return 0;
+
+	const uint8_t *encoded = (const uint8_t*)src;
+	size_t padding = 0;
+	if( encoded[length - 1] == '=' ) padding++;
+	if( encoded[length - 2] == '=' ) padding++;
+	if( padding > 2 ) return 0;
+	for( size_t offset = 0; offset < length; offset += 4 ){
+		int c1 = qs_base64_char2ascii(encoded[offset]);
+		int c2 = qs_base64_char2ascii(encoded[offset + 1]);
+		int c3 = encoded[offset + 2] == '=' ? 0 : qs_base64_char2ascii(encoded[offset + 2]);
+		int c4 = encoded[offset + 3] == '=' ? 0 : qs_base64_char2ascii(encoded[offset + 3]);
+		int last = offset + 4 == length;
+		if( c1 < 0 || c2 < 0 || c3 < 0 || c4 < 0 ||
+			(encoded[offset + 2] == '=' && encoded[offset + 3] != '=') ||
+			(!last && (encoded[offset + 2] == '=' || encoded[offset + 3] == '=')) ||
+			(encoded[offset + 2] == '=' && (c2 & 0x0f) != 0) ||
+			(encoded[offset + 3] == '=' && encoded[offset + 2] != '=' && (c3 & 0x03) != 0) ){
+			return 0;
+		}
+	}
+	return ( length / 4 ) * 3 - padding + 1;
+}
+
 static int qs_base64_char2ascii( uint8_t c )
 {
 	int cnv = -1;
