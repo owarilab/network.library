@@ -2661,7 +2661,8 @@ char* api_qs_uniqid(QS_MEMORY_CONTEXT* memory_context, int32_t length)
 char* api_qs_base64_encode(QS_MEMORY_CONTEXT* memory_context, const void* data, size_t length)
 {
 	QS_MEMORY_POOL * memory = ( QS_MEMORY_POOL* )memory_context->memory;
-	int32_t memid_string = qs_create_memory_block(memory, length * 2);
+	size_t encoded_size = ( ( length + 2 ) / 3 ) * 4 + 1;
+	int32_t memid_string = qs_create_memory_block(memory, encoded_size);
 	if(-1==memid_string){
 		return NULL;
 	}
