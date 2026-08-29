@@ -1367,7 +1367,7 @@ int qs_check_socket_error(QS_SOCKET_ID sock)
 {
 	int getopt_val;
 	socklen_t len;
-	len = sizeof( len );
+	len = sizeof( getopt_val );
 
 #ifdef __WINDOWS__
 	if( getsockopt( sock, SOL_SOCKET, SO_ERROR, (char*)&getopt_val, &len ) != -1 )
@@ -2093,13 +2093,13 @@ ssize_t qs_parse_socket_binary( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockpar
 uint32_t qs_make_size_header(uint8_t* head_ptr,ssize_t size)
 {
 	uint32_t headersize = 0;
-	if( size < 125 ){
+	if( size <= 125 ){
 		headersize = 6;
 		if( head_ptr != NULL ){
 			*head_ptr = 0x00 | (uint8_t)size;
 		}
 	}
-	else if( size > 126 && size <= 65536 ){
+	else if( size >= 126 && size <= 65535 ){
 		headersize = 8;
 		if( head_ptr != NULL ){
 			*head_ptr = 0x00 | 126;
@@ -2149,14 +2149,15 @@ size_t qs_make_msg( QS_SOCKET_OPTION* option, QS_SOCKPARAM* psockparam, void* se
 		*(ptr++) = (uint8_t)(size & 0x00ff);
 	}
 	else if( headersize == 14 ){
-		*(ptr++) = (uint8_t)(( size & 0xff00000000000000) >> 56);
-		*(ptr++) = (uint8_t)(( size & 0x00ff000000000000) >> 48);
-		*(ptr++) = (uint8_t)(( size & 0x0000ff0000000000) >> 40);
-		*(ptr++) = (uint8_t)(( size & 0x000000ff00000000) >> 32);
-		*(ptr++) = (uint8_t)(( size & 0x00000000ff000000) >> 24);
-		*(ptr++) = (uint8_t)(( size & 0x0000000000ff0000) >> 16);
-		*(ptr++) = (uint8_t)(( size & 0x000000000000ff00) >> 8);
-		*(ptr++) = (uint8_t)(( size & 0x00000000000000ff) >> 0);
+		uint64_t u64size = (uint64_t)size;
+		*(ptr++) = (uint8_t)(( u64size & 0xff00000000000000ULL) >> 56);
+		*(ptr++) = (uint8_t)(( u64size & 0x00ff000000000000ULL) >> 48);
+		*(ptr++) = (uint8_t)(( u64size & 0x0000ff0000000000ULL) >> 40);
+		*(ptr++) = (uint8_t)(( u64size & 0x000000ff00000000ULL) >> 32);
+		*(ptr++) = (uint8_t)(( u64size & 0x00000000ff000000ULL) >> 24);
+		*(ptr++) = (uint8_t)(( u64size & 0x0000000000ff0000ULL) >> 16);
+		*(ptr++) = (uint8_t)(( u64size & 0x000000000000ff00ULL) >> 8);
+		*(ptr++) = (uint8_t)(( u64size & 0x00000000000000ffULL) >> 0);
 	}
 	MEMORY_PUSH_BIT32_B( option->memory_pool, ptr, payload_type );
 	cptr = (char*)ptr;
@@ -2197,14 +2198,15 @@ size_t qs_make_udpmsg( void* sendbin, const char* msg, ssize_t size, uint32_t pa
 		*(ptr++) = size & 0x00ff;
 	}
 	else if( headersize == 14 ){
-		*(ptr++) = ( size & 0xff00000000000000) >> 56;
-		*(ptr++) = ( size & 0x00ff000000000000) >> 48;
-		*(ptr++) = ( size & 0x0000ff0000000000) >> 40;
-		*(ptr++) = ( size & 0x000000ff00000000) >> 32;
-		*(ptr++) = ( size & 0x00000000ff000000) >> 24;
-		*(ptr++) = ( size & 0x0000000000ff0000) >> 16;
-		*(ptr++) = ( size & 0x000000000000ff00) >> 8;
-		*(ptr++) = ( size & 0x00000000000000ff) >> 0;
+		uint64_t u64size = (uint64_t)size;
+		*(ptr++) = (uint8_t)(( u64size & 0xff00000000000000ULL) >> 56);
+		*(ptr++) = (uint8_t)(( u64size & 0x00ff000000000000ULL) >> 48);
+		*(ptr++) = (uint8_t)(( u64size & 0x0000ff0000000000ULL) >> 40);
+		*(ptr++) = (uint8_t)(( u64size & 0x000000ff00000000ULL) >> 32);
+		*(ptr++) = (uint8_t)(( u64size & 0x00000000ff000000ULL) >> 24);
+		*(ptr++) = (uint8_t)(( u64size & 0x0000000000ff0000ULL) >> 16);
+		*(ptr++) = (uint8_t)(( u64size & 0x000000000000ff00ULL) >> 8);
+		*(ptr++) = (uint8_t)(( u64size & 0x00000000000000ffULL) >> 0);
 	}
 	MEMORY_PUSH_BIT32_B2( qs_endian(), ptr, payload_type );
 	cptr = (char*)ptr;
