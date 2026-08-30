@@ -161,12 +161,10 @@ int main(int argc, char *argv[])
         check_str("single cell: value",      qs_csv_get_row(memory, m, 0, 0), "solo");
     }
 
-    /* --- 7. 全フィールドが空 (,,) ---
-     * パーサー仕様: 先頭にデータなしで始まるカンマ区切りは
-     * 末尾の空フィールドが追加されないため 1フィールドになる */
+    /* --- 7. 全フィールドが空 (,,) --- */
     {
         int32_t m = qs_csv_parse(memory, ",,");
-        check_int("all empty ,, : row count (1 due to trailing-empty limitation)", qs_csv_get_row_length(memory, m, 0), 1);
+        check_int("all empty ,, : row count", qs_csv_get_row_length(memory, m, 0), 3);
         check_str("all empty ,, : col[0]", qs_csv_get_row(memory, m, 0, 0), "");
     }
 
@@ -179,6 +177,32 @@ int main(int argc, char *argv[])
         check_str("file roundtrip: [0][0]",     qs_csv_get_row(memory, m2, 0, 0), "id");
         check_str("file roundtrip: [1][1]",     qs_csv_get_row(memory, m2, 1, 1), "John Doe");
         check_str("file roundtrip: [4][3]",     qs_csv_get_row(memory, m2, 4, 3), "San Francisco");
+    }
+
+    /* --- 9. quoted comma and embedded newline --- */
+    {
+        int32_t m = qs_csv_parse(memory, "a,\"b,c\",\"line1\nline2\"");
+        check_int("quoted fields: field count", qs_csv_get_row_length(memory, m, 0), 3);
+        check_str("quoted comma", qs_csv_get_row(memory, m, 0, 1), "b,c");
+        check_str("embedded newline", qs_csv_get_row(memory, m, 0, 2), "line1\nline2");
+    }
+
+    /* --- 10. escaped quote must survive parse/build roundtrip --- */
+    {
+        int32_t m1 = qs_csv_parse(memory, "name,\"say \"\"hello\"\"\"");
+        char* built = qs_csv_build_csv(memory, m1, 1024);
+        int32_t m2 = qs_csv_parse(memory, built);
+        check_str("escaped quote: parsed value", qs_csv_get_row(memory, m2, 0, 1), "say \"hello\"");
+    }
+
+    /* --- 11. trailing empty fields and blank records are significant --- */
+    {
+        int32_t m = qs_csv_parse(memory, "a,b,\n\n");
+        check_int("trailing empty: field count", qs_csv_get_row_length(memory, m, 0), 3);
+        check_str("trailing empty: last field", qs_csv_get_row(memory, m, 0, 2), "");
+        check_int("blank record: line count", qs_csv_get_line_length(memory, m), 2);
+        check_int("blank record: field count", qs_csv_get_row_length(memory, m, 1), 1);
+        check_str("blank record: value", qs_csv_get_row(memory, m, 1, 0), "");
     }
 
     printf("\n=== Result: %d passed, %d failed ===\n", g_pass, g_fail);

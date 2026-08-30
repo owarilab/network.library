@@ -29,69 +29,69 @@ int32_t qs_csv_parse(QS_MEMORY_POOL* memory, const char * src_csv)
 		return -1;
 	}
 	QS_CSV* csv = (QS_CSV*)QS_GET_POINTER(memory,memid_csv);
-	int32_t memid_tokens = -1;
-	if( -1 == ( memid_tokens = qs_inittoken( memory, 1000, QS_TOKEN_READ_BUFFER_SIZE_MIN ) ) ){
+	if(NULL==src_csv){
 		return -1;
 	}
-	QS_TOKENS *tokens = (QS_TOKENS*)QS_GET_POINTER(memory,memid_tokens);
-	tokens->enable_newline = 1;
-	if(0!=qs_token_analyzer(memory,memid_tokens,(char*)src_csv)){
+	int32_t memid_field = qs_create_memory_block(memory, qs_strlen(src_csv)+1);
+	if(-1==memid_field){
 		return -1;
 	}
-	if( tokens->token_munit == -1 ){
-		return -1;
-	}
-
-	QS_TOKEN *token_list = (QS_TOKEN*)QS_GET_POINTER(memory,tokens->token_munit);
+	char* field = (char*)QS_GET_POINTER(memory,memid_field);
 	int32_t memid_current_array = -1;
-	int i;
-	int is_empty = 0;
-	for( i = 0; i < tokens->currentpos; i++ )
-	{
-		if(token_list[i].type==ID_SYS_NEWLINE){
+	size_t field_len = 0;
+	int in_quotes = 0;
+	int field_started = 0;
+	const char* p = src_csv;
+	for(;;p++){
+		char current = *p;
+		if(in_quotes){
+			if(current=='"'){
+				if(*(p+1)=='"'){
+					field[field_len++] = '"';
+					p++;
+				}else{
+					in_quotes = 0;
+				}
+			}else if(current=='\0'){
+				return -1;
+			}else{
+				field[field_len++] = current;
+			}
+			field_started = 1;
+			continue;
+		}
+		if(current=='"' && !field_started && field_len==0){
+			in_quotes = 1;
+			field_started = 1;
+			continue;
+		}
+		if(current==',' || current=='\n' || current=='\0'){
+			if(current=='\0' && memid_current_array==-1 && field_len==0 && !field_started){
+				break;
+			}
+			field[field_len] = '\0';
+			if(-1==qs_array_push_string(memory,&memid_current_array,field)){
+				return -1;
+			}
+			field_len = 0;
+			field_started = 0;
+			if(current==','){
+				continue;
+			}
 			if(-1==qs_array_push(memory,&csv->memid_csv_array,ELEMENT_ARRAY,memid_current_array)){
 				return -1;
 			}
 			memid_current_array = -1;
-			is_empty = 0;
+			if(current=='\0'){
+				break;
+			}
 			continue;
 		}
-		if(token_list[i].type==ID_SIGN){
-			if(is_empty==1){
-				if(-1==qs_array_push_string(memory,&memid_current_array,"")){
-					return -1;
-				}
-			}
-			if(!strcmp((char*)QS_GET_POINTER(memory,token_list[i].buf_munit),",")){
-				is_empty = 1;
-				continue;
-			}
-		}
-		/* '-'(ID_OP) の直後が数値トークンなら結合して負数として扱う */
-		if(token_list[i].type == ID_OP
-			&& !strcmp((char*)QS_GET_POINTER(memory,token_list[i].buf_munit),"-")
-			&& i + 1 < tokens->currentpos
-			&& (token_list[i+1].type == ID_NUM || token_list[i+1].type == ID_FLOAT))
-		{
-			char neg_buf[64];
-			snprintf(neg_buf, sizeof(neg_buf), "-%s", (char*)QS_GET_POINTER(memory,token_list[i+1].buf_munit));
-			if(-1==qs_array_push_string(memory,&memid_current_array,neg_buf)){
-				return -1;
-			}
-			is_empty = 0;
-			i++;
+		if(current=='\r' && *(p+1)=='\n'){
 			continue;
 		}
-		if(-1==qs_array_push_string(memory,&memid_current_array,(char*)QS_GET_POINTER(memory,token_list[i].buf_munit))){
-			return -1;
-		}
-		is_empty = 0;
-	}
-	if(memid_current_array!=-1){
-		if(-1==qs_array_push(memory,&csv->memid_csv_array,ELEMENT_ARRAY,memid_current_array)){
-			return -1;
-		}
-		memid_current_array = -1;
+		field[field_len++] = current;
+		field_started = 1;
 	}
 	return memid_csv;
 }
@@ -187,11 +187,19 @@ int32_t qs_csv_build_csv_memid(QS_MEMORY_POOL* memory, int32_t memid_csv, size_t
 					return -1;
 				}
 				link_len = qs_strlink( csv_string, link_len, "\"", 1, buffer_size );
-				if(str_len > 0){
-					if(link_len+str_len+1>=buffer_size){
-						return -1;
+				size_t k;
+				for(k=0;k<str_len;k++){
+					if(str[k]=='"'){
+						if(link_len+2>=buffer_size){
+							return -1;
+						}
+						link_len = qs_strlink( csv_string, link_len, "\"\"", 2, buffer_size );
+					}else{
+						if(link_len+1>=buffer_size){
+							return -1;
+						}
+						link_len = qs_strlink( csv_string, link_len, str+k, 1, buffer_size );
 					}
-					link_len = qs_strlink( csv_string, link_len, str, str_len, buffer_size );
 				}
 				if(link_len+2>=buffer_size){
 					return -1;
