@@ -40,6 +40,9 @@
 .codex
 .codex-plugin/
 
+# work
+work/
+
 # llm_agent build outputs and scripts
 sample/llm_agent/qs_llm_agent_server
 sample/llm_agent/*.log

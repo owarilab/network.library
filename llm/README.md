@@ -92,6 +92,36 @@ ls -l /usr/lib/x86_64-linux-gnu/libnccl.so*
 
 ### `network.library` へ組み込む最小構成
 
+#### macOS (Apple Silicon / Metal)
+
+macOS では CUDA/NCCL は使わず、Apple Silicon の Metal backend を有効にします。Homebrew が未導入の場合は先に https://brew.sh/ から導入してください。
+
+```bash
+brew install cmake
+git clone --depth 1 https://github.com/ggml-org/llama.cpp llm/third_party/llama.cpp
+
+cd llm/third_party/llama.cpp
+rm -rf build
+cmake -S . -B build \
+	-DBUILD_SHARED_LIBS=ON \
+	-DLLAMA_BUILD_COMMON=OFF \
+	-DLLAMA_BUILD_TESTS=OFF \
+	-DLLAMA_BUILD_EXAMPLES=OFF \
+	-DLLAMA_BUILD_TOOLS=OFF \
+	-DLLAMA_BUILD_SERVER=OFF \
+	-DLLAMA_BUILD_APP=OFF \
+	-DLLAMA_BUILD_UI=OFF \
+	-DLLAMA_OPENSSL=OFF \
+	-DGGML_METAL=ON
+cmake --build build -j"$(sysctl -n hw.ncpu)"
+
+cd ../../../llm/src
+make clean
+make build LLAMA_ENABLE=1 LLAMA_CUDA=0 LLAMA_METAL=1
+```
+
+生成される共有ライブラリは `libllama.dylib` です。Intel Mac でも Metal は利用できますが、Apple Silicon の方が推奨です。CPU のみで動かす場合は、CMake の `-DGGML_METAL=ON` と Make の `LLAMA_METAL=1` を省略してください。
+
 CPU ビルド:
 
 ```bash
@@ -147,7 +177,7 @@ make build LLAMA_ENABLE=1 LLAMA_CUDA=1
 
 補足:
 - この構成では `llama-cli` と `llama-server` はビルドされません。
-- `llm/src/Makefile` は `LLAMA_ENABLE=1` 時に `llm/third_party/llama.cpp/build/bin/libllama.so` を参照します。
+- `llm/src/Makefile` は Linux では `libllama.so`、macOS では `libllama.dylib` を参照します。
 - 最新の `llama.cpp` では `LLAMA_BUILD_TOOLS` / `LLAMA_BUILD_SERVER` / `LLAMA_BUILD_APP` / `LLAMA_BUILD_UI` が追加されているため、ライブラリ埋め込み用途では明示的に OFF にした方が無駄な生成物を減らせます。
 
 ### `llama-cli` / `llama-server` も使う構成
