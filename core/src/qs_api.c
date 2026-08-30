@@ -15,6 +15,7 @@
 #include "qs_random.h"
 #include "qs_csv.h"
 #include "qs_sha1.h"
+#include "qs_ranking.h"
 
 void api_qs_on_plain_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
 void api_qs_on_simple_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
@@ -2363,6 +2364,71 @@ int api_qs_persistence_kvs_memory_free(QS_KVS_CONTEXT* kvs_context)
 		qs_free(cache_main_memory);
 	}
 	return 0;
+}
+
+int api_qs_ranking_create(QS_MEMORY_CONTEXT* memory_context, QS_RANKING_CONTEXT* ranking_context, size_t size, int32_t key_size, int32_t get_max, int32_t refresh_size)
+{
+	if(NULL == memory_context || NULL == memory_context->memory || NULL == ranking_context){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)memory_context->memory;
+	ranking_context->memid_ranking = qs_create_ranking(memory, size, key_size, get_max, refresh_size);
+	if(-1 == ranking_context->memid_ranking){
+		ranking_context->memory = NULL;
+		return -1;
+	}
+	ranking_context->memory = (void*)memory;
+	return 0;
+}
+
+int api_qs_ranking_entry(QS_RANKING_CONTEXT* ranking_context, const char* id)
+{
+	if(NULL == ranking_context || NULL == ranking_context->memory || NULL == id){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)ranking_context->memory;
+	return (qs_entry_ranking(memory, ranking_context->memid_ranking, (char*)id) >= 0) ? 0 : -1;
+}
+
+int api_qs_ranking_set_value(QS_RANKING_CONTEXT* ranking_context, const char* id, uint32_t value)
+{
+	if(NULL == ranking_context || NULL == ranking_context->memory || NULL == id){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)ranking_context->memory;
+	return (qs_set_ranking_value(memory, ranking_context->memid_ranking, (char*)id, value) == QS_SYSTEM_OK) ? 0 : -1;
+}
+
+int api_qs_ranking_add_value(QS_RANKING_CONTEXT* ranking_context, const char* id, uint32_t value)
+{
+	if(NULL == ranking_context || NULL == ranking_context->memory || NULL == id){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)ranking_context->memory;
+	return (qs_add_ranking_value(memory, ranking_context->memid_ranking, (char*)id, value) == QS_SYSTEM_OK) ? 0 : -1;
+}
+
+int api_qs_ranking_sort(QS_RANKING_CONTEXT* ranking_context)
+{
+	if(NULL == ranking_context || NULL == ranking_context->memory){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)ranking_context->memory;
+	return (qs_ranking_sort_all_fast(memory, ranking_context->memid_ranking) == QS_SYSTEM_OK) ? 0 : -1;
+}
+
+char* api_qs_ranking_get(QS_RANKING_CONTEXT* ranking_context, int32_t offset, int32_t length, QS_MEMORY_CONTEXT* dest_memory)
+{
+	if(NULL == ranking_context || NULL == ranking_context->memory || NULL == dest_memory || NULL == dest_memory->memory || offset < 0 || length <= 0){
+		return NULL;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)ranking_context->memory;
+	QS_MEMORY_POOL* destination = (QS_MEMORY_POOL*)dest_memory->memory;
+	int32_t json_munit = qs_get_ranking(memory, ranking_context->memid_ranking, offset, length, destination);
+	if(-1 == json_munit){
+		return NULL;
+	}
+	return (char*)QS_GET_POINTER(destination, json_munit);
 }
 
 int api_qs_room_create(QS_SERVER_CONTEXT* context, const char* name, QS_MEMORY_CONTEXT* dest_memory, QS_JSON_ELEMENT_OBJECT* dest_object)

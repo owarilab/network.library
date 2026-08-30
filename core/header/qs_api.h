@@ -120,6 +120,12 @@ typedef struct QS_CSV_CONTEXT
 	void* memory;
 } QS_CSV_CONTEXT;
 
+typedef struct QS_RANKING_CONTEXT
+{
+	int32_t memid_ranking;
+	void* memory;
+} QS_RANKING_CONTEXT;
+
 int api_qs_init();
 uint32_t api_qs_rand();
 int api_qs_memory_alloc(QS_MEMORY_CONTEXT* context, size_t alloc_size);
@@ -284,6 +290,12 @@ int api_qs_room_create(QS_SERVER_CONTEXT* context, const char* name, QS_MEMORY_C
 int api_qs_room_list(QS_SERVER_CONTEXT* context, QS_MEMORY_CONTEXT* dest_memory, QS_JSON_ELEMENT_OBJECT* dest_object);
 int api_qs_room_join(QS_SERVER_CONTEXT* context, const char* room_id, const char* connection_id, QS_MEMORY_CONTEXT* dest_memory, QS_JSON_ELEMENT_OBJECT* dest_object);
 int api_qs_room_leave(QS_SERVER_CONTEXT* context, const char* room_id, const char* connection_id, QS_MEMORY_CONTEXT* dest_memory, QS_JSON_ELEMENT_OBJECT* dest_object);
+int api_qs_ranking_create(QS_MEMORY_CONTEXT* memory_context, QS_RANKING_CONTEXT* ranking_context, size_t size, int32_t key_size, int32_t get_max, int32_t refresh_size);
+int api_qs_ranking_entry(QS_RANKING_CONTEXT* ranking_context, const char* id);
+int api_qs_ranking_set_value(QS_RANKING_CONTEXT* ranking_context, const char* id, uint32_t value);
+int api_qs_ranking_add_value(QS_RANKING_CONTEXT* ranking_context, const char* id, uint32_t value);
+int api_qs_ranking_sort(QS_RANKING_CONTEXT* ranking_context);
+char* api_qs_ranking_get(QS_RANKING_CONTEXT* ranking_context, int32_t offset, int32_t length, QS_MEMORY_CONTEXT* dest_memory);
 int api_qs_http_response_json(QS_EVENT_PARAMETER params, QS_JSON_ELEMENT_OBJECT* object, size_t buffer_size);
 int api_qs_http_response_raw_json(QS_EVENT_PARAMETER params, QS_MEMORY_CONTEXT* temporary_memory,char* json);
 

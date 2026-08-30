@@ -149,6 +149,12 @@ typedef struct QS_CSV_CONTEXT
 	void* memory;
 } QS_CSV_CONTEXT;
 
+typedef struct QS_RANKING_CONTEXT
+{
+	int32_t memid_ranking;
+	void* memory;
+} QS_RANKING_CONTEXT;
+
 typedef struct QS_HTTP_CLIENT_CONTEXT
 {
 # ifdef QS_SSL_MODULE_ENABLED
@@ -316,6 +322,13 @@ int api_qs_kvs_delete(QS_KVS_CONTEXT* kvs_context,const char* key);
 int32_t api_qs_kvs_keys(QS_JSON_ELEMENT_ARRAY* array, QS_KVS_CONTEXT* kvs_context);
 int32_t api_qs_kvs_sorted_keys(QS_JSON_ELEMENT_ARRAY* array, QS_KVS_CONTEXT* kvs_context, int32_t is_sort_asc);
 int api_qs_persistence_kvs_memory_free(QS_KVS_CONTEXT* kvs_context);
+
+int api_qs_ranking_create(QS_MEMORY_CONTEXT* memory_context, QS_RANKING_CONTEXT* ranking_context, size_t size, int32_t key_size, int32_t get_max, int32_t refresh_size);
+int api_qs_ranking_entry(QS_RANKING_CONTEXT* ranking_context, const char* id);
+int api_qs_ranking_set_value(QS_RANKING_CONTEXT* ranking_context, const char* id, uint32_t value);
+int api_qs_ranking_add_value(QS_RANKING_CONTEXT* ranking_context, const char* id, uint32_t value);
+int api_qs_ranking_sort(QS_RANKING_CONTEXT* ranking_context);
+char* api_qs_ranking_get(QS_RANKING_CONTEXT* ranking_context, int32_t offset, int32_t length, QS_MEMORY_CONTEXT* dest_memory);
 
 int api_qs_room_create(QS_SERVER_CONTEXT* context, const char* name, QS_MEMORY_CONTEXT* dest_memory, QS_JSON_ELEMENT_OBJECT* dest_object);
 int api_qs_room_list(QS_SERVER_CONTEXT* context, QS_MEMORY_CONTEXT* dest_memory, QS_JSON_ELEMENT_OBJECT* dest_object);
