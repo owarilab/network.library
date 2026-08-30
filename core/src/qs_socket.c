@@ -3,6 +3,53 @@
  */
 
 #include "qs_socket.h"
+
+#define MAX_SOCKET_OPTIONS 64
+static QS_SOCKET_OPTION* s_socket_options[MAX_SOCKET_OPTIONS] = { NULL };
+
+void register_socket_option(QS_SOCKET_OPTION* option) {
+	for (int i = 0; i < MAX_SOCKET_OPTIONS; i++) {
+		if (s_socket_options[i] == NULL) {
+			s_socket_options[i] = option;
+			break;
+		}
+	}
+}
+
+void unregister_socket_option(QS_SOCKET_OPTION* option) {
+	for (int i = 0; i < MAX_SOCKET_OPTIONS; i++) {
+		if (s_socket_options[i] == option) {
+			s_socket_options[i] = NULL;
+			break;
+		}
+	}
+}
+
+QS_SOCKET_OPTION* find_socket_option_by_fd(QS_SOCKET_ID fd) {
+	for (int i = 0; i < MAX_SOCKET_OPTIONS; i++) {
+		QS_SOCKET_OPTION* opt = s_socket_options[i];
+		if (opt != NULL) {
+			if (opt->sockid == fd) {
+				return opt;
+			}
+			if (opt->sockid6 == fd) {
+				return opt;
+			}
+			if (opt->connection_munit != -1) {
+				QS_SERVER_CONNECTION_INFO* current = (QS_SERVER_CONNECTION_INFO*)QS_GET_POINTER(opt->memory_pool, opt->connection_munit);
+				if (current != NULL) {
+					for (int j = 0; j < opt->maxconnection; j++) {
+						if (current[j].id == fd) {
+							return opt;
+						}
+					}
+				}
+			}
+		}
+	}
+	return NULL;
+}
+
 // check kernel settings
 // sudo sysctl -a | grep somaxconn
 // sudo sysctl -a | grep tcp_max_syn_backlog
@@ -340,10 +387,13 @@ int qs_initialize_socket_option(
 	option->user_recv_function			= NULL;
 	option->user_send_function			= NULL;
 	option->user_protocol_filter        = NULL;
+	option->send_hook					= NULL;
+	option->recv_hook					= NULL;
 	option->recvbuffer_size				= SIZE_KBYTE*16;
 	option->sendbuffer_size				= SIZE_KBYTE*128;
 	option->msgbuffer_size				= SIZE_KBYTE*16;
 	option->connection_munit			= -1;
+	register_socket_option(option);
 	if( hostname == NULL ){
 		option->host_name_munit			= -1;
 	}
@@ -454,6 +504,14 @@ void set_user_send_event(QS_SOCKET_OPTION *option, QS_USER_SEND func)
 void set_user_protocol_filter(QS_SOCKET_OPTION *option, QS_USER_PROTOCOL_FILTER func)
 {
 	option->user_protocol_filter = func;
+}
+void set_lowlevel_send_hook(QS_SOCKET_OPTION* option, QS_SOCKET_SEND_HOOK func)
+{
+	option->send_hook = func;
+}
+void set_lowlevel_recv_hook(QS_SOCKET_OPTION* option, QS_SOCKET_RECV_HOOK func)
+{
+	option->recv_hook = func;
 }
 void qs_set_timeout_event( QS_SOCKET_OPTION *option, QS_CALLBACK func )
 {
@@ -787,9 +845,15 @@ ssize_t qs_send_all(QS_SOCKET_ID soc, char *buf, size_t size, int flag )
 	send_flag |= MSG_NOSIGNAL;
 	#endif
 	#endif
+	QS_SOCKET_OPTION* option = find_socket_option_by_fd(soc);
 	for( ptr = buf, lest = size; lest > 0; ptr += len, lest -= len )
 	{
-		if( ( len = send( soc, ptr, lest, send_flag ) ) == -1 )
+		if (option != NULL && option->send_hook != NULL) {
+			len = option->send_hook(soc, ptr, lest, send_flag);
+		} else {
+			len = send( soc, ptr, lest, send_flag );
+		}
+		if( len == -1 )
 		{
 #ifdef __WINDOWS__
 			int err = WSAGetLastError();
@@ -1163,18 +1227,28 @@ QS_SOCKET_ID qs_wait_client_socket(QS_SOCKET_OPTION *option)
 		{
 #ifdef __WINDOWS__
 			int err = WSAGetLastError();
-			if (err != 0 && err != WSAEWOULDBLOCK)
+			if (err == WSAEINTR) {
+				break;
+			}
+			if (err != WSAEWOULDBLOCK && err != WSAEINPROGRESS)
 #else
-			if (errno != EINPROGRESS && errno != EINTR)
+			if (errno == EINTR) {
+				break;
+			}
+			if (errno == EAGAIN) {
+				break;
+			}
+			if (errno != EINPROGRESS)
 #endif
 			{
 				qs_close_socket(&sock, "select");
-				freeaddrinfo(option->addr);
+				qs_free_addrinfo(option);
 				break;
 			}
 		}
 		else {
-			freeaddrinfo(option->addr);
+			option->client_connection_status = CLIENT_STATUS_CONNECTED;
+			qs_free_addrinfo(option);
 			break;
 		}
 		width = 0;
@@ -1194,15 +1268,19 @@ QS_SOCKET_ID qs_wait_client_socket(QS_SOCKET_OPTION *option)
 			switch (select(width, &read_mask, pwrite, NULL, &timeout))
 			{
 			case -1:
+#ifdef __WINDOWS__
+				if (WSAGetLastError() != WSAEINTR)
+#else
 				if (errno != EINTR)
+#endif
 				{
 					qs_close_socket(&sock, "select");
-					freeaddrinfo(option->addr);
+					qs_free_addrinfo(option);
 				}
 				break;
 			case 0:
 				qs_close_socket(&sock, "select:timeout");
-				freeaddrinfo(option->addr);
+				qs_free_addrinfo(option);
 				break;
 			default:
 				if ((pwrite != NULL && FD_ISSET(sock, pwrite)) || FD_ISSET(sock, &read_mask))
@@ -1215,7 +1293,7 @@ QS_SOCKET_ID qs_wait_client_socket(QS_SOCKET_OPTION *option)
 						connectSuccess = true;
 						option->client_connection_status = CLIENT_STATUS_CONNECTED;
 					}
-					freeaddrinfo(option->addr);
+					qs_free_addrinfo(option);
 				}
 				break;
 			}
@@ -1514,6 +1592,7 @@ int32_t qs_socket( QS_SOCKET_OPTION *option )
  */
 void qs_free_socket( QS_SOCKET_OPTION *option )
 {
+	unregister_socket_option(option);
 #ifdef __WINDOWS__
 	if( option->sockid != -1 ){
 		shutdown(option->sockid, SD_BOTH);
@@ -1669,6 +1748,9 @@ void qs_server_update(QS_SOCKET_OPTION *option)
 				if (option->user_recv_function != NULL) {
 					srlen = option->user_recv_function(child, child->id, (char*)QS_GET_POINTER(option->memory_pool, child->recvbuf_munit), buffer_size, 0);
 				}
+				else if (option->recv_hook != NULL) {
+					srlen = option->recv_hook(child->id, (char*)QS_GET_POINTER(option->memory_pool, child->recvbuf_munit), buffer_size, 0);
+				}
 				else {
 					srlen = recv(child->id, (char*)QS_GET_POINTER(option->memory_pool, child->recvbuf_munit), buffer_size, 0);
 				}
@@ -1788,28 +1870,88 @@ void qs_client_update(QS_SOCKET_OPTION *option)
 				return;
 			}
 			QS_SOCKET_ID sock = option->sockid;
-			if (connect(sock, option->addr->ai_addr, option->addr->ai_addrlen) == -1)
+			int res = connect(sock, option->addr->ai_addr, option->addr->ai_addrlen);
+			if (res == -1)
 			{
 #ifdef __WINDOWS__
 				int err = WSAGetLastError();
-				if (err != 0 && err != WSAEWOULDBLOCK)
+				if (err == WSAEINTR) {
+					return;
+				}
+				if (err == WSAEWOULDBLOCK || err == WSAEINPROGRESS || err == WSAEALREADY) {
+					option->client_connection_status = CLIENT_STATUS_CONNECT_PENDING;
+					return;
+				}
 #else
-				if (errno != EINPROGRESS && errno != EINTR)
+				if (errno == EINTR) {
+					return;
+				}
+				if (errno == EAGAIN) {
+					return;
+				}
+				if (errno == EINPROGRESS || errno == EALREADY) {
+					option->client_connection_status = CLIENT_STATUS_CONNECT_PENDING;
+					return;
+				}
 #endif
 				{
 					//printf("connect error: %s\n", strerror(errno));
 					qs_close_socket_common(option, child, 0);
-					freeaddrinfo(option->addr);
+					qs_free_addrinfo(option);
 					option->client_connection_status = CLIENT_STATUS_DISCONNECT;
 					return;
 				}
 			}
-			else {
+
+			if (res == 0) {
 				option->client_connection_status = CLIENT_STATUS_CONNECTED;
-				freeaddrinfo(option->addr);
+				qs_free_addrinfo(option);
 				if( option->connection_start_callback != NULL ){
 					option->connection_start_callback( child );
 				}
+			}
+		}
+		else if (option->client_connection_status == CLIENT_STATUS_CONNECT_PENDING)
+		{
+			fd_set write_mask;
+			fd_set error_mask;
+			struct timeval timeout = { 0, 0 };
+			int select_result;
+
+			FD_ZERO(&write_mask);
+			FD_ZERO(&error_mask);
+			FD_SET(option->sockid, &write_mask);
+			FD_SET(option->sockid, &error_mask);
+			select_result = select((int)(option->sockid + 1), NULL, &write_mask, &error_mask, &timeout);
+			if (select_result == 0) {
+				return;
+			}
+			if (select_result < 0) {
+#ifdef __WINDOWS__
+				if (WSAGetLastError() == WSAEINTR) {
+					return;
+				}
+#else
+				if (errno == EINTR) {
+					return;
+				}
+#endif
+				qs_close_socket_common(option, child, 0);
+				qs_free_addrinfo(option);
+				option->client_connection_status = CLIENT_STATUS_DISCONNECT;
+				return;
+			}
+			if (qs_check_socket_error(option->sockid) != 0) {
+				qs_close_socket_common(option, child, 0);
+				qs_free_addrinfo(option);
+				option->client_connection_status = CLIENT_STATUS_DISCONNECT;
+				return;
+			}
+
+			option->client_connection_status = CLIENT_STATUS_CONNECTED;
+			qs_free_addrinfo(option);
+			if (option->connection_start_callback != NULL) {
+				option->connection_start_callback(child);
 			}
 		}
 
@@ -1823,6 +1965,9 @@ void qs_client_update(QS_SOCKET_OPTION *option)
 		{
 			if (option->user_recv_function != NULL) {
 				srlen = option->user_recv_function(child, child->id, (char*)QS_GET_POINTER(option->memory_pool, child->recvbuf_munit), buffer_size, 0);
+			}
+			else if (option->recv_hook != NULL) {
+				srlen = option->recv_hook(child->id, (char*)QS_GET_POINTER(option->memory_pool, child->recvbuf_munit), buffer_size, 0);
 			}
 			else {
 				srlen = recv(child->id, (char*)QS_GET_POINTER(option->memory_pool, child->recvbuf_munit), buffer_size, 0);

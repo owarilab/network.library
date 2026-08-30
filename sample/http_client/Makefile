@@ -1,9 +1,12 @@
 PROGRAM = qs_http_client
-CC      = gcc
-DEFINE  = -D_LINUX
+UNAME_S := $(shell uname -s)
+CC      = $(if $(filter Darwin,$(UNAME_S)),clang,gcc)
+DEFINE  = $(if $(filter Darwin,$(UNAME_S)),,-D_LINUX)
 CFLAG   = -pthread -Wall -O
 #CFLAG   = -Wall -O2
-INCDIR  = -I ../../core/header -I ../../ssl/header -I/usr/include/openssl
+OPENSSL_PREFIX ?= $(if $(filter Darwin,$(UNAME_S)),$(shell brew --prefix openssl@3 2>/dev/null),)
+INCDIR  = -I ../../core/header -I ../../ssl/header -I $(if $(OPENSSL_PREFIX),$(OPENSSL_PREFIX)/include,/usr/include/openssl)
+LIBDIR  = $(if $(OPENSSL_PREFIX),-L$(OPENSSL_PREFIX)/lib,)
 LIBA = ../../core/libqs_core.a ../../ssl/libqs_ssl_module.a -lssl -lcrypto
 MYSOCKETOBJGROUP = main.o $(LIBA)
 

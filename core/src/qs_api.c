@@ -728,6 +728,18 @@ void api_qs_client_free(QS_CLIENT_CONTEXT* context)
 	qs_free(client->memory_pool);
 	free(context);
 }
+void api_qs_client_set_lowlevel_send_hook(QS_CLIENT_CONTEXT* context, QS_SOCKET_SEND_HOOK func)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	QS_SOCKET_OPTION* client = (QS_SOCKET_OPTION*)QS_GET_POINTER(memory, context->memid_client);
+	set_lowlevel_send_hook(client, func);
+}
+void api_qs_client_set_lowlevel_recv_hook(QS_CLIENT_CONTEXT* context, QS_SOCKET_RECV_HOOK func)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	QS_SOCKET_OPTION* client = (QS_SOCKET_OPTION*)QS_GET_POINTER(memory, context->memid_client);
+	set_lowlevel_recv_hook(client, func);
+}
 int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_connection, int32_t server_type)
 {
 	if( ( (*ppcontext) = ( QS_SERVER_CONTEXT * )malloc( sizeof( QS_SERVER_CONTEXT ) ) ) == NULL ){
@@ -1065,6 +1077,18 @@ void api_qs_free(QS_SERVER_CONTEXT* context)
 		qs_free( kvs_memory );
 	}
 	free(context);
+}
+void api_qs_server_set_lowlevel_send_hook(QS_SERVER_CONTEXT* context, QS_SOCKET_SEND_HOOK func)
+{
+	QS_MEMORY_POOL* main_memory_pool = (QS_MEMORY_POOL*)context->memory;
+	QS_SOCKET_OPTION* server = (QS_SOCKET_OPTION*)QS_GET_POINTER(main_memory_pool, context->memid_server);
+	set_lowlevel_send_hook(server, func);
+}
+void api_qs_server_set_lowlevel_recv_hook(QS_SERVER_CONTEXT* context, QS_SOCKET_RECV_HOOK func)
+{
+	QS_MEMORY_POOL* main_memory_pool = (QS_MEMORY_POOL*)context->memory;
+	QS_SOCKET_OPTION* server = (QS_SOCKET_OPTION*)QS_GET_POINTER(main_memory_pool, context->memid_server);
+	set_lowlevel_recv_hook(server, func);
 }
 void api_qs_on_plain_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info)
 {

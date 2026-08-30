@@ -3,6 +3,7 @@
  */
 
 #include "qs_openssl_module.h"
+#include "qs_socket.h"
 
 //#define QS_OPENSSL_MODULE_DEBUG 1
 
@@ -363,6 +364,50 @@ int qs_ssl_module_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char
     return 0;
 }
 
+#ifdef QS_SSL_MODULE_ENABLED
+static ssize_t qs_ssl_lowlevel_send(QS_SOCKET_ID soc, const char *buf, size_t size, int flag)
+{
+    QS_SOCKET_OPTION* option = find_socket_option_by_fd(soc);
+    if (option != NULL && option->application_data != NULL) {
+        QS_CLIENT_CONTEXT* client_context = (QS_CLIENT_CONTEXT*)option->application_data;
+        QS_HTTP_CLIENT_CONTEXT* http_ctx = (QS_HTTP_CLIENT_CONTEXT*)client_context->client_data;
+        if (http_ctx != NULL && http_ctx->ssl != NULL) {
+            int ret = SSL_write(http_ctx->ssl, buf, (int)size);
+            if (ret <= 0) {
+                int err = SSL_get_error(http_ctx->ssl, ret);
+                if (err == SSL_ERROR_WANT_WRITE || err == SSL_ERROR_WANT_READ) {
+                    errno = EAGAIN;
+                }
+                return -1;
+            }
+            return ret;
+        }
+    }
+    return send(soc, buf, size, flag);
+}
+
+static ssize_t qs_ssl_lowlevel_recv(QS_SOCKET_ID soc, char *buf, size_t size, int flag)
+{
+    QS_SOCKET_OPTION* option = find_socket_option_by_fd(soc);
+    if (option != NULL && option->application_data != NULL) {
+        QS_CLIENT_CONTEXT* client_context = (QS_CLIENT_CONTEXT*)option->application_data;
+        QS_HTTP_CLIENT_CONTEXT* http_ctx = (QS_HTTP_CLIENT_CONTEXT*)client_context->client_data;
+        if (http_ctx != NULL && http_ctx->ssl != NULL) {
+            int ret = SSL_read(http_ctx->ssl, buf, (int)size);
+            if (ret <= 0) {
+                int err = SSL_get_error(http_ctx->ssl, ret);
+                if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+                    errno = EAGAIN;
+                }
+                return -1;
+            }
+            return ret;
+        }
+    }
+    return recv(soc, buf, size, flag);
+}
+#endif
+
 int qs_ssl_module_http_client_update(QS_HTTP_CLIENT_CONTEXT* context)
 {
     if(context->phase == QS_SSL_MODULE_PHASE_DISCONNECT){
@@ -373,54 +418,47 @@ int qs_ssl_module_http_client_update(QS_HTTP_CLIENT_CONTEXT* context)
         return 0;
     }
 #ifdef QS_SSL_MODULE_ENABLED
-    if(context->phase == QS_SSL_MODULE_PHASE_CONNECT){
-        // connect
-        do{
-            char* request_buffer = qs_ssl_module_http_client_get_request_buffer(context);
-            int ret = SSL_connect(context->ssl);
-            if(ret == 1){
-#if QS_OPENSSL_MODULE_DEBUG
-                printf("Connected with %s encryption\n", SSL_get_cipher(context->ssl));
-#endif
+    QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->client_context->memory;
+    QS_SOCKET_OPTION* client = (QS_SOCKET_OPTION*)QS_GET_POINTER(memory, context->client_context->memid_client);
 
+    // 1. TCP接続が完了するまではTCP接続を進める
+    if (client->client_connection_status == CLIENT_STATUS_CONNECTING ||
+        client->client_connection_status == CLIENT_STATUS_CONNECT_PENDING) {
+        api_qs_client_update(context->client_context);
+        return 0;
+    }
+
+    // 2. SSLハンドシェイク
+    if(context->phase == QS_SSL_MODULE_PHASE_CONNECT){
+        int ret = SSL_connect(context->ssl);
+        if(ret == 1){
 #if QS_OPENSSL_MODULE_DEBUG
-                printf("sending request:%s\n",request_buffer);
+            printf("Connected with %s encryption\n", SSL_get_cipher(context->ssl));
 #endif
-                SSL_write(context->ssl, request_buffer, strlen(request_buffer));
-                context->phase = QS_SSL_MODULE_PHASE_READ_HEADER;
-                break;
-            }
+            // ハンドシェイク完了後に初めてフックとイベントを登録する
+            api_qs_client_set_lowlevel_send_hook(context->client_context, qs_ssl_lowlevel_send);
+            api_qs_client_set_lowlevel_recv_hook(context->client_context, qs_ssl_lowlevel_recv);
+
+            api_qs_set_client_on_connect_event(context->client_context, qs_ssl_module_http_client_on_connect );
+            api_qs_set_client_on_plain_event(context->client_context, qs_ssl_module_http_client_on_recv );
+            api_qs_set_client_on_close_event(context->client_context, qs_ssl_module_http_client_on_close );
+
+            QS_EVENT_PARAMETER_STRUCT params;
+            params.parameter_type = QS_EVENT_PARAMETER_TYPE_CONNECTION;
+            params.params = QS_GET_POINTER(memory, client->connection_munit);
+            qs_ssl_module_http_client_on_connect(&params);
+        } else {
             int err = SSL_get_error(context->ssl, ret);
             if (err != SSL_ERROR_WANT_READ && err != SSL_ERROR_WANT_WRITE) {
                 printf("SSL_connect error\n");
                 ERR_print_errors_fp(stderr);
                 context->phase = QS_SSL_MODULE_PHASE_DISCONNECT;
-                break;
-            }
-        }while(0);
-    }else{
-        char* read_buffer = qs_ssl_module_http_client_get_read_buffer(context);
-        int ret = SSL_read(context->ssl, read_buffer, QS_HTTP_CLIENT_READ_BUFFER_SIZE);
-        int err = SSL_get_error(context->ssl, ret);
-        if(err != 0){
-            if (err != SSL_ERROR_WANT_READ && err != SSL_ERROR_WANT_WRITE) {
-#if QS_OPENSSL_MODULE_DEBUG
-                printf("SSL_read error %d\n",err);
-#endif
-                ERR_print_errors_fp(stderr);
-                context->phase = QS_SSL_MODULE_PHASE_DISCONNECT;
-                return -1;
             }
         }
-        if(ret <= 0){
-            return 0;
-        }
-
-        int read_bytes = ret;
-        char* payload = read_buffer;
-        int qs_ssl_module_http_client_recv_ret = qs_ssl_module_http_client_recv(context,payload,read_bytes);
-        memset(read_buffer, 0, QS_HTTP_CLIENT_READ_BUFFER_SIZE);
-        return qs_ssl_module_http_client_recv_ret;
+    }
+    // 3. 通信実行フェーズ：coreの非同期送受信ハンドラに任せる（透過的にフックされる）
+    else {
+        api_qs_client_update(context->client_context);
     }
 #endif // QS_SSL_MODULE_ENABLED
     return 0;

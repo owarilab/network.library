@@ -29,6 +29,18 @@ extern "C"{
 #define QS_EVENT_PARAMETER_TYPE_RECV 1
 #define QS_EVENT_PARAMETER_TYPE_CONNECTION 2
 
+#ifndef _QS_SOCKET_ID_DEFINED_
+#define _QS_SOCKET_ID_DEFINED_
+#ifdef __WINDOWS__
+typedef SOCKET QS_SOCKET_ID;
+#else
+typedef int QS_SOCKET_ID;
+#endif
+#endif
+
+typedef ssize_t (*QS_SOCKET_SEND_HOOK)(QS_SOCKET_ID soc, const char *buf, size_t size, int flag);
+typedef ssize_t (*QS_SOCKET_RECV_HOOK)(QS_SOCKET_ID soc, char *buf, size_t size, int flag);
+
 typedef struct QS_EVENT_PARAMETER_STRUCT
 {
     int32_t parameter_type;
@@ -196,6 +208,8 @@ QS_CLIENT_CONTEXT* api_qs_client_get_context(QS_EVENT_PARAMETER params);
 int api_qs_client_send(QS_CLIENT_CONTEXT* context, const char* payload, size_t payload_len);
 int api_qs_client_send_message(QS_CLIENT_CONTEXT* context,uint32_t payload_type, const char* payload, size_t payload_len);
 void api_qs_client_free(QS_CLIENT_CONTEXT* context);
+void api_qs_client_set_lowlevel_send_hook(QS_CLIENT_CONTEXT* context, QS_SOCKET_SEND_HOOK func);
+void api_qs_client_set_lowlevel_recv_hook(QS_CLIENT_CONTEXT* context, QS_SOCKET_RECV_HOOK func);
 
 
 int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_connection, int32_t server_type);
@@ -220,6 +234,8 @@ int api_qs_server_create_logger_error(QS_SERVER_CONTEXT* context,const char* log
 void api_qs_update(QS_SERVER_CONTEXT* context);
 void api_qs_sleep(QS_SERVER_CONTEXT* context);
 void api_qs_free(QS_SERVER_CONTEXT* context);
+void api_qs_server_set_lowlevel_send_hook(QS_SERVER_CONTEXT* context, QS_SOCKET_SEND_HOOK func);
+void api_qs_server_set_lowlevel_recv_hook(QS_SERVER_CONTEXT* context, QS_SOCKET_RECV_HOOK func);
 
 char* api_qs_get_ws_message(QS_EVENT_PARAMETER params);
 ssize_t api_qs_get_ws_message_size(QS_EVENT_PARAMETER params);

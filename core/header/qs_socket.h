@@ -9,6 +9,7 @@ extern "C"{
 #ifndef _QS_SOCKET_H_
 #define _QS_SOCKET_H_
 
+#include "qs_api.h"
 #include "qs_core.h"
 #include "qs_system.h"
 #include "qs_string.h"
@@ -28,10 +29,13 @@ extern "C"{
 #include <arpa/inet.h>
 #endif
 
+#ifndef _QS_SOCKET_ID_DEFINED_
+#define _QS_SOCKET_ID_DEFINED_
 #ifdef __WINDOWS__
 typedef SOCKET QS_SOCKET_ID;
 #else
 typedef int QS_SOCKET_ID;
+#endif
 #endif
 
 // inetflags
@@ -61,6 +65,7 @@ typedef int QS_SOCKET_ID;
 #define CLIENT_STATUS_DISCONNECT 0
 #define CLIENT_STATUS_CONNECTING 1
 #define CLIENT_STATUS_CONNECTED 2
+#define CLIENT_STATUS_CONNECT_PENDING 3
 
 // status
 #define PROTOCOL_STATUS_DEFAULT 0
@@ -203,6 +208,8 @@ typedef struct QS_SOCKET_OPTION
 	QS_USER_RECV user_recv_function;		// user call recv
 	QS_USER_SEND user_send_function;		// user call send
 	QS_USER_PROTOCOL_FILTER user_protocol_filter;
+	QS_SOCKET_SEND_HOOK send_hook;			// low-level send hook
+	QS_SOCKET_RECV_HOOK recv_hook;			// low-level recv hook
 	size_t recvbuffer_size;					// recv buffer size
 	size_t sendbuffer_size;					// send buffer size
 	size_t msgbuffer_size;					// message buffer size
@@ -293,6 +300,7 @@ void qs_set_sock_option( QS_SOCKET_OPTION *option );
 int32_t qs_make_socket( QS_SOCKET_OPTION *option );
 int32_t qs_socket( QS_SOCKET_OPTION *option );
 void qs_free_socket( QS_SOCKET_OPTION *option );
+QS_SOCKET_OPTION* find_socket_option_by_fd(QS_SOCKET_ID fd);
 
 void qs_recv_event(QS_SOCKET_OPTION *option, QS_SERVER_CONNECTION_INFO *child, socklen_t srlen);
 
@@ -313,6 +321,9 @@ size_t qs_make_msg( QS_SOCKET_OPTION* option,QS_SOCKPARAM *psockparam, void* sen
 ssize_t qs_send_msg( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockparam, const char* msg, ssize_t size, uint32_t payload_type );
 size_t qs_make_udpmsg( void* sendbin, const char* msg, ssize_t size, uint32_t payload_type );
 ssize_t qs_send_udpmsg( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockparam, const char* msg, ssize_t size, uint32_t payload_type, struct sockaddr *pfrom, socklen_t fromlen );
+
+void set_lowlevel_send_hook(QS_SOCKET_OPTION* option, QS_SOCKET_SEND_HOOK func);
+void set_lowlevel_recv_hook(QS_SOCKET_OPTION* option, QS_SOCKET_RECV_HOOK func);
 
 #endif /*_QS_SOCKET_H_*/
 

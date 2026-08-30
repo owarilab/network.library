@@ -19,16 +19,16 @@ int main( int argc, char *argv[], char *envp[] )
 	memset(&context, 0, sizeof(context));
 
 	// ssl
-	//const char* server_host = "www.google.com";
-	//const char* request_path = "/";
-	//int server_port = 443;
-	//int is_ssl = 1;
+	const char* server_host = "www.google.com";
+	const char* request_path = "/";
+	int server_port = 443;
+	int is_ssl = 1;
 
 	// plain
-	const char* server_host = "localhost";
-	const char* request_path = "/index.html";
-	int server_port = 4444;
-	int is_ssl = 0;
+	//const char* server_host = "localhost";
+	//const char* request_path = "/index.html";
+	//int server_port = 4444;
+	//int is_ssl = 0;
 	if(0 != qs_ssl_module_http_client_connect(&context,server_host,server_port,is_ssl)){
 		printf("qs_ssl_module_http_client_connect error\n");
 		return -1;
