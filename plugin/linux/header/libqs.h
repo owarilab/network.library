@@ -53,6 +53,10 @@ extern "C"{
 #define QS_SERVER_TYPE_SIMPLE 200
 #define QS_SERVER_TYPE_HTTP 300
 
+#define QS_SCHEDULER_MODE_HIGH 1
+#define QS_SCHEDULER_MODE_MIDDLE 2
+#define QS_SCHEDULER_MODE_LOW 3
+
 #define QS_KVS_MEMORY_TYPE_B1MB 0
 #define QS_KVS_MEMORY_TYPE_B128MB 1
 #define QS_KVS_MEMORY_TYPE_B256MB 2
@@ -61,6 +65,14 @@ extern "C"{
 
 #define QS_EVENT_PARAMETER_TYPE_RECV 1
 #define QS_EVENT_PARAMETER_TYPE_CONNECTION 2
+
+#ifndef _QS_SOCKET_ID_DEFINED_
+#define _QS_SOCKET_ID_DEFINED_
+typedef int QS_SOCKET_ID;
+#endif
+
+typedef ssize_t (*QS_SOCKET_SEND_HOOK)(QS_SOCKET_ID soc, const char *buf, size_t size, int flag);
+typedef ssize_t (*QS_SOCKET_RECV_HOOK)(QS_SOCKET_ID soc, char *buf, size_t size, int flag);
 
 typedef struct QS_EVENT_PARAMETER_STRUCT
 {
@@ -109,6 +121,10 @@ typedef struct QS_SERVER_CONTEXT
 	void* kvs_memory;
 	int32_t memid_kvs_memory;
 	int32_t memid_kvs;
+
+	// websocket binary support
+	uint8_t ws_opcode;
+	ssize_t ws_message_size;
 } QS_SERVER_CONTEXT;
 
 typedef struct QS_CLIENT_CONTEXT
@@ -123,6 +139,17 @@ typedef struct QS_CLIENT_CONTEXT
 	QS_EVENT_FUNCTION on_simple_event;
 	QS_EVENT_FUNCTION on_close;
 	void* client_data;
+	int32_t websocket_mode;
+	int32_t websocket_handshake_complete;
+	char websocket_key[64];
+	char websocket_accept[64];
+	char websocket_path[1024];
+	uint8_t websocket_buffer[65536];
+	size_t websocket_buffer_size;
+	uint8_t websocket_opcode;
+	size_t websocket_payload_size;
+	size_t websocket_payload_offset;
+	QS_EVENT_FUNCTION on_websocket_event;
 } QS_CLIENT_CONTEXT;
 
 typedef struct QS_SERVER_SCRIPT_CONTEXT
@@ -201,6 +228,11 @@ int api_qs_memory_clean(QS_MEMORY_CONTEXT* context);
 void api_qs_memory_info(QS_MEMORY_CONTEXT* context);
 int api_qs_memory_free(QS_MEMORY_CONTEXT* context);
 size_t api_qs_memory_available_size(QS_MEMORY_CONTEXT* context);
+int32_t api_qs_memory_create_block(QS_MEMORY_CONTEXT* context, size_t size);
+void* api_qs_memory_get_pointer(QS_MEMORY_CONTEXT* context, int32_t memid);
+void* api_qs_memory_get_offset_pointer(QS_MEMORY_CONTEXT* context, int32_t memid, size_t size, int32_t offset);
+size_t api_qs_memory_get_size(QS_MEMORY_CONTEXT* context, int32_t memid);
+int api_qs_memory_free_block(QS_MEMORY_CONTEXT* context, int32_t* memid);
 int api_qs_array_create(QS_MEMORY_CONTEXT* context, QS_JSON_ELEMENT_ARRAY* array);
 int api_qs_array_push_integer(QS_JSON_ELEMENT_ARRAY* array,int32_t value);
 int api_qs_array_push_big_integer(QS_JSON_ELEMENT_ARRAY* array,int64_t value);
@@ -248,25 +280,37 @@ int32_t api_qs_csv_get_row_length(QS_CSV_CONTEXT* csv, int32_t line_pos);
 char* api_qs_csv_get_row(QS_CSV_CONTEXT* csv, int32_t line_pos, int32_t row_pos);
 
 int api_qs_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host, int port, int32_t server_type);
+int api_qs_websocket_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host, int port, const char* path);
 int api_qs_client_get_socket(QS_CLIENT_CONTEXT* context);
 void api_qs_set_client_on_connect_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_connect );
 void api_qs_set_client_on_plain_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_plain_event );
 void api_qs_set_client_on_simple_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_simple_event );
 void api_qs_set_client_on_close_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_close );
+void api_qs_set_websocket_client_on_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_event);
 void api_qs_client_update(QS_CLIENT_CONTEXT* context);
 void api_qs_client_sleep(QS_CLIENT_CONTEXT* context);
 QS_CLIENT_CONTEXT* api_qs_client_get_context(QS_EVENT_PARAMETER params);
 int api_qs_client_send(QS_CLIENT_CONTEXT* context, const char* payload, size_t payload_len);
 int api_qs_client_send_message(QS_CLIENT_CONTEXT* context,uint32_t payload_type, const char* payload, size_t payload_len);
+int api_qs_websocket_client_send(QS_CLIENT_CONTEXT* context, int is_binary, const void* payload, size_t payload_len);
+int api_qs_websocket_client_close(QS_CLIENT_CONTEXT* context);
+uint8_t* api_qs_get_websocket_payload(QS_EVENT_PARAMETER params);
+size_t api_qs_get_websocket_payload_length(QS_EVENT_PARAMETER params);
+uint8_t api_qs_get_websocket_opcode(QS_EVENT_PARAMETER params);
 void api_qs_client_free(QS_CLIENT_CONTEXT* context);
+void api_qs_client_set_lowlevel_send_hook(QS_CLIENT_CONTEXT* context, QS_SOCKET_SEND_HOOK func);
+void api_qs_client_set_lowlevel_recv_hook(QS_CLIENT_CONTEXT* context, QS_SOCKET_RECV_HOOK func);
 
 
 int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_connection, int32_t server_type);
+void api_qs_server_memory_info(QS_SERVER_CONTEXT* context);
 int api_qs_server_get_socket(QS_SERVER_CONTEXT* context);
+int api_qs_set_scheduler(QS_SERVER_CONTEXT* context, int32_t scheduler_mode);
 void api_qs_set_server_session_timeout(QS_SERVER_CONTEXT* context, int32_t timeout);
 int api_qs_server_create_router(QS_SERVER_CONTEXT* context);
 void api_qs_router_memory_info(QS_SERVER_CONTEXT* context);
 int api_qs_server_create_kvs(QS_SERVER_CONTEXT* context, int kvs_memory_type);
+void api_qs_kvs_memory_info(QS_SERVER_CONTEXT* context);
 int api_qs_server_get_kvs(QS_SERVER_CONTEXT* context,QS_KVS_CONTEXT* kvs_context);
 void api_qs_set_on_connect_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_connect );
 void api_qs_set_on_plain_event(QS_SERVER_CONTEXT* context, QS_EVENT_FUNCTION on_plain_event );
@@ -280,10 +324,16 @@ int api_qs_server_create_logger_error(QS_SERVER_CONTEXT* context,const char* log
 void api_qs_update(QS_SERVER_CONTEXT* context);
 void api_qs_sleep(QS_SERVER_CONTEXT* context);
 void api_qs_free(QS_SERVER_CONTEXT* context);
+void api_qs_server_set_lowlevel_send_hook(QS_SERVER_CONTEXT* context, QS_SOCKET_SEND_HOOK func);
+void api_qs_server_set_lowlevel_recv_hook(QS_SERVER_CONTEXT* context, QS_SOCKET_RECV_HOOK func);
 
 char* api_qs_get_ws_message(QS_EVENT_PARAMETER params);
+ssize_t api_qs_get_ws_message_size(QS_EVENT_PARAMETER params);
+uint8_t api_qs_get_ws_opcode(QS_EVENT_PARAMETER params);
 int api_qs_send_ws_message(QS_EVENT_PARAMETER params,const char* message);
 int api_qs_send_ws_message_plane(QS_EVENT_PARAMETER params,const char* message);
+int api_qs_send_ws_binary(QS_EVENT_PARAMETER params,const void* data,size_t size);
+void api_qs_send_ws_binary_by_connection_offset(QS_SERVER_CONTEXT* context,uint32_t connection_offset,const void* data,size_t size);
 
 char* api_qs_get_http_method(QS_EVENT_PARAMETER params);
 char* api_qs_get_http_path(QS_EVENT_PARAMETER params);
@@ -303,6 +353,10 @@ size_t api_qs_get_plain_payload_length(QS_EVENT_PARAMETER params);
 QS_SERVER_CONTEXT* api_qs_get_server_context(QS_EVENT_PARAMETER params);
 uint32_t api_qs_get_connection_offset(QS_EVENT_PARAMETER params);
 time_t api_qs_get_connection_create_time(QS_EVENT_PARAMETER params);
+uint8_t* api_qs_get_connection_data(QS_EVENT_PARAMETER params);
+size_t api_qs_get_connection_data_size(QS_EVENT_PARAMETER params);
+char* api_qs_get_connection_id(QS_EVENT_PARAMETER params);
+int32_t api_qs_set_connection_data(QS_EVENT_PARAMETER params, uint8_t* data, size_t data_size);
 void api_qs_send_response_by_connection_offset(QS_SERVER_CONTEXT* context, uint32_t connection_offset, const char* response);
 int api_qs_script_read_file(QS_MEMORY_CONTEXT* memory_context, QS_SERVER_SCRIPT_CONTEXT* script_context,const char* file_path);
 int api_qs_script_set_argv_object(QS_SERVER_SCRIPT_CONTEXT* script_context,const char* name, QS_JSON_ELEMENT_OBJECT* object);
@@ -313,12 +367,27 @@ char* api_qs_script_get_parameter(QS_SERVER_SCRIPT_CONTEXT* script_context, cons
 
 int api_qs_kvs_create_b1mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context);
 int api_qs_kvs_create_b8mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context);
+int api_qs_kvs_create_b16mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context);
+int api_qs_kvs_create_b32mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context);
+int api_qs_kvs_create_b64mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context);
+int api_qs_kvs_create_b128mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context);
+int api_qs_kvs_create_b256mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context);
+int api_qs_kvs_create_b512mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context);
+int api_qs_kvs_create_b1024mb(QS_MEMORY_CONTEXT* memory_context, QS_KVS_CONTEXT* kvs_context);
 int api_qs_kvs_create_b1mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path);
 int api_qs_kvs_create_b8mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path);
+int api_qs_kvs_create_b16mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path);
+int api_qs_kvs_create_b32mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path);
+int api_qs_kvs_create_b64mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path);
+int api_qs_kvs_create_b128mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path);
+int api_qs_kvs_create_b256mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path);
+int api_qs_kvs_create_b512mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path);
+int api_qs_kvs_create_b1024mb_persistence(QS_KVS_CONTEXT* kvs_context, const char* file_path);
 int api_qs_kvs_set(QS_KVS_CONTEXT* kvs_context,const char* key, const char* value, int32_t life_time);
 char* api_qs_kvs_get(QS_KVS_CONTEXT* kvs_context,const char* key);
 size_t api_qs_kvs_get_buffer_size(QS_KVS_CONTEXT* kvs_context,const char* key);
 int api_qs_kvs_delete(QS_KVS_CONTEXT* kvs_context,const char* key);
+int32_t api_qs_kvs_key_length(QS_KVS_CONTEXT* kvs_context);
 int32_t api_qs_kvs_keys(QS_JSON_ELEMENT_ARRAY* array, QS_KVS_CONTEXT* kvs_context);
 int32_t api_qs_kvs_sorted_keys(QS_JSON_ELEMENT_ARRAY* array, QS_KVS_CONTEXT* kvs_context, int32_t is_sort_asc);
 int api_qs_persistence_kvs_memory_free(QS_KVS_CONTEXT* kvs_context);
