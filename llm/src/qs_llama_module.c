@@ -318,7 +318,7 @@ int qs_llama_module_stream_text(const char* prompt, QS_LLM_STREAM_TOKEN_CALLBACK
 	}
 	QS_LLAMA_DEBUG_PRINTF("stream_text: start prompt_len=%zu\n", strlen(prompt));
 
-	int max_tokens = 128;
+	int max_tokens = 512;
 	const char* max_tokens_env = getenv("QS_LLM_MAX_TOKENS");
 	if (max_tokens_env != NULL && max_tokens_env[0] != '\0') {
 		int value = atoi(max_tokens_env);
@@ -327,7 +327,7 @@ int qs_llama_module_stream_text(const char* prompt, QS_LLM_STREAM_TOKEN_CALLBACK
 		}
 	}
 
-	int n_ctx = 2048;
+	int n_ctx = 8192;
 	const char* n_ctx_env = getenv("QS_LLM_N_CTX");
 	if (n_ctx_env != NULL && n_ctx_env[0] != '\0') {
 		int value = atoi(n_ctx_env);

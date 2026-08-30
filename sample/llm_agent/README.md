@@ -52,7 +52,7 @@ cd sample/llm_agent
 # モデルパスを指定して起動
 export QS_LLM_MODEL_PATH=/path/to/your-model.gguf
 export QS_LLM_MAX_TOKENS=512
-export QS_LLM_N_CTX=4096
+export QS_LLM_N_CTX=8192
 
 ./qs_llm_agent_server
 # → [Main] Loaded prompt template from ./prompt.conf (N bytes)
@@ -67,8 +67,8 @@ export QS_LLM_N_CTX=4096
 | 変数 | デフォルト | 説明 |
 |------|-----------|------|
 | `QS_LLM_MODEL_PATH` | (なし) | GGUFモデルファイルのパス |
-| `QS_LLM_MAX_TOKENS` | `128` | 最大生成トークン数 |
-| `QS_LLM_N_CTX` | `2048` | コンテキストウィンドウサイズ |
+| `QS_LLM_MAX_TOKENS` | `512` | 最大生成トークン数 |
+| `QS_LLM_N_CTX` | `8192` | コンテキストウィンドウサイズ |
 | `QS_LLM_N_GPU_LAYERS` | `999` | GPUにオフロードするレイヤー数 |
 | `QS_LLM_DEBUG` | (なし) | `1` でデバッグログ有効 |
 | `QS_AGENT_PROMPT_FILE` | `./prompt.conf` | プロンプトテンプレートファイル |

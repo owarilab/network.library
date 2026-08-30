@@ -1,6 +1,7 @@
 #include "agent_core.h"
 #include "tools/tool_file_list.h"
 #include "tools/tool_file_read.h"
+#include "tools/tool_file_info.h"
 #include "tools/tool_file_write.h"
 #include "tools/tool_file_edit.h"
 #include "tools/tool_file_search.h"
@@ -352,6 +353,7 @@ void agent_free_api_docs(void)
 static TOOL_ENTRY g_tool_registry[] = {
     { "file_list",         tool_file_list_execute        },
     { "file_read",         tool_file_read_execute        },
+    { "file_info",         tool_file_info_execute          },
     { "file_write",        tool_file_write_execute       },
     { "file_edit",         tool_file_edit_execute        },
     { "file_search",       tool_file_search_execute      },

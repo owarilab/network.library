@@ -3,6 +3,7 @@ UNAME_S := $(shell uname -s)
 CC      = $(if $(filter Darwin,$(UNAME_S)),clang,gcc)
 DEFINE  = $(if $(filter Darwin,$(UNAME_S)),,-D_LINUX)
 CFLAG   = -pthread -Wall -O
+OPENSSL_PREFIX ?= $(if $(filter Darwin,$(UNAME_S)),$(shell brew --prefix openssl@3 2>/dev/null),)
 LLAMA_ENABLE ?= 0
 LLAMA_CUDA ?= 0
 LLAMA_METAL ?= $(if $(filter Darwin,$(UNAME_S)),1,0)
@@ -24,11 +25,12 @@ LLAMA_CMAKE_ACCEL += -DGGML_METAL=ON
 endif
 endif
 
-INCDIR  = -I ../../core/header -I ../../llm/header -I ../../ssl/header -I /usr/include/openssl -I $(LLAMA_CPP_DIR)/include
-LIBA    = ../../core/libqs_core.a ../../llm/libqs_llm_module.a ../../ssl/libqs_ssl_module.a -lssl -lcrypto
+INCDIR  = -I ../../core/header -I ../../llm/header -I ../../ssl/header -I $(if $(OPENSSL_PREFIX),$(OPENSSL_PREFIX)/include,/usr/include/openssl) -I $(LLAMA_CPP_DIR)/include
+LIBA    = ../../core/libqs_core.a ../../llm/libqs_llm_module.a ../../ssl/libqs_ssl_module.a
+SSL_LIBS = -L$(OPENSSL_PREFIX)/lib -lssl -lcrypto
 
 OBJGROUP = main.o agent_core.o \
-           tools/tool_common.o tools/tool_file_list.o tools/tool_file_read.o tools/tool_file_write.o tools/tool_file_edit.o tools/tool_file_search.o tools/tool_grep_search.o \
+		   tools/tool_common.o tools/tool_file_list.o tools/tool_file_read.o tools/tool_file_info.o tools/tool_file_write.o tools/tool_file_edit.o tools/tool_file_search.o tools/tool_grep_search.o \
            tools/tool_http_request.o tools/tool_url_whitelist_get.o tools/tool_url_whitelist_info_get.o \
            handlers/handler_common.o \
            handlers/handler_init.o handlers/handler_think.o \
@@ -52,7 +54,7 @@ $(LLAMA_RUNTIME_TARGET):
 	cd ../../ssl/src && make build
 
 $(PROGRAM): $(OBJGROUP)
-	$(CC) $(CFLAG) $(INCDIR) -o $(PROGRAM) $(OBJGROUP) $(LLAMA_LIBS)
+	$(CC) $(CFLAG) $(INCDIR) -o $(PROGRAM) $(OBJGROUP) $(LLAMA_LIBS) $(SSL_LIBS)
 
 main.o: main.c
 	$(CC) $(DEFINE) $(CFLAG) $(INCDIR) -c main.c -o main.o
@@ -68,6 +70,9 @@ tools/tool_file_list.o: tools/tool_file_list.c tools/tool_file_list.h
 
 tools/tool_file_read.o: tools/tool_file_read.c tools/tool_file_read.h
 	$(CC) $(DEFINE) $(CFLAG) $(INCDIR) -c tools/tool_file_read.c -o tools/tool_file_read.o
+
+tools/tool_file_info.o: tools/tool_file_info.c tools/tool_file_info.h
+	$(CC) $(DEFINE) $(CFLAG) $(INCDIR) -c tools/tool_file_info.c -o tools/tool_file_info.o
 
 tools/tool_file_write.o: tools/tool_file_write.c tools/tool_file_write.h
 	$(CC) $(DEFINE) $(CFLAG) $(INCDIR) -c tools/tool_file_write.c -o tools/tool_file_write.o
