@@ -40,7 +40,7 @@ typedef struct QS_RANKING_USER{
 } QS_RANKING_USER;
 
 typedef struct QS_RANKING_SORT{
-	int32_t value;
+	uint32_t value;
 	int32_t ranking;
 	int32_t munit;
 } QS_RANKING_SORT;
@@ -50,6 +50,7 @@ int32_t qs_entry_ranking( QS_MEMORY_POOL* _ppool, int32_t ranking_munit, char* i
 int32_t qs_set_ranking_value( QS_MEMORY_POOL* _ppool, int32_t ranking_munit, char* id, uint32_t value );
 int32_t qs_add_ranking_value( QS_MEMORY_POOL* _ppool, int32_t ranking_munit, char* id, uint32_t value );
 int32_t qs_ranking_sort_all( QS_MEMORY_POOL* _ppool, int32_t ranking_munit );
+int32_t qs_ranking_sort_all_fast( QS_MEMORY_POOL* _ppool, int32_t ranking_munit );
 int32_t qs_get_ranking( QS_MEMORY_POOL* _ppool, int32_t ranking_munit, int32_t offset, int32_t length, QS_MEMORY_POOL* dest_memory );
 void qs_push_integer( QS_MEMORY_POOL* _ppool, int32_t munit,int32_t value );
 

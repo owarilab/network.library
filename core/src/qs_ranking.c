@@ -216,13 +216,13 @@ int32_t qs_ranking_sort_all( QS_MEMORY_POOL* _ppool, int32_t ranking_munit )
 	for( i = 0; i < parray->max_size; i++ )
 	{
 		int32_t target_hash_munit = qs_get_hash_fix_ihash(_ppool,(elm+i)->memid_array_element_data,"value",hashkey_value);
-		int32_t target_rank_value = QS_INT32(_ppool,target_hash_munit);
+		uint32_t target_rank_value = (uint32_t)QS_INT32(_ppool,target_hash_munit);
 		(sort_buffer+i)->munit = (elm+i)->memid_array_element_data;
 		(sort_buffer+i)->value = target_rank_value;
 		(sort_buffer+i)->ranking = 0;
 	}
 	int32_t tmp_munit;
-	int32_t tmp_value;
+	uint32_t tmp_value;
 	for( i = 0; i < parray->max_size; i++ )
 	{
 		for( j = parray->max_size-1; j > i; j-- ){
@@ -239,20 +239,93 @@ int32_t qs_ranking_sort_all( QS_MEMORY_POOL* _ppool, int32_t ranking_munit )
 			}
 		}
 	}
-	int32_t old_ranking_value = -1;
+	uint32_t old_ranking_value = 0;
+	int has_old_ranking_value = 0;
 	int32_t ranking_offset = 0;
 	qs_memory_clean(index_memory);
 	ranking->ranking_index_munit = qs_create_hash( index_memory, parray->max_size );
 	for( i = 0; i < parray->max_size; i++ )
 	{
-		if( old_ranking_value == -1 || (sort_buffer+i)->value < old_ranking_value ){
+		if( !has_old_ranking_value || (sort_buffer+i)->value < old_ranking_value ){
 			ranking_offset=i+1;
 		}
 		old_ranking_value = (sort_buffer+i)->value;
+		has_old_ranking_value = 1;
 		int32_t ranking_hash_munit = qs_get_hash_fix_ihash(_ppool,(elm+i)->memid_array_element_data,"ranking",hashkey_ranking);
 		qs_push_integer( _ppool, ranking_hash_munit, ranking_offset );
 		int32_t target_id_hash_munit = qs_get_hash_fix_ihash(_ppool,(elm+i)->memid_array_element_data,"id",hashkey_id);
 		qs_add_hash_integer( index_memory, ranking->ranking_index_munit, (char*)QS_GET_POINTER(_ppool,target_id_hash_munit), i );
+	}
+	return QS_SYSTEM_OK;
+}
+
+static int qs_ranking_sort_compare( const void* left, const void* right )
+{
+	const QS_RANKING_SORT* left_sort = (const QS_RANKING_SORT*)left;
+	const QS_RANKING_SORT* right_sort = (const QS_RANKING_SORT*)right;
+	if( left_sort->value < right_sort->value ){
+		return 1;
+	}
+	if( left_sort->value > right_sort->value ){
+		return -1;
+	}
+	if( left_sort->ranking > right_sort->ranking ){
+		return 1;
+	}
+	if( left_sort->ranking < right_sort->ranking ){
+		return -1;
+	}
+	return 0;
+}
+
+int32_t qs_ranking_sort_all_fast( QS_MEMORY_POOL* _ppool, int32_t ranking_munit )
+{
+	QS_RANKING* ranking = (QS_RANKING*)QS_GET_POINTER(_ppool,ranking_munit);
+	QS_MEMORY_POOL* index_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(_ppool,ranking->ranking_index_memory_id);
+	QS_ARRAY* parray = (QS_ARRAY*)QS_GET_POINTER(_ppool,ranking->ranking_user_munit );
+	QS_ARRAY_ELEMENT* elm = (QS_ARRAY_ELEMENT*)QS_GET_POINTER( _ppool, parray->memid );
+	QS_RANKING_SORT* sort_buffer = (QS_RANKING_SORT*)QS_GET_POINTER(_ppool,ranking->sort_buffer_munit);
+	size_t active_size = (size_t)ranking->tail_ranking;
+	size_t i;
+	uint32_t hashkey_value = qs_ihash( "value", RANKING_USER_HASH_SIZE );
+	uint32_t hashkey_ranking = qs_ihash( "ranking", RANKING_USER_HASH_SIZE );
+	uint32_t hashkey_id = qs_ihash( "id", RANKING_USER_HASH_SIZE );
+
+	if( active_size > parray->max_size ){
+		active_size = parray->max_size;
+	}
+	for( i = 0; i < active_size; i++ ){
+		int32_t target_hash_munit = qs_get_hash_fix_ihash(_ppool,(elm+i)->memid_array_element_data,"value",hashkey_value);
+		(sort_buffer+i)->munit = (elm+i)->memid_array_element_data;
+		(sort_buffer+i)->value = (uint32_t)QS_INT32(_ppool,target_hash_munit);
+		(sort_buffer+i)->ranking = (int32_t)i;
+	}
+	qsort( sort_buffer, active_size, sizeof( QS_RANKING_SORT ), qs_ranking_sort_compare );
+
+	for( i = 0; i < active_size; i++ ){
+		int32_t tmp_munit = (elm+i)->memid_array_element_data;
+		(elm+i)->memid_array_element_data = (sort_buffer+i)->munit;
+		(sort_buffer+i)->munit = tmp_munit;
+	}
+	qs_memory_clean(index_memory);
+	ranking->ranking_index_munit = qs_create_hash( index_memory, parray->max_size );
+	if( ranking->ranking_index_munit == -1 ){
+		return QS_SYSTEM_ERROR;
+	}
+
+	uint32_t old_ranking_value = 0;
+	int has_old_ranking_value = 0;
+	int32_t ranking_offset = 0;
+	for( i = 0; i < active_size; i++ ){
+		if( !has_old_ranking_value || (sort_buffer+i)->value < old_ranking_value ){
+			ranking_offset = (int32_t)i + 1;
+		}
+		old_ranking_value = (sort_buffer+i)->value;
+		has_old_ranking_value = 1;
+		int32_t ranking_hash_munit = qs_get_hash_fix_ihash(_ppool,(elm+i)->memid_array_element_data,"ranking",hashkey_ranking);
+		qs_push_integer( _ppool, ranking_hash_munit, ranking_offset );
+		int32_t target_id_hash_munit = qs_get_hash_fix_ihash(_ppool,(elm+i)->memid_array_element_data,"id",hashkey_id);
+		qs_add_hash_integer( index_memory, ranking->ranking_index_munit, (char*)QS_GET_POINTER(_ppool,target_id_hash_munit), (int32_t)i );
 	}
 	return QS_SYSTEM_OK;
 }
