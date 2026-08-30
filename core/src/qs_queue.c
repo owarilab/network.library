@@ -4,7 +4,7 @@
 
 #include "qs_queue.h"
 
-void qs_create_message_queue( QS_MEMORY_POOL* _ppool, int32_t* q_munit, size_t qlen, size_t size )
+void qs_create_queue( QS_MEMORY_POOL* _ppool, int32_t* q_munit, size_t qlen, size_t size )
 {
 	int i;
 #ifdef __WINDOWS__
@@ -28,6 +28,8 @@ void qs_create_message_queue( QS_MEMORY_POOL* _ppool, int32_t* q_munit, size_t q
 		pmq->top		= 0;
 		pmq->tail		= 0;
 		pmq->status		= 0;
+		pmq->readindex	= 0;
+		pmq->readmunit	= -1;
 		pmq->queuelen	= qlen;
 #ifdef __WINDOWS__
 		if( 0 >= ( pmq->mqlock_munit = qs_create_memory_block( _ppool, sizeof( HANDLE ) ) ) ){
@@ -45,7 +47,7 @@ void qs_create_message_queue( QS_MEMORY_POOL* _ppool, int32_t* q_munit, size_t q
 		}
 		pmutex = (pthread_mutex_t *)qs_upointer( _ppool, pmq->mqlock_munit );
 		if( pthread_mutex_init(pmutex, NULL) != 0 ){
-			printf( "qs_create_message_queue:pthread_mutex_init : error \n" );
+			printf( "qs_create_queue:pthread_mutex_init : error \n" );
 			(*q_munit) = -1;
 			break;
 		}
@@ -76,6 +78,12 @@ void qs_create_message_queue( QS_MEMORY_POOL* _ppool, int32_t* q_munit, size_t q
 			pminf->len = 0;
 			pminf->id  = 0;
 		}
+		if( -1 == ( pmq->readmunit = qs_create_memory_block( _ppool, sizeof( char ) * ( QS_READ_BUFFER_SIZE + 1 ) ) ) ){
+			printf("create readmunit error\n");
+			(*q_munit) = -1;
+			break;
+		}
+
 	}while( false );
 }
 
@@ -87,6 +95,9 @@ int qs_enqueue( QS_MEMORY_POOL* _ppool, int32_t q_munit, const char* pbuf, size_
 	QS_MSG_INFO *pminf;
 	char* pmqbuf;
 	do{
+		if( pbuf == NULL || size == 0 ){
+			break;
+		}
 		if( -1 == q_munit ){
 			printf( "q_munit is not allocate : %d\n", q_munit );
 			break;
@@ -205,6 +216,93 @@ int32_t qs_dequeue( QS_MEMORY_POOL* _ppool, int32_t q_munit )
 		pmq->top = ( pmq->top + 1 ) % pmq->queuelen;
 	}while( false );
 	return munit;
+}
+
+int qs_read_queue( QS_MEMORY_POOL* _ppool, int32_t q_munit, char** pbuf, size_t* readlen )
+{
+	int status = QS_QUEUE_READ_STATUS_NONE;
+	QS_MSGQUEUE *pmq;
+	int32_t* mqlist;
+	QS_MSG_INFO *pminf = NULL;
+	size_t copy_size;
+	size_t remaining_size;
+	char* src;
+	char* readbuf;
+	do{
+		if( pbuf == NULL || readlen == NULL ){
+			break;
+		}
+		*pbuf = NULL;
+		*readlen = 0;
+		if( -1 == q_munit ){
+			printf( "q_munit is not allocate : %d\n", q_munit );
+			break;
+		}
+		pmq = (QS_MSGQUEUE *)qs_upointer( _ppool, q_munit );
+		if( -1 == pmq->queuemunit ){
+			printf( "queuemunit is not allocate : %d\n", pmq->queuemunit );
+			break;
+		}
+		if( -1 == pmq->readmunit ){
+			printf( "readmunit is not allocate : %d\n", pmq->readmunit );
+			break;
+		}
+		mqlist = (int32_t*)qs_upointer( _ppool, pmq->queuemunit );
+		int32_t target = pmq->top - pmq->status;
+		if( target < 0 ){
+			target = pmq->queuelen-1;
+		}
+		if( pmq->top == pmq->tail ){
+			if( pmq->status == 0 ){
+				break;
+			}
+			if( pmq->status == 1 ){
+				pminf = (QS_MSG_INFO*)qs_upointer( _ppool, mqlist[target] );
+				if( -1 == pminf->msgmunit ){
+					printf( "pminf->msgmunit is not allocate : %d\n", pminf->msgmunit );
+					break;
+				}
+			}
+		}
+		else{
+			if( -1 == mqlist[target] ){
+				printf( "mqlist[pmq->top] is not allocate : %d\n", target );
+				break;
+			}
+			pminf = (QS_MSG_INFO*)qs_upointer( _ppool, mqlist[target] );
+			if( -1 == pminf->msgmunit ){
+				printf( "pminf->msgmunit is not allocate : %d\n", pminf->msgmunit );
+				break;
+			}
+		}
+
+		if( pmq->readindex >= pminf->len ){
+			break;
+		}
+		src = (char*)qs_upointer( _ppool, pminf->msgmunit );
+		readbuf = (char*)qs_upointer( _ppool, pmq->readmunit );
+		remaining_size = pminf->len - pmq->readindex;
+		copy_size = remaining_size > QS_READ_BUFFER_SIZE ? QS_READ_BUFFER_SIZE : remaining_size;
+		memcpy( readbuf, src + pmq->readindex, copy_size );
+		readbuf[copy_size] = '\0';
+		*pbuf = readbuf;
+		*readlen = copy_size;
+		pmq->readindex += copy_size;
+
+		if( pmq->readindex < pminf->len ){
+			status = QS_QUEUE_READ_STATUS_CONTINUE;
+		}
+		else{
+			status = QS_QUEUE_READ_STATUS_DEQUEUE;
+			pmq->readindex = 0;
+			if( pmq->top == pmq->tail && pmq->status == 1){
+				pmq->status = 0;
+			}else{
+				pmq->top = ( pmq->top + 1 ) % pmq->queuelen;
+			}
+		}
+	}while( false );
+	return status;
 }
 
 int32_t qs_get_queue_length( QS_MEMORY_POOL* _ppool, int32_t q_munit )

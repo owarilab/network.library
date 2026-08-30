@@ -17,6 +17,12 @@ extern "C"{
 #ifdef __WINDOWS__
 #endif
 
+#define QS_READ_BUFFER_SIZE 1024
+#define QS_QUEUE_READ_STATUS_NONE 0
+#define QS_QUEUE_READ_STATUS_CONTINUE 1
+#define QS_QUEUE_READ_STATUS_DEQUEUE 2
+
+
 typedef struct QS_MSGQUEUE
 {
 	int32_t top;
@@ -25,6 +31,10 @@ typedef struct QS_MSGQUEUE
 	size_t queuelen;
 	int32_t queuemunit;
 	int32_t mqlock_munit;
+
+	//read buffer
+	size_t readindex;
+	int32_t readmunit;
 } QS_MSGQUEUE;
 
 typedef struct QS_MSG_INFO
@@ -35,10 +45,11 @@ typedef struct QS_MSG_INFO
 	uint8_t status;
 } QS_MSG_INFO;
 
-void qs_create_message_queue( QS_MEMORY_POOL* _ppool, int32_t* q_munit, size_t qlen, size_t size );
+void qs_create_queue( QS_MEMORY_POOL* _ppool, int32_t* q_munit, size_t qlen, size_t size );
 int qs_enqueue( QS_MEMORY_POOL* _ppool, int32_t q_munit, const char* pbuf, size_t size );
 int qs_safe_enqueue( QS_MEMORY_POOL* _ppool, int32_t q_munit, const char* pbuf, size_t size );
 int32_t qs_dequeue( QS_MEMORY_POOL* _ppool, int32_t q_munit );
+int qs_read_queue( QS_MEMORY_POOL* _ppool, int32_t q_munit, char** pbuf, size_t* readlen );
 int32_t qs_get_queue_length( QS_MEMORY_POOL* _ppool, int32_t q_munit );
 
 #endif /*_QS_QUEUE_H_*/
