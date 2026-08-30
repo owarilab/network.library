@@ -44,6 +44,57 @@ make LLAMA_ENABLE=1
 初回は llama.cpp が cmake でビルドされます（数分かかります）。  
 CUDA を使う場合: `make LLAMA_ENABLE=1 LLAMA_CUDA=1`
 
+### macOS (Apple Silicon / Metal)
+
+macOS では `clang` と Apple Metal backend が自動的に選択されます。事前に Homebrew、CMake、OpenSSL 3 をインストールしてください。
+
+```bash
+brew install cmake openssl
+```
+
+`llama.cpp` が未ビルドの場合は、リポジトリのルートから次のコマンドを実行します。
+
+```bash
+cd llm/third_party/llama.cpp
+
+rm -rf build
+cmake -S . -B build \
+  -DBUILD_SHARED_LIBS=ON \
+  -DLLAMA_BUILD_COMMON=OFF \
+  -DLLAMA_BUILD_TESTS=OFF \
+  -DLLAMA_BUILD_EXAMPLES=OFF \
+  -DLLAMA_BUILD_TOOLS=OFF \
+  -DLLAMA_BUILD_SERVER=OFF \
+  -DLLAMA_BUILD_APP=OFF \
+  -DLLAMA_BUILD_UI=OFF \
+  -DLLAMA_OPENSSL=OFF \
+  -DGGML_METAL=ON
+cmake --build build -j"$(sysctl -n hw.ncpu)"
+```
+
+その後、`llm_agent` をビルドします。
+
+```bash
+cd ../../../sample/llm_agent
+make clean
+make LLAMA_ENABLE=1 LLAMA_METAL=1 LLAMA_CUDA=0
+```
+
+macOS では `LLAMA_METAL=1` がデフォルトのため、通常は次の短縮形でもビルドできます。
+
+```bash
+cd sample/llm_agent
+make LLAMA_ENABLE=1
+```
+
+Metal を使わず CPU のみでビルドする場合は、次のように指定します。
+
+```bash
+cd sample/llm_agent
+make clean
+make LLAMA_ENABLE=1 LLAMA_METAL=0 LLAMA_CUDA=0
+```
+
 ## 起動
 
 ```bash
