@@ -32,6 +32,8 @@ int api_qs_client_on_connect(QS_SERVER_CONNECTION_INFO* connection);
 int32_t api_qs_client_on_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
 int32_t api_qs_client_on_simple_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
 int api_qs_client_on_close(QS_SERVER_CONNECTION_INFO* connection);
+int api_qs_websocket_client_on_connect(QS_SERVER_CONNECTION_INFO* connection);
+int32_t api_qs_websocket_client_on_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
 //---------------------------------------------------
 
 int api_qs_init()
@@ -612,6 +614,16 @@ int api_qs_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host, int port
 	context->on_plain_event = NULL;
 	context->on_simple_event = NULL;
 	context->on_close = NULL;
+	context->websocket_mode = 0;
+	context->websocket_handshake_complete = 0;
+	context->websocket_key[0] = '\0';
+	context->websocket_accept[0] = '\0';
+	context->websocket_path[0] = '\0';
+	context->websocket_buffer_size = 0;
+	context->websocket_opcode = 0;
+	context->websocket_payload_size = 0;
+	context->websocket_payload_offset = 0;
+	context->on_websocket_event = NULL;
 	context->memory = NULL;
 	context->current_time = time(NULL);
 	context->update_time = 0;
@@ -663,6 +675,22 @@ int api_qs_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host, int port
 	client->application_data = (void*)context;
 	return 0;
 }
+int api_qs_websocket_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host, int port, const char* path)
+{
+	int ret = api_qs_client_init(ppcontext, host, port, QS_SERVER_TYPE_PLAIN);
+	if(ret != 0){
+		return ret;
+	}
+	QS_CLIENT_CONTEXT* context = *ppcontext;
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	QS_SOCKET_OPTION* client = (QS_SOCKET_OPTION*)QS_GET_POINTER(memory, context->memid_client);
+	context->websocket_mode = 1;
+	snprintf(context->websocket_path, sizeof(context->websocket_path), "%s", path == NULL ? "/" : path);
+	client->application_data = context;
+	set_on_connect_event(client, api_qs_websocket_client_on_connect);
+	set_on_plain_recv_event(client, api_qs_websocket_client_on_recv);
+	return 0;
+}
 int api_qs_client_get_socket(QS_CLIENT_CONTEXT* context)
 {
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
@@ -684,6 +712,10 @@ void api_qs_set_client_on_simple_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNC
 void api_qs_set_client_on_close_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_close )
 {
 	context->on_close = on_close;
+}
+void api_qs_set_websocket_client_on_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_event)
+{
+	context->on_websocket_event = on_event;
 }
 void api_qs_client_update(QS_CLIENT_CONTEXT* context)
 {
@@ -1966,6 +1998,191 @@ int api_qs_client_on_close(QS_SERVER_CONNECTION_INFO* connection)
 		context->on_close(&params);
 	}
 	return 0;
+}
+
+static int api_qs_websocket_client_send_frame(QS_CLIENT_CONTEXT* context, uint8_t opcode, const void* payload, size_t payload_len)
+{
+	uint8_t frame[65536];
+	uint32_t mask;
+	size_t header_size;
+	size_t pos;
+	uint8_t* mask_bytes;
+	const uint8_t* source = (const uint8_t*)payload;
+	if(payload_len > 65535 || payload_len + 14 > sizeof(frame)){
+		return -1;
+	}
+	frame[0] = 0x80 | opcode;
+	if(payload_len <= 125){
+		frame[1] = 0x80 | (uint8_t)payload_len;
+		header_size = 2;
+	}else{
+		frame[1] = 0x80 | 126;
+		frame[2] = (uint8_t)(payload_len >> 8);
+		frame[3] = (uint8_t)payload_len;
+		header_size = 4;
+	}
+	mask = qs_rand_32();
+	mask_bytes = frame + header_size;
+	mask_bytes[0] = (uint8_t)(mask >> 24);
+	mask_bytes[1] = (uint8_t)(mask >> 16);
+	mask_bytes[2] = (uint8_t)(mask >> 8);
+	mask_bytes[3] = (uint8_t)mask;
+	pos = header_size + 4;
+	for(size_t i = 0; i < payload_len; i++){
+		frame[pos + i] = source == NULL ? 0 : source[i] ^ mask_bytes[i & 3];
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	QS_SOCKET_OPTION* client = (QS_SOCKET_OPTION*)QS_GET_POINTER(memory, context->memid_client);
+	return qs_send_all(client->sockid, (char*)frame, pos + payload_len, 0) < 0 ? -1 : 0;
+}
+
+static int api_qs_websocket_client_read_frame(QS_CLIENT_CONTEXT* context, size_t* consumed)
+{
+	uint8_t* buffer = context->websocket_buffer;
+	size_t size = context->websocket_buffer_size;
+	size_t header_size = 2;
+	size_t payload_len;
+	size_t payload_pos;
+	uint8_t mask[4];
+	if(size < 2){
+		return 0;
+	}
+	payload_len = buffer[1] & 0x7f;
+	if(payload_len == 126){
+		if(size < 4) return 0;
+		payload_len = ((size_t)buffer[2] << 8) | buffer[3];
+		header_size = 4;
+	}else if(payload_len == 127){
+		return -1;
+	}
+	if(buffer[1] & 0x80){
+		header_size += 4;
+	}
+	payload_pos = header_size;
+	if(size < payload_pos + payload_len){
+		return 0;
+	}
+	if((buffer[1] & 0x80) != 0){
+		memcpy(mask, buffer + header_size - 4, sizeof(mask));
+		for(size_t i = 0; i < payload_len; i++){
+			buffer[payload_pos + i] ^= mask[i & 3];
+		}
+	}
+	context->websocket_opcode = buffer[0] & 0x0f;
+	context->websocket_payload_size = payload_len;
+	*consumed = payload_pos + payload_len;
+	context->websocket_payload_offset = payload_pos;
+	if(context->websocket_opcode == 9){
+		api_qs_websocket_client_send_frame(context, 10, buffer + payload_pos, payload_len);
+	}else if(context->websocket_opcode == 8){
+		api_qs_websocket_client_close(context);
+	}else if(context->on_websocket_event != NULL){
+		QS_EVENT_PARAMETER_STRUCT params;
+		params.parameter_type = QS_EVENT_PARAMETER_TYPE_RECV;
+		params.params = context;
+		context->on_websocket_event(&params);
+	}
+	return 1;
+}
+
+int api_qs_websocket_client_on_connect(QS_SERVER_CONNECTION_INFO* connection)
+{
+	QS_CLIENT_CONTEXT* context = ((QS_SOCKET_OPTION*)connection->qs_socket_option)->application_data;
+	uint8_t random_key[16];
+	uint8_t accept_hash[20];
+	char accept_source[128];
+	char encoded_key[64];
+	char* request;
+	for(size_t i = 0; i < sizeof(random_key); i += 4){
+		uint32_t value = qs_rand_32();
+		memcpy(random_key + i, &value, sizeof(value));
+	}
+	qs_base64_encode(encoded_key, sizeof(encoded_key), random_key, sizeof(random_key));
+	snprintf(context->websocket_key, sizeof(context->websocket_key), "%s", encoded_key);
+	snprintf(accept_source, sizeof(accept_source), "%s258EAFA5-E914-47DA-95CA-C5AB0DC85B11", context->websocket_key);
+	request = (char*)malloc(2048);
+	if(request == NULL) return -1;
+	snprintf(request, 2048, "GET %s HTTP/1.1\r\nHost: websocket\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: %s\r\nSec-WebSocket-Version: 13\r\n\r\n", context->websocket_path, context->websocket_key);
+	qs_sha1(accept_hash, accept_source, (uint32_t)strlen(accept_source));
+	qs_base64_encode(context->websocket_accept, sizeof(context->websocket_accept), accept_hash, sizeof(accept_hash));
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	QS_SOCKET_OPTION* client = (QS_SOCKET_OPTION*)QS_GET_POINTER(memory, context->memid_client);
+	int ret = qs_send_all(client->sockid, request, strlen(request), 0);
+	free(request);
+	return ret < 0 ? -1 : 0;
+}
+
+int32_t api_qs_websocket_client_on_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info)
+{
+	QS_CLIENT_CONTEXT* context = ((QS_SOCKET_OPTION*)qs_recv_info->tinfo->qs_socket_option)->application_data;
+	if(context->websocket_buffer_size + payload_len > sizeof(context->websocket_buffer)) return -1;
+	memcpy(context->websocket_buffer + context->websocket_buffer_size, payload, payload_len);
+	context->websocket_buffer_size += payload_len;
+	if(!context->websocket_handshake_complete){
+		size_t header_size = 0;
+		for(size_t i = 3; i < context->websocket_buffer_size; i++){
+			if(context->websocket_buffer[i - 3] == '\r' && context->websocket_buffer[i - 2] == '\n' && context->websocket_buffer[i - 1] == '\r' && context->websocket_buffer[i] == '\n'){
+				header_size = i + 1;
+				break;
+			}
+		}
+		if(header_size == 0) return 0;
+		if(context->websocket_buffer_size < 12 || memcmp(context->websocket_buffer, "HTTP/1.1 101", 12) != 0) return -1;
+		size_t accept_length = strlen(context->websocket_accept);
+		int accept_found = 0;
+		for(size_t i = 0; i + accept_length <= header_size; i++){
+			if(memcmp(context->websocket_buffer + i, context->websocket_accept, accept_length) == 0){
+				accept_found = 1;
+				break;
+			}
+		}
+		if(!accept_found) return -1;
+		context->websocket_handshake_complete = 1;
+		memmove(context->websocket_buffer, context->websocket_buffer + header_size, context->websocket_buffer_size - header_size);
+		context->websocket_buffer_size -= header_size;
+		if(context->on_connect != NULL){
+			QS_EVENT_PARAMETER_STRUCT params;
+			params.parameter_type = QS_EVENT_PARAMETER_TYPE_CONNECTION;
+			params.params = qs_recv_info->tinfo;
+			context->on_connect(&params);
+		}
+	}
+	while(context->websocket_handshake_complete && context->websocket_buffer_size > 0){
+		size_t consumed = 0;
+		int ret = api_qs_websocket_client_read_frame(context, &consumed);
+		if(ret <= 0) return ret < 0 ? -1 : 0;
+		memmove(context->websocket_buffer, context->websocket_buffer + consumed, context->websocket_buffer_size - consumed);
+		context->websocket_buffer_size -= consumed;
+	}
+	return 0;
+}
+
+int api_qs_websocket_client_send(QS_CLIENT_CONTEXT* context, int is_binary, const void* payload, size_t payload_len)
+{
+	if(!context->websocket_handshake_complete) return -1;
+	return api_qs_websocket_client_send_frame(context, is_binary ? 2 : 1, payload, payload_len);
+}
+
+int api_qs_websocket_client_close(QS_CLIENT_CONTEXT* context)
+{
+	if(!context->websocket_handshake_complete) return -1;
+	return api_qs_websocket_client_send_frame(context, 8, NULL, 0);
+}
+
+uint8_t* api_qs_get_websocket_payload(QS_EVENT_PARAMETER params)
+{
+	QS_CLIENT_CONTEXT* context = (QS_CLIENT_CONTEXT*)params->params;
+	return context->websocket_buffer + context->websocket_payload_offset;
+}
+
+size_t api_qs_get_websocket_payload_length(QS_EVENT_PARAMETER params)
+{
+	return ((QS_CLIENT_CONTEXT*)params->params)->websocket_payload_size;
+}
+
+uint8_t api_qs_get_websocket_opcode(QS_EVENT_PARAMETER params)
+{
+	return ((QS_CLIENT_CONTEXT*)params->params)->websocket_opcode;
 }
 
 int api_qs_script_read_file(QS_MEMORY_CONTEXT* memory_context, QS_SERVER_SCRIPT_CONTEXT* script_context,const char* file_path)

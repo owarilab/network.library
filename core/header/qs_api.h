@@ -106,6 +106,17 @@ typedef struct QS_CLIENT_CONTEXT
 	QS_EVENT_FUNCTION on_simple_event;
 	QS_EVENT_FUNCTION on_close;
 	void* client_data;
+	int32_t websocket_mode;
+	int32_t websocket_handshake_complete;
+	char websocket_key[64];
+	char websocket_accept[64];
+	char websocket_path[1024];
+	uint8_t websocket_buffer[65536];
+	size_t websocket_buffer_size;
+	uint8_t websocket_opcode;
+	size_t websocket_payload_size;
+	size_t websocket_payload_offset;
+	QS_EVENT_FUNCTION on_websocket_event;
 } QS_CLIENT_CONTEXT;
 
 typedef struct QS_SERVER_SCRIPT_CONTEXT
@@ -197,16 +208,23 @@ int32_t api_qs_csv_get_row_length(QS_CSV_CONTEXT* csv, int32_t line_pos);
 char* api_qs_csv_get_row(QS_CSV_CONTEXT* csv, int32_t line_pos, int32_t row_pos);
 
 int api_qs_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host, int port, int32_t server_type);
+int api_qs_websocket_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host, int port, const char* path);
 int api_qs_client_get_socket(QS_CLIENT_CONTEXT* context);
 void api_qs_set_client_on_connect_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_connect );
 void api_qs_set_client_on_plain_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_plain_event );
 void api_qs_set_client_on_simple_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_simple_event );
 void api_qs_set_client_on_close_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_close );
+void api_qs_set_websocket_client_on_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_event);
 void api_qs_client_update(QS_CLIENT_CONTEXT* context);
 void api_qs_client_sleep(QS_CLIENT_CONTEXT* context);
 QS_CLIENT_CONTEXT* api_qs_client_get_context(QS_EVENT_PARAMETER params);
 int api_qs_client_send(QS_CLIENT_CONTEXT* context, const char* payload, size_t payload_len);
 int api_qs_client_send_message(QS_CLIENT_CONTEXT* context,uint32_t payload_type, const char* payload, size_t payload_len);
+int api_qs_websocket_client_send(QS_CLIENT_CONTEXT* context, int is_binary, const void* payload, size_t payload_len);
+int api_qs_websocket_client_close(QS_CLIENT_CONTEXT* context);
+uint8_t* api_qs_get_websocket_payload(QS_EVENT_PARAMETER params);
+size_t api_qs_get_websocket_payload_length(QS_EVENT_PARAMETER params);
+uint8_t api_qs_get_websocket_opcode(QS_EVENT_PARAMETER params);
 void api_qs_client_free(QS_CLIENT_CONTEXT* context);
 void api_qs_client_set_lowlevel_send_hook(QS_CLIENT_CONTEXT* context, QS_SOCKET_SEND_HOOK func);
 void api_qs_client_set_lowlevel_recv_hook(QS_CLIENT_CONTEXT* context, QS_SOCKET_RECV_HOOK func);
