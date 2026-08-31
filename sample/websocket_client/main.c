@@ -112,6 +112,12 @@ int main(int argc, char** argv)
 		fprintf(stderr, "websocket client init failed\n");
 		return 1;
 	}
+	if(api_qs_websocket_client_set_max_message_size(g_client, 4096) != 0 ||
+		api_qs_websocket_client_get_max_message_size(g_client) != 4096){
+		fprintf(stderr, "websocket message size configuration failed\n");
+		api_qs_client_free(g_client);
+		return 1;
+	}
 	printf("WebSocket client initialized, socket=%d\n", api_qs_client_get_socket(g_client));
 	api_qs_set_client_on_connect_event(g_client, on_connect);
 	api_qs_set_websocket_client_on_event(g_client, on_websocket_event);
@@ -134,8 +140,10 @@ int main(int argc, char** argv)
 		snprintf(body, sizeof(body), "room_id=%s&connection_id=%s", g_room_id, g_connection_id);
 		run_room_request("POST", "/api/v1/room/leave", body, response, sizeof(response));
 	}
-	if(api_qs_websocket_client_close(g_client) != 0 ||
+	if(api_qs_websocket_client_close_with_reason(g_client, 1000, "test complete") != 0 ||
 		api_qs_websocket_client_get_state(g_client) != QS_WEBSOCKET_STATE_CLOSING ||
+		api_qs_websocket_client_get_close_code(g_client) != 1000 ||
+		strcmp(api_qs_websocket_client_get_close_reason(g_client), "test complete") != 0 ||
 		api_qs_websocket_client_send(g_client, 0, "after-close", strlen("after-close")) == 0){
 		fprintf(stderr, "WebSocket close state handling failed\n");
 		g_failed = 1;

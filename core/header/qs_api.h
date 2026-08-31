@@ -28,6 +28,7 @@ extern "C"{
 
 #define QS_EVENT_PARAMETER_TYPE_RECV 1
 #define QS_EVENT_PARAMETER_TYPE_CONNECTION 2
+#define QS_WEBSOCKET_MAX_MESSAGE_SIZE 65526
 
 typedef enum QS_WEBSOCKET_STATE
 {
@@ -139,6 +140,14 @@ typedef struct QS_CLIENT_CONTEXT
 	uint8_t websocket_opcode;
 	size_t websocket_payload_size;
 	size_t websocket_payload_offset;
+	uint8_t* websocket_payload;
+	uint8_t websocket_fragment_opcode;
+	int32_t websocket_fragment_active;
+	size_t websocket_fragment_size;
+	uint8_t websocket_fragment_buffer[65536];
+	size_t websocket_max_message_size;
+	uint16_t websocket_close_code;
+	char websocket_close_reason[124];
 	QS_EVENT_FUNCTION on_websocket_event;
 } QS_CLIENT_CONTEXT;
 
@@ -245,8 +254,13 @@ int api_qs_client_send(QS_CLIENT_CONTEXT* context, const char* payload, size_t p
 int api_qs_client_send_message(QS_CLIENT_CONTEXT* context,uint32_t payload_type, const char* payload, size_t payload_len);
 int api_qs_websocket_client_send(QS_CLIENT_CONTEXT* context, int is_binary, const void* payload, size_t payload_len);
 int api_qs_websocket_client_close(QS_CLIENT_CONTEXT* context);
+int api_qs_websocket_client_close_with_reason(QS_CLIENT_CONTEXT* context, uint16_t status_code, const char* reason);
+int api_qs_websocket_client_set_max_message_size(QS_CLIENT_CONTEXT* context, size_t max_message_size);
+size_t api_qs_websocket_client_get_max_message_size(QS_CLIENT_CONTEXT* context);
 QS_WEBSOCKET_STATE api_qs_websocket_client_get_state(QS_CLIENT_CONTEXT* context);
 QS_WEBSOCKET_ERROR api_qs_websocket_client_get_error(QS_CLIENT_CONTEXT* context);
+uint16_t api_qs_websocket_client_get_close_code(QS_CLIENT_CONTEXT* context);
+const char* api_qs_websocket_client_get_close_reason(QS_CLIENT_CONTEXT* context);
 uint8_t* api_qs_get_websocket_payload(QS_EVENT_PARAMETER params);
 size_t api_qs_get_websocket_payload_length(QS_EVENT_PARAMETER params);
 uint8_t api_qs_get_websocket_opcode(QS_EVENT_PARAMETER params);
