@@ -51,7 +51,13 @@ static int on_connect(QS_EVENT_PARAMETER params)
 {
 	const char* hello = "native-websocket-client";
 	int send_result;
+	(void)params;
 	printf("WebSocket upgrade complete\n");
+	if(api_qs_websocket_client_get_state(g_client) != QS_WEBSOCKET_STATE_OPEN){
+		fprintf(stderr, "WebSocket did not enter OPEN state\n");
+		g_failed = 1;
+		return -1;
+	}
 	send_result = api_qs_websocket_client_send(g_client, 0, hello, strlen(hello));
 	printf("initial WebSocket send result=%d\n", send_result);
 	if(send_result != 0){
@@ -128,7 +134,12 @@ int main(int argc, char** argv)
 		snprintf(body, sizeof(body), "room_id=%s&connection_id=%s", g_room_id, g_connection_id);
 		run_room_request("POST", "/api/v1/room/leave", body, response, sizeof(response));
 	}
-	api_qs_websocket_client_close(g_client);
+	if(api_qs_websocket_client_close(g_client) != 0 ||
+		api_qs_websocket_client_get_state(g_client) != QS_WEBSOCKET_STATE_CLOSING ||
+		api_qs_websocket_client_send(g_client, 0, "after-close", strlen("after-close")) == 0){
+		fprintf(stderr, "WebSocket close state handling failed\n");
+		g_failed = 1;
+	}
 	api_qs_client_free(g_client);
 	if(g_failed || !g_message_received){
 		fprintf(stderr, "WEBSOCKET TEST FAILED\n");

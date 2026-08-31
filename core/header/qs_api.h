@@ -29,6 +29,27 @@ extern "C"{
 #define QS_EVENT_PARAMETER_TYPE_RECV 1
 #define QS_EVENT_PARAMETER_TYPE_CONNECTION 2
 
+typedef enum QS_WEBSOCKET_STATE
+{
+	QS_WEBSOCKET_STATE_CONNECTING = 0,
+	QS_WEBSOCKET_STATE_HANDSHAKING,
+	QS_WEBSOCKET_STATE_OPEN,
+	QS_WEBSOCKET_STATE_CLOSING,
+	QS_WEBSOCKET_STATE_CLOSED,
+	QS_WEBSOCKET_STATE_ERROR
+} QS_WEBSOCKET_STATE;
+
+typedef enum QS_WEBSOCKET_ERROR
+{
+	QS_WEBSOCKET_ERROR_NONE = 0,
+	QS_WEBSOCKET_ERROR_HANDSHAKE_SEND,
+	QS_WEBSOCKET_ERROR_HANDSHAKE_RESPONSE,
+	QS_WEBSOCKET_ERROR_HANDSHAKE_ACCEPT,
+	QS_WEBSOCKET_ERROR_RECEIVE_BUFFER,
+	QS_WEBSOCKET_ERROR_FRAME,
+	QS_WEBSOCKET_ERROR_SEND
+} QS_WEBSOCKET_ERROR;
+
 #ifndef _QS_SOCKET_ID_DEFINED_
 #define _QS_SOCKET_ID_DEFINED_
 #ifdef __WINDOWS__
@@ -108,6 +129,8 @@ typedef struct QS_CLIENT_CONTEXT
 	void* client_data;
 	int32_t websocket_mode;
 	int32_t websocket_handshake_complete;
+	QS_WEBSOCKET_STATE websocket_state;
+	QS_WEBSOCKET_ERROR websocket_error;
 	char websocket_key[64];
 	char websocket_accept[64];
 	char websocket_path[1024];
@@ -222,6 +245,8 @@ int api_qs_client_send(QS_CLIENT_CONTEXT* context, const char* payload, size_t p
 int api_qs_client_send_message(QS_CLIENT_CONTEXT* context,uint32_t payload_type, const char* payload, size_t payload_len);
 int api_qs_websocket_client_send(QS_CLIENT_CONTEXT* context, int is_binary, const void* payload, size_t payload_len);
 int api_qs_websocket_client_close(QS_CLIENT_CONTEXT* context);
+QS_WEBSOCKET_STATE api_qs_websocket_client_get_state(QS_CLIENT_CONTEXT* context);
+QS_WEBSOCKET_ERROR api_qs_websocket_client_get_error(QS_CLIENT_CONTEXT* context);
 uint8_t* api_qs_get_websocket_payload(QS_EVENT_PARAMETER params);
 size_t api_qs_get_websocket_payload_length(QS_EVENT_PARAMETER params);
 uint8_t api_qs_get_websocket_opcode(QS_EVENT_PARAMETER params);

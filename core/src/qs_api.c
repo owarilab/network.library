@@ -616,6 +616,8 @@ int api_qs_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host, int port
 	context->on_close = NULL;
 	context->websocket_mode = 0;
 	context->websocket_handshake_complete = 0;
+	context->websocket_state = QS_WEBSOCKET_STATE_CLOSED;
+	context->websocket_error = QS_WEBSOCKET_ERROR_NONE;
 	context->websocket_key[0] = '\0';
 	context->websocket_accept[0] = '\0';
 	context->websocket_path[0] = '\0';
@@ -685,6 +687,7 @@ int api_qs_websocket_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
 	QS_SOCKET_OPTION* client = (QS_SOCKET_OPTION*)QS_GET_POINTER(memory, context->memid_client);
 	context->websocket_mode = 1;
+	context->websocket_state = QS_WEBSOCKET_STATE_CONNECTING;
 	snprintf(context->websocket_path, sizeof(context->websocket_path), "%s", path == NULL ? "/" : path);
 	client->application_data = context;
 	set_on_connect_event(client, api_qs_websocket_client_on_connect);
@@ -1991,6 +1994,9 @@ int api_qs_client_on_close(QS_SERVER_CONNECTION_INFO* connection)
 {
 	//printf("api_qs_client_on_close\n");
 	QS_CLIENT_CONTEXT* context = ((QS_SOCKET_OPTION*)connection->qs_socket_option)->application_data;
+	if(context->websocket_mode && context->websocket_state != QS_WEBSOCKET_STATE_ERROR){
+		context->websocket_state = QS_WEBSOCKET_STATE_CLOSED;
+	}
 	if(context->on_close != NULL){
 		QS_EVENT_PARAMETER_STRUCT params;
 		params.parameter_type = QS_EVENT_PARAMETER_TYPE_CONNECTION;
@@ -1998,6 +2004,12 @@ int api_qs_client_on_close(QS_SERVER_CONNECTION_INFO* connection)
 		context->on_close(&params);
 	}
 	return 0;
+}
+
+static void api_qs_websocket_client_set_error(QS_CLIENT_CONTEXT* context, QS_WEBSOCKET_ERROR error)
+{
+	context->websocket_error = error;
+	context->websocket_state = QS_WEBSOCKET_STATE_ERROR;
 }
 
 static int api_qs_websocket_client_send_frame(QS_CLIENT_CONTEXT* context, uint8_t opcode, const void* payload, size_t payload_len)
@@ -2009,6 +2021,7 @@ static int api_qs_websocket_client_send_frame(QS_CLIENT_CONTEXT* context, uint8_
 	uint8_t* mask_bytes;
 	const uint8_t* source = (const uint8_t*)payload;
 	if(payload_len > 65535 || payload_len + 14 > sizeof(frame)){
+		api_qs_websocket_client_set_error(context, QS_WEBSOCKET_ERROR_SEND);
 		return -1;
 	}
 	frame[0] = 0x80 | opcode;
@@ -2033,7 +2046,11 @@ static int api_qs_websocket_client_send_frame(QS_CLIENT_CONTEXT* context, uint8_
 	}
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
 	QS_SOCKET_OPTION* client = (QS_SOCKET_OPTION*)QS_GET_POINTER(memory, context->memid_client);
-	return qs_send_all(client->sockid, (char*)frame, pos + payload_len, 0) < 0 ? -1 : 0;
+	if(qs_send_all(client->sockid, (char*)frame, pos + payload_len, 0) < 0){
+		api_qs_websocket_client_set_error(context, QS_WEBSOCKET_ERROR_SEND);
+		return -1;
+	}
+	return 0;
 }
 
 static int api_qs_websocket_client_read_frame(QS_CLIENT_CONTEXT* context, size_t* consumed)
@@ -2053,6 +2070,7 @@ static int api_qs_websocket_client_read_frame(QS_CLIENT_CONTEXT* context, size_t
 		payload_len = ((size_t)buffer[2] << 8) | buffer[3];
 		header_size = 4;
 	}else if(payload_len == 127){
+		api_qs_websocket_client_set_error(context, QS_WEBSOCKET_ERROR_FRAME);
 		return -1;
 	}
 	if(buffer[1] & 0x80){
@@ -2073,9 +2091,13 @@ static int api_qs_websocket_client_read_frame(QS_CLIENT_CONTEXT* context, size_t
 	*consumed = payload_pos + payload_len;
 	context->websocket_payload_offset = payload_pos;
 	if(context->websocket_opcode == 9){
-		api_qs_websocket_client_send_frame(context, 10, buffer + payload_pos, payload_len);
+		if(api_qs_websocket_client_send_frame(context, 10, buffer + payload_pos, payload_len) != 0){
+			return -1;
+		}
 	}else if(context->websocket_opcode == 8){
-		api_qs_websocket_client_close(context);
+		if(api_qs_websocket_client_close(context) != 0){
+			return -1;
+		}
 	}else if(context->on_websocket_event != NULL){
 		QS_EVENT_PARAMETER_STRUCT params;
 		params.parameter_type = QS_EVENT_PARAMETER_TYPE_RECV;
@@ -2093,6 +2115,7 @@ int api_qs_websocket_client_on_connect(QS_SERVER_CONNECTION_INFO* connection)
 	char accept_source[128];
 	char encoded_key[64];
 	char* request;
+	context->websocket_state = QS_WEBSOCKET_STATE_HANDSHAKING;
 	for(size_t i = 0; i < sizeof(random_key); i += 4){
 		uint32_t value = qs_rand_32();
 		memcpy(random_key + i, &value, sizeof(value));
@@ -2101,7 +2124,10 @@ int api_qs_websocket_client_on_connect(QS_SERVER_CONNECTION_INFO* connection)
 	snprintf(context->websocket_key, sizeof(context->websocket_key), "%s", encoded_key);
 	snprintf(accept_source, sizeof(accept_source), "%s258EAFA5-E914-47DA-95CA-C5AB0DC85B11", context->websocket_key);
 	request = (char*)malloc(2048);
-	if(request == NULL) return -1;
+	if(request == NULL){
+		api_qs_websocket_client_set_error(context, QS_WEBSOCKET_ERROR_HANDSHAKE_SEND);
+		return -1;
+	}
 	snprintf(request, 2048, "GET %s HTTP/1.1\r\nHost: websocket\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: %s\r\nSec-WebSocket-Version: 13\r\n\r\n", context->websocket_path, context->websocket_key);
 	qs_sha1(accept_hash, accept_source, (uint32_t)strlen(accept_source));
 	qs_base64_encode(context->websocket_accept, sizeof(context->websocket_accept), accept_hash, sizeof(accept_hash));
@@ -2109,13 +2135,20 @@ int api_qs_websocket_client_on_connect(QS_SERVER_CONNECTION_INFO* connection)
 	QS_SOCKET_OPTION* client = (QS_SOCKET_OPTION*)QS_GET_POINTER(memory, context->memid_client);
 	int ret = qs_send_all(client->sockid, request, strlen(request), 0);
 	free(request);
-	return ret < 0 ? -1 : 0;
+	if(ret < 0){
+		api_qs_websocket_client_set_error(context, QS_WEBSOCKET_ERROR_HANDSHAKE_SEND);
+		return -1;
+	}
+	return 0;
 }
 
 int32_t api_qs_websocket_client_on_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info)
 {
 	QS_CLIENT_CONTEXT* context = ((QS_SOCKET_OPTION*)qs_recv_info->tinfo->qs_socket_option)->application_data;
-	if(context->websocket_buffer_size + payload_len > sizeof(context->websocket_buffer)) return -1;
+	if(context->websocket_buffer_size + payload_len > sizeof(context->websocket_buffer)){
+		api_qs_websocket_client_set_error(context, QS_WEBSOCKET_ERROR_RECEIVE_BUFFER);
+		return -1;
+	}
 	memcpy(context->websocket_buffer + context->websocket_buffer_size, payload, payload_len);
 	context->websocket_buffer_size += payload_len;
 	if(!context->websocket_handshake_complete){
@@ -2127,7 +2160,10 @@ int32_t api_qs_websocket_client_on_recv(uint8_t* payload, size_t payload_len, QS
 			}
 		}
 		if(header_size == 0) return 0;
-		if(context->websocket_buffer_size < 12 || memcmp(context->websocket_buffer, "HTTP/1.1 101", 12) != 0) return -1;
+		if(context->websocket_buffer_size < 12 || memcmp(context->websocket_buffer, "HTTP/1.1 101", 12) != 0){
+			api_qs_websocket_client_set_error(context, QS_WEBSOCKET_ERROR_HANDSHAKE_RESPONSE);
+			return -1;
+		}
 		size_t accept_length = strlen(context->websocket_accept);
 		int accept_found = 0;
 		for(size_t i = 0; i + accept_length <= header_size; i++){
@@ -2136,8 +2172,12 @@ int32_t api_qs_websocket_client_on_recv(uint8_t* payload, size_t payload_len, QS
 				break;
 			}
 		}
-		if(!accept_found) return -1;
+		if(!accept_found){
+			api_qs_websocket_client_set_error(context, QS_WEBSOCKET_ERROR_HANDSHAKE_ACCEPT);
+			return -1;
+		}
 		context->websocket_handshake_complete = 1;
+		context->websocket_state = QS_WEBSOCKET_STATE_OPEN;
 		memmove(context->websocket_buffer, context->websocket_buffer + header_size, context->websocket_buffer_size - header_size);
 		context->websocket_buffer_size -= header_size;
 		if(context->on_connect != NULL){
@@ -2159,14 +2199,27 @@ int32_t api_qs_websocket_client_on_recv(uint8_t* payload, size_t payload_len, QS
 
 int api_qs_websocket_client_send(QS_CLIENT_CONTEXT* context, int is_binary, const void* payload, size_t payload_len)
 {
-	if(!context->websocket_handshake_complete) return -1;
+	if(context->websocket_state != QS_WEBSOCKET_STATE_OPEN) return -1;
 	return api_qs_websocket_client_send_frame(context, is_binary ? 2 : 1, payload, payload_len);
 }
 
 int api_qs_websocket_client_close(QS_CLIENT_CONTEXT* context)
 {
-	if(!context->websocket_handshake_complete) return -1;
-	return api_qs_websocket_client_send_frame(context, 8, NULL, 0);
+	int ret;
+	if(context->websocket_state != QS_WEBSOCKET_STATE_OPEN) return -1;
+	context->websocket_state = QS_WEBSOCKET_STATE_CLOSING;
+	ret = api_qs_websocket_client_send_frame(context, 8, NULL, 0);
+	return ret;
+}
+
+QS_WEBSOCKET_STATE api_qs_websocket_client_get_state(QS_CLIENT_CONTEXT* context)
+{
+	return context->websocket_state;
+}
+
+QS_WEBSOCKET_ERROR api_qs_websocket_client_get_error(QS_CLIENT_CONTEXT* context)
+{
+	return context->websocket_error;
 }
 
 uint8_t* api_qs_get_websocket_payload(QS_EVENT_PARAMETER params)
