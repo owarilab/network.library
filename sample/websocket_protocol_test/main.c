@@ -1,5 +1,6 @@
 #include "qs_protocol.h"
 
+#include <fcntl.h>
 #include <sys/socket.h>
 
 typedef struct TEST_MESSAGE
@@ -216,6 +217,62 @@ static int test_close_and_invalid_continuation(void)
 	return passed ? 0 : -1;
 }
 
+static int set_nonblocking(int socket)
+{
+	int flags = fcntl(socket, F_GETFL, 0);
+	return flags < 0 ? -1 : fcntl(socket, F_SETFL, flags | O_NONBLOCK);
+}
+
+static ssize_t drain_socket(int socket, uint8_t* buffer, size_t buffer_size, size_t* offset)
+{
+	ssize_t result;
+	while(*offset < buffer_size && (result = recv(socket, buffer + *offset, buffer_size - *offset, 0)) > 0) *offset += (size_t)result;
+	return result;
+}
+
+static int test_nonblocking_send_queue(void)
+{
+	int sockets[2];
+	int send_buffer_size = 1024;
+	uint8_t* payload = (uint8_t*)malloc(60000);
+	uint8_t* wire = (uint8_t*)malloc(70000);
+	QS_WEBSOCKET_CLIENT* client = create_open_client();
+	if(client == NULL || payload == NULL || wire == NULL || socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) != 0) return -1;
+	memset(payload, 'a', 60000);
+	setsockopt(sockets[0], SOL_SOCKET, SO_SNDBUF, &send_buffer_size, sizeof(send_buffer_size));
+	if(set_nonblocking(sockets[0]) != 0 || set_nonblocking(sockets[1]) != 0){ close(sockets[0]); close(sockets[1]); qs_websocket_client_destroy(client); free(wire); free(payload); return -1; }
+	int result = qs_websocket_client_send(client, sockets[0], 1, payload, 60000);
+	size_t pending_after_partial_write = qs_websocket_client_get_pending_send_size(client);
+	result |= qs_websocket_client_send(client, sockets[0], 0, "ok", 2);
+	size_t queued_size = client->websocket_send_size;
+	size_t queued_offset = client->websocket_send_offset;
+	client->websocket_send_size = QS_WEBSOCKET_MAX_SEND_QUEUE_SIZE;
+	client->websocket_send_offset = 0;
+	int upper_bound_result = qs_websocket_client_send(client, sockets[0], 0, "x", 1);
+	client->websocket_send_size = queued_size;
+	client->websocket_send_offset = queued_offset;
+	client->websocket_error = QS_WEBSOCKET_ERROR_NONE;
+	size_t wire_size = 0;
+	int flush_count = 0;
+	while(qs_websocket_client_get_pending_send_size(client) > 0 && flush_count++ < 100){
+		drain_socket(sockets[1], wire, 70000, &wire_size);
+		if(qs_websocket_client_on_writable(client, sockets[0]) != 0) result = -1;
+	}
+	drain_socket(sockets[1], wire, 70000, &wire_size);
+	size_t first_frame_size = 8 + 60000;
+	int passed = result == 0 && pending_after_partial_write > 0 && qs_websocket_client_get_pending_send_size(client) == 0 && upper_bound_result == -1 && wire_size == first_frame_size + 8 && wire[0] == 0x82 && wire[1] == 0xfe && wire[first_frame_size] == 0x81 && wire[first_frame_size + 1] == 0x82;
+	if(passed){
+		for(size_t index = 0; index < 60000; index++) if((wire[8 + index] ^ wire[4 + (index % 4)]) != 'a'){ passed = 0; break; }
+		passed = passed && (wire[first_frame_size + 6] ^ wire[first_frame_size + 2]) == 'o' && (wire[first_frame_size + 7] ^ wire[first_frame_size + 3]) == 'k';
+	}
+	close(sockets[0]);
+	close(sockets[1]);
+	qs_websocket_client_destroy(client);
+	free(wire);
+	free(payload);
+	return passed ? 0 : -1;
+}
+
 int main(void)
 {
 	int failed = 0;
@@ -229,6 +286,7 @@ int main(void)
 	failed |= test_ping_pong();
 	failed |= test_invalid_control_and_close_frames();
 	failed |= test_close_and_invalid_continuation();
+	failed |= test_nonblocking_send_queue();
 	if(failed != 0){
 		fprintf(stderr, "WEBSOCKET PROTOCOL TEST FAILED\n");
 		return 1;

@@ -18,6 +18,8 @@ extern "C"{
 #include "qs_sha1.h"
 #include "qs_base64.h"
 
+#define QS_WEBSOCKET_MAX_SEND_QUEUE_SIZE (SIZE_MBYTE * 1)
+
 // HTTP method
 #define HTTP_METHOD_GET		1;
 #define HTTP_METHOD_HEAD	2;
@@ -96,6 +98,10 @@ typedef struct QS_WEBSOCKET_CLIENT
 	size_t websocket_max_message_size;
 	uint16_t websocket_close_code;
 	char websocket_close_reason[124];
+	uint8_t* websocket_send_buffer;
+	size_t websocket_send_size;
+	size_t websocket_send_offset;
+	size_t websocket_send_capacity;
 } QS_WEBSOCKET_CLIENT;
 
 ssize_t qs_get_protocol_buffer_size(ssize_t payload_size);
@@ -133,6 +139,7 @@ int qs_websocket_client_create(QS_WEBSOCKET_CLIENT** client, const char* host, i
 void qs_websocket_client_destroy(QS_WEBSOCKET_CLIENT* client);
 int qs_websocket_client_on_connect(QS_WEBSOCKET_CLIENT* client, QS_SOCKET_ID socket);
 int qs_websocket_client_on_recv(QS_WEBSOCKET_CLIENT* client, QS_SOCKET_ID socket, const uint8_t* payload, size_t payload_len, int (*on_message)(void* user_data), void* user_data);
+int qs_websocket_client_on_writable(QS_WEBSOCKET_CLIENT* client, QS_SOCKET_ID socket);
 int qs_websocket_client_send(QS_WEBSOCKET_CLIENT* client, QS_SOCKET_ID socket, int is_binary, const void* payload, size_t payload_len);
 int qs_websocket_client_close(QS_WEBSOCKET_CLIENT* client, QS_SOCKET_ID socket);
 int qs_websocket_client_close_with_reason(QS_WEBSOCKET_CLIENT* client, QS_SOCKET_ID socket, uint16_t status_code, const char* reason);
@@ -147,6 +154,7 @@ const char* qs_websocket_client_get_close_reason(const QS_WEBSOCKET_CLIENT* clie
 uint8_t* qs_websocket_client_get_payload(const QS_WEBSOCKET_CLIENT* client);
 size_t qs_websocket_client_get_payload_length(const QS_WEBSOCKET_CLIENT* client);
 uint8_t qs_websocket_client_get_opcode(const QS_WEBSOCKET_CLIENT* client);
+size_t qs_websocket_client_get_pending_send_size(const QS_WEBSOCKET_CLIENT* client);
 
 #endif /*_QS_PROTOCOL_H_*/
 

@@ -604,6 +604,8 @@ char* api_qs_csv_get_row(QS_CSV_CONTEXT* csv, int32_t line_pos, int32_t row_pos)
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)csv->memory;
 	return qs_csv_get_row(memory,csv->memid_csv,line_pos,row_pos);
 }
+static void* api_qs_websocket_client_on_writable(void* user_data);
+
 int api_qs_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host, int port, int32_t server_type)
 {
 	if( ( (*ppcontext) = ( QS_CLIENT_CONTEXT * )malloc( sizeof( QS_CLIENT_CONTEXT ) ) ) == NULL ){
@@ -686,6 +688,7 @@ int api_qs_websocket_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host
 	client->application_data = context;
 	set_on_connect_event(client, api_qs_websocket_client_on_connect);
 	set_on_plain_recv_event(client, api_qs_websocket_client_on_recv);
+	set_on_write_ready_event(client, api_qs_websocket_client_on_writable);
 	return 0;
 }
 int api_qs_client_get_socket(QS_CLIENT_CONTEXT* context)
@@ -2014,11 +2017,28 @@ static int api_qs_websocket_client_dispatch_event(void* user_data)
 	return 0;
 }
 
+static void api_qs_websocket_client_update_write_wait(QS_CLIENT_CONTEXT* context, QS_SOCKET_OPTION* client)
+{
+	qs_set_write_wait(client, qs_websocket_client_get_pending_send_size(context->websocket_client) > 0);
+}
+
+static void* api_qs_websocket_client_on_writable(void* user_data)
+{
+	QS_CLIENT_CONTEXT* context = (QS_CLIENT_CONTEXT*)user_data;
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	QS_SOCKET_OPTION* client = (QS_SOCKET_OPTION*)QS_GET_POINTER(memory, context->memid_client);
+	qs_websocket_client_on_writable(context->websocket_client, client->sockid);
+	api_qs_websocket_client_update_write_wait(context, client);
+	return NULL;
+}
+
 int api_qs_websocket_client_on_connect(QS_SERVER_CONNECTION_INFO* connection)
 {
 	QS_SOCKET_OPTION* client = (QS_SOCKET_OPTION*)connection->qs_socket_option;
 	QS_CLIENT_CONTEXT* context = client->application_data;
-	return qs_websocket_client_on_connect(context->websocket_client, client->sockid);
+	int result = qs_websocket_client_on_connect(context->websocket_client, client->sockid);
+	api_qs_websocket_client_update_write_wait(context, client);
+	return result;
 }
 
 int32_t api_qs_websocket_client_on_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info)
@@ -2027,6 +2047,7 @@ int32_t api_qs_websocket_client_on_recv(uint8_t* payload, size_t payload_len, QS
 	QS_CLIENT_CONTEXT* context = client->application_data;
 	int was_handshaking = !qs_websocket_client_is_handshake_complete(context->websocket_client);
 	int result = qs_websocket_client_on_recv(context->websocket_client, client->sockid, payload, payload_len, api_qs_websocket_client_dispatch_event, context);
+	api_qs_websocket_client_update_write_wait(context, client);
 	if(result == 0 && was_handshaking && qs_websocket_client_is_handshake_complete(context->websocket_client) && context->on_connect != NULL){
 		QS_EVENT_PARAMETER_STRUCT params;
 		params.parameter_type = QS_EVENT_PARAMETER_TYPE_CONNECTION;
@@ -2040,21 +2061,27 @@ int api_qs_websocket_client_send(QS_CLIENT_CONTEXT* context, int is_binary, cons
 {
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
 	QS_SOCKET_OPTION* client = (QS_SOCKET_OPTION*)QS_GET_POINTER(memory, context->memid_client);
-	return qs_websocket_client_send(context->websocket_client, client->sockid, is_binary, payload, payload_len);
+	int result = qs_websocket_client_send(context->websocket_client, client->sockid, is_binary, payload, payload_len);
+	api_qs_websocket_client_update_write_wait(context, client);
+	return result;
 }
 
 int api_qs_websocket_client_close(QS_CLIENT_CONTEXT* context)
 {
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
 	QS_SOCKET_OPTION* client = (QS_SOCKET_OPTION*)QS_GET_POINTER(memory, context->memid_client);
-	return qs_websocket_client_close(context->websocket_client, client->sockid);
+	int result = qs_websocket_client_close(context->websocket_client, client->sockid);
+	api_qs_websocket_client_update_write_wait(context, client);
+	return result;
 }
 
 int api_qs_websocket_client_close_with_reason(QS_CLIENT_CONTEXT* context, uint16_t status_code, const char* reason)
 {
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
 	QS_SOCKET_OPTION* client = (QS_SOCKET_OPTION*)QS_GET_POINTER(memory, context->memid_client);
-	return qs_websocket_client_close_with_reason(context->websocket_client, client->sockid, status_code, reason);
+	int result = qs_websocket_client_close_with_reason(context->websocket_client, client->sockid, status_code, reason);
+	api_qs_websocket_client_update_write_wait(context, client);
+	return result;
 }
 
 int api_qs_websocket_client_set_max_message_size(QS_CLIENT_CONTEXT* context, size_t max_message_size)

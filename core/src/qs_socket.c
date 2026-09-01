@@ -380,6 +380,8 @@ int qs_initialize_socket_option(
 	option->wait_read = 0;
 	option->connection_start_callback	= NULL;
 	option->send_finish_callback		= NULL;
+	option->write_ready_callback		= NULL;
+	option->wait_write				= 0;
 	option->plain_recv_callback			= NULL;
 	option->payload_recv_callback 		= NULL;
 	option->close_callback				= NULL;
@@ -480,6 +482,16 @@ void set_on_connect_event( QS_SOCKET_OPTION *option, QS_CONNECTION_EVENT_CALLBAC
 void set_on_sent_event( QS_SOCKET_OPTION *option, QS_CALLBACK func )
 {
 	option->send_finish_callback = func;
+}
+
+void set_on_write_ready_event( QS_SOCKET_OPTION *option, QS_CALLBACK func )
+{
+	option->write_ready_callback = func;
+}
+
+void qs_set_write_wait( QS_SOCKET_OPTION *option, int wait_write )
+{
+	option->wait_write = wait_write ? 1 : 0;
 }
 void set_on_plain_recv_event( QS_SOCKET_OPTION *option, QS_ON_PLAIN_RECV func )
 {
@@ -833,6 +845,25 @@ ssize_t qs_send( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockparam, char *buf, 
 		}
 	}
 	return len;
+}
+
+ssize_t qs_send_once(QS_SOCKET_ID soc, const char *buf, size_t size, int flag)
+{
+	int send_flag = flag;
+#ifndef __WINDOWS__
+#ifdef MSG_NOSIGNAL
+	send_flag |= MSG_NOSIGNAL;
+#endif
+#endif
+	QS_SOCKET_OPTION* option = find_socket_option_by_fd(soc);
+	ssize_t result = option != NULL && option->send_hook != NULL ? option->send_hook(soc, buf, size, send_flag) : send(soc, buf, size, send_flag);
+	if(result >= 0) return result;
+#ifdef __WINDOWS__
+	if(WSAGetLastError() == WSAEWOULDBLOCK) return -2;
+#else
+	if(errno == EAGAIN || errno == EWOULDBLOCK) return -2;
+#endif
+	return -1;
 }
 
 ssize_t qs_send_all(QS_SOCKET_ID soc, char *buf, size_t size, int flag )
@@ -1959,6 +1990,14 @@ void qs_client_update(QS_SOCKET_OPTION *option)
 		if(option->client_connection_status != CLIENT_STATUS_CONNECTED)
 		{
 			return;
+		}
+		if(option->wait_write && option->write_ready_callback != NULL){
+			fd_set write_mask;
+			struct timeval timeout = { 0, 0 };
+			FD_ZERO(&write_mask);
+			FD_SET(option->sockid, &write_mask);
+			int select_result = select((int)(option->sockid + 1), NULL, &write_mask, NULL, &timeout);
+			if(select_result > 0 && FD_ISSET(option->sockid, &write_mask)) option->write_ready_callback(option->application_data);
 		}
 
 		if (child->id != -1)

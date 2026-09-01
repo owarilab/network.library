@@ -199,8 +199,10 @@ typedef struct QS_SOCKET_OPTION
 	int32_t session_timeout_sec;
 	int32_t sleep_usec;
 	uint8_t wait_read;
+	uint8_t wait_write;
 	QS_CONNECTION_EVENT_CALLBACK connection_start_callback;	// callback pointer
 	QS_CALLBACK send_finish_callback;		// callback pointer
+	QS_CALLBACK write_ready_callback;
 	QS_ON_PLAIN_RECV plain_recv_callback;		// callback pointer
 	QS_CONNECTION_EVENT_CALLBACK close_callback;			// callback pointer
 	QS_CALLBACK timeout_callback;			// callback pointer
@@ -254,6 +256,8 @@ int qs_initialize_socket_option(
 
 void set_on_connect_event( QS_SOCKET_OPTION *option, QS_CONNECTION_EVENT_CALLBACK func );
 void set_on_sent_event( QS_SOCKET_OPTION *option, QS_CALLBACK func );
+void set_on_write_ready_event( QS_SOCKET_OPTION *option, QS_CALLBACK func );
+void qs_set_write_wait( QS_SOCKET_OPTION *option, int wait_write );
 void set_on_plain_recv_event( QS_SOCKET_OPTION *option, QS_ON_PLAIN_RECV func );
 void set_on_payload_recv_event( QS_SOCKET_OPTION *option, QS_ON_RECV func );
 void set_on_close_event( QS_SOCKET_OPTION *option, QS_CONNECTION_EVENT_CALLBACK func );
@@ -283,6 +287,7 @@ void qs_initialize_connection_info( QS_SOCKET_OPTION *option, QS_SERVER_CONNECTI
 ssize_t qs_send_broadcast( QS_SOCKET_OPTION *option, char *buf, size_t size, uint32_t payload_type );
 ssize_t qs_send_one( QS_SOCKET_OPTION *option, uint32_t connection, char *buf, size_t size, uint32_t payload_type );
 ssize_t qs_send( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psockparam, char *buf, size_t size, uint32_t payload_type );
+ssize_t qs_send_once(QS_SOCKET_ID soc, const char *buf, size_t size, int flag);
 ssize_t qs_send_all(QS_SOCKET_ID soc, char *buf, size_t size, int flag );
 ssize_t qs_sendto_all(QS_SOCKET_ID soc, char *buf, size_t size, int flag, struct sockaddr *pfrom, socklen_t fromlen );
 
