@@ -74,6 +74,29 @@ typedef struct QS_HTTP_CLIENT
 	size_t temp_buffer_size;
 } QS_HTTP_CLIENT;
 
+typedef struct QS_WEBSOCKET_CLIENT
+{
+	int32_t websocket_handshake_complete;
+	QS_WEBSOCKET_STATE websocket_state;
+	QS_WEBSOCKET_ERROR websocket_error;
+	char websocket_key[64];
+	char websocket_accept[64];
+	char websocket_path[1024];
+	uint8_t websocket_buffer[QS_WEBSOCKET_MAX_MESSAGE_SIZE + 14];
+	size_t websocket_buffer_size;
+	uint8_t websocket_opcode;
+	size_t websocket_payload_size;
+	size_t websocket_payload_offset;
+	uint8_t* websocket_payload;
+	uint8_t websocket_fragment_opcode;
+	int32_t websocket_fragment_active;
+	size_t websocket_fragment_size;
+	uint8_t websocket_fragment_buffer[QS_WEBSOCKET_MAX_MESSAGE_SIZE];
+	size_t websocket_max_message_size;
+	uint16_t websocket_close_code;
+	char websocket_close_reason[124];
+} QS_WEBSOCKET_CLIENT;
+
 ssize_t qs_get_protocol_buffer_size(ssize_t payload_size);
 uint8_t qs_get_protocol_header_size_byte(ssize_t payload_size);
 uint32_t qs_get_protocol_header_size(ssize_t payload_size);
@@ -104,6 +127,25 @@ ssize_t qs_parse_websocket_binary( QS_SOCKET_OPTION *option, QS_SOCKPARAM *psock
 ssize_t qs_make_websocket_msg( void* message_buffer, size_t message_buffer_size,int is_binary, const char* msg, ssize_t size );
 ssize_t qs_make_ws_message_simple(QS_MEMORY_POOL * temporary_memory,char* connection_id,char* type,char* message,void* buffer,size_t buffer_size);
 int qs_send_handshake_param(QS_SOCKET_ID socket, QS_SOCKET_OPTION *option, QS_SERVER_CONNECTION_INFO* connection );
+
+int qs_websocket_client_create(QS_WEBSOCKET_CLIENT** client, const char* path);
+void qs_websocket_client_destroy(QS_WEBSOCKET_CLIENT* client);
+int qs_websocket_client_on_connect(QS_WEBSOCKET_CLIENT* client, QS_SOCKET_ID socket);
+int qs_websocket_client_on_recv(QS_WEBSOCKET_CLIENT* client, QS_SOCKET_ID socket, const uint8_t* payload, size_t payload_len, int (*on_message)(void* user_data), void* user_data);
+int qs_websocket_client_send(QS_WEBSOCKET_CLIENT* client, QS_SOCKET_ID socket, int is_binary, const void* payload, size_t payload_len);
+int qs_websocket_client_close(QS_WEBSOCKET_CLIENT* client, QS_SOCKET_ID socket);
+int qs_websocket_client_close_with_reason(QS_WEBSOCKET_CLIENT* client, QS_SOCKET_ID socket, uint16_t status_code, const char* reason);
+int qs_websocket_client_set_max_message_size(QS_WEBSOCKET_CLIENT* client, size_t max_message_size);
+int qs_websocket_client_is_handshake_complete(const QS_WEBSOCKET_CLIENT* client);
+void qs_websocket_client_set_closed(QS_WEBSOCKET_CLIENT* client);
+size_t qs_websocket_client_get_max_message_size(const QS_WEBSOCKET_CLIENT* client);
+QS_WEBSOCKET_STATE qs_websocket_client_get_state(const QS_WEBSOCKET_CLIENT* client);
+QS_WEBSOCKET_ERROR qs_websocket_client_get_error(const QS_WEBSOCKET_CLIENT* client);
+uint16_t qs_websocket_client_get_close_code(const QS_WEBSOCKET_CLIENT* client);
+const char* qs_websocket_client_get_close_reason(const QS_WEBSOCKET_CLIENT* client);
+uint8_t* qs_websocket_client_get_payload(const QS_WEBSOCKET_CLIENT* client);
+size_t qs_websocket_client_get_payload_length(const QS_WEBSOCKET_CLIENT* client);
+uint8_t qs_websocket_client_get_opcode(const QS_WEBSOCKET_CLIENT* client);
 
 #endif /*_QS_PROTOCOL_H_*/
 

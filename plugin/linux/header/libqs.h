@@ -137,6 +137,8 @@ typedef struct QS_SERVER_CONTEXT
 	ssize_t ws_message_size;
 } QS_SERVER_CONTEXT;
 
+typedef struct QS_WEBSOCKET_CLIENT QS_WEBSOCKET_CLIENT;
+
 typedef struct QS_CLIENT_CONTEXT
 {
 	void* memory;
@@ -150,15 +152,7 @@ typedef struct QS_CLIENT_CONTEXT
 	QS_EVENT_FUNCTION on_close;
 	void* client_data;
 	int32_t websocket_mode;
-	int32_t websocket_handshake_complete;
-	char websocket_key[64];
-	char websocket_accept[64];
-	char websocket_path[1024];
-	uint8_t websocket_buffer[65536];
-	size_t websocket_buffer_size;
-	uint8_t websocket_opcode;
-	size_t websocket_payload_size;
-	size_t websocket_payload_offset;
+	QS_WEBSOCKET_CLIENT* websocket_client;
 	QS_EVENT_FUNCTION on_websocket_event;
 } QS_CLIENT_CONTEXT;
 

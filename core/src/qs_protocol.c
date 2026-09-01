@@ -3,7 +3,10 @@
  */
 
 #include "qs_protocol.h"
+#include "qs_random.h"
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static void qs_http_canonicalize_header_name(char* out, size_t out_size, const char* in)
@@ -1451,4 +1454,333 @@ int qs_send_handshake_param(QS_SOCKET_ID socket, QS_SOCKET_OPTION *option, QS_SE
 		return qs_error("send handshake buffer size error");
 	}
 	return 1;
+}
+
+static void qs_websocket_client_set_error(QS_WEBSOCKET_CLIENT* context, QS_WEBSOCKET_ERROR error)
+{
+	context->websocket_error = error;
+	context->websocket_state = QS_WEBSOCKET_STATE_ERROR;
+}
+
+static int qs_websocket_client_is_valid_close_code(uint16_t status_code)
+{
+	return status_code >= 1000 && status_code < 5000 && status_code != 1004 &&
+		status_code != 1005 && status_code != 1006 && status_code != 1015;
+}
+
+static int qs_websocket_client_send_frame(QS_WEBSOCKET_CLIENT* context, QS_SOCKET_ID socket, uint8_t opcode, const void* payload, size_t payload_len)
+{
+	uint8_t frame[65536];
+	uint32_t mask;
+	size_t header_size;
+	size_t payload_offset;
+	uint8_t* mask_bytes;
+	const uint8_t* source = (const uint8_t*)payload;
+	if(payload_len > 65535 || payload_len + 14 > sizeof(frame)){
+		qs_websocket_client_set_error(context, QS_WEBSOCKET_ERROR_SEND);
+		return -1;
+	}
+	frame[0] = 0x80 | opcode;
+	if(payload_len <= 125){
+		frame[1] = 0x80 | (uint8_t)payload_len;
+		header_size = 2;
+	}else{
+		frame[1] = 0x80 | 126;
+		frame[2] = (uint8_t)(payload_len >> 8);
+		frame[3] = (uint8_t)payload_len;
+		header_size = 4;
+	}
+	mask = qs_rand_32();
+	mask_bytes = frame + header_size;
+	mask_bytes[0] = (uint8_t)(mask >> 24);
+	mask_bytes[1] = (uint8_t)(mask >> 16);
+	mask_bytes[2] = (uint8_t)(mask >> 8);
+	mask_bytes[3] = (uint8_t)mask;
+	payload_offset = header_size + 4;
+	for(size_t i = 0; i < payload_len; i++){
+		frame[payload_offset + i] = source == NULL ? 0 : source[i] ^ mask_bytes[i & 3];
+	}
+	if(qs_send_all(socket, (char*)frame, payload_offset + payload_len, 0) < 0){
+		qs_websocket_client_set_error(context, QS_WEBSOCKET_ERROR_SEND);
+		return -1;
+	}
+	return 0;
+}
+
+static int qs_websocket_client_send_close_payload(QS_WEBSOCKET_CLIENT* context, QS_SOCKET_ID socket, const void* payload, size_t payload_len)
+{
+	if(payload_len > 125) return -1;
+	return qs_websocket_client_send_frame(context, socket, 8, payload, payload_len);
+}
+
+static void qs_websocket_client_fail_frame(QS_WEBSOCKET_CLIENT* context, QS_SOCKET_ID socket, uint16_t close_code)
+{
+	uint8_t payload[2];
+	payload[0] = (uint8_t)(close_code >> 8);
+	payload[1] = (uint8_t)close_code;
+	if(context->websocket_state == QS_WEBSOCKET_STATE_OPEN){
+		context->websocket_state = QS_WEBSOCKET_STATE_CLOSING;
+		qs_websocket_client_send_close_payload(context, socket, payload, sizeof(payload));
+	}
+	qs_websocket_client_set_error(context, QS_WEBSOCKET_ERROR_FRAME);
+}
+
+static int qs_websocket_client_read_frame(QS_WEBSOCKET_CLIENT* context, QS_SOCKET_ID socket, size_t* consumed, int (*on_message)(void* user_data), void* user_data)
+{
+	uint8_t* buffer = context->websocket_buffer;
+	size_t size = context->websocket_buffer_size;
+	size_t header_size = 2;
+	size_t payload_len;
+	size_t payload_pos;
+	uint64_t payload_len64;
+	uint8_t opcode;
+	int fin;
+	uint8_t mask[4];
+	if(size < 2) return 0;
+	opcode = buffer[0] & 0x0f;
+	fin = (buffer[0] & 0x80) != 0;
+	payload_len64 = buffer[1] & 0x7f;
+	if(payload_len64 == 126){
+		if(size < 4) return 0;
+		payload_len64 = ((uint64_t)buffer[2] << 8) | buffer[3];
+		header_size = 4;
+	}else if(payload_len64 == 127){
+		if(size < 10) return 0;
+		if(buffer[2] & 0x80){ qs_websocket_client_fail_frame(context, socket, 1002); return -1; }
+		payload_len64 = 0;
+		for(size_t i = 0; i < 8; i++) payload_len64 = (payload_len64 << 8) | buffer[2 + i];
+		header_size = 10;
+	}
+	if(opcode >= 8 && (opcode > 10 || !fin || payload_len64 > 125)){ qs_websocket_client_fail_frame(context, socket, 1002); return -1; }
+	if(buffer[1] & 0x80) header_size += 4;
+	if(payload_len64 > SIZE_MAX || (opcode < 8 && payload_len64 > context->websocket_max_message_size) || payload_len64 > sizeof(context->websocket_buffer) - header_size){
+		qs_websocket_client_fail_frame(context, socket, 1009);
+		return -1;
+	}
+	payload_len = (size_t)payload_len64;
+	payload_pos = header_size;
+	if(size < payload_pos + payload_len) return 0;
+	if(buffer[1] & 0x80){
+		memcpy(mask, buffer + header_size - 4, sizeof(mask));
+		for(size_t i = 0; i < payload_len; i++) buffer[payload_pos + i] ^= mask[i & 3];
+	}
+	context->websocket_opcode = opcode;
+	context->websocket_payload_size = payload_len;
+	context->websocket_payload_offset = payload_pos;
+	context->websocket_payload = buffer + payload_pos;
+	*consumed = payload_pos + payload_len;
+	if(opcode == 9){
+		if(qs_websocket_client_send_frame(context, socket, 10, buffer + payload_pos, payload_len) != 0) return -1;
+		return 1;
+	}
+	if(opcode == 8){
+		if(payload_len == 1){ qs_websocket_client_fail_frame(context, socket, 1002); return -1; }
+		if(payload_len >= 2){
+			context->websocket_close_code = ((uint16_t)buffer[payload_pos] << 8) | buffer[payload_pos + 1];
+			if(!qs_websocket_client_is_valid_close_code(context->websocket_close_code)){ qs_websocket_client_fail_frame(context, socket, 1002); return -1; }
+			memcpy(context->websocket_close_reason, buffer + payload_pos + 2, payload_len - 2);
+			context->websocket_close_reason[payload_len - 2] = '\0';
+		}
+		if(context->websocket_state == QS_WEBSOCKET_STATE_OPEN && qs_websocket_client_send_close_payload(context, socket, buffer + payload_pos, payload_len) != 0) return -1;
+		context->websocket_state = QS_WEBSOCKET_STATE_CLOSING;
+		return 1;
+	}
+	if(opcode == 10) return 1;
+	if(opcode == 0){
+		if(!context->websocket_fragment_active){ qs_websocket_client_fail_frame(context, socket, 1002); return -1; }
+		if(context->websocket_fragment_size + payload_len > context->websocket_max_message_size){ qs_websocket_client_fail_frame(context, socket, 1009); return -1; }
+		memcpy(context->websocket_fragment_buffer + context->websocket_fragment_size, buffer + payload_pos, payload_len);
+		context->websocket_fragment_size += payload_len;
+		if(fin){
+			context->websocket_opcode = context->websocket_fragment_opcode;
+			context->websocket_payload_size = context->websocket_fragment_size;
+			context->websocket_payload_offset = 0;
+			context->websocket_payload = context->websocket_fragment_buffer;
+			context->websocket_fragment_active = 0;
+			context->websocket_fragment_size = 0;
+			if(on_message != NULL && on_message(user_data) != 0) return -1;
+		}
+		return 1;
+	}
+	if(opcode == 1 || opcode == 2){
+		if(context->websocket_fragment_active){ qs_websocket_client_fail_frame(context, socket, 1002); return -1; }
+		if(fin){
+			if(on_message != NULL && on_message(user_data) != 0) return -1;
+		}else if(payload_len > context->websocket_max_message_size){
+			qs_websocket_client_fail_frame(context, socket, 1009);
+			return -1;
+		}else{
+			memcpy(context->websocket_fragment_buffer, buffer + payload_pos, payload_len);
+			context->websocket_fragment_opcode = opcode;
+			context->websocket_fragment_size = payload_len;
+			context->websocket_fragment_active = 1;
+		}
+		return 1;
+	}
+	qs_websocket_client_fail_frame(context, socket, 1002);
+	return -1;
+}
+
+int qs_websocket_client_create(QS_WEBSOCKET_CLIENT** client, const char* path)
+{
+	if(client == NULL) return -1;
+	*client = (QS_WEBSOCKET_CLIENT*)malloc(sizeof(QS_WEBSOCKET_CLIENT));
+	if(*client == NULL) return -1;
+	QS_WEBSOCKET_CLIENT* context = *client;
+	context->websocket_handshake_complete = 0;
+	context->websocket_state = QS_WEBSOCKET_STATE_CONNECTING;
+	context->websocket_error = QS_WEBSOCKET_ERROR_NONE;
+	context->websocket_buffer_size = 0;
+	context->websocket_payload = NULL;
+	context->websocket_fragment_active = 0;
+	context->websocket_fragment_size = 0;
+	context->websocket_max_message_size = QS_WEBSOCKET_MAX_MESSAGE_SIZE;
+	context->websocket_close_code = 0;
+	context->websocket_close_reason[0] = '\0';
+	snprintf(context->websocket_path, sizeof(context->websocket_path), "%s", path == NULL ? "/" : path);
+	return 0;
+}
+
+void qs_websocket_client_destroy(QS_WEBSOCKET_CLIENT* client)
+{
+	free(client);
+}
+
+int qs_websocket_client_on_connect(QS_WEBSOCKET_CLIENT* context, QS_SOCKET_ID socket)
+{
+	uint8_t random_key[16];
+	uint8_t accept_hash[20];
+	char accept_source[128];
+	char encoded_key[64];
+	char request[2048];
+	context->websocket_state = QS_WEBSOCKET_STATE_HANDSHAKING;
+	for(size_t i = 0; i < sizeof(random_key); i += 4){ uint32_t value = qs_rand_32(); memcpy(random_key + i, &value, sizeof(value)); }
+	qs_base64_encode(encoded_key, sizeof(encoded_key), random_key, sizeof(random_key));
+	snprintf(context->websocket_key, sizeof(context->websocket_key), "%s", encoded_key);
+	snprintf(accept_source, sizeof(accept_source), "%s258EAFA5-E914-47DA-95CA-C5AB0DC85B11", context->websocket_key);
+	snprintf(request, sizeof(request), "GET %s HTTP/1.1\r\nHost: websocket\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: %s\r\nSec-WebSocket-Version: 13\r\n\r\n", context->websocket_path, context->websocket_key);
+	qs_sha1(accept_hash, accept_source, (uint32_t)strlen(accept_source));
+	qs_base64_encode(context->websocket_accept, sizeof(context->websocket_accept), accept_hash, sizeof(accept_hash));
+	if(qs_send_all(socket, request, strlen(request), 0) < 0){ qs_websocket_client_set_error(context, QS_WEBSOCKET_ERROR_HANDSHAKE_SEND); return -1; }
+	return 0;
+}
+
+int qs_websocket_client_on_recv(QS_WEBSOCKET_CLIENT* context, QS_SOCKET_ID socket, const uint8_t* payload, size_t payload_len, int (*on_message)(void* user_data), void* user_data)
+{
+	if(context->websocket_buffer_size + payload_len > sizeof(context->websocket_buffer)){ qs_websocket_client_set_error(context, QS_WEBSOCKET_ERROR_RECEIVE_BUFFER); return -1; }
+	memcpy(context->websocket_buffer + context->websocket_buffer_size, payload, payload_len);
+	context->websocket_buffer_size += payload_len;
+	if(!context->websocket_handshake_complete){
+		size_t header_size = 0;
+		for(size_t i = 3; i < context->websocket_buffer_size; i++) if(context->websocket_buffer[i - 3] == '\r' && context->websocket_buffer[i - 2] == '\n' && context->websocket_buffer[i - 1] == '\r' && context->websocket_buffer[i] == '\n'){ header_size = i + 1; break; }
+		if(header_size == 0) return 0;
+		if(context->websocket_buffer_size < 12 || memcmp(context->websocket_buffer, "HTTP/1.1 101", 12) != 0){ qs_websocket_client_set_error(context, QS_WEBSOCKET_ERROR_HANDSHAKE_RESPONSE); return -1; }
+		{
+			size_t accept_length = strlen(context->websocket_accept);
+			int accept_found = 0;
+			for(size_t i = 0; i + accept_length <= header_size; i++){
+				if(memcmp(context->websocket_buffer + i, context->websocket_accept, accept_length) == 0){ accept_found = 1; break; }
+			}
+			if(!accept_found){ qs_websocket_client_set_error(context, QS_WEBSOCKET_ERROR_HANDSHAKE_ACCEPT); return -1; }
+		}
+		context->websocket_handshake_complete = 1;
+		context->websocket_state = QS_WEBSOCKET_STATE_OPEN;
+		memmove(context->websocket_buffer, context->websocket_buffer + header_size, context->websocket_buffer_size - header_size);
+		context->websocket_buffer_size -= header_size;
+	}
+	while(context->websocket_buffer_size > 0){
+		size_t consumed = 0;
+		int result = qs_websocket_client_read_frame(context, socket, &consumed, on_message, user_data);
+		if(result <= 0) return result < 0 ? -1 : 0;
+		memmove(context->websocket_buffer, context->websocket_buffer + consumed, context->websocket_buffer_size - consumed);
+		context->websocket_buffer_size -= consumed;
+	}
+	return 0;
+}
+
+int qs_websocket_client_send(QS_WEBSOCKET_CLIENT* context, QS_SOCKET_ID socket, int is_binary, const void* payload, size_t payload_len)
+{
+	if(context->websocket_state != QS_WEBSOCKET_STATE_OPEN) return -1;
+	return qs_websocket_client_send_frame(context, socket, is_binary ? 2 : 1, payload, payload_len);
+}
+
+int qs_websocket_client_close(QS_WEBSOCKET_CLIENT* context, QS_SOCKET_ID socket)
+{
+	if(context->websocket_state != QS_WEBSOCKET_STATE_OPEN) return -1;
+	context->websocket_state = QS_WEBSOCKET_STATE_CLOSING;
+	return qs_websocket_client_send_close_payload(context, socket, NULL, 0);
+}
+
+int qs_websocket_client_close_with_reason(QS_WEBSOCKET_CLIENT* context, QS_SOCKET_ID socket, uint16_t status_code, const char* reason)
+{
+	uint8_t payload[125];
+	size_t reason_len = reason == NULL ? 0 : strlen(reason);
+	if(context->websocket_state != QS_WEBSOCKET_STATE_OPEN || !qs_websocket_client_is_valid_close_code(status_code) || reason_len > sizeof(payload) - 2) return -1;
+	payload[0] = (uint8_t)(status_code >> 8);
+	payload[1] = (uint8_t)status_code;
+	if(reason_len > 0) memcpy(payload + 2, reason, reason_len);
+	context->websocket_close_code = status_code;
+	memcpy(context->websocket_close_reason, payload + 2, reason_len);
+	context->websocket_close_reason[reason_len] = '\0';
+	context->websocket_state = QS_WEBSOCKET_STATE_CLOSING;
+	return qs_websocket_client_send_close_payload(context, socket, payload, reason_len + 2);
+}
+
+int qs_websocket_client_set_max_message_size(QS_WEBSOCKET_CLIENT* context, size_t max_message_size)
+{
+	if(max_message_size == 0 || max_message_size > QS_WEBSOCKET_MAX_MESSAGE_SIZE) return -1;
+	context->websocket_max_message_size = max_message_size;
+	return 0;
+}
+
+int qs_websocket_client_is_handshake_complete(const QS_WEBSOCKET_CLIENT* client)
+{
+	return client != NULL && client->websocket_handshake_complete;
+}
+
+void qs_websocket_client_set_closed(QS_WEBSOCKET_CLIENT* client)
+{
+	if(client != NULL && client->websocket_state != QS_WEBSOCKET_STATE_ERROR){
+		client->websocket_state = QS_WEBSOCKET_STATE_CLOSED;
+	}
+}
+
+size_t qs_websocket_client_get_max_message_size(const QS_WEBSOCKET_CLIENT* client)
+{
+	return client == NULL ? 0 : client->websocket_max_message_size;
+}
+
+QS_WEBSOCKET_STATE qs_websocket_client_get_state(const QS_WEBSOCKET_CLIENT* client)
+{
+	return client == NULL ? QS_WEBSOCKET_STATE_CLOSED : client->websocket_state;
+}
+
+QS_WEBSOCKET_ERROR qs_websocket_client_get_error(const QS_WEBSOCKET_CLIENT* client)
+{
+	return client == NULL ? QS_WEBSOCKET_ERROR_NONE : client->websocket_error;
+}
+
+uint16_t qs_websocket_client_get_close_code(const QS_WEBSOCKET_CLIENT* client)
+{
+	return client == NULL ? 0 : client->websocket_close_code;
+}
+
+const char* qs_websocket_client_get_close_reason(const QS_WEBSOCKET_CLIENT* client)
+{
+	return client == NULL ? "" : client->websocket_close_reason;
+}
+
+uint8_t* qs_websocket_client_get_payload(const QS_WEBSOCKET_CLIENT* client)
+{
+	return client == NULL ? NULL : client->websocket_payload;
+}
+
+size_t qs_websocket_client_get_payload_length(const QS_WEBSOCKET_CLIENT* client)
+{
+	return client == NULL ? 0 : client->websocket_payload_size;
+}
+
+uint8_t qs_websocket_client_get_opcode(const QS_WEBSOCKET_CLIENT* client)
+{
+	return client == NULL ? 0 : client->websocket_opcode;
 }

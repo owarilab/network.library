@@ -28,7 +28,7 @@ extern "C"{
 
 #define QS_EVENT_PARAMETER_TYPE_RECV 1
 #define QS_EVENT_PARAMETER_TYPE_CONNECTION 2
-#define QS_WEBSOCKET_MAX_MESSAGE_SIZE 65526
+#define QS_WEBSOCKET_MAX_MESSAGE_SIZE 65535
 
 typedef enum QS_WEBSOCKET_STATE
 {
@@ -50,6 +50,8 @@ typedef enum QS_WEBSOCKET_ERROR
 	QS_WEBSOCKET_ERROR_FRAME,
 	QS_WEBSOCKET_ERROR_SEND
 } QS_WEBSOCKET_ERROR;
+
+typedef struct QS_WEBSOCKET_CLIENT QS_WEBSOCKET_CLIENT;
 
 #ifndef _QS_SOCKET_ID_DEFINED_
 #define _QS_SOCKET_ID_DEFINED_
@@ -129,25 +131,7 @@ typedef struct QS_CLIENT_CONTEXT
 	QS_EVENT_FUNCTION on_close;
 	void* client_data;
 	int32_t websocket_mode;
-	int32_t websocket_handshake_complete;
-	QS_WEBSOCKET_STATE websocket_state;
-	QS_WEBSOCKET_ERROR websocket_error;
-	char websocket_key[64];
-	char websocket_accept[64];
-	char websocket_path[1024];
-	uint8_t websocket_buffer[65536];
-	size_t websocket_buffer_size;
-	uint8_t websocket_opcode;
-	size_t websocket_payload_size;
-	size_t websocket_payload_offset;
-	uint8_t* websocket_payload;
-	uint8_t websocket_fragment_opcode;
-	int32_t websocket_fragment_active;
-	size_t websocket_fragment_size;
-	uint8_t websocket_fragment_buffer[65536];
-	size_t websocket_max_message_size;
-	uint16_t websocket_close_code;
-	char websocket_close_reason[124];
+	QS_WEBSOCKET_CLIENT* websocket_client;
 	QS_EVENT_FUNCTION on_websocket_event;
 } QS_CLIENT_CONTEXT;
 
