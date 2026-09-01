@@ -677,7 +677,7 @@ int api_qs_websocket_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host
 	QS_CLIENT_CONTEXT* context = *ppcontext;
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
 	QS_SOCKET_OPTION* client = (QS_SOCKET_OPTION*)QS_GET_POINTER(memory, context->memid_client);
-	if(qs_websocket_client_create(&context->websocket_client, path) != 0){
+	if(qs_websocket_client_create(&context->websocket_client, host, port, path) != 0){
 		api_qs_client_free(context);
 		*ppcontext = NULL;
 		return -1;

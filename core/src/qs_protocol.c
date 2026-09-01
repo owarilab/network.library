@@ -1530,6 +1530,38 @@ static int qs_websocket_client_is_valid_close_code(uint16_t status_code)
 		status_code != 1005 && status_code != 1006 && status_code != 1015;
 }
 
+static int qs_websocket_client_is_valid_utf8(const uint8_t* value, size_t value_len)
+{
+	size_t index = 0;
+	while(index < value_len){
+		uint8_t first = value[index++];
+		if(first <= 0x7f) continue;
+		if(first >= 0xc2 && first <= 0xdf){
+			if(index >= value_len || value[index] < 0x80 || value[index] > 0xbf) return 0;
+			index++;
+		}else if(first == 0xe0){
+			if(index + 1 >= value_len || value[index] < 0xa0 || value[index] > 0xbf || value[index + 1] < 0x80 || value[index + 1] > 0xbf) return 0;
+			index += 2;
+		}else if((first >= 0xe1 && first <= 0xec) || (first >= 0xee && first <= 0xef)){
+			if(index + 1 >= value_len || value[index] < 0x80 || value[index] > 0xbf || value[index + 1] < 0x80 || value[index + 1] > 0xbf) return 0;
+			index += 2;
+		}else if(first == 0xed){
+			if(index + 1 >= value_len || value[index] < 0x80 || value[index] > 0x9f || value[index + 1] < 0x80 || value[index + 1] > 0xbf) return 0;
+			index += 2;
+		}else if(first == 0xf0){
+			if(index + 2 >= value_len || value[index] < 0x90 || value[index] > 0xbf || value[index + 1] < 0x80 || value[index + 1] > 0xbf || value[index + 2] < 0x80 || value[index + 2] > 0xbf) return 0;
+			index += 3;
+		}else if(first >= 0xf1 && first <= 0xf3){
+			if(index + 2 >= value_len || value[index] < 0x80 || value[index] > 0xbf || value[index + 1] < 0x80 || value[index + 1] > 0xbf || value[index + 2] < 0x80 || value[index + 2] > 0xbf) return 0;
+			index += 3;
+		}else if(first == 0xf4){
+			if(index + 2 >= value_len || value[index] < 0x80 || value[index] > 0x8f || value[index + 1] < 0x80 || value[index + 1] > 0xbf || value[index + 2] < 0x80 || value[index + 2] > 0xbf) return 0;
+			index += 3;
+		}else return 0;
+	}
+	return 1;
+}
+
 static int qs_websocket_client_send_frame(QS_WEBSOCKET_CLIENT* context, QS_SOCKET_ID socket, uint8_t opcode, const void* payload, size_t payload_len)
 {
 	uint8_t frame[65536];
@@ -1640,6 +1672,7 @@ static int qs_websocket_client_read_frame(QS_WEBSOCKET_CLIENT* context, QS_SOCKE
 		if(payload_len >= 2){
 			context->websocket_close_code = ((uint16_t)buffer[payload_pos] << 8) | buffer[payload_pos + 1];
 			if(!qs_websocket_client_is_valid_close_code(context->websocket_close_code)){ qs_websocket_client_fail_frame(context, socket, 1002); return -1; }
+			if(!qs_websocket_client_is_valid_utf8(buffer + payload_pos + 2, payload_len - 2)){ qs_websocket_client_fail_frame(context, socket, 1007); return -1; }
 			memcpy(context->websocket_close_reason, buffer + payload_pos + 2, payload_len - 2);
 			context->websocket_close_reason[payload_len - 2] = '\0';
 		}
@@ -1683,9 +1716,9 @@ static int qs_websocket_client_read_frame(QS_WEBSOCKET_CLIENT* context, QS_SOCKE
 	return -1;
 }
 
-int qs_websocket_client_create(QS_WEBSOCKET_CLIENT** client, const char* path)
+int qs_websocket_client_create(QS_WEBSOCKET_CLIENT** client, const char* host, int port, const char* path)
 {
-	if(client == NULL) return -1;
+	if(client == NULL || host == NULL || host[0] == '\0' || port <= 0 || port > 65535) return -1;
 	*client = (QS_WEBSOCKET_CLIENT*)malloc(sizeof(QS_WEBSOCKET_CLIENT));
 	if(*client == NULL) return -1;
 	QS_WEBSOCKET_CLIENT* context = *client;
@@ -1699,6 +1732,8 @@ int qs_websocket_client_create(QS_WEBSOCKET_CLIENT** client, const char* path)
 	context->websocket_max_message_size = QS_WEBSOCKET_MAX_MESSAGE_SIZE;
 	context->websocket_close_code = 0;
 	context->websocket_close_reason[0] = '\0';
+	if(port == 80) snprintf(context->websocket_host, sizeof(context->websocket_host), "%s", host);
+	else snprintf(context->websocket_host, sizeof(context->websocket_host), "%s:%d", host, port);
 	snprintf(context->websocket_path, sizeof(context->websocket_path), "%s", path == NULL ? "/" : path);
 	return 0;
 }
@@ -1720,7 +1755,7 @@ int qs_websocket_client_on_connect(QS_WEBSOCKET_CLIENT* context, QS_SOCKET_ID so
 	qs_base64_encode(encoded_key, sizeof(encoded_key), random_key, sizeof(random_key));
 	snprintf(context->websocket_key, sizeof(context->websocket_key), "%s", encoded_key);
 	snprintf(accept_source, sizeof(accept_source), "%s258EAFA5-E914-47DA-95CA-C5AB0DC85B11", context->websocket_key);
-	snprintf(request, sizeof(request), "GET %s HTTP/1.1\r\nHost: websocket\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: %s\r\nSec-WebSocket-Version: 13\r\n\r\n", context->websocket_path, context->websocket_key);
+	snprintf(request, sizeof(request), "GET %s HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: %s\r\nSec-WebSocket-Version: 13\r\n\r\n", context->websocket_path, context->websocket_host, context->websocket_key);
 	qs_sha1(accept_hash, accept_source, (uint32_t)strlen(accept_source));
 	qs_base64_encode(context->websocket_accept, sizeof(context->websocket_accept), accept_hash, sizeof(accept_hash));
 	if(qs_send_all(socket, request, strlen(request), 0) < 0){ qs_websocket_client_set_error(context, QS_WEBSOCKET_ERROR_HANDSHAKE_SEND); return -1; }
@@ -1770,7 +1805,7 @@ int qs_websocket_client_close_with_reason(QS_WEBSOCKET_CLIENT* context, QS_SOCKE
 {
 	uint8_t payload[125];
 	size_t reason_len = reason == NULL ? 0 : strlen(reason);
-	if(context->websocket_state != QS_WEBSOCKET_STATE_OPEN || !qs_websocket_client_is_valid_close_code(status_code) || reason_len > sizeof(payload) - 2) return -1;
+	if(context->websocket_state != QS_WEBSOCKET_STATE_OPEN || !qs_websocket_client_is_valid_close_code(status_code) || reason_len > sizeof(payload) - 2 || !qs_websocket_client_is_valid_utf8((const uint8_t*)reason, reason_len)) return -1;
 	payload[0] = (uint8_t)(status_code >> 8);
 	payload[1] = (uint8_t)status_code;
 	if(reason_len > 0) memcpy(payload + 2, reason, reason_len);

@@ -81,6 +81,7 @@ typedef struct QS_WEBSOCKET_CLIENT
 	QS_WEBSOCKET_ERROR websocket_error;
 	char websocket_key[64];
 	char websocket_accept[64];
+	char websocket_host[1024];
 	char websocket_path[1024];
 	uint8_t websocket_buffer[QS_WEBSOCKET_MAX_MESSAGE_SIZE + 14];
 	size_t websocket_buffer_size;
@@ -128,7 +129,7 @@ ssize_t qs_make_websocket_msg( void* message_buffer, size_t message_buffer_size,
 ssize_t qs_make_ws_message_simple(QS_MEMORY_POOL * temporary_memory,char* connection_id,char* type,char* message,void* buffer,size_t buffer_size);
 int qs_send_handshake_param(QS_SOCKET_ID socket, QS_SOCKET_OPTION *option, QS_SERVER_CONNECTION_INFO* connection );
 
-int qs_websocket_client_create(QS_WEBSOCKET_CLIENT** client, const char* path);
+int qs_websocket_client_create(QS_WEBSOCKET_CLIENT** client, const char* host, int port, const char* path);
 void qs_websocket_client_destroy(QS_WEBSOCKET_CLIENT* client);
 int qs_websocket_client_on_connect(QS_WEBSOCKET_CLIENT* client, QS_SOCKET_ID socket);
 int qs_websocket_client_on_recv(QS_WEBSOCKET_CLIENT* client, QS_SOCKET_ID socket, const uint8_t* payload, size_t payload_len, int (*on_message)(void* user_data), void* user_data);
