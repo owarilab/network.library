@@ -1462,6 +1462,68 @@ static void qs_websocket_client_set_error(QS_WEBSOCKET_CLIENT* context, QS_WEBSO
 	context->websocket_state = QS_WEBSOCKET_STATE_ERROR;
 }
 
+static int qs_websocket_client_ascii_equal(const uint8_t* value, size_t value_len, const char* expected)
+{
+	size_t expected_len = strlen(expected);
+	if(value_len != expected_len) return 0;
+	for(size_t index = 0; index < value_len; index++){
+		uint8_t current = value[index];
+		uint8_t target = (uint8_t)expected[index];
+		if(current >= 'A' && current <= 'Z') current = (uint8_t)(current + ('a' - 'A'));
+		if(target >= 'A' && target <= 'Z') target = (uint8_t)(target + ('a' - 'A'));
+		if(current != target) return 0;
+	}
+	return 1;
+}
+
+static int qs_websocket_client_header_has_token(const uint8_t* value, size_t value_len, const char* expected)
+{
+	size_t index = 0;
+	while(index < value_len){
+		while(index < value_len && (value[index] == ' ' || value[index] == '\t' || value[index] == ',')) index++;
+		size_t token_start = index;
+		while(index < value_len && value[index] != ',') index++;
+		size_t token_end = index;
+		while(token_end > token_start && (value[token_end - 1] == ' ' || value[token_end - 1] == '\t')) token_end--;
+		if(qs_websocket_client_ascii_equal(value + token_start, token_end - token_start, expected)) return 1;
+	}
+	return 0;
+}
+
+static int qs_websocket_client_validate_handshake_response(QS_WEBSOCKET_CLIENT* context, size_t header_size)
+{
+	size_t position = 0;
+	int has_upgrade = 0;
+	int has_connection = 0;
+	int has_accept = 0;
+	if(header_size < 14 || memcmp(context->websocket_buffer, "HTTP/1.1 101", 12) != 0) return QS_WEBSOCKET_ERROR_HANDSHAKE_RESPONSE;
+	while(position + 1 < header_size && !(context->websocket_buffer[position] == '\r' && context->websocket_buffer[position + 1] == '\n')) position++;
+	if(position + 1 >= header_size) return QS_WEBSOCKET_ERROR_HANDSHAKE_RESPONSE;
+	position += 2;
+	while(position + 1 < header_size && !(context->websocket_buffer[position] == '\r' && context->websocket_buffer[position + 1] == '\n')){
+		size_t line_end = position;
+		while(line_end + 1 < header_size && !(context->websocket_buffer[line_end] == '\r' && context->websocket_buffer[line_end + 1] == '\n')) line_end++;
+		if(line_end + 1 >= header_size) return QS_WEBSOCKET_ERROR_HANDSHAKE_RESPONSE;
+		size_t colon = position;
+		while(colon < line_end && context->websocket_buffer[colon] != ':') colon++;
+		if(colon == line_end) return QS_WEBSOCKET_ERROR_HANDSHAKE_RESPONSE;
+		size_t value_start = colon + 1;
+		while(value_start < line_end && (context->websocket_buffer[value_start] == ' ' || context->websocket_buffer[value_start] == '\t')) value_start++;
+		size_t value_end = line_end;
+		while(value_end > value_start && (context->websocket_buffer[value_end - 1] == ' ' || context->websocket_buffer[value_end - 1] == '\t')) value_end--;
+		if(qs_websocket_client_ascii_equal(context->websocket_buffer + position, colon - position, "Upgrade")){
+			has_upgrade = qs_websocket_client_header_has_token(context->websocket_buffer + value_start, value_end - value_start, "websocket");
+		}else if(qs_websocket_client_ascii_equal(context->websocket_buffer + position, colon - position, "Connection")){
+			has_connection = qs_websocket_client_header_has_token(context->websocket_buffer + value_start, value_end - value_start, "Upgrade");
+		}else if(qs_websocket_client_ascii_equal(context->websocket_buffer + position, colon - position, "Sec-WebSocket-Accept")){
+			has_accept = strlen(context->websocket_accept) == value_end - value_start && memcmp(context->websocket_buffer + value_start, context->websocket_accept, value_end - value_start) == 0;
+		}
+		position = line_end + 2;
+	}
+	if(!has_upgrade || !has_connection) return QS_WEBSOCKET_ERROR_HANDSHAKE_RESPONSE;
+	return has_accept ? QS_WEBSOCKET_ERROR_NONE : QS_WEBSOCKET_ERROR_HANDSHAKE_ACCEPT;
+}
+
 static int qs_websocket_client_is_valid_close_code(uint16_t status_code)
 {
 	return status_code >= 1000 && status_code < 5000 && status_code != 1004 &&
@@ -1674,15 +1736,8 @@ int qs_websocket_client_on_recv(QS_WEBSOCKET_CLIENT* context, QS_SOCKET_ID socke
 		size_t header_size = 0;
 		for(size_t i = 3; i < context->websocket_buffer_size; i++) if(context->websocket_buffer[i - 3] == '\r' && context->websocket_buffer[i - 2] == '\n' && context->websocket_buffer[i - 1] == '\r' && context->websocket_buffer[i] == '\n'){ header_size = i + 1; break; }
 		if(header_size == 0) return 0;
-		if(context->websocket_buffer_size < 12 || memcmp(context->websocket_buffer, "HTTP/1.1 101", 12) != 0){ qs_websocket_client_set_error(context, QS_WEBSOCKET_ERROR_HANDSHAKE_RESPONSE); return -1; }
-		{
-			size_t accept_length = strlen(context->websocket_accept);
-			int accept_found = 0;
-			for(size_t i = 0; i + accept_length <= header_size; i++){
-				if(memcmp(context->websocket_buffer + i, context->websocket_accept, accept_length) == 0){ accept_found = 1; break; }
-			}
-			if(!accept_found){ qs_websocket_client_set_error(context, QS_WEBSOCKET_ERROR_HANDSHAKE_ACCEPT); return -1; }
-		}
+		QS_WEBSOCKET_ERROR handshake_error = qs_websocket_client_validate_handshake_response(context, header_size);
+		if(handshake_error != QS_WEBSOCKET_ERROR_NONE){ qs_websocket_client_set_error(context, handshake_error); return -1; }
 		context->websocket_handshake_complete = 1;
 		context->websocket_state = QS_WEBSOCKET_STATE_OPEN;
 		memmove(context->websocket_buffer, context->websocket_buffer + header_size, context->websocket_buffer_size - header_size);
