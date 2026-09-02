@@ -360,7 +360,7 @@ size_t qs_initialize_mmapmemory_f( const char* file_name, QS_MEMORY_POOL** memor
 			unit->id = (((*memory)->block_size - 1) - i);
 		}
 		// make memory header
-		int32_t header_size = 56;
+		int32_t header_size = SAVE_MEMORY_HEADER_SIZE;
 		(*memory)->top = header_size;
 		QS_BYTE_BUFFER buffer;
 		buffer.endian = (*memory)->endian;
@@ -395,7 +395,7 @@ size_t qs_initialize_mmapmemory_f( const char* file_name, QS_MEMORY_POOL** memor
 int32_t qs_sync_mmap_memory(QS_MEMORY_POOL* memory_pool)
 {
 	// make memory header
-	int32_t header_size = 56;
+	int32_t header_size = SAVE_MEMORY_HEADER_SIZE;
 	QS_BYTE_BUFFER buffer;
 	buffer.endian = memory_pool->endian;
 	buffer.buffer = (uint8_t*)(memory_pool->memory);
@@ -411,7 +411,7 @@ int32_t qs_sync_mmap_memory(QS_MEMORY_POOL* memory_pool)
 int32_t qs_async_mmap_memory(QS_MEMORY_POOL* memory_pool)
 {
 	// make memory header
-	int32_t header_size = 56;
+	int32_t header_size = SAVE_MEMORY_HEADER_SIZE;
 	QS_BYTE_BUFFER buffer;
 	buffer.endian = memory_pool->endian;
 	buffer.buffer = (uint8_t*)(memory_pool->memory);
