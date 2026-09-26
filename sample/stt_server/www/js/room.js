@@ -12,6 +12,8 @@ class SttManager {
 		this._sttWorklet = null;
 		this._sttFlushIntervalMs = opts.sttFlushIntervalMs || 500;
 		this._sttFlushTimer = null;
+		this._sttPartialSessionId = null;
+		this._sttPartialRevision = -1;
 		this.callbacks = {};
 
 		// transfer rate tracking
@@ -74,14 +76,12 @@ class SttManager {
 			if (event.data instanceof ArrayBuffer) {
 				const uint8 = new Uint8Array(event.data);
 				const text = new TextDecoder('utf-8').decode(uint8);
-				console.log('[STT recv binary] len=' + event.data.byteLength + ' text="' + text.replace(/\n$/, '') + '"');
-				this.emit('onWsBinaryMessage', { data: uint8, text: text });
+				this.handleWsBinaryMessage(uint8, text, event.data.byteLength);
 			} else if (event.data instanceof Blob) {
 				event.data.arrayBuffer().then((buf) => {
 					const uint8 = new Uint8Array(buf);
 					const text = new TextDecoder('utf-8').decode(uint8);
-					console.log('[STT recv binary blob] len=' + buf.byteLength + ' text="' + text.replace(/\n$/, '') + '"');
-					this.emit('onWsBinaryMessage', { data: uint8, text: text });
+					this.handleWsBinaryMessage(uint8, text, buf.byteLength);
 				});
 			} else {
 				console.log('[STT recv text] ' + event.data);
@@ -98,6 +98,35 @@ class SttManager {
 		});
 
 		return this.wsSocket;
+	}
+
+	handleWsBinaryMessage(data, text, byteLength) {
+		let message;
+		try {
+			message = JSON.parse(text);
+		} catch (error) {
+			console.log('[STT recv binary] len=' + byteLength + ' text="' + text.replace(/\n$/, '') + '"');
+			this.emit('onWsBinaryMessage', { data, text });
+			return;
+		}
+		if (!message || message.type !== 'stt_partial' ||
+			typeof message.session_id !== 'number' || typeof message.revision !== 'number' ||
+			typeof message.text !== 'string') {
+			console.log('[STT recv binary] len=' + byteLength + ' text="' + text.replace(/\n$/, '') + '"');
+			this.emit('onWsBinaryMessage', { data, text });
+			return;
+		}
+		if (this._sttPartialSessionId !== message.session_id) {
+			this._sttPartialSessionId = message.session_id;
+			this._sttPartialRevision = -1;
+		}
+		if (message.revision <= this._sttPartialRevision) return;
+		this._sttPartialRevision = message.revision;
+		this.emit('onSttPartial', {
+			sessionId: message.session_id,
+			revision: message.revision,
+			text: message.text
+		});
 	}
 
 	disconnect(code, reason) {
@@ -248,6 +277,8 @@ class SttManager {
 		}
 		this._sttTargetRate = targetSampleRate;
 		this._sttPcmChunks = [];
+		this._sttPartialSessionId = null;
+		this._sttPartialRevision = -1;
 
 		this._sttStream = await navigator.mediaDevices.getUserMedia({
 			audio: {

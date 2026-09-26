@@ -24,6 +24,18 @@
 	white-space: pre-wrap;
 	word-break: break-word;
 }
+#stt_partial {
+	margin-top: 8px;
+	padding: 8px;
+	min-height: 24px;
+	border-left: 3px solid #16827a;
+	background: #eef6f4;
+	color: #35524f;
+	font-family: monospace;
+	font-size: 14px;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
 </style>
 <script type="text/javascript" src="/js/room.js"></script>
 <script type="text/javascript">
@@ -56,6 +68,10 @@ window.onload = function() {
 					el.scrollTop = el.scrollHeight;
 				}
 			},
+			onSttPartial: function(payload) {
+				var el = document.getElementById('stt_partial');
+				if (el) el.textContent = payload.text;
+			},
 			onWsTextMessage: function(payload) {
 				console.log('[STT text recv] ' + payload.data);
 			},
@@ -69,6 +85,7 @@ window.onload = function() {
 				}
 			},
 			onSttStart: function() {
+				document.getElementById('stt_partial').textContent = '';
 				document.getElementById('stt_start').disabled = true;
 				document.getElementById('stt_stop').disabled = false;
 				document.getElementById('stt_status').textContent = '録音中...';
@@ -76,6 +93,7 @@ window.onload = function() {
 			onSttStop: function(payload) {
 				document.getElementById('stt_start').disabled = false;
 				document.getElementById('stt_stop').disabled = true;
+				document.getElementById('stt_partial').textContent = '';
 				document.getElementById('stt_status').textContent = '送信完了 (' + payload.bytesSent + ' bytes)';
 			},
 			onCallbackError: function(payload) {
@@ -111,6 +129,7 @@ function stt_stop() {
 		<button id="stt_stop" onclick="stt_stop()" disabled>録音停止 &amp; 送信</button>
 		<span id="stt_status" style="margin-left:8px;color:#555">待機中</span>
 		<span id="send_rate"></span>
+		<div id="stt_partial" aria-live="polite"></div>
 		<div id="stt_output"></div>
 	</div>
 </body>
