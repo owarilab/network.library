@@ -95,6 +95,8 @@ static void stt_process_connections(void);
 static int stt_init_whisper(void);
 static void stt_shutdown_whisper(void);
 static int stt_is_non_speech_text(const char* text);
+static size_t stt_trim_recent_text_overlap(const STT_CONNECTION_DATA* con_data, const char* text, char* output, size_t output_size);
+static size_t stt_trim_leading_text_overlap(const char* previous, const char* text, char* output, size_t output_size);
 static void stt_debug_log(STT_CONNECTION_DATA* con_data, const char* format, ...);
 static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_t* samples, int32_t sample_count, int64_t window_start_samples);
 static void stt_run_partial_inference(STT_CONNECTION_DATA* con_data);
@@ -177,6 +179,50 @@ static int stt_is_non_speech_text(const char* text)
 		return 1;
 	}
 	return 0;
+}
+
+static size_t stt_trim_recent_text_overlap(const STT_CONNECTION_DATA* con_data, const char* text, char* output, size_t output_size)
+{
+	if (!text || !output || output_size == 0) return 0;
+	return stt_trim_leading_text_overlap(con_data ? con_data->last_emitted_text : NULL,
+		text, output, output_size);
+}
+
+static size_t stt_trim_leading_text_overlap(const char* previous, const char* text, char* output, size_t output_size)
+{
+	size_t previous_length;
+	size_t text_length;
+	size_t overlap = 0;
+	size_t index;
+	if (!text || !output || output_size == 0) return 0;
+	text_length = strlen(text);
+	if (!previous || !*previous) {
+		if (text_length >= output_size) text_length = output_size - 1;
+		memcpy(output, text, text_length);
+		output[text_length] = '\0';
+		return text_length;
+	}
+	previous_length = strlen(previous);
+	for (index = 0; index < previous_length; index++) {
+		size_t candidate = previous_length - index;
+		if (candidate < 6 || candidate > text_length) continue;
+		if (memcmp(previous + index, text, candidate) == 0) {
+			overlap = candidate;
+			break;
+		}
+	}
+	while (overlap > 0 && overlap < text_length && (((unsigned char)text[overlap] & 0xc0u) == 0x80u)) overlap--;
+	if (overlap < 6) overlap = 0;
+	text += overlap;
+	text_length -= overlap;
+	while (text_length > 0 && (*text == ' ' || *text == '\t' || *text == '\n' || *text == '\r')) {
+		text++;
+		text_length--;
+	}
+	if (text_length >= output_size) text_length = output_size - 1;
+	memcpy(output, text, text_length);
+	output[text_length] = '\0';
+	return text_length;
 }
 
 static void stt_copy_recent_samples(const STT_CONNECTION_DATA* con_data, int16_t* dst, int32_t sample_count)
@@ -280,6 +326,7 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 		int64_t seg_t0 = window_start_samples + whisper_full_get_segment_t0(g_whisper_ctx, i) * 10 * STT_TARGET_SAMPLE_RATE / 1000;
 		int64_t seg_t1 = window_start_samples + whisper_full_get_segment_t1(g_whisper_ctx, i) * 10 * STT_TARGET_SAMPLE_RATE / 1000;
 		char segment_text[1024];
+		char output_text[1024];
 		const char* text = seg_text;
 		const char* discard_reason = NULL;
 		while (text && (*text == ' ' || *text == '\t' || *text == '\n' || *text == '\r')) text++;
@@ -293,10 +340,17 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 			continue;
 		}
 		snprintf(segment_text, sizeof(segment_text), "%s", text);
-		if (segment_text[0] == '\0') {
-			stt_debug_log(con_data, "SEGMENT index=%d t0_sample=%lld t1_sample=%lld no_speech=%.4f decision=discard reason=empty_after_overlap text=%s\n",
-				i, (long long)seg_t0, (long long)seg_t1, no_speech_prob, text);
-			continue;
+		if (seg_t0 < (int64_t)con_data->last_emitted_sample) {
+			size_t output_length = stt_trim_recent_text_overlap(con_data, segment_text, output_text, sizeof(output_text));
+			if (output_length == 0) {
+				stt_debug_log(con_data, "SEGMENT index=%d t0_sample=%lld t1_sample=%lld no_speech=%.4f decision=discard reason=duplicate_text_overlap text=%s\n",
+					i, (long long)seg_t0, (long long)seg_t1, no_speech_prob, text);
+				continue;
+			}
+			if (strcmp(segment_text, output_text) != 0) {
+				stt_debug_log(con_data, "SEGMENT index=%d overlap_trim original=%s output=%s\n", i, segment_text, output_text);
+				snprintf(segment_text, sizeof(segment_text), "%s", output_text);
+			}
 		}
 		stt_debug_log(con_data, "SEGMENT index=%d t0_sample=%lld t1_sample=%lld no_speech=%.4f decision=emit text=%s\n",
 			i, (long long)seg_t0, (long long)seg_t1, no_speech_prob, segment_text);
