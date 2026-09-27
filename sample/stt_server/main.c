@@ -188,6 +188,38 @@ static size_t stt_trim_recent_text_overlap(const STT_CONNECTION_DATA* con_data, 
 		text, output, output_size);
 }
 
+static int stt_has_non_punctuation_text(const char* text)
+{
+	const unsigned char* current = (const unsigned char*)text;
+	if (!current) return 0;
+	while (*current) {
+		if (*current < 0x80u) {
+			if ((*current >= '0' && *current <= '9') || (*current >= 'A' && *current <= 'Z') ||
+				(*current >= 'a' && *current <= 'z')) return 1;
+			current++;
+			continue;
+		}
+		if ((*current & 0xe0u) == 0xc0u && current[1] != '\0') {
+			if (current[0] != 0xc2u ||
+				(current[1] < 0xa1u || current[1] > 0xbfu) ||
+				(current[1] >= 0xa1u && current[1] <= 0xa6u) ||
+				current[1] == 0xa8u || current[1] == 0xa9u || current[1] == 0xabu ||
+				(current[1] >= 0xadu && current[1] <= 0xb1u) || current[1] == 0xbbu ||
+				current[1] == 0xbfu) return 1;
+			current += 2;
+			continue;
+		}
+		if ((*current & 0xf0u) == 0xe0u && current[1] != '\0' && current[2] != '\0') {
+			if (!(current[0] == 0xe3u && current[1] == 0x80u &&
+				(current[2] >= 0x80u && current[2] <= 0x81u))) return 1;
+			current += 3;
+			continue;
+		}
+		return 1;
+	}
+	return 0;
+}
+
 static size_t stt_trim_leading_text_overlap(const char* previous, const char* text, char* output, size_t output_size)
 {
 	size_t previous_length;
@@ -342,7 +374,8 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 		snprintf(segment_text, sizeof(segment_text), "%s", text);
 		if (seg_t0 < (int64_t)con_data->last_emitted_sample) {
 			size_t output_length = stt_trim_recent_text_overlap(con_data, segment_text, output_text, sizeof(output_text));
-			if (output_length == 0) {
+			if (output_length == 0 ||
+				(strcmp(segment_text, output_text) != 0 && !stt_has_non_punctuation_text(output_text))) {
 				stt_debug_log(con_data, "SEGMENT index=%d t0_sample=%lld t1_sample=%lld no_speech=%.4f decision=discard reason=duplicate_text_overlap text=%s\n",
 					i, (long long)seg_t0, (long long)seg_t1, no_speech_prob, text);
 				continue;
