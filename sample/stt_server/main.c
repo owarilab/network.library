@@ -230,8 +230,6 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 	int ret;
 	int n_segments;
 	int64_t max_emitted_sample;
-	int64_t max_processed_sample = window_start_samples + sample_count;
-	int64_t commit_sample = max_processed_sample;
 
 	if (!con_data || !samples || sample_count <= 0 || !g_whisper_ctx) {
 		return;
@@ -272,13 +270,10 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 
 	n_segments = whisper_full_n_segments(g_whisper_ctx);
 	stt_debug_log(con_data, "INFER start_sample=%lld end_sample=%lld duration_ms=%lld segments=%d processed_before=%llu emitted_before=%llu\n",
-		(long long)window_start_samples, (long long)max_processed_sample,
+		(long long)window_start_samples, (long long)(window_start_samples + sample_count),
 		(long long)((int64_t)sample_count * 1000 / STT_TARGET_SAMPLE_RATE), n_segments,
 		(unsigned long long)con_data->processed_samples, (unsigned long long)con_data->last_emitted_sample);
 	max_emitted_sample = con_data->last_emitted_sample;
-	if (con_data->processed_samples > (uint64_t)window_start_samples) {
-		commit_sample = (int64_t)con_data->processed_samples;
-	}
 	for (i = 0; i < n_segments; i++) {
 		const char* seg_text = whisper_full_get_segment_text(g_whisper_ctx, i);
 		float no_speech_prob = whisper_full_get_segment_no_speech_prob(g_whisper_ctx, i);
@@ -291,7 +286,6 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 		if (!text || !*text) discard_reason = "empty";
 		else if (no_speech_prob >= STT_WHISPER_NO_SPEECH_THOLD) discard_reason = "no_speech";
 		else if (seg_t1 <= (int64_t)con_data->last_emitted_sample) discard_reason = "already_emitted";
-		else if (seg_t0 < commit_sample) discard_reason = "before_commit_watermark";
 		else if (stt_is_non_speech_text(text)) discard_reason = "filtered_text";
 		if (discard_reason) {
 			stt_debug_log(con_data, "SEGMENT index=%d t0_sample=%lld t1_sample=%lld no_speech=%.4f decision=discard reason=%s text=%s\n",
@@ -325,12 +319,6 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 	}
 	if (max_emitted_sample > (int64_t)con_data->last_emitted_sample) {
 		con_data->last_emitted_sample = (uint64_t)max_emitted_sample;
-	}
-	if ((uint64_t)commit_sample > con_data->processed_samples) {
-		con_data->processed_samples = (uint64_t)commit_sample;
-	}
-	if (con_data->processed_samples > con_data->total_samples_received) {
-		con_data->processed_samples = con_data->total_samples_received;
 	}
 	stt_debug_log(con_data, "INFER_DONE processed=%llu emitted=%llu total=%llu\n",
 		(unsigned long long)con_data->processed_samples, (unsigned long long)con_data->last_emitted_sample,
