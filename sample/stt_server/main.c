@@ -132,6 +132,8 @@ static int stt_init_whisper(void)
 	}
 	snprintf(model_path, sizeof(model_path), "../../stt/models/ggml-large-v3.bin");
 	cparams = whisper_context_default_params();
+	cparams.dtw_token_timestamps = true;
+	cparams.dtw_aheads_preset = WHISPER_AHEADS_LARGE_V3;
 	g_whisper_ctx = whisper_init_from_file_with_params(model_path, cparams);
 	if (!g_whisper_ctx) {
 		printf("[STT][whisper] init failed: %s\n", model_path);
@@ -229,6 +231,7 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 	int n_segments;
 	int64_t max_emitted_sample;
 	int64_t max_processed_sample = window_start_samples + sample_count;
+	int64_t commit_sample = max_processed_sample;
 
 	if (!con_data || !samples || sample_count <= 0 || !g_whisper_ctx) {
 		return;
@@ -273,6 +276,9 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 		(long long)((int64_t)sample_count * 1000 / STT_TARGET_SAMPLE_RATE), n_segments,
 		(unsigned long long)con_data->processed_samples, (unsigned long long)con_data->last_emitted_sample);
 	max_emitted_sample = con_data->last_emitted_sample;
+	if (con_data->processed_samples > (uint64_t)window_start_samples) {
+		commit_sample = (int64_t)con_data->processed_samples;
+	}
 	for (i = 0; i < n_segments; i++) {
 		const char* seg_text = whisper_full_get_segment_text(g_whisper_ctx, i);
 		float no_speech_prob = whisper_full_get_segment_no_speech_prob(g_whisper_ctx, i);
@@ -285,9 +291,7 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 		if (!text || !*text) discard_reason = "empty";
 		else if (no_speech_prob >= STT_WHISPER_NO_SPEECH_THOLD) discard_reason = "no_speech";
 		else if (seg_t1 <= (int64_t)con_data->last_emitted_sample) discard_reason = "already_emitted";
-		else if (seg_t0 <= (int64_t)con_data->last_emitted_sample &&
-			con_data->last_emitted_text[0] != '\0' &&
-			strcmp(text, con_data->last_emitted_text) == 0) discard_reason = "duplicate_text_overlap";
+		else if (seg_t0 < commit_sample) discard_reason = "before_commit_watermark";
 		else if (stt_is_non_speech_text(text)) discard_reason = "filtered_text";
 		if (discard_reason) {
 			stt_debug_log(con_data, "SEGMENT index=%d t0_sample=%lld t1_sample=%lld no_speech=%.4f decision=discard reason=%s text=%s\n",
@@ -322,8 +326,8 @@ static void stt_run_inference_window(STT_CONNECTION_DATA* con_data, const int16_
 	if (max_emitted_sample > (int64_t)con_data->last_emitted_sample) {
 		con_data->last_emitted_sample = (uint64_t)max_emitted_sample;
 	}
-	if (max_processed_sample > (int64_t)con_data->processed_samples) {
-		con_data->processed_samples = (uint64_t)max_processed_sample;
+	if ((uint64_t)commit_sample > con_data->processed_samples) {
+		con_data->processed_samples = (uint64_t)commit_sample;
 	}
 	if (con_data->processed_samples > con_data->total_samples_received) {
 		con_data->processed_samples = con_data->total_samples_received;
@@ -667,6 +671,11 @@ static void stt_process_connections(void)
 					sample_index, (long long)seg_start, (long long)seg_end);
 				continue;
 			}
+			if (seg_start < (int64_t)con_data->processed_samples) {
+				stt_debug_log(con_data, "VAD_SEGMENT index=%d start=%lld end=%lld decision=skip reason=overlaps_committed_audio\n",
+					sample_index, (long long)seg_start, (long long)seg_end);
+				continue;
+			}
 			if (seg_start < analysis_start) seg_start = analysis_start;
 			if (seg_end <= seg_start) {
 				stt_debug_log(con_data, "VAD_SEGMENT index=%d start=%lld end=%lld decision=skip reason=empty\n",
@@ -681,9 +690,11 @@ static void stt_process_connections(void)
 				inference_start = ring_start;
 			}
 			if (seg_end - inference_start > STT_WHISPER_MAX_WINDOW_SAMPLES) {
-				inference_start = seg_end - STT_WHISPER_MAX_WINDOW_SAMPLES;
+				stt_debug_log(con_data, "VAD_SEGMENT index=%d start=%lld end=%lld inference_start=%lld decision=skip reason=context_exceeds_window\n",
+					sample_index, (long long)seg_start, (long long)seg_end, (long long)inference_start);
+				continue;
 			}
-			if (inference_start > seg_start || inference_start < ring_start) {
+			if (inference_start < ring_start || inference_start >= seg_end) {
 				stt_debug_log(con_data, "VAD_SEGMENT index=%d start=%lld end=%lld inference_start=%lld decision=skip reason=invalid_window\n",
 					sample_index, (long long)seg_start, (long long)seg_end, (long long)inference_start);
 				continue;
