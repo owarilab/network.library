@@ -1553,6 +1553,41 @@ int api_qs_send_ws_message_plane(QS_EVENT_PARAMETER params,const char* message)
 	}
 	return api_qs_send_ws_message_common(tinfo,message,true);
 }
+int api_qs_send_ws_text_by_connection_offset(QS_SERVER_CONTEXT* context,uint32_t connection_offset,const char* message)
+{
+	QS_MEMORY_POOL* memory;
+	QS_SOCKET_OPTION* server;
+	QS_SERVER_CONNECTION_INFO* tinfo;
+	QS_SOCKET_OPTION* option;
+	QS_MEMORY_POOL* temporary_memory;
+	QS_SOCKPARAM* socket_params;
+	size_t buffer_size;
+	int32_t message_buffer_munit;
+	void* buffer;
+	ssize_t sendlen;
+	if (context == NULL || message == NULL || context->memory == NULL) return -1;
+	memory = (QS_MEMORY_POOL*)context->memory;
+	server = (QS_SOCKET_OPTION*)QS_GET_POINTER(memory, context->memid_server);
+	if (server == NULL || connection_offset >= (uint32_t)server->maxconnection) return -1;
+	tinfo = qs_offsetpointer(server->memory_pool, server->connection_munit,
+		sizeof(QS_SERVER_CONNECTION_INFO), connection_offset);
+	if (tinfo == NULL) return -1;
+	socket_params = &tinfo->sockparam;
+	if (socket_params->acc == -1 || socket_params->phase != QS_HTTP_SOCK_PHASE_MSG_WEBSOCKET) return -1;
+	option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
+	if (option == NULL || option->memory_pool == NULL) return -1;
+	if (option->memory_pool == NULL) return -1;
+	temporary_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(option->memory_pool, context->memid_temporary_memory);
+	if (temporary_memory == NULL) return -1;
+	buffer_size = qs_strlen(message) + 64;
+	qs_memory_clean(temporary_memory);
+	message_buffer_munit = qs_create_memory_block(temporary_memory, buffer_size);
+	if (message_buffer_munit == -1) return -1;
+	buffer = QS_GET_POINTER(temporary_memory, message_buffer_munit);
+	sendlen = qs_make_websocket_msg(buffer, buffer_size, false, message, qs_strlen(message));
+	if (sendlen <= 0) return -1;
+	return qs_send_all(socket_params->acc, buffer, sendlen, 0) == -1 ? -1 : 0;
+}
 int api_qs_send_ws_message_common(QS_SERVER_CONNECTION_INFO *tinfo,const char* message,int is_plane)
 {
 	QS_SOCKET_OPTION* option = (QS_SOCKET_OPTION*)tinfo->qs_socket_option;
