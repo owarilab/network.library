@@ -6,6 +6,9 @@
   const audioState = document.querySelector('#audioState');
   const startButton = document.querySelector('#startButton');
   const stopButton = document.querySelector('#stopButton');
+  const echoCancellation = document.querySelector('#echoCancellation');
+  const noiseSuppression = document.querySelector('#noiseSuppression');
+  const autoGainControl = document.querySelector('#autoGainControl');
   const clearButton = document.querySelector('#clearButton');
   const results = document.querySelector('#results');
   const emptyState = document.querySelector('#emptyState');
@@ -37,6 +40,24 @@
   function setButtons() {
     startButton.disabled = recording || stopping || preparing || !socket || socket.readyState !== WebSocket.OPEN;
     stopButton.disabled = !recording;
+  }
+
+  async function changeAudioConstraint(control, constraintName) {
+    if (!stream) return;
+    const track = stream.getAudioTracks()[0];
+    const requestedValue = control.checked;
+    if (!track || typeof track.applyConstraints !== 'function') {
+      control.checked = !requestedValue;
+      sessionState.textContent = 'このブラウザーでは録音中の設定変更に対応していません';
+      return;
+    }
+    try {
+      await track.applyConstraints({ [constraintName]: requestedValue });
+      sessionState.textContent = 'マイク設定を変更しました';
+    } catch {
+      control.checked = !requestedValue;
+      sessionState.textContent = 'マイクがこの設定変更を受け付けませんでした';
+    }
   }
 
   function connect() {
@@ -75,6 +96,9 @@
       setConnection('recording', 'RECORDING');
       sessionState.textContent = '録音中';
       audioState.textContent = 'MICROPHONE ACTIVE';
+      echoCancellation.disabled = false;
+      noiseSuppression.disabled = false;
+      autoGainControl.disabled = false;
       timerHandle = window.setInterval(updateTimer, 200);
       setButtons();
       return;
@@ -121,10 +145,18 @@
       return;
     }
     preparing = true;
+    echoCancellation.disabled = true;
+    noiseSuppression.disabled = true;
+    autoGainControl.disabled = true;
     setButtons();
     try {
       stream = await navigator.mediaDevices.getUserMedia({
-        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+        audio: {
+          channelCount: 1,
+          echoCancellation: echoCancellation.checked,
+          noiseSuppression: noiseSuppression.checked,
+          autoGainControl: autoGainControl.checked
+        }
       });
       audioContext = new AudioContext();
       await audioContext.audioWorklet.addModule('./pcm-worklet.js');
@@ -144,6 +176,9 @@
       sessionState.textContent = `マイクを開始できません: ${error.message}`;
       audioState.textContent = 'MICROPHONE ERROR';
       disposeAudio();
+      echoCancellation.disabled = false;
+      noiseSuppression.disabled = false;
+      autoGainControl.disabled = false;
       preparing = false;
       setButtons();
     }
@@ -213,6 +248,9 @@
     window.clearInterval(timerHandle);
     meterFill.style.width = '0%';
     audioState.textContent = 'MICROPHONE IDLE';
+    echoCancellation.disabled = false;
+    noiseSuppression.disabled = false;
+    autoGainControl.disabled = false;
     if (connectionLabel.dataset.state !== 'offline' && connectionLabel.dataset.state !== 'error') {
       setConnection('online', 'CONNECTED');
     }
@@ -244,6 +282,9 @@
 
   startButton.addEventListener('click', startCapture);
   stopButton.addEventListener('click', () => stopCapture());
+  echoCancellation.addEventListener('change', () => changeAudioConstraint(echoCancellation, 'echoCancellation'));
+  noiseSuppression.addEventListener('change', () => changeAudioConstraint(noiseSuppression, 'noiseSuppression'));
+  autoGainControl.addEventListener('change', () => changeAudioConstraint(autoGainControl, 'autoGainControl'));
   clearButton.addEventListener('click', () => {
     results.replaceChildren();
     results.append(emptyState);

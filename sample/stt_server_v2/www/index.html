@@ -36,6 +36,11 @@
           </button>
           <button id="stopButton" class="stop-button" type="button" disabled>停止して確定</button>
         </div>
+        <fieldset class="audio-options" aria-label="マイク音声処理">
+          <label><input id="echoCancellation" type="checkbox" checked><span>エコーキャンセル</span></label>
+          <label><input id="noiseSuppression" type="checkbox" checked><span>ノイズ抑制</span></label>
+          <label><input id="autoGainControl" type="checkbox" checked><span>自動ゲイン調整</span></label>
+        </fieldset>
         <div class="meter" aria-hidden="true"><span id="meterFill"></span></div>
         <div class="console-foot">
           <span>16 kHz &nbsp; / &nbsp; MONO &nbsp; / &nbsp; PCM</span>
