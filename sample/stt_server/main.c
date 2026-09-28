@@ -896,30 +896,41 @@ static int stt_begin_recording(STT_CONNECTION_DATA* con_data, const char* connec
 	con_data->session_id = ++g_stt_session_counter;
 	con_data->is_recording = 1;
 
-	snprintf(con_data->wav_path, sizeof(con_data->wav_path), "./recv_%s_%u.wav", connection_id, con_data->session_id);
+	{
+		/* Include the session counter so recordings started within one second stay unique. */
+		time_t now = time(NULL);
+		struct tm local_time;
+		char timestamp[15];
+		if (!localtime_r(&now, &local_time) || !strftime(timestamp, sizeof(timestamp), "%Y%m%d%H%M%S", &local_time)) {
+			printf("[STT] failed to create recording timestamp\n");
+			stt_reset_connection_data(con_data);
+			return -1;
+		}
+		snprintf(con_data->wav_path, sizeof(con_data->wav_path), "./recv_%s_%u.wav", timestamp, con_data->session_id);
+		snprintf(con_data->txt_path, sizeof(con_data->txt_path), "./recv_%s_%u.txt", timestamp, con_data->session_id);
+		{
+			char debug_path[256];
+			snprintf(debug_path, sizeof(debug_path), "./recv_%s_%u_debug.txt", timestamp, con_data->session_id);
+			con_data->debug_file = fopen(debug_path, "w");
+			if (!con_data->debug_file) {
+				printf("[STT] failed to open debug log: %s\n", debug_path);
+			}
+			else {
+				stt_debug_log(con_data, "SESSION connection_id=%s session_id=%u wav=%s sample_rate=%u channels=%u bits=%u\n",
+					connection_id, con_data->session_id, con_data->wav_path, con_data->sample_rate,
+					(unsigned int)con_data->channels, (unsigned int)con_data->bits_per_sample);
+			}
+		}
+	}
 	con_data->wav_file = fopen(con_data->wav_path, "wb+");
 	if (!con_data->wav_file) {
 		printf("[STT] failed to open wav file: %s\n", con_data->wav_path);
 		stt_reset_connection_data(con_data);
 		return -1;
 	}
-	snprintf(con_data->txt_path, sizeof(con_data->txt_path), "./recv_%s_%u.txt", connection_id, con_data->session_id);
 	con_data->txt_file = fopen(con_data->txt_path, "w");
 	if (!con_data->txt_file) {
 		printf("[STT] failed to open txt file: %s\n", con_data->txt_path);
-	}
-	{
-		char debug_path[256];
-		snprintf(debug_path, sizeof(debug_path), "./recv_%s_%u_debug.txt", connection_id, con_data->session_id);
-		con_data->debug_file = fopen(debug_path, "w");
-		if (!con_data->debug_file) {
-			printf("[STT] failed to open debug log: %s\n", debug_path);
-		}
-		else {
-			stt_debug_log(con_data, "SESSION connection_id=%s session_id=%u wav=%s sample_rate=%u channels=%u bits=%u\n",
-				connection_id, con_data->session_id, con_data->wav_path, con_data->sample_rate,
-				(unsigned int)con_data->channels, (unsigned int)con_data->bits_per_sample);
-		}
 	}
 	if (-1 == stt_write_wav_header(con_data->wav_file, con_data->sample_rate, con_data->channels, con_data->bits_per_sample, 0)) {
 		if (con_data->txt_file) { fclose(con_data->txt_file); con_data->txt_file = NULL; }
