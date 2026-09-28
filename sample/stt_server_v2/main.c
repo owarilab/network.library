@@ -25,6 +25,7 @@
 #define STT_V2_VAD_MODEL_PATH "../../stt/models/ggml-silero-v5.1.2.bin"
 #define STT_V2_MESSAGE_CAPACITY 2048
 #define STT_V2_TRANSCRIPT_PATH_CAPACITY 256
+#define STT_V2_PCM_PATH_CAPACITY 256
 
 typedef struct {
 	uint32_t connection_offset;
@@ -49,6 +50,9 @@ typedef struct {
 	size_t pcm_capacity;
 	char worker_error[64];
 	char transcript_path[STT_V2_TRANSCRIPT_PATH_CAPACITY];
+	char pcm_file_path[STT_V2_PCM_PATH_CAPACITY];
+	FILE* pcm_file;
+	uint32_t wav_data_bytes;
 } STT_V2_SESSION;
 
 typedef struct {
@@ -75,7 +79,8 @@ static struct whisper_vad_context* g_vad_context;
 static uint32_t g_next_session_id = 1;
 static uint32_t g_next_result_id = 1;
 
-static int create_transcript_file(QS_MEMORY_CONTEXT* memory, char* path, size_t path_capacity)
+static int create_session_file_paths(QS_MEMORY_CONTEXT* memory, char* transcript_path,
+	size_t transcript_path_capacity, char* wav_path, size_t wav_path_capacity)
 {
 	time_t now = time(NULL);
 	struct tm local_time;
@@ -86,13 +91,94 @@ static int create_transcript_file(QS_MEMORY_CONTEXT* memory, char* path, size_t 
 	if (strftime(timestamp, sizeof(timestamp), "%Y%m%d%H%M%S", &local_time) == 0) return -1;
 	unique_id = api_qs_uniqid(memory, 16);
 	if (unique_id == NULL) return -1;
-	if (snprintf(path, path_capacity, "transcripts/%s_%s.txt", timestamp, unique_id) >= (int)path_capacity) return -1;
-	file = fopen(path, "wx");
+	if (snprintf(transcript_path, transcript_path_capacity,
+		"transcripts/%s_%s.txt", timestamp, unique_id) >= (int)transcript_path_capacity ||
+		snprintf(wav_path, wav_path_capacity,
+			"transcripts/%s_%s.wav", timestamp, unique_id) >= (int)wav_path_capacity) return -1;
+	file = fopen(transcript_path, "wx");
 	if (file == NULL) return -1;
 	if (fclose(file) != 0) {
-		remove(path);
+		remove(transcript_path);
 		return -1;
 	}
+	file = fopen(wav_path, "wx");
+	if (file == NULL) {
+		remove(transcript_path);
+		return -1;
+	}
+	if (fclose(file) != 0) {
+		remove(transcript_path);
+		remove(wav_path);
+		return -1;
+	}
+	return 0;
+}
+
+static void write_wav_u16(FILE* file, uint16_t value)
+{
+	uint8_t bytes[2] = { (uint8_t)value, (uint8_t)(value >> 8) };
+	fwrite(bytes, 1, sizeof(bytes), file);
+}
+
+static void write_wav_u32(FILE* file, uint32_t value)
+{
+	uint8_t bytes[4] = {
+		(uint8_t)value, (uint8_t)(value >> 8), (uint8_t)(value >> 16), (uint8_t)(value >> 24)
+	};
+	fwrite(bytes, 1, sizeof(bytes), file);
+}
+
+static int write_wav_header(FILE* file, uint32_t data_bytes)
+{
+	if (fseek(file, 0, SEEK_SET) != 0) return -1;
+	if (fwrite("RIFF", 1, 4, file) != 4) return -1;
+	write_wav_u32(file, 36 + data_bytes);
+	if (ferror(file)) return -1;
+	if (fwrite("WAVEfmt ", 1, 8, file) != 8) return -1;
+	write_wav_u32(file, 16);
+	write_wav_u16(file, 1);
+	write_wav_u16(file, 1);
+	write_wav_u32(file, STT_V2_SAMPLE_RATE);
+	write_wav_u32(file, STT_V2_SAMPLE_RATE * 2);
+	write_wav_u16(file, 2);
+	write_wav_u16(file, 16);
+	if (ferror(file)) return -1;
+	if (fwrite("data", 1, 4, file) != 4) return -1;
+	write_wav_u32(file, data_bytes);
+	return ferror(file) ? -1 : 0;
+}
+
+static int open_session_wav(STT_V2_SESSION* session)
+{
+	FILE* file = fopen(session->pcm_file_path, "wb+");
+	if (file == NULL) return -1;
+	session->wav_data_bytes = 0;
+	if (write_wav_header(file, 0) != 0 || fflush(file) != 0) {
+		fclose(file);
+		return -1;
+	}
+	session->pcm_file = file;
+	return 0;
+}
+
+static int finalize_session_wav(STT_V2_SESSION* session)
+{
+	int status = 0;
+	if (!session || !session->pcm_file) return 0;
+	if (write_wav_header(session->pcm_file, session->wav_data_bytes) != 0 ||
+		fflush(session->pcm_file) != 0) status = -1;
+	if (fclose(session->pcm_file) != 0) status = -1;
+	session->pcm_file = NULL;
+	if (status != 0) fprintf(stderr, "Failed to finalize WAV file: %s\n", session->pcm_file_path);
+	return status;
+}
+
+static int append_session_pcm(STT_V2_SESSION* session, const uint8_t* bytes, size_t byte_count)
+{
+	if (!session || !session->pcm_file || byte_count > UINT32_MAX - session->wav_data_bytes) return -1;
+	if (fseek(session->pcm_file, 0, SEEK_END) != 0 ||
+		fwrite(bytes, 1, byte_count, session->pcm_file) != byte_count) return -1;
+	session->wav_data_bytes += (uint32_t)byte_count;
 	return 0;
 }
 
@@ -141,6 +227,7 @@ static uint16_t read_pcm_sample_le(const uint8_t* bytes)
 static void clear_session(STT_V2_SESSION* session)
 {
 	if (!session) return;
+	finalize_session_wav(session);
 	free(session->pcm);
 	memset(session, 0, sizeof(*session));
 }
@@ -238,6 +325,7 @@ static int on_ws_event(QS_EVENT_PARAMETER params)
 			int channels = api_qs_object_get_integer_val(&object, "channels");
 			int bits_per_sample = api_qs_object_get_integer_val(&object, "bits_per_sample");
 			char transcript_path[STT_V2_TRANSCRIPT_PATH_CAPACITY] = "";
+			char wav_path[STT_V2_PCM_PATH_CAPACITY] = "";
 			int created_session = 0;
 			pthread_mutex_lock(&g_state_mutex);
 			session = sample_rate == STT_V2_SAMPLE_RATE && channels == 1 && bits_per_sample == 16 ?
@@ -255,7 +343,8 @@ static int on_ws_event(QS_EVENT_PARAMETER params)
 					return 0;
 				}
 				if (session->transcript_path[0] == '\0') {
-					if (create_transcript_file(&json_memory, transcript_path, sizeof(transcript_path)) != 0) {
+					if (create_session_file_paths(&json_memory, transcript_path, sizeof(transcript_path),
+						wav_path, sizeof(wav_path)) != 0) {
 						if (created_session) clear_session(session);
 						api_qs_send_ws_message_plane(params,
 							"{\"type\":\"stt_error\",\"code\":\"transcript_file_create_failed\"}");
@@ -263,8 +352,20 @@ static int on_ws_event(QS_EVENT_PARAMETER params)
 						api_qs_memory_free(&json_memory);
 						return 0;
 					}
+					snprintf(session->pcm_file_path, sizeof(session->pcm_file_path), "%s", wav_path);
+					if (open_session_wav(session) != 0) {
+						remove(transcript_path);
+						remove(wav_path);
+						if (created_session) clear_session(session);
+						api_qs_send_ws_message_plane(params,
+							"{\"type\":\"stt_error\",\"code\":\"wav_file_create_failed\"}");
+						pthread_mutex_unlock(&g_state_mutex);
+						api_qs_memory_free(&json_memory);
+						return 0;
+					}
 					snprintf(session->transcript_path, sizeof(session->transcript_path), "%s", transcript_path);
-					printf("Transcript file: %s\n", session->transcript_path);
+					printf("Transcript file: %s\nWAV file: %s\n",
+						session->transcript_path, session->pcm_file_path);
 				}
 				char response[STT_V2_MESSAGE_CAPACITY];
 				snprintf(response, sizeof(response), "{\"type\":\"stt_ready\",\"session_id\":%u}",
@@ -337,6 +438,13 @@ static int on_ws_event(QS_EVENT_PARAMETER params)
 		for (sample_index = 0; sample_index < (size_t)message_size / 2; sample_index++) {
 			uint16_t bits = read_pcm_sample_le((const uint8_t*)message + sample_index * 2);
 			session->pcm[session->pcm_sample_count + sample_index] = (int16_t)bits;
+		}
+		if (append_session_pcm(session, (const uint8_t*)message, (size_t)message_size) != 0) {
+			fail_session_locked(session, "wav_write_failed");
+			api_qs_send_ws_message_plane(params,
+				"{\"type\":\"stt_error\",\"code\":\"wav_write_failed\"}");
+			pthread_mutex_unlock(&g_state_mutex);
+			return 0;
 		}
 		session->pcm_sample_count += (size_t)message_size / 2;
 		session->total_samples_received += (uint64_t)message_size / 2;
