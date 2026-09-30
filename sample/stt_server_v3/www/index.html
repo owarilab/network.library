@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STT Server v3 Sample</title>
+<style>
+:root {
+	color-scheme: light;
+	--bg: linear-gradient(135deg, #f7f4ea 0%, #eef5ff 52%, #e7f6ef 100%);
+	--panel: rgba(255, 255, 255, 0.86);
+	--panel-strong: rgba(255, 255, 255, 0.96);
+	--line: rgba(27, 44, 72, 0.14);
+	--text: #1f2c3d;
+	--muted: #5d6b7a;
+	--accent: #0d8f72;
+	--accent-strong: #0a6d57;
+	--warn: #c27412;
+	--error: #be3f45;
+	--shadow: 0 22px 60px rgba(31, 44, 61, 0.12);
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	min-height: 100vh;
+	font-family: "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+	color: var(--text);
+	background: var(--bg);
+}
+
+button,
+input,
+textarea {
+	font: inherit;
+}
+
+.shell {
+	width: min(1160px, calc(100% - 32px));
+	margin: 0 auto;
+	padding: 28px 0 40px;
+}
+
+.hero {
+	display: grid;
+	grid-template-columns: 1.4fr 1fr;
+	gap: 18px;
+	margin-bottom: 18px;
+}
+
+.panel {
+	background: var(--panel);
+	border: 1px solid var(--line);
+	border-radius: 24px;
+	box-shadow: var(--shadow);
+	backdrop-filter: blur(18px);
+}
+
+.hero-main {
+	padding: 28px;
+}
+
+.hero-side {
+	padding: 22px;
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+
+.eyebrow {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 12px;
+	border-radius: 999px;
+	background: rgba(13, 143, 114, 0.1);
+	color: var(--accent-strong);
+	font-size: 13px;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+}
+
+h1 {
+	margin: 16px 0 10px;
+	font-size: clamp(32px, 5vw, 54px);
+	line-height: 1.02;
+}
+
+.lead {
+	margin: 0;
+	font-size: 16px;
+	line-height: 1.8;
+	color: var(--muted);
+}
+
+.controls {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	margin-top: 24px;
+}
+
+.button {
+	border: 0;
+	border-radius: 16px;
+	padding: 14px 18px;
+	min-width: 148px;
+	cursor: pointer;
+	transition: transform 120ms ease, opacity 120ms ease, background 120ms ease;
+}
+
+.button:hover:enabled {
+	transform: translateY(-1px);
+}
+
+.button:disabled {
+	opacity: 0.45;
+	cursor: default;
+}
+
+.button-primary {
+	background: var(--accent);
+	color: #fff;
+	font-weight: 700;
+}
+
+.button-secondary {
+	background: rgba(19, 57, 92, 0.09);
+	color: var(--text);
+	font-weight: 700;
+}
+
+.button-danger {
+	background: #b94f4d;
+	color: #fff;
+	font-weight: 700;
+}
+
+.button-ghost {
+	background: rgba(255, 255, 255, 0.78);
+	color: var(--text);
+	border: 1px solid var(--line);
+}
+
+.status-grid,
+.metrics-grid,
+.content-grid {
+	display: grid;
+	gap: 18px;
+}
+
+.status-grid {
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	margin-bottom: 18px;
+}
+
+.status-card,
+.metric-card,
+.content-card {
+	padding: 18px;
+	border-radius: 22px;
+	background: var(--panel-strong);
+	border: 1px solid var(--line);
+}
+
+.status-label,
+.metric-label {
+	font-size: 12px;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+
+.status-value,
+.metric-value {
+	margin-top: 10px;
+	font-size: 24px;
+	font-weight: 700;
+}
+
+.status-value.small,
+.metric-value.small {
+	font-size: 18px;
+}
+
+.metrics-grid {
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	margin-bottom: 18px;
+}
+
+.content-grid {
+	grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.9fr);
+}
+
+.card-head {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 12px;
+	margin-bottom: 14px;
+}
+
+.card-title {
+	margin: 0;
+	font-size: 18px;
+}
+
+.card-note {
+	font-size: 13px;
+	color: var(--muted);
+}
+
+.live-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 7px 10px;
+	border-radius: 999px;
+	background: rgba(13, 143, 114, 0.08);
+	color: var(--accent-strong);
+	font-size: 12px;
+	font-weight: 700;
+}
+
+.live-dot {
+	width: 9px;
+	height: 9px;
+	border-radius: 50%;
+	background: currentColor;
+}
+
+.meter {
+	position: relative;
+	width: 100%;
+	height: 14px;
+	border-radius: 999px;
+	background: rgba(27, 44, 72, 0.08);
+	overflow: hidden;
+}
+
+.meter-fill {
+	position: absolute;
+	inset: 0 auto 0 0;
+	width: 0%;
+	border-radius: inherit;
+	background: linear-gradient(90deg, #1eb980 0%, #ecd05f 55%, #db5b5b 100%);
+	transition: width 80ms linear;
+}
+
+.partial-box,
+.transcript-list,
+.event-log {
+	border-radius: 18px;
+	border: 1px solid var(--line);
+	background: rgba(246, 249, 252, 0.86);
+}
+
+.partial-box {
+	min-height: 92px;
+	padding: 16px;
+	font-size: 15px;
+	line-height: 1.7;
+	color: var(--text);
+	white-space: pre-wrap;
+}
+
+.placeholder {
+	color: var(--muted);
+}
+
+.transcript-list {
+	padding: 10px;
+	min-height: 320px;
+	max-height: 580px;
+	overflow: auto;
+}
+
+.transcript-item {
+	padding: 14px;
+	border-radius: 14px;
+	background: #fff;
+	border: 1px solid rgba(27, 44, 72, 0.08);
+}
+
+.transcript-item + .transcript-item {
+	margin-top: 10px;
+}
+
+.transcript-meta {
+	display: flex;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 8px;
+	font-size: 12px;
+	color: var(--muted);
+}
+
+.transcript-text {
+	font-size: 15px;
+	line-height: 1.7;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.transcript-text.filtered {
+	color: var(--muted);
+	font-style: italic;
+}
+
+.event-log {
+	min-height: 480px;
+	max-height: 580px;
+	overflow: auto;
+	padding: 10px;
+}
+
+.event-row {
+	display: grid;
+	grid-template-columns: 78px 1fr;
+	gap: 10px;
+	padding: 10px 8px;
+	border-bottom: 1px solid rgba(27, 44, 72, 0.08);
+	font-size: 13px;
+}
+
+.event-row:last-child {
+	border-bottom: 0;
+}
+
+.event-time {
+	color: var(--muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.event-text {
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.aside-block {
+	padding: 14px 16px;
+	border-radius: 16px;
+	background: rgba(13, 143, 114, 0.05);
+	border: 1px solid rgba(13, 143, 114, 0.12);
+}
+
+.aside-title {
+	margin: 0 0 8px;
+	font-size: 13px;
+	color: var(--muted);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.aside-value {
+	margin: 0;
+	font-size: 15px;
+	line-height: 1.6;
+}
+
+.tone-ok {
+	color: var(--accent-strong);
+}
+
+.tone-warn {
+	color: var(--warn);
+}
+
+.tone-error {
+	color: var(--error);
+}
+
+@media (max-width: 980px) {
+	.hero,
+	.content-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.status-grid,
+	.metrics-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 640px) {
+	.shell {
+		width: min(100% - 20px, 1160px);
+		padding-top: 18px;
+	}
+
+	.hero-main,
+	.hero-side,
+	.status-card,
+	.metric-card,
+	.content-card {
+		padding: 16px;
+	}
+
+	.status-grid,
+	.metrics-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.controls {
+		flex-direction: column;
+	}
+
+	.button {
+		width: 100%;
+	}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+	<section class="hero">
+		<div class="panel hero-main">
+			<div class="eyebrow">STT Server v3</div>
+			<h1>Whisper + VAD の逐次認識をブラウザから試す</h1>
+			<p class="lead">
+				stt_start でセッションを開始し、16kHz / mono / int16 PCM を WebSocket で送信します。
+				サーバーから返る speech_start / speech_end / result を可視化します。
+			</p>
+			<div class="controls">
+				<button id="connectButton" class="button button-secondary" type="button">接続し直す</button>
+				<button id="startButton" class="button button-primary" type="button">録音開始</button>
+				<button id="stopButton" class="button button-danger" type="button" disabled>録音停止</button>
+				<button id="clearButton" class="button button-ghost" type="button">表示をクリア</button>
+			</div>
+		</div>
+		<aside class="panel hero-side">
+			<div class="aside-block">
+				<h2 class="aside-title">接続先</h2>
+				<p id="socketUrl" class="aside-value"></p>
+			</div>
+			<div class="aside-block">
+				<h2 class="aside-title">送信フォーマット</h2>
+				<p class="aside-value">PCM little endian / 16kHz / mono / int16</p>
+			</div>
+			<div class="aside-block">
+				<h2 class="aside-title">メモ</h2>
+				<p class="aside-value">サーバーは binary フレームで JSON を返します。発話の切れ目ごとに推論結果が追加されます。</p>
+			</div>
+		</aside>
+	</section>
+
+	<section class="status-grid">
+		<div class="status-card">
+			<div class="status-label">WebSocket</div>
+			<div id="wsState" class="status-value small">CONNECTING</div>
+		</div>
+		<div class="status-card">
+			<div class="status-label">Streaming</div>
+			<div id="streamState" class="status-value small">Idle</div>
+		</div>
+		<div class="status-card">
+			<div class="status-label">Server</div>
+			<div id="serverState" class="status-value small">Awaiting ready</div>
+		</div>
+		<div class="status-card">
+			<div class="status-label">Current Speech</div>
+			<div id="speechState" class="status-value small">Silence</div>
+		</div>
+	</section>
+
+	<section class="metrics-grid">
+		<div class="metric-card">
+			<div class="metric-label">Captured Samples</div>
+			<div id="capturedSamples" class="metric-value">0</div>
+		</div>
+		<div class="metric-card">
+			<div class="metric-label">Sent Bytes</div>
+			<div id="sentBytes" class="metric-value">0 B</div>
+		</div>
+		<div class="metric-card">
+			<div class="metric-label">PCM Chunks</div>
+			<div id="chunkCount" class="metric-value">0</div>
+		</div>
+		<div class="metric-card">
+			<div class="metric-label">Mic Level</div>
+			<div style="margin-top: 12px;">
+				<div class="meter"><div id="meterFill" class="meter-fill"></div></div>
+				<div id="meterText" class="metric-value small" style="margin-top: 10px;">0%</div>
+			</div>
+		</div>
+	</section>
+
+	<section class="content-grid">
+		<div class="content-card">
+			<div class="card-head">
+				<h2 class="card-title">認識結果</h2>
+				<div id="liveChip" class="live-chip"><span class="live-dot"></span><span>standby</span></div>
+			</div>
+			<div class="card-note">現在の発話区間と、確定した文字起こしを分けて表示します。</div>
+			<div id="partialBox" class="partial-box" style="margin-top: 14px;"><span class="placeholder">発話中の状態がここに出ます。</span></div>
+			<div id="transcriptList" class="transcript-list" style="margin-top: 14px;">
+				<div class="placeholder" style="padding: 12px;">結果はまだありません。</div>
+			</div>
+		</div>
+		<div class="content-card">
+			<div class="card-head">
+				<h2 class="card-title">イベントログ</h2>
+				<div class="card-note">binary JSON の受信内容も記録します。</div>
+			</div>
+			<div id="eventLog" class="event-log">
+				<div class="placeholder" style="padding: 12px;">ログはまだありません。</div>
+			</div>
+		</div>
+	</section>
+</div>
+
+<script>
+(function() {
+	const TARGET_SAMPLE_RATE = 16000;
+	const FLUSH_INTERVAL_MS = 160;
+	const SOCKET_URL = (window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host;
+
+	const elements = {
+		socketUrl: document.getElementById("socketUrl"),
+		connectButton: document.getElementById("connectButton"),
+		startButton: document.getElementById("startButton"),
+		stopButton: document.getElementById("stopButton"),
+		clearButton: document.getElementById("clearButton"),
+		wsState: document.getElementById("wsState"),
+		streamState: document.getElementById("streamState"),
+		serverState: document.getElementById("serverState"),
+		speechState: document.getElementById("speechState"),
+		capturedSamples: document.getElementById("capturedSamples"),
+		sentBytes: document.getElementById("sentBytes"),
+		chunkCount: document.getElementById("chunkCount"),
+		meterFill: document.getElementById("meterFill"),
+		meterText: document.getElementById("meterText"),
+		liveChip: document.getElementById("liveChip"),
+		partialBox: document.getElementById("partialBox"),
+		transcriptList: document.getElementById("transcriptList"),
+		eventLog: document.getElementById("eventLog")
+	};
+
+	const state = {
+		ws: null,
+		audioContext: null,
+		mediaStream: null,
+		sourceNode: null,
+		processorNode: null,
+		flushTimer: null,
+		isRecording: false,
+		queue: [],
+		queuedSamples: 0,
+		totalCapturedSamples: 0,
+		sentBytes: 0,
+		sentChunks: 0,
+		transcriptCount: 0,
+		serverReady: false,
+		currentSpeech: null,
+		reconnecting: false
+	};
+
+	elements.socketUrl.textContent = SOCKET_URL;
+
+	function formatBytes(bytes) {
+		if (bytes >= 1024 * 1024) {
+			return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+		}
+		if (bytes >= 1024) {
+			return (bytes / 1024).toFixed(1) + " KB";
+		}
+		return bytes + " B";
+	}
+
+	function formatTimeMs(ms) {
+		const total = Math.max(0, Math.round(ms));
+		const minutes = Math.floor(total / 60000);
+		const seconds = Math.floor((total % 60000) / 1000);
+		const millis = total % 1000;
+		return String(minutes).padStart(2, "0") + ":" +
+			String(seconds).padStart(2, "0") + "." +
+			String(millis).padStart(3, "0");
+	}
+
+	function setText(element, text, className) {
+		element.textContent = text;
+		if (className !== undefined) {
+			element.className = className;
+		}
+	}
+
+	function logEvent(kind, message, tone) {
+		if (elements.eventLog.querySelector(".placeholder")) {
+			elements.eventLog.innerHTML = "";
+		}
+		const row = document.createElement("div");
+		row.className = "event-row";
+		const now = new Date();
+		const time = String(now.getHours()).padStart(2, "0") + ":" +
+			String(now.getMinutes()).padStart(2, "0") + ":" +
+			String(now.getSeconds()).padStart(2, "0");
+		const toneClass = tone === "error" ? "tone-error" : tone === "warn" ? "tone-warn" : "tone-ok";
+		row.innerHTML = "<div class=\"event-time\">" + time + "</div>" +
+			"<div class=\"event-text " + toneClass + "\">[" + escapeHtml(kind) + "] " + escapeHtml(message) + "</div>";
+		elements.eventLog.prepend(row);
+	}
+
+	function escapeHtml(text) {
+		return String(text)
+			.replace(/&/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;")
+			.replace(/\"/g, "&quot;")
+			.replace(/'/g, "&#39;");
+	}
+
+	function updateButtons() {
+		const wsOpen = state.ws && state.ws.readyState === WebSocket.OPEN;
+		elements.startButton.disabled = !wsOpen || state.isRecording;
+		elements.stopButton.disabled = !state.isRecording;
+	}
+
+	function updateMetrics() {
+		elements.capturedSamples.textContent = state.totalCapturedSamples.toLocaleString();
+		elements.sentBytes.textContent = formatBytes(state.sentBytes);
+		elements.chunkCount.textContent = state.sentChunks.toLocaleString();
+	}
+
+	function updateLiveChip(text, tone) {
+		const chipClass = tone === "warn"
+			? "live-chip tone-warn"
+			: tone === "error"
+				? "live-chip tone-error"
+				: "live-chip tone-ok";
+		elements.liveChip.className = chipClass;
+		elements.liveChip.innerHTML = "<span class=\"live-dot\"></span><span>" + escapeHtml(text) + "</span>";
+	}
+
+	function setPartialText(text, placeholder) {
+		if (!text) {
+			elements.partialBox.innerHTML = "<span class=\"placeholder\">" + escapeHtml(placeholder || "発話中の状態がここに出ます。") + "</span>";
+			return;
+		}
+		elements.partialBox.textContent = text;
+	}
+
+	function resetUi() {
+		state.serverReady = false;
+		state.currentSpeech = null;
+		setText(elements.serverState, "Awaiting ready", "status-value small");
+		setText(elements.streamState, "Idle", "status-value small");
+		setText(elements.speechState, "Silence", "status-value small");
+		setPartialText("", "発話中の状態がここに出ます。");
+		updateLiveChip("standby", "ok");
+		elements.meterFill.style.width = "0%";
+		elements.meterText.textContent = "0%";
+	}
+
+	function clearTranscript() {
+		state.transcriptCount = 0;
+		elements.transcriptList.innerHTML = '<div class="placeholder" style="padding: 12px;">結果はまだありません。</div>';
+	}
+
+	function clearLog() {
+		elements.eventLog.innerHTML = '<div class="placeholder" style="padding: 12px;">ログはまだありません。</div>';
+	}
+
+	function addTranscript(message) {
+		if (elements.transcriptList.querySelector(".placeholder")) {
+			elements.transcriptList.innerHTML = "";
+		}
+		state.transcriptCount += 1;
+		const item = document.createElement("article");
+		item.className = "transcript-item";
+		const filtered = message.filtered === true;
+		const text = message.text && message.text.trim() ? message.text.trim() : "(no text)";
+		const reason = filtered ? "filtered" : "accepted";
+		const inferMs = typeof message.infer_ms === "number" ? message.infer_ms + " ms" : "-";
+		item.innerHTML =
+			"<div class=\"transcript-meta\">" +
+			"<span>#" + state.transcriptCount + " " + formatTimeMs(message.t0 || 0) + " - " + formatTimeMs(message.t1 || 0) + "</span>" +
+			"<span>" + escapeHtml(reason) + " / infer " + escapeHtml(inferMs) + "</span>" +
+			"</div>" +
+			"<div class=\"transcript-text" + (filtered ? " filtered" : "") + "\">" + escapeHtml(text) + "</div>";
+		elements.transcriptList.prepend(item);
+	}
+
+	function setMeter(level) {
+		const clamped = Math.max(0, Math.min(1, level));
+		const percent = Math.round(clamped * 100);
+		elements.meterFill.style.width = percent + "%";
+		elements.meterText.textContent = percent + "%";
+	}
+
+	function ensureSocketOpen() {
+		if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+			return Promise.resolve(state.ws);
+		}
+		if (state.reconnecting) {
+			return new Promise((resolve, reject) => {
+				const check = () => {
+					if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+						resolve(state.ws);
+					} else if (!state.reconnecting) {
+						reject(new Error("WebSocket reconnect failed"));
+					} else {
+						window.setTimeout(check, 60);
+					}
+				};
+				check();
+			});
+		}
+		return connectWebSocket();
+	}
+
+	function connectWebSocket() {
+		if (state.ws && (state.ws.readyState === WebSocket.OPEN || state.ws.readyState === WebSocket.CONNECTING)) {
+			return Promise.resolve(state.ws);
+		}
+
+		state.reconnecting = true;
+		setText(elements.wsState, "CONNECTING", "status-value small tone-warn");
+		logEvent("ws", "connecting to " + SOCKET_URL, "ok");
+
+		return new Promise((resolve, reject) => {
+			const ws = new WebSocket(SOCKET_URL);
+			ws.binaryType = "arraybuffer";
+			state.ws = ws;
+
+			ws.addEventListener("open", () => {
+				state.reconnecting = false;
+				setText(elements.wsState, "OPEN", "status-value small tone-ok");
+				updateButtons();
+				logEvent("ws", "socket opened", "ok");
+				resolve(ws);
+			});
+
+			ws.addEventListener("close", (event) => {
+				state.reconnecting = false;
+				setText(elements.wsState, "CLOSED", "status-value small tone-error");
+				updateButtons();
+				if (state.isRecording) {
+					stopRecording({ skipServerStop: true }).catch(function(error) {
+						logEvent("client", error.message, "error");
+					});
+				}
+				state.serverReady = false;
+				logEvent("ws", "socket closed code=" + event.code, event.wasClean ? "warn" : "error");
+			});
+
+			ws.addEventListener("error", () => {
+				logEvent("ws", "socket error", "error");
+			});
+
+			ws.addEventListener("message", (event) => {
+				handleSocketMessage(event).catch(function(error) {
+					logEvent("recv", error.message, "error");
+				});
+			});
+
+			const failTimer = window.setTimeout(() => {
+				if (ws.readyState !== WebSocket.OPEN) {
+					state.reconnecting = false;
+					reject(new Error("WebSocket open timeout"));
+				}
+			}, 4000);
+
+			ws.addEventListener("open", () => window.clearTimeout(failTimer), { once: true });
+			ws.addEventListener("close", () => window.clearTimeout(failTimer), { once: true });
+		});
+	}
+
+	function sendJson(payload) {
+		if (!state.ws || state.ws.readyState !== WebSocket.OPEN) {
+			throw new Error("WebSocket is not open");
+		}
+		const text = JSON.stringify(payload);
+		state.ws.send(text);
+		state.sentBytes += new TextEncoder().encode(text).length;
+		updateMetrics();
+	}
+
+	function flushAudioQueue() {
+		if (!state.ws || state.ws.readyState !== WebSocket.OPEN || state.queue.length === 0) {
+			return;
+		}
+		const totalSamples = state.queuedSamples;
+		const pcm = new Int16Array(totalSamples);
+		let offset = 0;
+		for (let i = 0; i < state.queue.length; i++) {
+			pcm.set(state.queue[i], offset);
+			offset += state.queue[i].length;
+		}
+		state.queue = [];
+		state.queuedSamples = 0;
+		const payload = pcm.buffer.slice(pcm.byteOffset, pcm.byteOffset + pcm.byteLength);
+		state.ws.send(payload);
+		state.sentBytes += payload.byteLength;
+		state.sentChunks += 1;
+		updateMetrics();
+	}
+
+	function downsampleTo16k(input, sourceRate) {
+		if (sourceRate === TARGET_SAMPLE_RATE) {
+			return input;
+		}
+		const ratio = sourceRate / TARGET_SAMPLE_RATE;
+		const length = Math.max(1, Math.round(input.length / ratio));
+		const output = new Float32Array(length);
+		let offset = 0;
+		for (let i = 0; i < length; i++) {
+			const nextOffset = Math.min(input.length, Math.round((i + 1) * ratio));
+			let sum = 0;
+			let count = 0;
+			while (offset < nextOffset && offset < input.length) {
+				sum += input[offset];
+				count += 1;
+				offset += 1;
+			}
+			output[i] = count > 0 ? sum / count : output[Math.max(0, i - 1)] || 0;
+		}
+		return output;
+	}
+
+	function floatToInt16(float32) {
+		const output = new Int16Array(float32.length);
+		for (let i = 0; i < float32.length; i++) {
+			const sample = Math.max(-1, Math.min(1, float32[i]));
+			output[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+		}
+		return output;
+	}
+
+	function enqueueAudio(float32) {
+		const resampled = downsampleTo16k(float32, state.audioContext.sampleRate);
+		const pcm = floatToInt16(resampled);
+		state.queue.push(pcm);
+		state.queuedSamples += pcm.length;
+		state.totalCapturedSamples += pcm.length;
+		updateMetrics();
+	}
+
+	async function startRecording() {
+		if (state.isRecording) {
+			return;
+		}
+		await ensureSocketOpen();
+
+		const stream = await navigator.mediaDevices.getUserMedia({
+			audio: {
+				channelCount: 1,
+				echoCancellation: false,
+				noiseSuppression: false,
+				autoGainControl: false
+			}
+		});
+
+		const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+		const sourceNode = audioContext.createMediaStreamSource(stream);
+		const processorNode = audioContext.createScriptProcessor(4096, 1, 1);
+
+		state.audioContext = audioContext;
+		state.mediaStream = stream;
+		state.sourceNode = sourceNode;
+		state.processorNode = processorNode;
+		state.queue = [];
+		state.queuedSamples = 0;
+		state.totalCapturedSamples = 0;
+		state.sentBytes = 0;
+		state.sentChunks = 0;
+		state.serverReady = false;
+		state.currentSpeech = null;
+		updateMetrics();
+
+		processorNode.onaudioprocess = function(event) {
+			if (!state.isRecording) {
+				return;
+			}
+			const input = event.inputBuffer.getChannelData(0);
+			const copy = new Float32Array(input.length);
+			copy.set(input);
+			enqueueAudio(copy);
+			let rms = 0;
+			for (let i = 0; i < copy.length; i++) {
+				rms += copy[i] * copy[i];
+			}
+			setMeter(Math.sqrt(rms / copy.length) * 3.4);
+		};
+
+		sourceNode.connect(processorNode);
+		processorNode.connect(audioContext.destination);
+
+		sendJson({
+			type: "stt_start",
+			sample_rate: TARGET_SAMPLE_RATE,
+			channels: 1,
+			bits_per_sample: 16
+		});
+
+		state.flushTimer = window.setInterval(flushAudioQueue, FLUSH_INTERVAL_MS);
+		state.isRecording = true;
+		setText(elements.streamState, "Capturing", "status-value small tone-ok");
+		setText(elements.serverState, "Waiting ready", "status-value small tone-warn");
+		setText(elements.speechState, "Silence", "status-value small");
+		setPartialText("", "サーバー応答待ちです。");
+		updateLiveChip("recording", "ok");
+		updateButtons();
+		logEvent("client", "sent stt_start and began capturing", "ok");
+	}
+
+	async function stopRecording(options) {
+		const skipServerStop = options && options.skipServerStop;
+		if (!state.isRecording && !skipServerStop) {
+			return;
+		}
+
+		state.isRecording = false;
+		if (state.flushTimer) {
+			window.clearInterval(state.flushTimer);
+			state.flushTimer = null;
+		}
+		flushAudioQueue();
+
+		if (!skipServerStop && state.ws && state.ws.readyState === WebSocket.OPEN) {
+			sendJson({ type: "stt_stop" });
+			logEvent("client", "sent stt_stop", "warn");
+		}
+
+		if (state.processorNode) {
+			state.processorNode.disconnect();
+			state.processorNode.onaudioprocess = null;
+			state.processorNode = null;
+		}
+		if (state.sourceNode) {
+			state.sourceNode.disconnect();
+			state.sourceNode = null;
+		}
+		if (state.mediaStream) {
+			state.mediaStream.getTracks().forEach(function(track) {
+				track.stop();
+			});
+			state.mediaStream = null;
+		}
+		if (state.audioContext) {
+			await state.audioContext.close();
+			state.audioContext = null;
+		}
+
+		setText(elements.streamState, "Idle", "status-value small");
+		updateLiveChip("stopped", "warn");
+		updateButtons();
+		setMeter(0);
+	}
+
+	async function decodeIncomingData(data) {
+		if (data instanceof Blob) {
+			data = await data.arrayBuffer();
+		}
+		if (data instanceof ArrayBuffer) {
+			return new TextDecoder("utf-8").decode(new Uint8Array(data));
+		}
+		return String(data);
+	}
+
+	function parseServerMessage(text) {
+		const trimmed = text.trim();
+		if (!trimmed) {
+			return null;
+		}
+		try {
+			return JSON.parse(trimmed);
+		} catch (error) {
+			if (trimmed[0] !== "{" && trimmed.indexOf('"type"') === 0) {
+				return JSON.parse("{" + trimmed);
+			}
+			throw error;
+		}
+	}
+
+	async function handleSocketMessage(event) {
+		const text = await decodeIncomingData(event.data);
+		const message = parseServerMessage(text);
+		if (!message || !message.type) {
+			logEvent("recv", "non-JSON payload: " + text, "warn");
+			return;
+		}
+
+		switch (message.type) {
+		case "ready":
+			state.serverReady = true;
+			setText(elements.serverState, "Ready", "status-value small tone-ok");
+			logEvent("server", "ready", "ok");
+			break;
+		case "speech_start":
+			state.currentSpeech = { t0: message.t0 || 0 };
+			setText(elements.speechState, "Speaking", "status-value small tone-ok");
+			setPartialText("speech started at " + formatTimeMs(message.t0 || 0));
+			updateLiveChip("speech detected", "ok");
+			logEvent("server", "speech_start t0=" + (message.t0 || 0), "ok");
+			break;
+		case "speech_end":
+			setText(elements.speechState, "Silence", "status-value small");
+			setPartialText("speech end " + formatTimeMs(message.t0 || 0) + " - " + formatTimeMs(message.t1 || 0) +
+				" / reason=" + (message.reason || "unknown") + (message.discarded ? " / discarded" : ""));
+			updateLiveChip(message.discarded ? "discarded" : "segment ready", message.discarded ? "warn" : "ok");
+			logEvent("server", "speech_end reason=" + (message.reason || "unknown"), message.discarded ? "warn" : "ok");
+			break;
+		case "result":
+			addTranscript(message);
+			setPartialText("", "次の発話を待っています。");
+			updateLiveChip(message.filtered ? "filtered result" : "transcribed", message.filtered ? "warn" : "ok");
+			logEvent("server", "result text=" + (message.text || "") + (message.filtered ? " (filtered)" : ""), message.filtered ? "warn" : "ok");
+			break;
+		case "stopped":
+			state.serverReady = false;
+			setText(elements.serverState, "Stopped", "status-value small tone-warn");
+			setText(elements.speechState, "Silence", "status-value small");
+			updateLiveChip("server stopped", "warn");
+			logEvent("server", "stopped", "warn");
+			break;
+		case "error":
+			setText(elements.serverState, "Error", "status-value small tone-error");
+			updateLiveChip("server error", "error");
+			logEvent("server", message.message || "unknown error", "error");
+			break;
+		default:
+			logEvent("server", "unknown message type=" + message.type, "warn");
+			break;
+		}
+	}
+
+	elements.connectButton.addEventListener("click", function() {
+		if (state.ws) {
+			try {
+				state.ws.close(1000, "manual reconnect");
+			} catch (error) {
+				logEvent("ws", error.message, "warn");
+			}
+			state.ws = null;
+		}
+		connectWebSocket().catch(function(error) {
+			logEvent("ws", error.message, "error");
+		});
+	});
+
+	elements.startButton.addEventListener("click", function() {
+		startRecording().catch(function(error) {
+			logEvent("client", error.message, "error");
+			setText(elements.streamState, "Error", "status-value small tone-error");
+			updateLiveChip("start failed", "error");
+			updateButtons();
+		});
+	});
+
+	elements.stopButton.addEventListener("click", function() {
+		stopRecording().catch(function(error) {
+			logEvent("client", error.message, "error");
+		});
+	});
+
+	elements.clearButton.addEventListener("click", function() {
+		clearTranscript();
+		clearLog();
+		setPartialText("", "表示をクリアしました。次の発話を待っています。");
+	});
+
+	window.addEventListener("beforeunload", function() {
+		if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+			try {
+				if (state.isRecording) {
+					state.ws.send(JSON.stringify({ type: "stt_stop" }));
+				}
+				state.ws.close(1000, "page unload");
+			} catch (error) {
+				console.error(error);
+			}
+		}
+	});
+
+	resetUi();
+	clearTranscript();
+	clearLog();
+	connectWebSocket().catch(function(error) {
+		logEvent("ws", error.message, "error");
+	});
+})();
+</script>
+</body>
+</html>
