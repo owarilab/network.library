@@ -361,6 +361,7 @@ mkdir outputs
 ```bash
 cd llm/third_party/stable-diffusion.cpp
 git pull --ff-only
+#git submodule update --remote
 ```
 
 submodule 配置:
@@ -388,6 +389,12 @@ CUDA ビルド:
 
 ```bash
 cd llm/third_party/stable-diffusion.cpp
+
+# 2. GGML をクリーンビルド
+cd ggml
+rm -rf build
+cd ..
+
 rm -rf build
 # mv build build_old
 mkdir -p build
