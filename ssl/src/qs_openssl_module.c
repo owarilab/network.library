@@ -18,6 +18,7 @@ static void qs_ssl_module_http_client_free_transient_buffers(QS_HTTP_CLIENT_CONT
 static int qs_ssl_module_http_client_alloc_response_buffers(QS_HTTP_CLIENT_CONTEXT* context);
 static void qs_ssl_module_http_client_free_response_buffers(QS_HTTP_CLIENT_CONTEXT* context);
 static int qs_ssl_module_http_client_append_body(QS_HTTP_CLIENT_CONTEXT* context, const char* payload, size_t payload_size);
+static void qs_ssl_module_http_client_reset_work_state(QS_HTTP_CLIENT_CONTEXT* context);
 
 int qs_ssl_module_http_client_on_connect(QS_EVENT_PARAMETER params);
 int qs_ssl_module_http_client_on_recv(QS_EVENT_PARAMETER params);
@@ -215,6 +216,26 @@ static int qs_ssl_module_http_client_append_body(QS_HTTP_CLIENT_CONTEXT* context
     return 0;
 }
 
+static void qs_ssl_module_http_client_reset_work_state(QS_HTTP_CLIENT_CONTEXT* context)
+{
+#ifdef QS_SSL_MODULE_ENABLED
+    context->ssl = NULL;
+    context->ctx = NULL;
+#endif
+    context->client_context = NULL;
+    context->socket = 0;
+    context->is_ssl = 0;
+    context->phase = QS_SSL_MODULE_PHASE_IDLE;
+    context->body_length = 0;
+    context->total_read_body_length = 0;
+    context->temp_max_body_length = 0;
+    context->temp_chunked_size = 0;
+    context->temp_chunked_read_size = 0;
+    context->body_write_offset = 0;
+    context->chunk_size_buffer_len = 0;
+    context->waiting_for_chunk_trailer = 0;
+}
+
 int qs_ssl_module_http_client_on_connect(QS_EVENT_PARAMETER params)
 {
 #if QS_OPENSSL_MODULE_DEBUG
@@ -291,16 +312,14 @@ SSL* qs_ssl_module_http_client_ssl_create(SSL_CTX* ctx, int sock)
 
 int qs_ssl_module_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char* server_host, int server_port, int is_ssl)
 {
-#ifdef QS_SSL_MODULE_ENABLED
-    context->ssl = NULL;
-    context->ctx = NULL;
-#endif
-    context->client_context = NULL;
+    qs_ssl_module_http_client_dispose(context);
+
     if(qs_ssl_module_http_client_alloc_transient_buffers(context, server_host, server_port) != 0){
+        qs_ssl_module_http_client_dispose(context);
         return -1;
     }
     if(qs_ssl_module_http_client_alloc_response_buffers(context) != 0){
-        qs_ssl_module_http_client_free_transient_buffers(context);
+        qs_ssl_module_http_client_dispose(context);
         return -1;
     }
 
@@ -319,8 +338,7 @@ int qs_ssl_module_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char
     int error = 0;
 	if(0 != (error=api_qs_client_init(&context->client_context,server_host,server_port,QS_SERVER_TYPE_HTTP))){
         printf("api_qs_client_init error:%d\n",error);
-        qs_ssl_module_http_client_free_transient_buffers(context);
-        qs_ssl_module_http_client_free_response_buffers(context);
+    qs_ssl_module_http_client_dispose(context);
         return -1;
     }
 
@@ -334,16 +352,14 @@ int qs_ssl_module_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char
         context->ctx = qs_ssl_module_http_client_ssl_create_context();
         if(context->ctx == NULL)
         {
-            qs_ssl_module_http_client_free(context);
-            qs_ssl_module_http_client_free_response_buffers(context);
+            qs_ssl_module_http_client_dispose(context);
             return -1;
         }
 
         context->ssl = qs_ssl_module_http_client_ssl_create(context->ctx, context->socket);
         if(context->ssl == NULL)
         {
-            qs_ssl_module_http_client_free(context);
-            qs_ssl_module_http_client_free_response_buffers(context);
+            qs_ssl_module_http_client_dispose(context);
             return -1;
         }
 
@@ -351,8 +367,7 @@ int qs_ssl_module_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char
         api_qs_client_update(context->client_context);
 #else
         printf("SSL module is not enabled.\n");
-    qs_ssl_module_http_client_free(context);
-    qs_ssl_module_http_client_free_response_buffers(context);
+    qs_ssl_module_http_client_dispose(context);
         return -1;
 #endif
     }else{
@@ -785,7 +800,7 @@ int qs_ssl_module_http_client_free(QS_HTTP_CLIENT_CONTEXT* context)
         context->client_context = NULL;
     }
     qs_ssl_module_http_client_free_transient_buffers(context);
-    context->socket = 0;
+    qs_ssl_module_http_client_reset_work_state(context);
     return 0;
 }
 
@@ -793,15 +808,16 @@ int qs_ssl_module_http_client_dispose(QS_HTTP_CLIENT_CONTEXT* context)
 {
     qs_ssl_module_http_client_free(context);
     qs_ssl_module_http_client_free_response_buffers(context);
-    context->body_write_offset = 0;
-    context->body_length = 0;
-    context->total_read_body_length = 0;
-    context->temp_max_body_length = 0;
-    context->temp_chunked_size = 0;
-    context->temp_chunked_read_size = 0;
-    context->chunk_size_buffer_len = 0;
-    context->waiting_for_chunk_trailer = 0;
+    qs_ssl_module_http_client_reset_work_state(context);
     return 0;
+}
+
+int qs_ssl_module_http_client_is_connectable(const QS_HTTP_CLIENT_CONTEXT* context)
+{
+    if(context == NULL){
+        return 0;
+    }
+    return context->phase == QS_SSL_MODULE_PHASE_IDLE && context->client_context == NULL;
 }
 
 int qs_ssl_module_http_client_get_header(QS_HTTP_CLIENT_CONTEXT* context, const char* key, char* value, size_t value_size)

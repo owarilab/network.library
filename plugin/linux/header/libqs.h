@@ -43,11 +43,12 @@ extern "C"{
 #include <openssl/err.h>
 # endif
 
-#define QS_SSL_MODULE_PHASE_CONNECT 0
-#define QS_SSL_MODULE_PHASE_READ_HEADER 1
-#define QS_SSL_MODULE_PHASE_READ_BODY 2
-#define QS_SSL_MODULE_PHASE_READ_CHUNKED_BODY 3
-#define QS_SSL_MODULE_PHASE_DISCONNECT 4
+#define QS_SSL_MODULE_PHASE_IDLE 0
+#define QS_SSL_MODULE_PHASE_CONNECT 1
+#define QS_SSL_MODULE_PHASE_READ_HEADER 2
+#define QS_SSL_MODULE_PHASE_READ_BODY 3
+#define QS_SSL_MODULE_PHASE_READ_CHUNKED_BODY 4
+#define QS_SSL_MODULE_PHASE_DISCONNECT 5
 
 #define QS_HTTP_CLIENT_HOST_SIZE 1024
 #define QS_HTTP_CLIENT_PORT_SIZE 16
@@ -226,6 +227,7 @@ int qs_ssl_module_http_client_update(QS_HTTP_CLIENT_CONTEXT* context);
 int qs_ssl_module_http_client_recv(QS_HTTP_CLIENT_CONTEXT* context, char* payload, size_t payload_size);
 int qs_ssl_module_http_client_free(QS_HTTP_CLIENT_CONTEXT* context);
 int qs_ssl_module_http_client_dispose(QS_HTTP_CLIENT_CONTEXT* context);
+int qs_ssl_module_http_client_is_connectable(const QS_HTTP_CLIENT_CONTEXT* context);
 int qs_ssl_module_http_client_get_header(QS_HTTP_CLIENT_CONTEXT* context, const char* key, char* value, size_t value_size);
 char* qs_ssl_module_http_client_get_request_buffer(QS_HTTP_CLIENT_CONTEXT* context);
 const char* qs_ssl_module_http_client_get_header_buffer(QS_HTTP_CLIENT_CONTEXT* context);
