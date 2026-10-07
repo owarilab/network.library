@@ -153,8 +153,13 @@ h1 {
 }
 
 .status-grid {
-	grid-template-columns: repeat(4, minmax(0, 1fr));
+	grid-template-columns: repeat(5, minmax(0, 1fr));
 	margin-bottom: 18px;
+}
+
+.status-value.mono {
+	font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+	letter-spacing: 0.02em;
 }
 
 .status-card,
@@ -464,6 +469,10 @@ h1 {
 			<div class="status-label">Current Speech</div>
 			<div id="speechState" class="status-value small">Silence</div>
 		</div>
+		<div class="status-card">
+			<div class="status-label">Connection ID</div>
+			<div id="connectionId" class="status-value small mono">-</div>
+		</div>
 	</section>
 
 	<section class="metrics-grid">
@@ -528,6 +537,7 @@ h1 {
 		streamState: document.getElementById("streamState"),
 		serverState: document.getElementById("serverState"),
 		speechState: document.getElementById("speechState"),
+		connectionId: document.getElementById("connectionId"),
 		capturedSamples: document.getElementById("capturedSamples"),
 		sentBytes: document.getElementById("sentBytes"),
 		chunkCount: document.getElementById("chunkCount"),
@@ -648,6 +658,7 @@ h1 {
 		setText(elements.serverState, "Awaiting ready", "status-value small");
 		setText(elements.streamState, "Idle", "status-value small");
 		setText(elements.speechState, "Silence", "status-value small");
+		setText(elements.connectionId, "-", "status-value small mono");
 		setPartialText("", "発話中の状態がここに出ます。");
 		updateLiveChip("standby", "ok");
 		elements.meterFill.style.width = "0%";
@@ -900,6 +911,7 @@ h1 {
 		setText(elements.streamState, "Capturing", "status-value small tone-ok");
 		setText(elements.serverState, "Waiting ready", "status-value small tone-warn");
 		setText(elements.speechState, "Silence", "status-value small");
+		setText(elements.connectionId, "-", "status-value small mono");
 		setPartialText("", "サーバー応答待ちです。");
 		updateLiveChip("recording", "ok");
 		updateButtons();
@@ -987,7 +999,10 @@ h1 {
 		case "ready":
 			state.serverReady = true;
 			setText(elements.serverState, "Ready", "status-value small tone-ok");
-			logEvent("server", "ready", "ok");
+			if (message.connection_id) {
+				setText(elements.connectionId, message.connection_id, "status-value small mono");
+			}
+			logEvent("server", "ready connection_id=" + (message.connection_id || "-"), "ok");
 			break;
 		case "speech_start":
 			state.currentSpeech = { t0: message.t0 || 0 };

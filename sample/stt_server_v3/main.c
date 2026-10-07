@@ -91,6 +91,7 @@ typedef struct SVS_SLOT_STRUCT
     int state;
     uint32_t generation;
     uint32_t connection_offset;
+    char connection_id[17]; /* stt_start ごとに api_qs_uniqid で再生成 (16文字 + \0) */
     int is_streaming;
     int stop_requested;
     int16_t* inbox;
@@ -770,6 +771,16 @@ static int svs_start_session(uint32_t connection_offset)
 {
     int slot_index;
     SVS_SLOT* slot;
+    char* id;
+
+    /* stt_start ごとに接続IDを再生成(録音セッション単位)。
+     * g_temporary_memory は on_ws_event 末尾で clean されるので、
+     * 生成直後にスロット内の固定バッファへコピーする */
+    id = api_qs_uniqid(&g_temporary_memory, 16);
+    if(!id){
+        printf("[SVS][session] uniqid failed connection_offset=%u\n", connection_offset);
+        return -1;
+    }
 
     pthread_mutex_lock(&g_lock);
     slot_index = svs_find_slot_locked(connection_offset);
@@ -799,14 +810,15 @@ static int svs_start_session(uint32_t connection_offset)
 
     slot = &g_slots[slot_index];
     slot->generation = ++g_generation_counter;
+    memcpy(slot->connection_id, id, sizeof(slot->connection_id));
     slot->is_streaming = 1;
     slot->stop_requested = 0;
     slot->inbox_len = 0;
     slot->inbox_overflow_logged = 0;
     pthread_mutex_unlock(&g_lock);
 
-    printf("[SVS][session] start slot=%d connection_offset=%u generation=%d\n", slot_index, connection_offset, slot->generation);
-    svs_post_message(slot_index, slot->generation, "{\"type\":\"ready\"}");
+    printf("[SVS][session] start slot=%d connection_offset=%u generation=%d connection_id=%s\n", slot_index, connection_offset, slot->generation, slot->connection_id);
+    svs_post_message(slot_index, slot->generation, "{\"type\":\"ready\",\"connection_id\":\"%s\"}", slot->connection_id);
     return slot_index;
 }
 
@@ -860,6 +872,8 @@ int main(int argc, char* argv[], char* envp[])
     QS_SERVER_CONTEXT* context = 0;
     pthread_t worker;
     int i;
+
+    api_qs_init();
 
     /* ログをファイルにリダイレクトしても逐次出るように行バッファにする */
     setvbuf(stdout, NULL, _IOLBF, 0);
