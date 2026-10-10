@@ -49,6 +49,24 @@ static void qs_http_canonicalize_header_name(char* out, size_t out_size, const c
 	out[w] = '\0';
 }
 
+/* ヘッダ保存時と同じ正規化名で検索する。クライアントの大文字小文字に依存しない */
+static int32_t qs_http_get_header_memid(QS_MEMORY_POOL* con_memory, int32_t memid_hash, const char* headername)
+{
+	char canonical_headername[256];
+	qs_http_canonicalize_header_name(canonical_headername, sizeof(canonical_headername), headername);
+	return qs_get_hash( con_memory, memid_hash, canonical_headername );
+}
+
+/* ヘッダの値を返す。無い場合は空文字 */
+static char* qs_http_get_header_value(QS_MEMORY_POOL* con_memory, int32_t memid_hash, const char* headername)
+{
+	int32_t memid = qs_http_get_header_memid( con_memory, memid_hash, headername );
+	if( -1 == memid ){
+		return "";
+	}
+	return (char*)QS_GET_POINTER(con_memory, memid);
+}
+
 uint8_t qs_get_protocol_header_size_byte(ssize_t payload_size)
 {
 	uint8_t size_byte = 0;
@@ -150,7 +168,7 @@ int qs_http_protocol_filter(QS_RECV_INFO* rinfo)
 		psockparam->tmpmsglen = 0;
 		rinfo->recvlen = 0;
 		QS_MEMORY_POOL* con_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(option->memory_pool,tinfo->memid_connection_data_memory);
-		int32_t memid_len_hash = qs_get_hash( con_memory, psockparam->http_header_munit, "Content-Length" );
+		int32_t memid_len_hash = qs_http_get_header_memid( con_memory, psockparam->http_header_munit, "Content-Length" );
 		if( -1 != memid_len_hash ){
 			rinfo->recvlen = atoi( (char*)QS_GET_POINTER(con_memory,memid_len_hash) );
 		}
@@ -270,8 +288,8 @@ int qs_http_parse_header( QS_RECV_INFO *rinfo, int skip_head )
 			if(is_upload_enable)
 			{
 				if(psockparam->opcode==3){
-					if( -1 != qs_get_hash( con_memory, psockparam->http_header_munit, "Content-Length" ) ){
-						int contentlen = atoi( (char*)QS_GET_POINTER(con_memory,qs_get_hash( con_memory, psockparam->http_header_munit, "Content-Length" )) );
+					if( -1 != qs_http_get_header_memid( con_memory, psockparam->http_header_munit, "Content-Length" ) ){
+						int contentlen = atoi( (char*)QS_GET_POINTER(con_memory,qs_http_get_header_memid( con_memory, psockparam->http_header_munit, "Content-Length" )) );
 						size_t write_size = 0;
 						size_t current = 0;
 						while(current<rinfo->recvlen){
@@ -316,8 +334,8 @@ int qs_http_parse_header( QS_RECV_INFO *rinfo, int skip_head )
 			if( psockparam->opcode == 1 ){
 				if(is_upload_enable)
 				{
-					if(qs_get_hash(con_memory, psockparam->http_header_munit, "Content-Type") != -1){
-						char* contentType = (char*)QS_GET_POINTER(con_memory,qs_get_hash(con_memory, psockparam->http_header_munit, "Content-Type"));
+					if(qs_http_get_header_memid(con_memory, psockparam->http_header_munit, "Content-Type") != -1){
+						char* contentType = (char*)QS_GET_POINTER(con_memory,qs_http_get_header_memid(con_memory, psockparam->http_header_munit, "Content-Type"));
 						char* pt = contentType;
 						char param[256];
 						char formkey[256];
@@ -364,11 +382,11 @@ int qs_http_parse_header( QS_RECV_INFO *rinfo, int skip_head )
 								}
 								psockparam->opcode = 3;
 
-								if( -1 == qs_get_hash( con_memory, psockparam->http_header_munit, "Content-Length" ) ){
+								if( -1 == qs_http_get_header_memid( con_memory, psockparam->http_header_munit, "Content-Length" ) ){
 									// error
 									break;
 								}
-								int contentlen = atoi( (char*)QS_GET_POINTER(con_memory,qs_get_hash( con_memory, psockparam->http_header_munit, "Content-Length" )) );
+								int contentlen = atoi( (char*)QS_GET_POINTER(con_memory,qs_http_get_header_memid( con_memory, psockparam->http_header_munit, "Content-Length" )) );
 								size_t write_size = 0;
 								size_t current = (ppt-target_pt);
 								while(current<rinfo->recvlen){
@@ -404,8 +422,8 @@ int qs_http_parse_header( QS_RECV_INFO *rinfo, int skip_head )
 					}
 				}
 
-				if( -1 != qs_get_hash( con_memory, psockparam->http_header_munit, "Content-Length" ) ){
-					int contentlen = atoi( (char*)QS_GET_POINTER(con_memory,qs_get_hash( con_memory, psockparam->http_header_munit, "Content-Length" )) );
+				if( -1 != qs_http_get_header_memid( con_memory, psockparam->http_header_munit, "Content-Length" ) ){
+					int contentlen = atoi( (char*)QS_GET_POINTER(con_memory,qs_http_get_header_memid( con_memory, psockparam->http_header_munit, "Content-Length" )) );
 					if( contentlen > 0 )
 					{
 						if( msgbuffer_size == 0 ){
@@ -742,11 +760,11 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 	int32_t memid_http_method = qs_get_hash(con_memory, memid_headers, "HTTP_METHOD");
 	int32_t memid_request = qs_get_hash( con_memory, memid_headers, "REQUEST" );
 	int32_t memid_get_params = qs_get_hash( con_memory, memid_headers, "GET_PARAMS" );
-	int32_t memid_content_type = qs_get_hash( con_memory, memid_headers, "Content-Type" );
-	int32_t memid_cache_control = qs_get_hash( con_memory, memid_headers, "Cache-Control" );
+	int32_t memid_content_type = qs_http_get_header_memid( con_memory, memid_headers, "Content-Type" );
+	int32_t memid_cache_control = qs_http_get_header_memid( con_memory, memid_headers, "Cache-Control" );
 	int32_t memid_http_version = qs_get_hash( con_memory, memid_headers, "HTTP_VERSION" );
-	int32_t memid_user_agent = qs_get_hash( con_memory, memid_headers, "User-Agent" );
-	int32_t memid_cookie = qs_get_hash( con_memory, memid_headers, "Cookie" );
+	int32_t memid_user_agent = qs_http_get_header_memid( con_memory, memid_headers, "User-Agent" );
+	int32_t memid_cookie = qs_http_get_header_memid( con_memory, memid_headers, "Cookie" );
 	if(-1!=memid_http_method){
 		http_request->method = (char*)QS_GET_POINTER(con_memory,memid_http_method);
 	}
@@ -861,7 +879,7 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 		else if( !strcmp(http_request->extension,"css"))
 		{
 			if( !strcmp(http_request->cache_control,"max-age=0") ){
-				char *modified_since = (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, memid_headers, "If-Modified-Since" ));
+				char *modified_since = qs_http_get_header_value( con_memory, memid_headers, "If-Modified-Since" );
 				if( strcmp("",modified_since)){
 					http_request->http_status_code = 304;
 					break;
@@ -874,7 +892,7 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 		else if( !strcmp(http_request->extension,"js"))
 		{
 			if( !strcmp(http_request->cache_control,"max-age=0") ){
-				char *modified_since = (char*)QS_GET_POINTER(option->memory_pool,qs_get_hash( option->memory_pool, memid_headers, "If-Modified-Since" ));
+				char *modified_since = qs_http_get_header_value( con_memory, memid_headers, "If-Modified-Since" );
 				if( strcmp("",modified_since)){
 					http_request->http_status_code = 304;
 					break;
@@ -887,7 +905,7 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 		else if (!strcmp(http_request->extension, "json"))
 		{
 			if (!strcmp(http_request->cache_control, "max-age=0")) {
-				char *modified_since = (char*)QS_GET_POINTER(option->memory_pool, qs_get_hash(option->memory_pool, memid_headers, "If-Modified-Since"));
+				char *modified_since = qs_http_get_header_value( con_memory, memid_headers, "If-Modified-Since" );
 				if (strcmp("", modified_since)) {
 					http_request->http_status_code = 304;
 					break;
@@ -1381,11 +1399,11 @@ int qs_send_handshake_param(QS_SOCKET_ID socket, QS_SOCKET_OPTION *option, QS_SE
 	const char* ws_guid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 	QS_SOCKPARAM* psockparam = &connection->sockparam;
 	QS_MEMORY_POOL* con_memory = (QS_MEMORY_POOL*)QS_GET_POINTER(option->memory_pool,connection->memid_connection_data_memory);
-	if( -1 != qs_get_hash( con_memory, psockparam->http_header_munit, "Sec-WebSocket-Key" ) ){
-		pwskey = (char*)QS_GET_POINTER(con_memory,qs_get_hash( con_memory, psockparam->http_header_munit, "Sec-WebSocket-Key" ));
+	if( -1 != qs_http_get_header_memid( con_memory, psockparam->http_header_munit, "Sec-WebSocket-Key" ) ){
+		pwskey = (char*)QS_GET_POINTER(con_memory,qs_http_get_header_memid( con_memory, psockparam->http_header_munit, "Sec-WebSocket-Key" ));
 	}
-	if( -1 != qs_get_hash( con_memory, psockparam->http_header_munit, "Sec-WebSocket-Protocol" ) ){
-		pprotocol = (char*)QS_GET_POINTER(con_memory,qs_get_hash( con_memory, psockparam->http_header_munit, "Sec-WebSocket-Protocol" ));
+	if( -1 != qs_http_get_header_memid( con_memory, psockparam->http_header_munit, "Sec-WebSocket-Protocol" ) ){
+		pprotocol = (char*)QS_GET_POINTER(con_memory,qs_http_get_header_memid( con_memory, psockparam->http_header_munit, "Sec-WebSocket-Protocol" ));
 	}
 	if( pwskey == NULL || pwskey[0] == '\0' )
 	{
