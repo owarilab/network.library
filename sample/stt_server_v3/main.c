@@ -25,7 +25,11 @@
  *                    {"type":"result","t0":..,"t1":..,"text":"..","infer_ms":..}
  *                    {"type":"stopped"} / {"type":"error","message":".."}
  *   (libqsの接続オフセット指定送信 API が binary のみのため、JSON も binary フレームで返す)
- * 
+ *
+ * 受信 PCM の保存:
+ *  stt_start ごとに <record_dir>/<connection_id>.pcm (生PCM) と <record_dir>/<connection_id>.wav (WAV) を作成する。
+ *  書き込み・開閉はすべて main thread で行う。stt_stop / 切断で WAV ヘッダを確定する。
+ *
  * */
 
 #include <stdio.h>
@@ -37,6 +41,8 @@
 #include <time.h>
 #include <signal.h>
 #include <unistd.h>
+#include <errno.h>
+#include <sys/stat.h>
 #include <pthread.h>
 #include "qs_api.h"
 #include "whisper.h"
@@ -61,6 +67,9 @@
 #define SVS_UTTER_MAX_SAMPLES (SVS_SAMPLE_RATE * 20)
 #define SVS_OUT_QUEUE_MAX 1024
 
+#define SVS_WAV_HEADER_SIZE 44
+#define SVS_WAV_DATA_MAX (UINT32_MAX - 36)
+
 enum {
    SVS_SLOT_FREE = 0,
    SVS_SLOT_ACTIVE,
@@ -83,6 +92,7 @@ typedef struct SVS_CONFIG_STRUCT
     int pre_roll_ms;     /* 発話開始前に遡って含める長さ(語頭欠け対策) */
     int post_pad_ms;     /* 発話終了後に残す無音の長さ */
     float no_speech_thold;
+    char record_dir[256]; /* 受信 PCM の保存先。空文字で録音しない */
 } SVS_CONFIG;
 
 /* main thread と sorker thread で共有する接続スロット(g_lock で保護)*/
@@ -97,6 +107,10 @@ typedef struct SVS_SLOT_STRUCT
     int16_t* inbox;
     int32_t inbox_len;
     int inbox_overflow_logged;
+    /* 録音用。main thread だけが触る(g_lock 不要) */
+    FILE* record_pcm;
+    FILE* record_wav;
+    uint32_t record_bytes;
 } SVS_SLOT;
 
 /* worker thread だけが触る発話検出の状態 */
@@ -129,6 +143,9 @@ int on_connect(QS_EVENT_PARAMETER params);
 int on_http_event(QS_EVENT_PARAMETER params);
 int on_ws_event(QS_EVENT_PARAMETER params);
 int on_close(QS_EVENT_PARAMETER params);
+
+static void svs_record_open(SVS_SLOT* slot);
+static void svs_record_close(SVS_SLOT* slot);
 
 QS_MEMORY_CONTEXT g_temporary_memory;
 
@@ -303,6 +320,7 @@ static void svs_config_default(SVS_CONFIG* config)
     config->pre_roll_ms = 300;
     config->post_pad_ms = 200;
     config->no_speech_thold = 0.6f;
+    snprintf(config->record_dir, sizeof(config->record_dir), "recordings");
 }
 
 static int svs_config_load(SVS_CONFIG* config, const char* path)
@@ -362,6 +380,9 @@ static int svs_config_load(SVS_CONFIG* config, const char* path)
     }
     if( 0 != (v = api_qs_script_get_parameter(&script, "no_speech_thold"))){
         config->no_speech_thold = (float)atof(v);
+    }
+    if( 0 != (v = api_qs_script_get_parameter(&script, "record_dir"))){
+        snprintf(config->record_dir, sizeof(config->record_dir), "%s", v);
     }
     api_qs_memory_clean(&g_temporary_memory);
 
@@ -817,6 +838,10 @@ static int svs_start_session(uint32_t connection_offset)
     slot->inbox_overflow_logged = 0;
     pthread_mutex_unlock(&g_lock);
 
+    /* 同じ接続で stt_start が重なった場合は前の録音を閉じてから開く */
+    svs_record_close(slot);
+    svs_record_open(slot);
+
     printf("[SVS][session] start slot=%d connection_offset=%u generation=%d connection_id=%s\n", slot_index, connection_offset, slot->generation, slot->connection_id);
     svs_post_message(slot_index, slot->generation, "{\"type\":\"ready\",\"connection_id\":\"%s\"}", slot->connection_id);
     return slot_index;
@@ -834,6 +859,7 @@ static void svs_stop_session(uint32_t connection_offset)
     pthread_mutex_unlock(&g_lock);
     if(slot_index >= 0){
         printf("[SVS][session] stop slot=%d connection_offset=%u\n", slot_index, connection_offset);
+        svs_record_close(&g_slots[slot_index]);
     }
 }
 
@@ -861,6 +887,146 @@ static void svs_push_pcm(uint32_t connection_offset, const int16_t* samples, int
     memcpy(slot->inbox + slot->inbox_len, samples, sizeof(int16_t) * (size_t)n_samples);
     slot->inbox_len += n_samples;
     pthread_mutex_unlock(&g_lock);
+}
+
+/* -------------------------------------------------- */
+/* recording (main thread)                            */
+/* -------------------------------------------------- */
+
+static void svs_put_le16(uint8_t* p, uint16_t value)
+{
+    p[0] = (uint8_t)value;
+    p[1] = (uint8_t)(value >> 8);
+}
+
+static void svs_put_le32(uint8_t* p, uint32_t value)
+{
+    p[0] = (uint8_t)value;
+    p[1] = (uint8_t)(value >> 8);
+    p[2] = (uint8_t)(value >> 16);
+    p[3] = (uint8_t)(value >> 24);
+}
+
+/* 16kHz / mono / 16bit PCM の 44 バイト WAV ヘッダを作る */
+static void svs_wav_build_header(uint8_t* h, uint32_t data_bytes)
+{
+    memcpy(h, "RIFF", 4);
+    svs_put_le32(h + 4, 36 + data_bytes);
+    memcpy(h + 8, "WAVEfmt ", 8);
+    svs_put_le32(h + 16, 16);
+    svs_put_le16(h + 20, 1);                                    /* PCM */
+    svs_put_le16(h + 22, 1);                                    /* mono */
+    svs_put_le32(h + 24, SVS_SAMPLE_RATE);
+    svs_put_le32(h + 28, SVS_SAMPLE_RATE * 2);                  /* byte rate */
+    svs_put_le16(h + 32, 2);                                    /* block align */
+    svs_put_le16(h + 34, 16);                                   /* bits per sample */
+    memcpy(h + 36, "data", 4);
+    svs_put_le32(h + 40, data_bytes);
+}
+
+/* connection_offset から現在のスロット index を探す (メインスレッドから呼ぶ) */
+static int svs_find_slot(uint32_t connection_offset)
+{
+    int slot_index;
+    pthread_mutex_lock(&g_lock);
+    slot_index = svs_find_slot_locked(connection_offset);
+    pthread_mutex_unlock(&g_lock);
+    return slot_index;
+}
+
+/* 録音ファイルを作る。失敗しても文字起こしは継続する */
+static void svs_record_open(SVS_SLOT* slot)
+{
+    char pcm_path[512];
+    char wav_path[512];
+    uint8_t header[SVS_WAV_HEADER_SIZE];
+
+    if(g_config.record_dir[0] == '\0'){
+        return;
+    }
+    if(mkdir(g_config.record_dir, 0755) != 0 && errno != EEXIST){
+        printf("[SVS][record] mkdir failed dir=%s\n", g_config.record_dir);
+        return;
+    }
+    snprintf(pcm_path, sizeof(pcm_path), "%s/%s.pcm", g_config.record_dir, slot->connection_id);
+    snprintf(wav_path, sizeof(wav_path), "%s/%s.wav", g_config.record_dir, slot->connection_id);
+
+    slot->record_pcm = fopen(pcm_path, "wbx");
+    if(!slot->record_pcm){
+        printf("[SVS][record] open failed %s\n", pcm_path);
+        return;
+    }
+    slot->record_wav = fopen(wav_path, "wbx");
+    if(!slot->record_wav){
+        printf("[SVS][record] open failed %s\n", wav_path);
+        fclose(slot->record_pcm);
+        slot->record_pcm = NULL;
+        return;
+    }
+    /* data サイズは停止時に確定させるので、ここでは 0 のヘッダを書いておく */
+    svs_wav_build_header(header, 0);
+    if(fwrite(header, 1, sizeof(header), slot->record_wav) != sizeof(header)){
+        printf("[SVS][record] header write failed %s\n", wav_path);
+        fclose(slot->record_wav);
+        fclose(slot->record_pcm);
+        slot->record_wav = NULL;
+        slot->record_pcm = NULL;
+        return;
+    }
+    slot->record_bytes = 0;
+    printf("[SVS][record] start connection_id=%s dir=%s\n", slot->connection_id, g_config.record_dir);
+}
+
+/* WAV ヘッダの data サイズを確定して両ファイルを閉じる */
+static void svs_record_close(SVS_SLOT* slot)
+{
+    uint8_t header[SVS_WAV_HEADER_SIZE];
+
+    if(!slot->record_pcm && !slot->record_wav){
+        return;
+    }
+    if(slot->record_wav){
+        svs_wav_build_header(header, slot->record_bytes);
+        if(fseek(slot->record_wav, 0, SEEK_SET) != 0 ||
+           fwrite(header, 1, sizeof(header), slot->record_wav) != sizeof(header)){
+            printf("[SVS][record] wav header update failed connection_id=%s\n", slot->connection_id);
+        }
+        fclose(slot->record_wav);
+        slot->record_wav = NULL;
+    }
+    if(slot->record_pcm){
+        fclose(slot->record_pcm);
+        slot->record_pcm = NULL;
+    }
+    printf("[SVS][record] stop connection_id=%s bytes=%u\n", slot->connection_id, slot->record_bytes);
+    slot->record_bytes = 0;
+}
+
+/* 受信した生バイト列をそのまま両ファイルに書く */
+static void svs_record_write(uint32_t connection_offset, const char* data, size_t byte_count)
+{
+    int slot_index = svs_find_slot(connection_offset);
+    SVS_SLOT* slot;
+
+    if(slot_index < 0){
+        return;
+    }
+    slot = &g_slots[slot_index];
+    if(!slot->record_wav){
+        return;
+    }
+    if(byte_count > SVS_WAV_DATA_MAX - slot->record_bytes){
+        printf("[SVS][record] wav size limit reached connection_id=%s, stop recording\n", slot->connection_id);
+        svs_record_close(slot);
+        return;
+    }
+    if(fwrite(data, 1, byte_count, slot->record_pcm) != byte_count ||
+       fwrite(data, 1, byte_count, slot->record_wav) != byte_count){
+        printf("[SVS][record] write failed connection_id=%s, stop recording\n", slot->connection_id);
+        svs_record_close(slot);
+        return;
+    }
+    slot->record_bytes += (uint32_t)byte_count;
 }
 
 /* -------------------------------------------------- */
@@ -922,6 +1088,7 @@ int main(int argc, char* argv[], char* envp[])
     pthread_join(worker, NULL);
     api_qs_free(context);
     for(i=0; i<SVS_CONNECTION_MAX; i++){
+        svs_record_close(&g_slots[i]);
         free(g_slots[i].inbox);
         svs_worker_free(&g_workers[i]);
     }
@@ -962,6 +1129,7 @@ int on_ws_event(QS_EVENT_PARAMETER params)
             printf("[SVS][ws] odd pcm byte count=%zd connection_offset=%u\n", size, connection_offset);
             return 0;
         }
+        svs_record_write(connection_offset, message, (size_t)size);
         svs_push_pcm(connection_offset, (const int16_t*)message, (int32_t)(size / (ssize_t)sizeof(int16_t)));
         return 0;
     }
@@ -996,16 +1164,16 @@ int on_ws_event(QS_EVENT_PARAMETER params)
 int on_close(QS_EVENT_PARAMETER params)
 {
     uint32_t connection_offset = api_qs_get_connection_offset(params);
-    int slot_index;
+    int slot_index = svs_find_slot(connection_offset);
 
-    pthread_mutex_lock(&g_lock);
-    slot_index = svs_find_slot_locked(connection_offset);
     if(slot_index >= 0){
+        /* 録音ファイルは worker が CLOSING のスロットを解放する前に閉じる */
+        svs_record_close(&g_slots[slot_index]);
+
         /* 解放は workerに任せる(推論中の可能性があるため)*/
-        g_slots[slot_index].state = SVS_SLOT_CLOSING;    
-    }
-    pthread_mutex_unlock(&g_lock);
-    if(slot_index >= 0){
+        pthread_mutex_lock(&g_lock);
+        g_slots[slot_index].state = SVS_SLOT_CLOSING;
+        pthread_mutex_unlock(&g_lock);
         printf("[SVS][slot] close slot=%d connection_offset=%u\n", slot_index, connection_offset);
     }
     return 0;
