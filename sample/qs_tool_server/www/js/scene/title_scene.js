@@ -3,6 +3,20 @@
  * アプリ起動時の入口となるタイトルシーン。
  */
 class TitleScene extends Scene {
+  static LAYOUT = {
+    pad: 24,
+    footerH: 40,
+    buttonW: 220,
+    buttonH: 52,
+    buttonGap: 16,
+    panelMaxW: 620,
+    panelMaxH: 420,
+    panelEmptyH: 120,
+    panelHeadH: 52,
+    rowH: 56,
+    rowGap: 10,
+  };
+
   constructor() {
     super();
     this._buttons = [];
@@ -45,96 +59,149 @@ class TitleScene extends Scene {
   }
 
   render(ctx, canvas, appData) {
+    const layout = this._computeLayout(canvas, appData);
+
     ctx.fillStyle = '#1b1f2a';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const centerX = canvas.width * 0.5;
-    const topY = Math.max(80, canvas.height * 0.2);
+    this._drawHeader(ctx, canvas, appData, layout);
 
-    ctx.fillStyle = '#f3f4f6';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = 'bold 40px sans-serif';
-    ctx.fillText('QS Tool Server', centerX, topY);
-
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '16px sans-serif';
-    ctx.fillText('Project-based tool flow prototype', centerX, topY + 42);
-
-    const projectName = appData.currentProject ? appData.currentProject.name : 'No project loaded';
-    ctx.fillStyle = '#cbd5e1';
-    ctx.font = '15px sans-serif';
-    ctx.fillText(`Current Project: ${projectName}`, centerX, topY + 78);
-
-    if (this._statusMessage) {
-      ctx.fillStyle = this._statusTone === 'error' ? '#fca5a5' : '#93c5fd';
-      ctx.font = '13px sans-serif';
-      ctx.fillText(this._statusMessage, centerX, topY + 104);
-    }
-
-    this._buttons = this._buildButtons(canvas, appData);
+    this._buttons = this._buildButtons(layout, appData);
     for (let index = 0; index < this._buttons.length; index++) {
       this._drawButton(ctx, this._buttons[index], index === this._hoverIndex);
     }
 
-    this._browserProjectItems = this._buildBrowserProjectItems(canvas);
-    this._drawBrowserProjectSection(ctx, canvas);
+    this._browserPanelRect = layout.panel;
+    this._browserProjectVisibleRows = layout.visibleRows;
+    this._browserProjectItems = this._buildBrowserProjectItems(layout.panel);
+    this._drawBrowserProjectSection(ctx, layout.panel);
 
     ctx.fillStyle = '#64748b';
     ctx.font = '13px sans-serif';
-    ctx.fillText('Enter: New Project / Continue, L: Load Project', centerX, canvas.height - 40);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Enter: Continue / New, N: New, L: Load', canvas.width * 0.5, layout.footerY);
   }
 
-  _buildButtons(canvas, appData) {
-    const buttonW = 280;
-    const buttonH = 52;
-    const gap = 16;
-    const startY = Math.max(180, canvas.height * 0.38);
-    const x = ((canvas.width - buttonW) / 2) | 0;
-    const buttons = [
-      {
-        label: 'New Project',
-        action: () => this._createNewProject(),
-        rect: { x, y: startY, w: buttonW, h: buttonH },
-      },
-    ];
+  // ヘッダ・ボタン・パネル・フッタの配置を一度に計算する。
+  // 縦方向は「ヘッダ + ボタン + パネル」の塊を、フッタを除いた領域の中央に置く。
+  _computeLayout(canvas, appData) {
+    const L = TitleScene.LAYOUT;
+    const w = canvas.width;
+    const h = canvas.height;
+    const hasContinue = !!appData.currentProject;
+    const hasStatus = !!this._statusMessage;
+    const buttonCount = hasContinue ? 3 : 2;
+    const buttonsTotalW = buttonCount * L.buttonW + (buttonCount - 1) * L.buttonGap;
+    const horizontal = w - L.pad * 2 >= buttonsTotalW;
+    const actionsH = horizontal
+      ? L.buttonH
+      : buttonCount * L.buttonH + (buttonCount - 1) * L.buttonGap;
 
-    if (appData.currentProject) {
-      buttons.push({
-        label: 'Continue Project',
-        action: () => appData.changeScene(new ProjectTopScene()),
-        rect: { x, y: startY + (buttonH + gap), w: buttonW, h: buttonH },
-      });
+    // ヘッダ先頭からパネル上端までの高さ（下記 header の各 offset と対応）
+    const stackH = (hasStatus ? 190 : 160) + actionsH;
+    const empty = this._browserProjects.length === 0;
+    const minPanelH = L.panelHeadH + L.rowH + 12;
+    const panelH = empty
+      ? L.panelEmptyH
+      : Math.min(L.panelMaxH, Math.max(minPanelH, h - L.footerH - stackH - L.pad * 2));
+    const top = Math.max(12, Math.floor((h - L.footerH - stackH - panelH) / 2));
+    const panelTop = top + stackH;
+    const actionsY = panelTop - L.pad - actionsH;
+
+    const panelW = Math.min(L.panelMaxW, w - L.pad * 2);
+    const panel = { x: Math.floor((w - panelW) / 2), y: panelTop, w: panelW, h: panelH };
+    const visibleRows = Math.max(1, Math.floor((panelH - L.panelHeadH - 12 + L.rowGap) / (L.rowH + L.rowGap)));
+
+    const buttonRects = [];
+    for (let i = 0; i < buttonCount; i++) {
+      buttonRects.push(horizontal
+        ? { x: Math.floor((w - buttonsTotalW) / 2) + i * (L.buttonW + L.buttonGap), y: actionsY, w: L.buttonW, h: L.buttonH }
+        : { x: Math.floor((w - L.buttonW) / 2), y: actionsY + i * (L.buttonH + L.buttonGap), w: L.buttonW, h: L.buttonH });
     }
 
-    buttons.push({
-      label: 'Load Project',
-      action: () => this._openProjectPicker(),
-      rect: { x, y: startY + ((buttonH + gap) * (buttons.length)), w: buttonW, h: buttonH },
-    });
+    return {
+      panel,
+      visibleRows,
+      buttonRects,
+      titleY: top + 24,
+      subtitleY: top + 59,
+      projectY: top + 82,
+      statusY: top + 129,
+      footerY: h - L.footerH / 2,
+    };
+  }
 
-    buttons.push({
-      label: 'Open Browser Project',
-      action: null,
-      disabled: this._browserProjects.length === 0,
-      rect: { x, y: startY + ((buttonH + gap) * (buttons.length)), w: buttonW, h: buttonH },
-    });
+  _drawHeader(ctx, canvas, appData, layout) {
+    const L = TitleScene.LAYOUT;
+    const centerX = canvas.width * 0.5;
+    const maxTextW = canvas.width - L.pad * 2;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
 
-    return buttons;
+    ctx.fillStyle = '#f3f4f6';
+    ctx.font = 'bold 40px sans-serif';
+    ctx.fillText('QS Tool Server', centerX, layout.titleY);
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '16px sans-serif';
+    ctx.fillText('Project-based tool flow prototype', centerX, layout.subtitleY);
+
+    const projectName = appData.currentProject ? appData.currentProject.name : 'No project loaded';
+    ctx.font = '13px sans-serif';
+    const label = this._truncateText(ctx, `Current Project: ${projectName}`, maxTextW - 32);
+    const pillW = Math.ceil(ctx.measureText(label).width) + 32;
+    const pillX = Math.round(centerX - pillW / 2);
+    ctx.fillStyle = '#0f172a';
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(pillX, layout.projectY, pillW, 26, 13);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#cbd5e1';
+    ctx.fillText(label, centerX, layout.projectY + 13);
+
+    if (this._statusMessage) {
+      ctx.fillStyle = this._statusTone === 'error' ? '#fca5a5' : '#93c5fd';
+      ctx.font = '13px sans-serif';
+      ctx.fillText(this._truncateText(ctx, this._statusMessage, maxTextW), centerX, layout.statusY);
+    }
+  }
+
+  _buildButtons(layout, appData) {
+    const actions = [
+      { label: 'New Project', action: () => this._createNewProject() },
+    ];
+    if (appData.currentProject) {
+      actions.push({ label: 'Continue Project', action: () => appData.changeScene(new ProjectTopScene()) });
+    }
+    actions.push({ label: 'Load Project', action: () => this._openProjectPicker() });
+
+    const primaryLabel = appData.currentProject ? 'Continue Project' : 'New Project';
+    return actions.map((item, index) => ({
+      ...item,
+      primary: item.label === primaryLabel,
+      rect: layout.buttonRects[index],
+    }));
   }
 
   _drawButton(ctx, button, hovered) {
     const { x, y, w, h } = button.rect;
-    const disabled = !!button.disabled;
-    ctx.fillStyle = disabled ? '#334155' : hovered ? '#2563eb' : '#0f172a';
-    ctx.strokeStyle = hovered ? '#93c5fd' : '#475569';
+    if (button.primary) {
+      ctx.fillStyle = hovered ? '#2563eb' : '#1d4ed8';
+      ctx.strokeStyle = hovered ? '#93c5fd' : '#3b82f6';
+    } else {
+      ctx.fillStyle = hovered ? '#1e293b' : '#0f172a';
+      ctx.strokeStyle = hovered ? '#93c5fd' : '#475569';
+    }
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.roundRect(x, y, w, h, 12);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = disabled ? '#64748b' : '#e5e7eb';
+    ctx.fillStyle = '#e5e7eb';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.font = 'bold 18px sans-serif';
@@ -150,7 +217,7 @@ class TitleScene extends Scene {
   _onMouseDown(e) {
     if (e.button !== 0) return;
     const button = this._buttons.find(item => this._inRect(e.x, e.y, item.rect));
-    if (button && !button.disabled && button.action) {
+    if (button && button.action) {
       button.action();
       return;
     }
@@ -282,40 +349,29 @@ class TitleScene extends Scene {
       });
   }
 
-  _buildBrowserProjectItems(canvas) {
-    const panel = this._getBrowserPanelRect(canvas);
-    this._browserPanelRect = panel;
-    const itemH = 56;
-    const itemGap = 10;
-    const topPad = 64;
-    const leftPad = 14;
-    const rightPad = 14;
-    const maxRows = Math.max(1, Math.floor((panel.h - topPad - 12 + itemGap) / (itemH + itemGap)));
-    this._browserProjectVisibleRows = maxRows;
-    const maxOffset = this._getMaxBrowserProjectScrollOffset(this._browserProjects.length, maxRows);
+  _buildBrowserProjectItems(panel) {
+    const L = TitleScene.LAYOUT;
+    const rows = this._browserProjectVisibleRows;
+    const maxOffset = this._getMaxBrowserProjectScrollOffset(this._browserProjects.length, rows);
     if (this._browserProjectScrollOffset > maxOffset) {
       this._browserProjectScrollOffset = maxOffset;
     }
-    const visible = this._browserProjects.slice(this._browserProjectScrollOffset, this._browserProjectScrollOffset + maxRows);
-    return visible.map((project, index) => ({
-      project,
-      rect: {
-        x: panel.x + leftPad,
-        y: panel.y + topPad + (itemH + itemGap) * index,
-        w: panel.w - leftPad - rightPad,
-        h: itemH,
-      },
-      deleteRect: {
-        x: panel.x + panel.w - rightPad - 72,
-        y: panel.y + topPad + (itemH + itemGap) * index + 12,
-        w: 60,
-        h: 24,
-      },
-    }));
+    const leftPad = 14;
+    const rightPad = maxOffset > 0 ? 26 : 14;
+    const rowW = panel.w - leftPad - rightPad;
+    const visible = this._browserProjects.slice(this._browserProjectScrollOffset, this._browserProjectScrollOffset + rows);
+    return visible.map((project, index) => {
+      const y = panel.y + L.panelHeadH + (L.rowH + L.rowGap) * index;
+      return {
+        project,
+        rect: { x: panel.x + leftPad, y, w: rowW, h: L.rowH },
+        deleteRect: { x: panel.x + leftPad + rowW - 72, y: y + (L.rowH - 24) / 2, w: 60, h: 24 },
+      };
+    });
   }
 
-  _drawBrowserProjectSection(ctx, canvas) {
-    const panel = this._getBrowserPanelRect(canvas);
+  _drawBrowserProjectSection(ctx, panel) {
+    const L = TitleScene.LAYOUT;
     ctx.fillStyle = '#0f172a';
     ctx.strokeStyle = '#334155';
     ctx.lineWidth = 2;
@@ -324,22 +380,30 @@ class TitleScene extends Scene {
     ctx.fill();
     ctx.stroke();
 
+    const total = this._browserProjects.length;
+    const headY = panel.y + 26;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#e2e8f0';
     ctx.font = 'bold 18px sans-serif';
-    ctx.fillText('Browser Projects', panel.x + 18, panel.y + 24);
+    ctx.fillText('Browser Projects', panel.x + 18, headY);
 
-    if (!this._browserProjectItems.length) {
+    if (!total) {
+      ctx.textAlign = 'center';
       ctx.fillStyle = '#64748b';
       ctx.font = '13px sans-serif';
-      ctx.fillText('No saved browser projects yet.', panel.x + 18, panel.y + 54);
+      ctx.fillText('No saved browser projects yet.', panel.x + panel.w / 2, panel.y + L.panelHeadH + (panel.h - L.panelHeadH) / 2);
       return;
     }
 
+    const scrollable = total > this._browserProjectVisibleRows;
+    ctx.textAlign = 'right';
     ctx.fillStyle = '#94a3b8';
     ctx.font = '13px sans-serif';
-    ctx.fillText(`Wheel: scroll list (${Math.min(this._browserProjects.length, this._browserProjectVisibleRows)}/${this._browserProjects.length})`, panel.x + 18, panel.y + 54);
+    const countLabel = scrollable
+      ? `${total} projects · Wheel: scroll`
+      : `${total} ${total === 1 ? 'project' : 'projects'}`;
+    ctx.fillText(countLabel, panel.x + panel.w - 18, headY);
 
     for (let i = 0; i < this._browserProjectItems.length; i++) {
       this._drawBrowserProjectItem(
@@ -349,6 +413,29 @@ class TitleScene extends Scene {
         i === this._hoverBrowserProjectDeleteIndex,
       );
     }
+
+    if (scrollable) this._drawBrowserScrollbar(ctx, panel);
+  }
+
+  _drawBrowserScrollbar(ctx, panel) {
+    const L = TitleScene.LAYOUT;
+    const total = this._browserProjects.length;
+    const rows = this._browserProjectVisibleRows;
+    const maxOffset = this._getMaxBrowserProjectScrollOffset(total, rows);
+    const trackX = panel.x + panel.w - 14;
+    const trackY = panel.y + L.panelHeadH;
+    const trackH = panel.h - L.panelHeadH - 12;
+    const thumbH = Math.max(24, Math.round(trackH * rows / total));
+    const thumbY = trackY + Math.round((trackH - thumbH) * this._browserProjectScrollOffset / maxOffset);
+
+    ctx.fillStyle = '#1e293b';
+    ctx.beginPath();
+    ctx.roundRect(trackX, trackY, 4, trackH, 2);
+    ctx.fill();
+    ctx.fillStyle = '#64748b';
+    ctx.beginPath();
+    ctx.roundRect(trackX, thumbY, 4, thumbH, 2);
+    ctx.fill();
   }
 
   _drawBrowserProjectItem(ctx, item, hovered, deleteHovered) {
@@ -361,22 +448,28 @@ class TitleScene extends Scene {
     ctx.fill();
     ctx.stroke();
 
-    ctx.textAlign = 'left';
+    const dr = item.deleteRect;
+    const dateX = dr.x - 12;
+    ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '12px sans-serif';
+    const dateLabel = this._formatTimestamp(item.project.updatedAt);
+    ctx.fillText(dateLabel, dateX, y + 18);
+    const dateW = ctx.measureText(dateLabel).width;
+
+    ctx.textAlign = 'left';
     ctx.fillStyle = '#f8fafc';
     ctx.font = 'bold 14px sans-serif';
-    ctx.fillText(item.project.name || 'Untitled Project', x + 12, y + 18);
+    const nameMaxW = dateX - dateW - 12 - (x + 12);
+    const name = this._truncateText(ctx, item.project.name || 'Untitled Project', nameMaxW);
+    ctx.fillText(name, x + 12, y + 18);
 
     const counts = item.project.assetCounts || {};
     const summary = `Pixel ${counts.pixelDocuments | 0} / Tileset ${counts.tilesets | 0} / Map ${counts.maps | 0} / PlayUnit ${counts.playUnits | 0}`;
     ctx.fillStyle = '#94a3b8';
     ctx.font = '12px sans-serif';
     ctx.fillText(summary, x + 12, y + 38);
-
-    const dr = item.deleteRect;
-    const dateLabel = this._formatTimestamp(item.project.updatedAt);
-    ctx.textAlign = 'right';
-    ctx.fillText(dateLabel, dr.x - 10, y + 18);
 
     ctx.fillStyle = deleteHovered ? '#dc2626' : '#7f1d1d';
     ctx.strokeStyle = deleteHovered ? '#fca5a5' : '#ef4444';
@@ -430,14 +523,6 @@ class TitleScene extends Scene {
       });
   }
 
-  _getBrowserPanelRect(canvas) {
-    const w = Math.min(620, canvas.width - 48);
-    const h = Math.min(280, Math.max(140, canvas.height - 440));
-    const x = ((canvas.width - w) / 2) | 0;
-    const y = Math.max(430, canvas.height - h - 32);
-    return { x, y, w, h };
-  }
-
   _formatTimestamp(timestamp) {
     const value = Number(timestamp);
     if (!value) return '-';
@@ -456,6 +541,15 @@ class TitleScene extends Scene {
 
   _getMaxBrowserProjectScrollOffset(projectCount, visibleRows) {
     return Math.max(0, projectCount - Math.max(1, visibleRows | 0));
+  }
+
+  // 現在のフォントで maxW に収まるように末尾を … で省略する
+  _truncateText(ctx, text, maxW) {
+    if (ctx.measureText(text).width <= maxW) return text;
+    const ellipsis = '…';
+    let end = text.length;
+    while (end > 0 && ctx.measureText(text.slice(0, end) + ellipsis).width > maxW) end--;
+    return end > 0 ? text.slice(0, end) + ellipsis : ellipsis;
   }
 
   _inRect(x, y, rect) {
