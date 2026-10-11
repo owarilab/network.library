@@ -220,11 +220,11 @@ typedef struct QS_SOCKET_OPTION
 	void* application_data;
 	struct addrinfo *addr;
 	int client_connection_status;
-	QS_FILE_INFO log_access_file_info;      // log file
-	QS_FILE_INFO log_error_file_info;       // log file
-	QS_FILE_INFO log_warning_file_info;     // log file
-	QS_FILE_INFO log_debug_file_info;       // log file
-	QS_FILE_INFO log_metrics_file_info;     // log file
+	QS_LOGGER log_access;                   // access log
+	QS_LOGGER log_error;                    // error log
+	QS_LOGGER log_warning;                  // warning log
+	QS_LOGGER log_debug;                    // debug log
+	QS_LOGGER log_metrics;                  // metrics log
 } QS_SOCKET_OPTION;
 
 QS_SOCKET_OPTION* qs_create_tcp_server(char* hostname, char* portnum);

@@ -123,7 +123,7 @@ int32_t http_request_common(QS_RECV_INFO *rinfo, QS_HTTP_REQUEST_COMMON* http_re
 int32_t http_json_response_common(QS_SERVER_CONNECTION_INFO * connection, QS_SOCKET_OPTION* option,QS_MEMORY_POOL* temporary_memory,int32_t memid_response_hash, size_t json_buffer_size);
 int32_t http_json_response_send(QS_SERVER_CONNECTION_INFO * connection, QS_SOCKET_OPTION* option,QS_MEMORY_POOL* temporary_memory,char* json);
 
-int32_t qs_http_access_log(QS_FILE_INFO* log_file_info,QS_HTTP_REQUEST_COMMON* http_request,int32_t http_status_code);
+int32_t qs_http_access_log(QS_LOGGER* logger,QS_HTTP_REQUEST_COMMON* http_request,int32_t http_status_code);
 
 int32_t qs_http_client_init(QS_MEMORY_POOL * memory, size_t http_request_buffer_size);
 QS_HTTP_CLIENT* qs_http_client_get(QS_MEMORY_POOL * memory, int32_t memid_http_client);

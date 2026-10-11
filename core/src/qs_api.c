@@ -1048,7 +1048,7 @@ int api_qs_server_create_logger_access(QS_SERVER_CONTEXT* context,const char* lo
 {
 	QS_MEMORY_POOL* main_memory_pool = (QS_MEMORY_POOL*)context->memory;
 	QS_SOCKET_OPTION* server = (QS_SOCKET_OPTION*)QS_GET_POINTER(main_memory_pool, context->memid_server);
-	if( QS_SYSTEM_ERROR == qs_log_open(&server->log_access_file_info, log_file_path)){
+	if( QS_SYSTEM_ERROR == qs_log_open(&server->log_access.file_info, log_file_path)){
 		return -1;
 	}
 	return 0;
@@ -1057,7 +1057,7 @@ int api_qs_server_create_logger_debug(QS_SERVER_CONTEXT* context,const char* log
 {
 	QS_MEMORY_POOL* main_memory_pool = (QS_MEMORY_POOL*)context->memory;
 	QS_SOCKET_OPTION* server = (QS_SOCKET_OPTION*)QS_GET_POINTER(main_memory_pool, context->memid_server);
-	if( QS_SYSTEM_ERROR == qs_log_open(&server->log_debug_file_info, log_file_path)){
+	if( QS_SYSTEM_ERROR == qs_log_open(&server->log_debug.file_info, log_file_path)){
 		return -1;
 	}
 	return 0;
@@ -1066,7 +1066,7 @@ int api_qs_server_create_logger_error(QS_SERVER_CONTEXT* context,const char* log
 {
 	QS_MEMORY_POOL* main_memory_pool = (QS_MEMORY_POOL*)context->memory;
 	QS_SOCKET_OPTION* server = (QS_SOCKET_OPTION*)QS_GET_POINTER(main_memory_pool, context->memid_server);
-	if( QS_SYSTEM_ERROR == qs_log_open(&server->log_error_file_info, log_file_path)){
+	if( QS_SYSTEM_ERROR == qs_log_open(&server->log_error.file_info, log_file_path)){
 		return -1;
 	}
 	return 0;
@@ -1077,8 +1077,8 @@ void api_qs_update(QS_SERVER_CONTEXT* context)
 	QS_SOCKET_OPTION* server = (QS_SOCKET_OPTION*)QS_GET_POINTER(main_memory_pool, context->memid_server);
 	context->current_time = time(NULL);
 	if (context->current_time - context->update_time > 60) {
-		//if( QS_SYSTEM_ERROR == qs_log_rotate(&server->log_access_file_info, "./", "access", 0)){}
-		//if( QS_SYSTEM_ERROR == qs_log_rotate(&server->log_error_file_info, "./", "error", 0)){}
+		//if( QS_SYSTEM_ERROR == qs_log_rotate(&server->log_access.file_info, "./", "access", 0)){}
+		//if( QS_SYSTEM_ERROR == qs_log_rotate(&server->log_error.file_info, "./", "error", 0)){}
 		if(-1 != context->memid_router){
 			QS_MEMORY_POOL* router_memory = (QS_MEMORY_POOL*)context->router_memory;
 			qs_update_packet_route(router_memory, context->memid_router);
@@ -1405,7 +1405,7 @@ void api_qs_exec_http(QS_RECV_INFO *rinfo)
 			qs_send( option, &tinfo->sockparam, HTTP_INTERNAL_SERVER_ERROR, qs_strlen( HTTP_INTERNAL_SERVER_ERROR ), 0 );
 		}
 	}
-	qs_http_access_log(&option->log_access_file_info, &http_request, http_status_code);
+	qs_http_access_log(&option->log_access, &http_request, http_status_code);
 	qs_disconnect(&tinfo->sockparam);
 }
 int api_qs_core_on_connect(QS_SERVER_CONNECTION_INFO* connection)

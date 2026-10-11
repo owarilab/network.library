@@ -996,7 +996,7 @@ int32_t http_json_response_send(QS_SERVER_CONNECTION_INFO * connection, QS_SOCKE
 	return http_status_code;
 }
 
-int32_t qs_http_access_log(QS_FILE_INFO* log_file_info,QS_HTTP_REQUEST_COMMON* http_request,int32_t http_status_code)
+int32_t qs_http_access_log(QS_LOGGER* logger,QS_HTTP_REQUEST_COMMON* http_request,int32_t http_status_code)
 {
 	char log_buffer[SIZE_KBYTE*4];
 	size_t log_buffer_size = sizeof(log_buffer);
@@ -1023,7 +1023,7 @@ int32_t qs_http_access_log(QS_FILE_INFO* log_file_info,QS_HTTP_REQUEST_COMMON* h
 	log_len = qs_strlink( log_buffer, log_len, http_request->user_agent, qs_strlen(http_request->user_agent), log_buffer_size );
 	log_buffer[log_len++] = '\n';
 	log_buffer[log_len] = '\0';
-	return qs_log_output(log_file_info,log_buffer);
+	return qs_log_output(&logger->file_info,log_buffer);
 }
 
 int32_t qs_http_client_init(QS_MEMORY_POOL * memory, size_t http_request_buffer_size)
@@ -1793,7 +1793,8 @@ int qs_websocket_client_on_connect(QS_WEBSOCKET_CLIENT* context, QS_SOCKET_ID so
 	uint8_t accept_hash[20];
 	char accept_source[128];
 	char encoded_key[64];
-	char request[2048];
+	// path + host + 固定ヘッダ + key を収めるサイズ（切り捨てを起こさない）
+	char request[sizeof(context->websocket_path) + sizeof(context->websocket_host) + 256];
 	context->websocket_state = QS_WEBSOCKET_STATE_HANDSHAKING;
 	for(size_t i = 0; i < sizeof(random_key); i += 4){ uint32_t value = qs_rand_32(); memcpy(random_key + i, &value, sizeof(value)); }
 	qs_base64_encode(encoded_key, sizeof(encoded_key), random_key, sizeof(random_key));

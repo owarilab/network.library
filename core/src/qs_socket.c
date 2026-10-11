@@ -443,11 +443,11 @@ int qs_initialize_socket_option(
 	option->addr = NULL;
 	option->client_connection_status = CLIENT_STATUS_DISCONNECT;
 
-	qs_finit(&option->log_access_file_info);
-	qs_finit(&option->log_debug_file_info);
-	qs_finit(&option->log_error_file_info);
-	qs_finit(&option->log_warning_file_info);
-	qs_finit(&option->log_metrics_file_info);
+	qs_logger_init(&option->log_access, QS_LOG_LEVEL_INFO);
+	qs_logger_init(&option->log_debug, QS_LOG_LEVEL_DEBUG);
+	qs_logger_init(&option->log_error, QS_LOG_LEVEL_ERROR);
+	qs_logger_init(&option->log_warning, QS_LOG_LEVEL_WARN);
+	qs_logger_init(&option->log_metrics, QS_LOG_LEVEL_INFO);
 #ifdef __WINDOWS__
 	result = WSAStartup( MAKEWORD( 2, 2 ), &option->wsdata );
 	if( result != 0 )
