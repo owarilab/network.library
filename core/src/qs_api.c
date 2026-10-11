@@ -1071,6 +1071,111 @@ int api_qs_server_create_logger_error(QS_SERVER_CONTEXT* context,const char* log
 	}
 	return 0;
 }
+static QS_LOGGER* api_qs_logger_get(QS_LOGGER_CONTEXT* logger)
+{
+	if( logger == NULL || logger->memid_logger == -1 || logger->memory == NULL ){ return NULL; }
+	return (QS_LOGGER*)qs_upointer((QS_MEMORY_POOL*)logger->memory, logger->memid_logger);
+}
+int api_qs_logger_create(QS_MEMORY_CONTEXT* context, QS_LOGGER_CONTEXT* logger, int32_t level)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	logger->memid_logger = qs_create_memory_block(memory, sizeof(QS_LOGGER));
+	if( logger->memid_logger == -1 ){
+		logger->memory = NULL;
+		return -1;
+	}
+	logger->memory = (void*)memory;
+	QS_LOGGER* ptr = api_qs_logger_get(logger);
+	if( ptr == NULL ){ return -1; }
+	qs_logger_init(ptr, level);
+	return 0;
+}
+int api_qs_logger_open(QS_LOGGER_CONTEXT* logger, const char* file_path)
+{
+	QS_LOGGER* ptr = api_qs_logger_get(logger);
+	if( ptr == NULL ){ return -1; }
+	return (QS_SYSTEM_ERROR == qs_log_open(&ptr->file_info, file_path)) ? -1 : 0;
+}
+int api_qs_logger_close(QS_LOGGER_CONTEXT* logger)
+{
+	QS_LOGGER* ptr = api_qs_logger_get(logger);
+	if( ptr == NULL ){ return -1; }
+	return (QS_SYSTEM_ERROR == qs_log_close(&ptr->file_info)) ? -1 : 0;
+}
+int api_qs_logger_free(QS_LOGGER_CONTEXT* logger)
+{
+	QS_LOGGER* ptr = api_qs_logger_get(logger);
+	if( ptr == NULL ){ return -1; }
+	qs_log_close(&ptr->file_info);
+	if( qs_free_memory_block((QS_MEMORY_POOL*)logger->memory, &logger->memid_logger) != QS_SYSTEM_OK ){ return -1; }
+	logger->memory = NULL;
+	return 0;
+}
+int api_qs_logger_set_level(QS_LOGGER_CONTEXT* logger, int32_t level)
+{
+	QS_LOGGER* ptr = api_qs_logger_get(logger);
+	if( ptr == NULL ){ return -1; }
+	qs_logger_set_level(ptr, level);
+	return 0;
+}
+int32_t api_qs_logger_get_level(QS_LOGGER_CONTEXT* logger)
+{
+	QS_LOGGER* ptr = api_qs_logger_get(logger);
+	if( ptr == NULL ){ return -1; }
+	return ptr->level;
+}
+static int api_qs_logger_vwrite(QS_LOGGER_CONTEXT* logger, int32_t level, const char* file, int32_t line, const char* format, va_list ap)
+{
+	QS_LOGGER* ptr = api_qs_logger_get(logger);
+	if( ptr == NULL ){ return -1; }
+	return (QS_SYSTEM_OK == qs_log_vwrite(ptr, level, file, line, format, ap)) ? 0 : -1;
+}
+int api_qs_logger_write(QS_LOGGER_CONTEXT* logger, int32_t level, const char* file, int32_t line, const char* format, ...)
+{
+	int result;
+	va_list ap;
+	va_start(ap, format);
+	result = api_qs_logger_vwrite(logger, level, file, line, format, ap);
+	va_end(ap);
+	return result;
+}
+int api_qs_logger_debug(QS_LOGGER_CONTEXT* logger, const char* format, ...)
+{
+	int result;
+	va_list ap;
+	va_start(ap, format);
+	result = api_qs_logger_vwrite(logger, QS_LOG_LEVEL_DEBUG, NULL, 0, format, ap);
+	va_end(ap);
+	return result;
+}
+int api_qs_logger_info(QS_LOGGER_CONTEXT* logger, const char* format, ...)
+{
+	int result;
+	va_list ap;
+	va_start(ap, format);
+	result = api_qs_logger_vwrite(logger, QS_LOG_LEVEL_INFO, NULL, 0, format, ap);
+	va_end(ap);
+	return result;
+}
+int api_qs_logger_warn(QS_LOGGER_CONTEXT* logger, const char* format, ...)
+{
+	int result;
+	va_list ap;
+	va_start(ap, format);
+	result = api_qs_logger_vwrite(logger, QS_LOG_LEVEL_WARN, NULL, 0, format, ap);
+	va_end(ap);
+	return result;
+}
+int api_qs_logger_error(QS_LOGGER_CONTEXT* logger, const char* format, ...)
+{
+	int result;
+	va_list ap;
+	va_start(ap, format);
+	result = api_qs_logger_vwrite(logger, QS_LOG_LEVEL_ERROR, NULL, 0, format, ap);
+	va_end(ap);
+	return result;
+}
+
 void api_qs_update(QS_SERVER_CONTEXT* context)
 {
 	QS_MEMORY_POOL* main_memory_pool = (QS_MEMORY_POOL*)context->memory;

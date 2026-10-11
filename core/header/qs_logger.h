@@ -12,22 +12,8 @@ extern "C"{
 #include "qs_system.h"
 #include "qs_memory_allocator.h"
 #include "qs_io.h"
+#include "qs_api.h"
 #include <stdarg.h>
-
-#ifdef __GNUC__
-#define QS_LOG_PRINTF_CHECK(fmt_index, arg_index) __attribute__((format(printf, fmt_index, arg_index)))
-#else
-#define QS_LOG_PRINTF_CHECK(fmt_index, arg_index)
-#endif
-
-typedef enum QS_LOG_LEVEL
-{
-	QS_LOG_LEVEL_DEBUG = 0,
-	QS_LOG_LEVEL_INFO,
-	QS_LOG_LEVEL_WARN,
-	QS_LOG_LEVEL_ERROR,
-	QS_LOG_LEVEL_NONE,			// ロガーの閾値に指定すると全出力を抑制
-} QS_LOG_LEVEL;
 
 typedef struct QS_LOGGER
 {

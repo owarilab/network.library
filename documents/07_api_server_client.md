@@ -28,6 +28,8 @@
 ## ルータ/ログ
 - ルータ: `api_qs_server_create_router`, `api_qs_room_create`, `api_qs_room_join`
 - ログ: `api_qs_server_create_logger_access` など
+- 単体ロガー（サーバーなしで使用可）: `api_qs_logger_create(&memory, &logger, QS_LOG_LEVEL_INFO)` → `api_qs_logger_open(&logger, path)` → `api_qs_logger_info(&logger, "fmt %d", v)` / `API_QS_LOG_ERROR(&logger, ...)`（`__FILE__`・`__LINE__` 付き） → `api_qs_logger_free(&logger)`
+- レベル: `api_qs_logger_set_level`, `api_qs_logger_get_level`（公開するのはレベルのみ）
 
 ## クライアント
 - `api_qs_client_init(&context, host, port, server_type)`

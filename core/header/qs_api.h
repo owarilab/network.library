@@ -165,6 +165,27 @@ typedef struct QS_RANKING_CONTEXT
 	void* memory;
 } QS_RANKING_CONTEXT;
 
+#ifdef __GNUC__
+#define QS_LOG_PRINTF_CHECK(fmt_index, arg_index) __attribute__((format(printf, fmt_index, arg_index)))
+#else
+#define QS_LOG_PRINTF_CHECK(fmt_index, arg_index)
+#endif
+
+typedef enum QS_LOG_LEVEL
+{
+	QS_LOG_LEVEL_DEBUG = 0,
+	QS_LOG_LEVEL_INFO,
+	QS_LOG_LEVEL_WARN,
+	QS_LOG_LEVEL_ERROR,
+	QS_LOG_LEVEL_NONE,			// ロガーの閾値に指定すると全出力を抑制
+} QS_LOG_LEVEL;
+
+typedef struct QS_LOGGER_CONTEXT
+{
+	int32_t memid_logger;		// QS_LOGGER を格納した munit（-1 は無効）
+	void* memory;				// QS_MEMORY_POOL
+} QS_LOGGER_CONTEXT;
+
 int api_qs_init();
 uint32_t api_qs_rand();
 int api_qs_memory_alloc(QS_MEMORY_CONTEXT* context, size_t alloc_size);
@@ -357,6 +378,24 @@ int api_qs_ranking_sort(QS_RANKING_CONTEXT* ranking_context);
 char* api_qs_ranking_get(QS_RANKING_CONTEXT* ranking_context, int32_t offset, int32_t length, QS_MEMORY_CONTEXT* dest_memory);
 int api_qs_http_response_json(QS_EVENT_PARAMETER params, QS_JSON_ELEMENT_OBJECT* object, size_t buffer_size);
 int api_qs_http_response_raw_json(QS_EVENT_PARAMETER params, QS_MEMORY_CONTEXT* temporary_memory,char* json);
+
+int api_qs_logger_create(QS_MEMORY_CONTEXT* context, QS_LOGGER_CONTEXT* logger, int32_t level);
+int api_qs_logger_open(QS_LOGGER_CONTEXT* logger, const char* file_path);
+int api_qs_logger_close(QS_LOGGER_CONTEXT* logger);
+int api_qs_logger_free(QS_LOGGER_CONTEXT* logger);
+int api_qs_logger_set_level(QS_LOGGER_CONTEXT* logger, int32_t level);
+int32_t api_qs_logger_get_level(QS_LOGGER_CONTEXT* logger);
+int api_qs_logger_write(QS_LOGGER_CONTEXT* logger, int32_t level, const char* file, int32_t line, const char* format, ...) QS_LOG_PRINTF_CHECK(5, 6);
+int api_qs_logger_debug(QS_LOGGER_CONTEXT* logger, const char* format, ...) QS_LOG_PRINTF_CHECK(2, 3);
+int api_qs_logger_info(QS_LOGGER_CONTEXT* logger, const char* format, ...) QS_LOG_PRINTF_CHECK(2, 3);
+int api_qs_logger_warn(QS_LOGGER_CONTEXT* logger, const char* format, ...) QS_LOG_PRINTF_CHECK(2, 3);
+int api_qs_logger_error(QS_LOGGER_CONTEXT* logger, const char* format, ...) QS_LOG_PRINTF_CHECK(2, 3);
+
+// マクロ版（__FILE__ / __LINE__ を付与）
+#define API_QS_LOG_DEBUG(logger, ...) api_qs_logger_write(logger, QS_LOG_LEVEL_DEBUG, __FILE__, __LINE__, __VA_ARGS__)
+#define API_QS_LOG_INFO(logger, ...)  api_qs_logger_write(logger, QS_LOG_LEVEL_INFO,  __FILE__, __LINE__, __VA_ARGS__)
+#define API_QS_LOG_WARN(logger, ...)  api_qs_logger_write(logger, QS_LOG_LEVEL_WARN,  __FILE__, __LINE__, __VA_ARGS__)
+#define API_QS_LOG_ERROR(logger, ...) api_qs_logger_write(logger, QS_LOG_LEVEL_ERROR, __FILE__, __LINE__, __VA_ARGS__)
 
 char* api_qs_uniqid(QS_MEMORY_CONTEXT* memory_context, int32_t length);
 char* api_qs_base64_encode(QS_MEMORY_CONTEXT* memory_context, const void* data, size_t length);
