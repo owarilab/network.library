@@ -124,7 +124,7 @@ class ProjectSession {
    * @returns {boolean}
    */
   _isValidDocumentType(type) {
-    return type === 'pixelDocument' || type === 'tileset' || type === 'map' || type === 'playUnit';
+    return type === 'pixelDocument' || type === 'tileset' || type === 'characterChipset' || type === 'map' || type === 'playUnit';
   }
 }
 
@@ -190,7 +190,8 @@ class ProjectSerializer {
       assets: {
         pixelDocuments: (project.assets?.pixelDocuments || []).map(doc => ProjectSerializer._serializePixelDocument(doc, fallbackPalette)),
         tilesets: (project.assets?.tilesets || []).map(tileset => ProjectSerializer._serializeTileset(tileset, fallbackPalette)),
-        maps: (project.assets?.maps || []).map(map => ProjectSerializer._serializeMap(map)),
+        characterChipsets: (project.assets?.characterChipsets || []).map(chipset => ProjectSerializer._serializeCharacterChipset(chipset, fallbackPalette)),
+        maps:(project.assets?.maps || []).map(map => ProjectSerializer._serializeMap(map)),
         playUnits: (project.assets?.playUnits || []).map(playUnit => ProjectSerializer._serializePlayUnit(playUnit)),
       },
     };
@@ -227,6 +228,25 @@ class ProjectSerializer {
       chipHeight: tilesetData.chipHeight,
       columns: tilesetData.columns,
       rows: tilesetData.rows,
+      storage: {
+        type: 'embedded',
+        codec: 'qts-base64',
+        data: ProjectSerializer._encodeQtsBase64(tilesetData, palette),
+      },
+    };
+  }
+
+  static _serializeCharacterChipset(chipset, fallbackPalette) {
+    const tilesetData = chipset.tilesetData
+      || CharacterChipset.createTilesetData(chipset.chipWidth | 0 || 16, chipset.chipHeight | 0 || 16);
+    const palette = ProjectSerializer._resolvePalette(chipset.palette, fallbackPalette);
+    return {
+      id: chipset.id,
+      type: 'characterChipset',
+      name: chipset.name,
+      chipWidth: tilesetData.chipWidth,
+      chipHeight: tilesetData.chipHeight,
+      layout: CharacterChipset.createLayout(),
       storage: {
         type: 'embedded',
         codec: 'qts-base64',
@@ -309,6 +329,7 @@ class ProjectSerializer {
     project.globalVariables = ProjectData.normalizeGlobalVariables(obj.globalVariables);
     project.assets.pixelDocuments = (obj.assets?.pixelDocuments || []).map(doc => ProjectSerializer._deserializePixelDocument(doc));
     project.assets.tilesets = (obj.assets?.tilesets || []).map(tileset => ProjectSerializer._deserializeTileset(tileset));
+    project.assets.characterChipsets = (obj.assets?.characterChipsets || []).map(chipset => ProjectSerializer._deserializeCharacterChipset(chipset));
     project.assets.maps = (obj.assets?.maps || []).map(map => ({
       id: typeof map.id === 'string' && map.id ? map.id : `map_${Date.now().toString(36)}`,
       type: 'map',
@@ -350,6 +371,20 @@ class ProjectSerializer {
       chipHeight: parsed.tilesetData.chipHeight,
       columns: parsed.tilesetData.columns,
       rows: parsed.tilesetData.rows,
+      tilesetData: parsed.tilesetData,
+      palette: parsed.palette.clone(),
+    };
+  }
+
+  static _deserializeCharacterChipset(chipset) {
+    const parsed = ProjectSerializer._decodeQtsBase64(chipset.storage?.data);
+    return {
+      id: typeof chipset.id === 'string' && chipset.id ? chipset.id : `cc_${Date.now().toString(36)}`,
+      type: 'characterChipset',
+      name: typeof chipset.name === 'string' && chipset.name.trim() ? chipset.name.trim() : 'character',
+      chipWidth: parsed.tilesetData.chipWidth,
+      chipHeight: parsed.tilesetData.chipHeight,
+      layout: CharacterChipset.createLayout(),
       tilesetData: parsed.tilesetData,
       palette: parsed.palette.clone(),
     };

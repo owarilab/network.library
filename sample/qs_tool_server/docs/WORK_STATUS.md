@@ -322,6 +322,17 @@ www/
   - 背景色ラジオ（透明 / 白）
   - `onConfirm(width, height, bgColor)` コールバック
 
+### キャラクターチップセット（歩行アニメ + プレイヤー移動）
+
+設計: [specs/CHARACTER_CHIPSET_PLAN.md](specs/CHARACTER_CHIPSET_PLAN.md)
+
+- データ: `assets.characterChipsets`（ID 接頭辞 `cc`、`type: 'characterChipset'`）。格納は `TilesetData`（3列 × 4行。列 = 立ち / 歩きA / 歩きB、行 = 下 / 左 / 右 / 上）。.qsproj は QTS 埋め込み、ブラウザ保存は `qs_tool_server_db` の assets に `qts-arraybuffer` で保存。
+- エディタ: EditorScene に同居（`editMode` は `'tileset'` のまま、`AppData.tilesetKind` が `'characterChipset'`）。File →「新規キャラクターチップ作成」、列・行見出し、右向きから左の反転コピー、キャラクタープレビュー窓。
+- ランタイム: `Character` コンポーネント（`characterChipsetId` / `scale` / `origin`）と `PlayerController`（向き・歩行フレーム）。PlayTest は実行用コピーに書き込み、アセットは変更しない。
+- Save As 時に `Character.characterChipsetId` を新 ID へ書き換える。
+- 検証（Playwright）: 保存と再読込の画素一致、.qsproj 往復、Save As の参照、反転、PlayTest の4方向移動・歩行サイクル・停止時の立ち、斜めの向き、PlayUnit 切替の往復（アセット不変、セッション中の状態保持）、エディタの +Character。
+- 未対応: キャラクターチップの PNG / JSON / QTS 取り込み、Undo、Collider の offset（origin を足元中央にしたとき当たり判定と見た目がずれる）、NPC・壁の衝突、PlayTest の要約表示への Character 件数追加。
+
 ---
 
 ## TODO リスト
@@ -706,14 +717,16 @@ pixel_data.js → pixel_data_converter.js → layer_data.js → app_data.js → 
 → menu_constants.js → dropdown_menu.js → menu_bar.js
 → ui_window.js
 → pixel_canvas.js
-→ dialog_base.js → new_file_dialog.js → new_tileset_dialog.js → import_tileset_dialog.js
+→ dialog_base.js → new_file_dialog.js → new_tileset_dialog.js → new_character_chipset_dialog.js → import_tileset_dialog.js
 → save_dialog.js → color_picker_dialog.js → quarter_view_tile_dialog.js
 → color_palette.js → color_palette_16.js → editable_palette_32.js → color_palette_window.js
 → chip_palette.js → chip_palette_window.js
 → tile_preview.js → tile_preview_window.js
+→ character_preview.js → character_preview_window.js
 → tool_bar.js → tool_bar_window.js
 → layer_panel.js → layer_panel_window.js
-→ tileset_data.js → quarter_view_tile_generator.js
+→ tileset_data.js → character/character_chipset.js → quarter_view_tile_generator.js
+→ play_unit/player_controller.js
 → scene.js → scene_manager.js → editor_scene.js
 → canvas_manager.js
 → インラインスクリプト（起動）

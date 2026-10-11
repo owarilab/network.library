@@ -38,6 +38,7 @@ class MenuConstants {
   static FILE_OPEN_TILESET     = 'file.open_tileset';
   static FILE_EXPORT_TILESET   = 'file.export_tileset';
   static FILE_EXPORT_CHIP      = 'file.export_chip';
+  static FILE_NEW_CHARACTER_CHIPSET = 'file.new_character_chipset';
 
   // ---- タイルセット ----
   static TILESET_COPY_CHIP   = 'tileset.copy_chip';
@@ -49,6 +50,8 @@ class MenuConstants {
   static TILESET_REMOVE_ROW  = 'tileset.remove_row';
   static TILESET_REMOVE_COL  = 'tileset.remove_col';
   static TILESET_TILE_PREVIEW = 'tileset.tile_preview';
+  static TILESET_CHARACTER_MIRROR_RIGHT_TO_LEFT = 'tileset.character_mirror_right_to_left';
+  static TILESET_CHARACTER_PREVIEW = 'tileset.character_preview';
 
   // ---- 生成 ----
   static GENERATE_QUARTER_VIEW_TILE = 'generate.quarter_view_tile';

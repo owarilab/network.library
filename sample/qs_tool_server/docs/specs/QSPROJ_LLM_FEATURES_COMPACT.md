@@ -42,6 +42,7 @@ Generate valid, minimal `.qsproj` JSON for `sample/qs_tool_server`.
     "assets": {
       "pixelDocuments": [],
       "tilesets": [],
+      "characterChipsets": [],
       "maps": [],
       "playUnits": []
     }
@@ -266,7 +267,7 @@ Variable definition shape:
 
 1. Prefer one playUnit first.
 2. Prefer only these components: `Transform`, `Camera`, `PlaySettings`, `Text`, `Rectangle`, `Collider`, `Trigger`, `EventAction`.
-3. Keep `pixelDocuments`, `tilesets`, and `maps` empty unless required.
+3. Keep `pixelDocuments`, `tilesets`, `characterChipsets`, and `maps` empty unless required.
 4. Use short ASCII names.
 5. Reuse known good component shapes exactly.
 6. If unsure, copy the minimal camera object and one text object.

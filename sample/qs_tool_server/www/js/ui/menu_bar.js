@@ -32,6 +32,7 @@ class MenuBar {
         dropdown: new DropdownMenu([
           { id: MenuConstants.FILE_NEW,          label: '新規作成'            },
           { id: MenuConstants.FILE_NEW_TILESET,   label: '新規タイルセット作成' },
+          { id: MenuConstants.FILE_NEW_CHARACTER_CHIPSET, label: '新規キャラクターチップ作成' },
           { id: MenuConstants.FILE_OPEN,          label: '開く...'              },
           { id: MenuConstants.FILE_OPEN_TILESET,  label: 'タイルセットを開く...' },
           { id: MenuConstants.SEPARATOR },
@@ -86,6 +87,9 @@ class MenuBar {
           { id: MenuConstants.TILESET_SWAP_CHIP,    label: 'チップを入れ替え' },
           { id: MenuConstants.SEPARATOR },
           { id: MenuConstants.TILESET_TILE_PREVIEW,  label: 'タイルプレビュー表示' },
+          { id: MenuConstants.SEPARATOR },
+          { id: MenuConstants.TILESET_CHARACTER_MIRROR_RIGHT_TO_LEFT, label: '右向きから左を作成' },
+          { id: MenuConstants.TILESET_CHARACTER_PREVIEW, label: 'キャラクタープレビュー表示' },
         ]),
       },
       {

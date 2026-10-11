@@ -132,6 +132,7 @@ class ProjectBrowserStorage {
         assetCounts: {
           pixelDocuments: row.assetCounts?.pixelDocuments | 0,
           tilesets: row.assetCounts?.tilesets | 0,
+          characterChipsets: row.assetCounts?.characterChipsets | 0,
           maps: row.assetCounts?.maps | 0,
           playUnits: row.assetCounts?.playUnits | 0,
         },
@@ -166,6 +167,7 @@ class ProjectBrowserStorage {
     return [
       ...(project.assets?.pixelDocuments || []),
       ...(project.assets?.tilesets || []),
+      ...(project.assets?.characterChipsets || []),
       ...(project.assets?.maps || []),
       ...(project.assets?.playUnits || []),
     ];
@@ -187,10 +189,13 @@ class ProjectBrowserStorage {
     nextProject.createdAt = now;
     nextProject.updatedAt = now;
 
-    ProjectBrowserStorage._reassignAssetIds(nextProject.assets.pixelDocuments || [], 'px', activeRef);
-    ProjectBrowserStorage._reassignAssetIds(nextProject.assets.tilesets || [], 'ts', activeRef);
-    ProjectBrowserStorage._reassignAssetIds(nextProject.assets.maps || [], 'map', activeRef);
-    ProjectBrowserStorage._reassignAssetIds(nextProject.assets.playUnits || [], 'pu', activeRef);
+    const idMap = new Map();
+    ProjectBrowserStorage._reassignAssetIds(nextProject.assets.pixelDocuments || [], 'px', activeRef, idMap);
+    ProjectBrowserStorage._reassignAssetIds(nextProject.assets.tilesets || [], 'ts', activeRef, idMap);
+    ProjectBrowserStorage._reassignAssetIds(nextProject.assets.characterChipsets || [], 'cc', activeRef, idMap);
+    ProjectBrowserStorage._reassignAssetIds(nextProject.assets.maps || [], 'map', activeRef, idMap);
+    ProjectBrowserStorage._reassignAssetIds(nextProject.assets.playUnits || [], 'pu', activeRef, idMap);
+    ProjectBrowserStorage._rewriteCharacterChipsetRefs(nextProject.assets.playUnits || [], idMap);
 
     nextSession.projectId = nextProject.id;
     nextSession.dirty = false;
@@ -198,13 +203,27 @@ class ProjectBrowserStorage {
     return { project: nextProject, session: nextSession };
   }
 
-  static _reassignAssetIds(assets, prefix, activeRef) {
+  static _reassignAssetIds(assets, prefix, activeRef, idMap) {
     for (let i = 0; i < assets.length; i++) {
       const oldId = assets[i].id;
       const newId = ProjectBrowserStorage._createId(prefix);
       assets[i].id = newId;
+      idMap.set(oldId, newId);
       if (activeRef?.id === oldId) {
         activeRef.id = newId;
+      }
+    }
+  }
+
+  // Save As で振り直した characterChipset の ID を、PlayUnit 内の Character 参照にも反映する
+  static _rewriteCharacterChipsetRefs(playUnits, idMap) {
+    for (const playUnit of playUnits) {
+      for (const object of playUnit.objects || []) {
+        for (const component of object.components || []) {
+          if (component.type !== 'Character') continue;
+          const newId = idMap.get(component.data?.characterChipsetId);
+          if (newId) component.data.characterChipsetId = newId;
+        }
       }
     }
   }
@@ -232,6 +251,7 @@ class ProjectBrowserStorage {
       assetCounts: {
         pixelDocuments: (project.assets?.pixelDocuments || []).length,
         tilesets: (project.assets?.tilesets || []).length,
+        characterChipsets: (project.assets?.characterChipsets || []).length,
         maps: (project.assets?.maps || []).length,
         playUnits: (project.assets?.playUnits || []).length,
       },
@@ -296,6 +316,28 @@ class ProjectBrowserStorage {
       };
     }
 
+    if (asset.type === 'characterChipset') {
+      const palette = ProjectSerializer._resolvePalette(asset.palette, fallbackPalette);
+      const tilesetData = asset.tilesetData || CharacterChipset.createTilesetData(asset.chipWidth | 0 || 16, asset.chipHeight | 0 || 16);
+      return {
+        id: asset.id,
+        projectId,
+        type: 'characterChipset',
+        name: asset.name,
+        updatedAt: Date.now(),
+        payloadVersion: 1,
+        storage: {
+          codec: 'qts-arraybuffer',
+          data: PixelDataConverter.createQtsArrayBuffer(tilesetData, palette),
+        },
+        meta: {
+          chipWidth: tilesetData.chipWidth,
+          chipHeight: tilesetData.chipHeight,
+          layout: CharacterChipset.createLayout(),
+        },
+      };
+    }
+
     const palette = ProjectSerializer._resolvePalette(asset.palette, fallbackPalette);
     const tilesetData = asset.tilesetData || new TilesetData(asset.chipWidth | 0 || 16, asset.chipHeight | 0 || 16, asset.columns | 0 || 1, asset.rows | 0 || 1);
     return {
@@ -332,6 +374,7 @@ class ProjectBrowserStorage {
 
     project.assets.pixelDocuments = [];
     project.assets.tilesets = [];
+    project.assets.characterChipsets = [];
     project.assets.maps = [];
     project.assets.playUnits = [];
     for (let i = 0; i < assetRecords.length; i++) {
@@ -339,6 +382,7 @@ class ProjectBrowserStorage {
       if (!asset) continue;
       if (asset.type === 'pixelDocument') project.assets.pixelDocuments.push(asset);
       else if (asset.type === 'tileset') project.assets.tilesets.push(asset);
+      else if (asset.type === 'characterChipset') project.assets.characterChipsets.push(asset);
       else if (asset.type === 'map') project.assets.maps.push(asset);
       else if (asset.type === 'playUnit') project.assets.playUnits.push(asset);
     }
@@ -382,6 +426,19 @@ class ProjectBrowserStorage {
         width: layerData.width,
         height: layerData.height,
         layerData,
+        palette: parsed.palette.clone(),
+      };
+    }
+
+    if (record.type === 'characterChipset') {
+      return {
+        id: record.id,
+        type: 'characterChipset',
+        name: record.name || 'character',
+        chipWidth: parsed.tilesetData.chipWidth,
+        chipHeight: parsed.tilesetData.chipHeight,
+        layout: CharacterChipset.createLayout(),
+        tilesetData: parsed.tilesetData,
         palette: parsed.palette.clone(),
       };
     }

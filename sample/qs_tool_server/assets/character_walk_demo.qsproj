@@ -1,0 +1,523 @@
+{
+  "format": "qsproj",
+  "version": 1,
+  "project": {
+    "id": "proj_character_walk_demo",
+    "version": 1,
+    "name": "Character Walk Demo",
+    "createdAt": 1791740863588,
+    "updatedAt": 1791740863588,
+    "settings": {
+      "defaultChipWidth": 16,
+      "defaultChipHeight": 16
+    },
+    "globalVariables": {
+      "version": 1,
+      "system": {
+        "fixed": {
+          "timer": {
+            "type": "number",
+            "initialValue": 0,
+            "description": ""
+          }
+        },
+        "persistent": {}
+      },
+      "user": {
+        "fixed": {},
+        "persistent": {}
+      }
+    },
+    "assets": {
+      "pixelDocuments": [],
+      "tilesets": [],
+      "characterChipsets": [
+        {
+          "id": "cc_character_walk_hero",
+          "type": "characterChipset",
+          "name": "Hero",
+          "chipWidth": 16,
+          "chipHeight": 16,
+          "layout": {
+            "directions": [
+              "down",
+              "left",
+              "right",
+              "up"
+            ],
+            "framesPerDirection": 3
+          },
+          "storage": {
+            "type": "embedded",
+            "codec": "qts-base64",
+            "data": "UVNUUwEAAAAQABAAAwAEAAMAAAAAAAAA//////8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEHAExheWVyIDEB/wAAAIGBgYGBgYGBgYEAAAAAAACBgoKCgoKCgoKBAAAAAAAAgYKCgoKCgoKCgQAAAAAAAIGCgoGCgoGCgoEAAAAAAACBgoKBgoKBgoKBAAAAAAAAgYKCgoKCgoKCgQAAAAAAAIGBgYGBgYGBgYEAAAAAAIGBgYGBgYGBgYGBgQAAAACBgoKCgoKCgoKCgoEAAAAAgYKCgoKCgoKCgoKBAAAAAIGCgoKCgoKCgoKCgQAAAACBgYGBgYGBgYGBgYEAAAAAAACBgYEAAIGBgQAAAAAAAAAAgYGBAACBgYEAAAAAAAAAAIGBgQAAgYGBAAAAAAAAAACBgYEAAIGBgQAAAAABBwBMYXllciAxAf8AAACBgYGBgYGBgYGBAAAAAAAAgYKCgoKCgoKCgQAAAAAAAIGCgoKCgoKCgoEAAAAAAACBgoKBgoKBgoKBAAAAAAAAgYKCgYKCgYKCgQAAAAAAAIGCgoKCgoKCgoEAAAAAAACBgYGBgYGBgYGBAAAAAACBgYGBgYGBgYGBgYEAAAAAgYKCgoKCgoKCgoKBAAAAAIGCgoKCgoKCgoKCgQAAAACBgoKCgoKCgoKCgoEAAAAAgYGBgYGBgYGBgYGBAAAAAACBgYEAAAAAgYGBAAAAAAAAgYGBAAAAAIGBgQAAAAAAAIGBgQAAAACBgYEAAAAAAACBgYEAAAAAgYGBAAAAAQcATGF5ZXIgMQH/AAAAgYGBgYGBgYGBgQAAAAAAAIGCgoKCgoKCgoEAAAAAAACBgoKCgoKCgoKBAAAAAAAAgYKCgYKCgYKCgQAAAAAAAIGCgoGCgoGCgoEAAAAAAACBgoKCgoKCgoKBAAAAAAAAgYGBgYGBgYGBgQAAAAAAgYGBgYGBgYGBgYGBAAAAAIGCgoKCgoKCgoKCgQAAAACBgoKCgoKCgoKCgoEAAAAAgYKCgoKCgoKCgoKBAAAAAIGBgYGBgYGBgYGBgQAAAAAAAIGBgQAAAIGBgQAAAAAAAACBgYEAAACBgYEAAAAAAAAAgYGBAAAAgYGBAAAAAAAAAIGBgQAAAIGBgQAAAAEHAExheWVyIDEB/wAAAIGBgYGBgYGBgYEAAAAAAACBgoKCgoKCgoKBAAAAAAAAgYKCgoKCgoKCgQAAAAAAAIGCgYKCgoKCgoEAAAAAAACBgoGCgoKCgoKBAAAAAAAAgYKCgoKCgoKCgQAAAAAAAIGBgYGBgYGBgYEAAAAAAIGBgYGBgYGBgYGBgQAAAACBgoKCgoKCgoKCgoEAAAAAgYKCgoKCgoKCgoKBAAAAAIGCgoKCgoKCgoKCgQAAAACBgYGBgYGBgYGBgYEAAAAAAACBgYEAAIGBgQAAAAAAAAAAgYGBAACBgYEAAAAAAAAAAIGBgQAAgYGBAAAAAAAAAACBgYEAAIGBgQAAAAABBwBMYXllciAxAf8AAACBgYGBgYGBgYGBAAAAAAAAgYKCgoKCgoKCgQAAAAAAAIGCgoKCgoKCgoEAAAAAAACBgoGCgoKCgoKBAAAAAAAAgYKBgoKCgoKCgQAAAAAAAIGCgoKCgoKCgoEAAAAAAACBgYGBgYGBgYGBAAAAAACBgYGBgYGBgYGBgYEAAAAAgYKCgoKCgoKCgoKBAAAAAIGCgoKCgoKCgoKCgQAAAACBgoKCgoKCgoKCgoEAAAAAgYGBgYGBgYGBgYGBAAAAAACBgYEAAAAAgYGBAAAAAAAAgYGBAAAAAIGBgQAAAAAAAIGBgQAAAACBgYEAAAAAAACBgYEAAAAAgYGBAAAAAQcATGF5ZXIgMQH/AAAAgYGBgYGBgYGBgQAAAAAAAIGCgoKCgoKCgoEAAAAAAACBgoKCgoKCgoKBAAAAAAAAgYKBgoKCgoKCgQAAAAAAAIGCgYKCgoKCgoEAAAAAAACBgoKCgoKCgoKBAAAAAAAAgYGBgYGBgYGBgQAAAAAAgYGBgYGBgYGBgYGBAAAAAIGCgoKCgoKCgoKCgQAAAACBgoKCgoKCgoKCgoEAAAAAgYKCgoKCgoKCgoKBAAAAAIGBgYGBgYGBgYGBgQAAAAAAAIGBgQAAAIGBgQAAAAAAAACBgYEAAACBgYEAAAAAAAAAgYGBAAAAgYGBAAAAAAAAAIGBgQAAAIGBgQAAAAEHAExheWVyIDEB/wAAAIGBgYGBgYGBgYEAAAAAAACBgoKCgoKCgoKBAAAAAAAAgYKCgoKCgoKCgQAAAAAAAIGCgoKCgoKBgoEAAAAAAACBgoKCgoKCgYKBAAAAAAAAgYKCgoKCgoKCgQAAAAAAAIGBgYGBgYGBgYEAAAAAAIGBgYGBgYGBgYGBgQAAAACBgoKCgoKCgoKCgoEAAAAAgYKCgoKCgoKCgoKBAAAAAIGCgoKCgoKCgoKCgQAAAACBgYGBgYGBgYGBgYEAAAAAAACBgYEAAIGBgQAAAAAAAAAAgYGBAACBgYEAAAAAAAAAAIGBgQAAgYGBAAAAAAAAAACBgYEAAIGBgQAAAAABBwBMYXllciAxAf8AAACBgYGBgYGBgYGBAAAAAAAAgYKCgoKCgoKCgQAAAAAAAIGCgoKCgoKCgoEAAAAAAACBgoKCgoKCgYKBAAAAAAAAgYKCgoKCgoGCgQAAAAAAAIGCgoKCgoKCgoEAAAAAAACBgYGBgYGBgYGBAAAAAACBgYGBgYGBgYGBgYEAAAAAgYKCgoKCgoKCgoKBAAAAAIGCgoKCgoKCgoKCgQAAAACBgoKCgoKCgoKCgoEAAAAAgYGBgYGBgYGBgYGBAAAAAACBgYEAAAAAgYGBAAAAAAAAgYGBAAAAAIGBgQAAAAAAAIGBgQAAAACBgYEAAAAAAACBgYEAAAAAgYGBAAAAAQcATGF5ZXIgMQH/AAAAgYGBgYGBgYGBgQAAAAAAAIGCgoKCgoKCgoEAAAAAAACBgoKCgoKCgoKBAAAAAAAAgYKCgoKCgoGCgQAAAAAAAIGCgoKCgoKBgoEAAAAAAACBgoKCgoKCgoKBAAAAAAAAgYGBgYGBgYGBgQAAAAAAgYGBgYGBgYGBgYGBAAAAAIGCgoKCgoKCgoKCgQAAAACBgoKCgoKCgoKCgoEAAAAAgYKCgoKCgoKCgoKBAAAAAIGBgYGBgYGBgYGBgQAAAAAAAIGBgQAAAIGBgQAAAAAAAACBgYEAAACBgYEAAAAAAAAAgYGBAAAAgYGBAAAAAAAAAIGBgQAAAIGBgQAAAAEHAExheWVyIDEB/wAAAIGBgYGBgYGBgYEAAAAAAACBgYGBgYGBgYGBAAAAAAAAgYGBgYGBgYGBgQAAAAAAAIGCgoKCgoKCgoEAAAAAAACBgoKCgoKCgoKBAAAAAAAAgYKCgoKCgoKCgQAAAAAAAIGBgYGBgYGBgYEAAAAAAIGBgYGBgYGBgYGBgQAAAACBgoKCgoKCgoKCgoEAAAAAgYKCgoKCgoKCgoKBAAAAAIGCgoKCgoKCgoKCgQAAAACBgYGBgYGBgYGBgYEAAAAAAACBgYEAAIGBgQAAAAAAAAAAgYGBAACBgYEAAAAAAAAAAIGBgQAAgYGBAAAAAAAAAACBgYEAAIGBgQAAAAABBwBMYXllciAxAf8AAACBgYGBgYGBgYGBAAAAAAAAgYGBgYGBgYGBgQAAAAAAAIGBgYGBgYGBgYEAAAAAAACBgoKCgoKCgoKBAAAAAAAAgYKCgoKCgoKCgQAAAAAAAIGCgoKCgoKCgoEAAAAAAACBgYGBgYGBgYGBAAAAAACBgYGBgYGBgYGBgYEAAAAAgYKCgoKCgoKCgoKBAAAAAIGCgoKCgoKCgoKCgQAAAACBgoKCgoKCgoKCgoEAAAAAgYGBgYGBgYGBgYGBAAAAAACBgYEAAAAAgYGBAAAAAAAAgYGBAAAAAIGBgQAAAAAAAIGBgQAAAACBgYEAAAAAAACBgYEAAAAAgYGBAAAAAQcATGF5ZXIgMQH/AAAAgYGBgYGBgYGBgQAAAAAAAIGBgYGBgYGBgYEAAAAAAACBgYGBgYGBgYGBAAAAAAAAgYKCgoKCgoKCgQAAAAAAAIGCgoKCgoKCgoEAAAAAAACBgoKCgoKCgoKBAAAAAAAAgYGBgYGBgYGBgQAAAAAAgYGBgYGBgYGBgYGBAAAAAIGCgoKCgoKCgoKCgQAAAACBgoKCgoKCgoKCgoEAAAAAgYKCgoKCgoKCgoKBAAAAAIGBgYGBgYGBgYGBgQAAAAAAAIGBgQAAAIGBgQAAAAAAAACBgYEAAACBgYEAAAAAAAAAgYGBAAAAgYGBAAAAAAAAAIGBgQAAAIGBgQAAAA=="
+          }
+        }
+      ],
+      "maps": [],
+      "playUnits": [
+        {
+          "id": "pu_character_walk_field",
+          "type": "playUnit",
+          "name": "Field",
+          "objects": [
+            {
+              "id": "obj_root",
+              "name": "Root",
+              "enabled": true,
+              "parentId": null,
+              "children": [
+                "obj_camera",
+                "obj_settings"
+              ],
+              "components": []
+            },
+            {
+              "id": "obj_camera",
+              "name": "CameraObject",
+              "enabled": true,
+              "parentId": "obj_root",
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Camera",
+                  "enabled": true,
+                  "data": {
+                    "zoom": 2,
+                    "viewportX": 0,
+                    "viewportY": 0,
+                    "viewportWidth": 0,
+                    "viewportHeight": 0,
+                    "followTargetObjectId": "obj_player",
+                    "followLerp": 0.15
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_settings",
+              "name": "PlaySettingsObject",
+              "enabled": true,
+              "parentId": "obj_root",
+              "children": [],
+              "components": [
+                {
+                  "type": "PlaySettings",
+                  "enabled": true,
+                  "data": {
+                    "defaultCameraObjectId": "obj_camera"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "ground",
+              "name": "Ground",
+              "enabled": true,
+              "parentId": null,
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 640,
+                    "height": 480,
+                    "fillAlpha": 1,
+                    "strokeWidth": 0,
+                    "strokeAlpha": 0,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "fillColor": "#e8e8e8"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "pebble_0",
+              "name": "Pebble0",
+              "enabled": true,
+              "parentId": null,
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 96,
+                    "y": 80,
+                    "z": 2,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 8,
+                    "height": 6,
+                    "fillAlpha": 1,
+                    "strokeWidth": 0,
+                    "strokeAlpha": 0,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "fillColor": "#8a8a8a"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "pebble_1",
+              "name": "Pebble1",
+              "enabled": true,
+              "parentId": null,
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 224,
+                    "y": 150,
+                    "z": 2,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 8,
+                    "height": 6,
+                    "fillAlpha": 1,
+                    "strokeWidth": 0,
+                    "strokeAlpha": 0,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "fillColor": "#8a8a8a"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "pebble_2",
+              "name": "Pebble2",
+              "enabled": true,
+              "parentId": null,
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 400,
+                    "y": 60,
+                    "z": 2,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 8,
+                    "height": 6,
+                    "fillAlpha": 1,
+                    "strokeWidth": 0,
+                    "strokeAlpha": 0,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "fillColor": "#8a8a8a"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "pebble_3",
+              "name": "Pebble3",
+              "enabled": true,
+              "parentId": null,
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 512,
+                    "y": 210,
+                    "z": 2,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 8,
+                    "height": 6,
+                    "fillAlpha": 1,
+                    "strokeWidth": 0,
+                    "strokeAlpha": 0,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "fillColor": "#8a8a8a"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "pebble_4",
+              "name": "Pebble4",
+              "enabled": true,
+              "parentId": null,
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 160,
+                    "y": 330,
+                    "z": 2,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 8,
+                    "height": 6,
+                    "fillAlpha": 1,
+                    "strokeWidth": 0,
+                    "strokeAlpha": 0,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "fillColor": "#8a8a8a"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "pebble_5",
+              "name": "Pebble5",
+              "enabled": true,
+              "parentId": null,
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 352,
+                    "y": 380,
+                    "z": 2,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 8,
+                    "height": 6,
+                    "fillAlpha": 1,
+                    "strokeWidth": 0,
+                    "strokeAlpha": 0,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "fillColor": "#8a8a8a"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "pebble_6",
+              "name": "Pebble6",
+              "enabled": true,
+              "parentId": null,
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 560,
+                    "y": 400,
+                    "z": 2,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 8,
+                    "height": 6,
+                    "fillAlpha": 1,
+                    "strokeWidth": 0,
+                    "strokeAlpha": 0,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "fillColor": "#8a8a8a"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "pebble_7",
+              "name": "Pebble7",
+              "enabled": true,
+              "parentId": null,
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 96,
+                    "y": 420,
+                    "z": 2,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 8,
+                    "height": 6,
+                    "fillAlpha": 1,
+                    "strokeWidth": 0,
+                    "strokeAlpha": 0,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "fillColor": "#8a8a8a"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_player",
+              "name": "Player",
+              "enabled": true,
+              "parentId": null,
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 320,
+                    "y": 240,
+                    "z": 10,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Controller",
+                  "enabled": true,
+                  "data": {
+                    "inputMode": "player1",
+                    "moveSpeed": 120
+                  }
+                },
+                {
+                  "type": "Character",
+                  "enabled": true,
+                  "data": {
+                    "characterChipsetId": "cc_character_walk_hero",
+                    "scale": 2,
+                    "origin": {
+                      "x": 0.5,
+                      "y": 1
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "session": {
+    "projectId": "proj_character_walk_demo",
+    "dirty": false,
+    "currentScene": "title",
+    "activeDocumentRef": {
+      "type": null,
+      "id": null
+    },
+    "editorState": {
+      "activeTool": "pencil",
+      "foreColor": 4278190080,
+      "backColor": 4294967295,
+      "editMode": "free",
+      "selectedChip": {
+        "col": 0,
+        "row": 0
+      }
+    }
+  }
+}

@@ -15,6 +15,8 @@ class ChipPalette {
   static CELL_SIZE = 32;     // サムネイル1チップのスクリーン表示サイズ (px)
   static GAP       = 2;      // チップ間の間隔 (px)
   static LABEL_H   = 18;     // 下部ラベル（選択チップ座標）の高さ
+  static HEADER_H  = 14;     // キャラクターチップセット: 上部の列見出し（立ち / 歩きA / 歩きB）
+  static HEADER_W  = 22;     // キャラクターチップセット: 左側の行見出し（下 / 左 / 右 / 上）
 
   // ---- スタイル定数 ----
   static BORDER_SELECTED = '#7ab0ff';
@@ -76,10 +78,21 @@ class ChipPalette {
       };
     }
     const td = appData.tilesetData;
+    const offset = this._headerOffsets(appData);
     return {
-      w: PADDING * 2 + td.columns * CELL_SIZE + Math.max(0, td.columns - 1) * GAP,
-      h: PADDING * 2 + td.rows * CELL_SIZE + Math.max(0, td.rows - 1) * GAP + LABEL_H,
+      w: offset.left + PADDING * 2 + td.columns * CELL_SIZE + Math.max(0, td.columns - 1) * GAP,
+      h: offset.top + PADDING * 2 + td.rows * CELL_SIZE + Math.max(0, td.rows - 1) * GAP + LABEL_H,
     };
+  }
+
+  /**
+   * 見出し用の余白。キャラクターチップセット編集時のみ確保する。
+   * @param {AppData} appData
+   * @returns {{ left: number, top: number }}
+   */
+  _headerOffsets(appData) {
+    if (!CharacterChipset.isEditing(appData)) return { left: 0, top: 0 };
+    return { left: ChipPalette.HEADER_W, top: ChipPalette.HEADER_H };
   }
 
   // ----------------------------------------------------------------
@@ -106,12 +119,19 @@ class ChipPalette {
 
     const td  = appData.tilesetData;
     const sel = appData.selectedChip;
+    const offset = this._headerOffsets(appData);
+    const ox = x + offset.left;
+    const oy = y + offset.top;
+
+    if (CharacterChipset.isEditing(appData)) {
+      this._drawCharacterHeaders(ctx, ox, oy, td);
+    }
 
     // ---- チップサムネイル格子描画 ----
     for (let r = 0; r < td.rows; r++) {
       for (let c = 0; c < td.columns; c++) {
-        const cx = x + PADDING + c * (CELL_SIZE + GAP);
-        const cy = y + PADDING + r * (CELL_SIZE + GAP);
+        const cx = ox + PADDING + c * (CELL_SIZE + GAP);
+        const cy = oy + PADDING + r * (CELL_SIZE + GAP);
 
         this._cells.push({ x: cx, y: cy, w: CELL_SIZE, h: CELL_SIZE, col: c, row: r });
 
@@ -126,6 +146,7 @@ class ChipPalette {
 
         // 通過フラグ表示（× マーク = 通過不可）
         if (appData.showPassFlags !== false &&
+            !CharacterChipset.isEditing(appData) &&
             td.passFlags && td.passFlags[r] && td.passFlags[r][c] === false) {
           ctx.save();
           ctx.strokeStyle = 'rgba(255, 60, 60, 0.7)';
@@ -158,7 +179,7 @@ class ChipPalette {
     }
 
     // ---- 下部ラベル: 選択チップ座標 + タイルインデックス ----
-    const labelY = y + PADDING + td.rows * (CELL_SIZE + GAP) + 2;
+    const labelY = oy + PADDING + td.rows * (CELL_SIZE + GAP) + 2;
 
     ctx.font         = TEXT_FONT;
     ctx.fillStyle    = TEXT_COLOR;
@@ -174,6 +195,37 @@ class ChipPalette {
     // リセット
     ctx.textAlign    = 'left';
     ctx.textBaseline = 'alphabetic';
+  }
+
+  /**
+   * キャラクターチップセットの列見出し（フレーム）と行見出し（向き）を描画する。
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {number} ox  格子の左上 X
+   * @param {number} oy  格子の左上 Y
+   * @param {TilesetData} td
+   */
+  _drawCharacterHeaders(ctx, ox, oy, td) {
+    const { PADDING, CELL_SIZE, GAP, HEADER_H, HEADER_W, TEXT_COLOR, TEXT_FONT } = ChipPalette;
+    ctx.save();
+    ctx.font         = TEXT_FONT;
+    ctx.fillStyle    = TEXT_COLOR;
+    ctx.textBaseline = 'middle';
+
+    ctx.textAlign = 'center';
+    CharacterChipset.FRAME_LABELS.forEach((label, c) => {
+      if (c >= td.columns) return;
+      const cx = ox + PADDING + c * (CELL_SIZE + GAP) + CELL_SIZE / 2;
+      ctx.fillText(label, cx, oy - HEADER_H / 2);
+    });
+
+    ctx.textAlign = 'right';
+    CharacterChipset.DIRECTION_LABELS.forEach((label, r) => {
+      if (r >= td.rows) return;
+      const cy = oy + PADDING + r * (CELL_SIZE + GAP) + CELL_SIZE / 2;
+      ctx.fillText(label, ox - 4, cy);
+    });
+
+    ctx.restore();
   }
 
   /**

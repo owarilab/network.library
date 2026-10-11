@@ -246,6 +246,7 @@ class PlayUnitEditorScene extends Scene {
       { label: '+Camera', action: () => this._addComponentToSelectedObject('Camera'), disabled: !hasAsset },
       { label: '+Controller', action: () => this._addComponentToSelectedObject('Controller'), disabled: !hasAsset },
       { label: '+Image', action: () => this._addComponentToSelectedObject('Image'), disabled: !hasAsset },
+      { label: '+Character', action: () => this._addCharacterToSelectedObject(), disabled: !hasAsset },
       { label: '+Rectangle', action: () => this._addComponentToSelectedObject('Rectangle'), disabled: !hasAsset },
       { label: '+Triangle', action: () => this._addShapeComponent('triangle'), disabled: !hasAsset },
       { label: '+Star', action: () => this._addShapeComponent('star'), disabled: !hasAsset },
@@ -471,6 +472,68 @@ class PlayUnitEditorScene extends Scene {
       : `Added image object: ${objectData.name}`);
   }
 
+  _addCharacterToSelectedObject() {
+    const objectData = this._getSelectedObject();
+    if (!objectData) {
+      this._statusTone = 'error';
+      this._statusMessage = 'Select an object first';
+      return;
+    }
+
+    if (objectData.findComponentByType('Character')) {
+      this._statusTone = 'error';
+      this._statusMessage = `Character already exists on ${objectData.name || objectData.id}`;
+      return;
+    }
+
+    const selectedChipset = this._promptCharacterChipsetSelection();
+    if (selectedChipset === false) return;
+
+    const data = this._createComponentTemplate('Character');
+    data.characterChipsetId = selectedChipset?.id || '';
+    objectData.addComponent({ type: 'Character', data });
+    this._markDirty(`Added Character to ${objectData.name || objectData.id}`);
+  }
+
+  _promptCharacterChipsetSelection() {
+    const chipsets = Array.isArray(this._appData?.currentProject?.assets?.characterChipsets)
+      ? this._appData.currentProject.assets.characterChipsets
+      : [];
+    if (!chipsets.length) {
+      this._statusTone = 'error';
+      this._statusMessage = 'No characterChipset assets available';
+      return false;
+    }
+
+    if (chipsets.length === 1) {
+      return chipsets[0];
+    }
+
+    const optionsText = chipsets
+      .map((chipset, index) => `${index + 1}: ${chipset.name || 'character'} (${chipset.id})`)
+      .join('\n');
+    const nextValue = window.prompt(
+      `Select characterChipset for Character\n${optionsText}\nEnter number or asset id`,
+      '1'
+    );
+    if (nextValue == null) return false;
+
+    const trimmed = nextValue.trim();
+    if (!trimmed) return chipsets[0];
+
+    const selectedByIndex = Number.parseInt(trimmed, 10);
+    if (Number.isFinite(selectedByIndex) && selectedByIndex >= 1 && selectedByIndex <= chipsets.length) {
+      return chipsets[selectedByIndex - 1];
+    }
+
+    const selectedById = chipsets.find((chipset) => chipset?.id === trimmed) || null;
+    if (selectedById) return selectedById;
+
+    this._statusTone = 'error';
+    this._statusMessage = 'characterChipset selection was invalid';
+    return false;
+  }
+
   _promptPixelDocumentSelection() {
     const pixelDocuments = Array.isArray(this._appData?.currentProject?.assets?.pixelDocuments)
       ? this._appData.currentProject.assets.pixelDocuments
@@ -648,6 +711,12 @@ class PlayUnitEditorScene extends Scene {
         return {
           inputMode: 'player1',
           moveSpeed: 120,
+        };
+      case 'Character':
+        return {
+          characterChipsetId: '',
+          scale: 1,
+          origin: { x: 0.5, y: 1 },
         };
       case 'Collider':
         return {

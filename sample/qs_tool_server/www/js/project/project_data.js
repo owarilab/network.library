@@ -18,11 +18,12 @@ class ProjectData {
 
     /**
      * 保存対象アセット群。
-     * @type {{ pixelDocuments: object[], tilesets: object[], maps: object[], playUnits: object[] }}
+     * @type {{ pixelDocuments: object[], tilesets: object[], characterChipsets: object[], maps: object[], playUnits: object[] }}
      */
     this.assets = {
       pixelDocuments: [],
       tilesets: [],
+      characterChipsets: [],
       maps: [],
       playUnits: [],
     };
@@ -265,6 +266,18 @@ class ProjectData {
   }
 
   /**
+   * キャラクターチップセットを追加する。
+   * @param {{ id?: string, name?: string, chipWidth?: number, chipHeight?: number, tilesetData?: TilesetData|null }} [characterChipset]
+   * @returns {object}
+   */
+  addCharacterChipset(characterChipset = {}) {
+    const asset = this._normalizeCharacterChipset(characterChipset);
+    this.assets.characterChipsets.push(asset);
+    this.touch();
+    return asset;
+  }
+
+  /**
    * マップを追加する。
    * @param {{ id?: string, name?: string, width?: number, height?: number, mapData?: object|null }} [map]
    * @returns {object}
@@ -300,6 +313,8 @@ class ProjectData {
         return this.findPixelDocumentById(ref.id);
       case 'tileset':
         return this.findTilesetById(ref.id);
+      case 'characterChipset':
+        return this.findCharacterChipsetById(ref.id);
       case 'map':
         return this.findMapById(ref.id);
       case 'playUnit':
@@ -323,6 +338,14 @@ class ProjectData {
    */
   findTilesetById(id) {
     return this.assets.tilesets.find(tileset => tileset.id === id) || null;
+  }
+
+  /**
+   * @param {string} id
+   * @returns {object|null}
+   */
+  findCharacterChipsetById(id) {
+    return this.assets.characterChipsets.find(chipset => chipset.id === id) || null;
   }
 
   /**
@@ -370,6 +393,24 @@ class ProjectData {
       columns: this._normalizeSize(tileset.columns, 1),
       rows: this._normalizeSize(tileset.rows, 1),
       tilesetData: tileset.tilesetData || null,
+    };
+  }
+
+  /**
+   * @param {{ id?: string, name?: string, chipWidth?: number, chipHeight?: number, tilesetData?: TilesetData|null }} characterChipset
+   * @returns {object}
+   */
+  _normalizeCharacterChipset(characterChipset) {
+    const chipWidth = this._normalizeSize(characterChipset.chipWidth, this.settings.defaultChipWidth);
+    const chipHeight = this._normalizeSize(characterChipset.chipHeight, this.settings.defaultChipHeight);
+    return {
+      id: this._normalizeId(characterChipset.id, 'cc'),
+      type: 'characterChipset',
+      name: this._normalizeName(characterChipset.name, 'character'),
+      chipWidth,
+      chipHeight,
+      layout: CharacterChipset.createLayout(),
+      tilesetData: characterChipset.tilesetData || CharacterChipset.createTilesetData(chipWidth, chipHeight),
     };
   }
 

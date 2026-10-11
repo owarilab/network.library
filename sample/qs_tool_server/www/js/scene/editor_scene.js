@@ -67,7 +67,7 @@ class EditorScene extends Scene {
           : 0x00000000;
         this._appData.saveActiveProjectAssetState();
         this._appData.tilesetData  = new TilesetData(chipW, chipH, cols, rows, fillColor);
-        this._appData.editMode     = 'tileset';
+        this._enterTilesetMode('standard');
         this._appData.selectedChip = { col: 0, row: 0 };
         this._appData.clearSelection();
         this._createProjectTileset(`tileset_${chipW}x${chipH}_${cols}x${rows}`);
@@ -76,6 +76,23 @@ class EditorScene extends Scene {
         console.log(`[EditorScene] new tileset: ${chipW}x${chipH} chip, ${cols}x${rows} grid, bg=${bgColor}`);
       },
       () => console.log('[EditorScene] new tileset dialog cancelled'),
+    );
+
+    /** キャラクターチップセット新規作成ダイアログ @type {NewCharacterChipsetDialog} */
+    this._newCharacterChipsetDialog = new NewCharacterChipsetDialog(
+      (chipW, chipH) => {
+        if (!this._appData) return;
+        this._appData.saveActiveProjectAssetState();
+        this._appData.tilesetData  = CharacterChipset.createTilesetData(chipW, chipH);
+        this._enterTilesetMode('characterChipset');
+        this._appData.selectedChip = { col: 0, row: 0 };
+        this._appData.clearSelection();
+        this._createProjectCharacterChipset(`character_${chipW}x${chipH}`);
+        this._pixelCanvas.resetView();
+        this._pixelCanvas.markDirty();
+        console.log(`[EditorScene] new character chipset: ${chipW}x${chipH} chip, 3x4 frames`);
+      },
+      () => console.log('[EditorScene] new character chipset dialog cancelled'),
     );
 
     /** カラーパレットウィンドウ (EditablePalette32 コンテンツ) @type {ColorPaletteWindow} */
@@ -150,6 +167,11 @@ class EditorScene extends Scene {
     this._tilePreviewWin = new TilePreviewWindow();
     /** タイルプレビュー表示フラグ */
     this._tilePreviewVisible = true;
+
+    /** キャラクタープレビューウィンドウ @type {CharacterPreviewWindow} */
+    this._characterPreviewWin = new CharacterPreviewWindow();
+    /** キャラクタープレビュー表示フラグ */
+    this._characterPreviewVisible = true;
     this._chipPaletteWin.onChipSelect = (col, row) => {
       if (!this._appData) return;
       const prev = this._appData.selectedChip;
@@ -173,6 +195,7 @@ class EditorScene extends Scene {
     };
     this._chipPaletteWin.onChipContextMenu = (col, row, screenX, screenY) => {
       if (!this._appData || !this._appData.tilesetData) return;
+      if (CharacterChipset.isEditing(this._appData)) return;
       if (!this._appData.showPassFlags) return;
       const td = this._appData.tilesetData;
       if (row < 0 || row >= td.rows || col < 0 || col >= td.columns) return;
@@ -253,7 +276,7 @@ class EditorScene extends Scene {
         if (!this._appData || !this._pendingImportPd) return;
         const td = PixelDataConverter.tilesetFromPixelData(this._pendingImportPd, chipW, chipH);
         this._appData.tilesetData  = td;
-        this._appData.editMode     = 'tileset';
+        this._enterTilesetMode('standard');
         this._appData.selectedChip = { col: 0, row: 0 };
         this._pixelCanvas.resetView();
         this._pixelCanvas.markDirty();
@@ -321,7 +344,7 @@ class EditorScene extends Scene {
               console.log(`[EditorScene] single-chip QTS imported as free mode: ${file.name}`);
             } else {
               this._appData.tilesetData  = result.tilesetData;
-              this._appData.editMode     = 'tileset';
+              this._enterTilesetMode('standard');
               this._appData.selectedChip = { col: 0, row: 0 };
               this._appData.clearSelection();
               this._registerImportedTileset(file.name, result.tilesetData, this._appData.palette);
@@ -333,7 +356,7 @@ class EditorScene extends Scene {
           } else if (result instanceof TilesetData) {
             // v2 タイルセット JSON
             this._appData.tilesetData  = result;
-            this._appData.editMode     = 'tileset';
+            this._enterTilesetMode('standard');
             this._appData.selectedChip = { col: 0, row: 0 };
             this._appData.clearSelection();
             this._pixelCanvas.resetView();
@@ -371,7 +394,7 @@ class EditorScene extends Scene {
         PixelDataConverter.importFromQts(file)
           .then(result => {
             this._appData.tilesetData  = result.tilesetData;
-            this._appData.editMode     = 'tileset';
+            this._enterTilesetMode('standard');
             this._appData.selectedChip = { col: 0, row: 0 };
             this._appData.clearSelection();
             // パレットを復元
@@ -395,7 +418,7 @@ class EditorScene extends Scene {
           .then(result => {
             if (result instanceof TilesetData) {
               this._appData.tilesetData  = result;
-              this._appData.editMode     = 'tileset';
+              this._enterTilesetMode('standard');
               this._appData.selectedChip = { col: 0, row: 0 };
               this._appData.clearSelection();
               this._pixelCanvas.resetView();
@@ -428,6 +451,10 @@ class EditorScene extends Scene {
       }
       if (id === MenuConstants.FILE_NEW_TILESET) {
         this._newTilesetDialog.show();
+        return;
+      }
+      if (id === MenuConstants.FILE_NEW_CHARACTER_CHIPSET) {
+        this._newCharacterChipsetDialog.show();
         return;
       }
       if (id === MenuConstants.FILE_OPEN) {
@@ -618,6 +645,7 @@ class EditorScene extends Scene {
       }
       if (id === MenuConstants.TILESET_ADD_ROW) {
         if (this._appData.editMode !== 'tileset' || !this._appData.tilesetData) return;
+        if (CharacterChipset.isEditing(this._appData)) return;
         this._appData.tilesetData.addRow();
         this._pixelCanvas.markDirty();
         console.log(`[EditorScene] row added: now ${this._appData.tilesetData.rows} rows`);
@@ -625,6 +653,7 @@ class EditorScene extends Scene {
       }
       if (id === MenuConstants.TILESET_ADD_COL) {
         if (this._appData.editMode !== 'tileset' || !this._appData.tilesetData) return;
+        if (CharacterChipset.isEditing(this._appData)) return;
         this._appData.tilesetData.addColumn();
         this._pixelCanvas.markDirty();
         console.log(`[EditorScene] column added: now ${this._appData.tilesetData.columns} cols`);
@@ -632,6 +661,7 @@ class EditorScene extends Scene {
       }
       if (id === MenuConstants.TILESET_REMOVE_ROW) {
         if (this._appData.editMode !== 'tileset' || !this._appData.tilesetData) return;
+        if (CharacterChipset.isEditing(this._appData)) return;
         const td = this._appData.tilesetData;
         td.removeRow();
         // 選択チップが範囲外になった場合の補正
@@ -644,6 +674,7 @@ class EditorScene extends Scene {
       }
       if (id === MenuConstants.TILESET_REMOVE_COL) {
         if (this._appData.editMode !== 'tileset' || !this._appData.tilesetData) return;
+        if (CharacterChipset.isEditing(this._appData)) return;
         const td = this._appData.tilesetData;
         td.removeColumn();
         // 選択チップが範囲外になった場合の補正
@@ -652,6 +683,20 @@ class EditorScene extends Scene {
         }
         this._pixelCanvas.markDirty();
         console.log(`[EditorScene] column removed: now ${td.columns} cols`);
+        return;
+      }
+
+      if (id === MenuConstants.TILESET_CHARACTER_MIRROR_RIGHT_TO_LEFT) {
+        if (!CharacterChipset.isEditing(this._appData)) return;
+        if (!window.confirm('左向き（2行目）を右向きの反転で上書きします。よろしいですか？')) return;
+        CharacterChipset.mirrorDirection(this._appData.tilesetData, 'right', 'left');
+        this._pixelCanvas.markDirty();
+        console.log('[EditorScene] character chipset: right mirrored to left');
+        return;
+      }
+      if (id === MenuConstants.TILESET_CHARACTER_PREVIEW) {
+        this._characterPreviewVisible = !this._characterPreviewVisible;
+        console.log(`[EditorScene] character preview: ${this._characterPreviewVisible ? 'show' : 'hide'}`);
         return;
       }
 
@@ -684,6 +729,7 @@ class EditorScene extends Scene {
       if (this._quarterViewTileDialog.isVisible) { this._quarterViewTileDialog.onKeyDown(e); return; }
       if (this._newFileDialog.isVisible)        { this._newFileDialog.onKeyDown(e);        return; }
       if (this._newTilesetDialog.isVisible)     { this._newTilesetDialog.onKeyDown(e);     return; }
+      if (this._newCharacterChipsetDialog.isVisible) { this._newCharacterChipsetDialog.onKeyDown(e); return; }
       if (this._importTilesetDialog.isVisible)  { this._importTilesetDialog.onKeyDown(e);  return; }
       if (this._saveDialog.isVisible)           { this._saveDialog.onKeyDown(e);           return; }
       if (key === ' ') {
@@ -773,6 +819,7 @@ class EditorScene extends Scene {
       this._quarterViewTileDialog.onMouseMove(e);
       this._newFileDialog.onMouseMove(e);
       this._newTilesetDialog.onMouseMove(e);
+      this._newCharacterChipsetDialog.onMouseMove(e);
       this._importTilesetDialog.onMouseMove(e);
       this._saveDialog.onMouseMove(e);
       this._colorPickerDialog.onMouseMove(e);
@@ -781,7 +828,8 @@ class EditorScene extends Scene {
       this._layerPanelWin.onMouseMove(e, appData);
       this._chipPaletteWin.onMouseMove(e, appData);
       if (this._tilePreviewVisible) this._tilePreviewWin.onMouseMove(e, appData);
-      if (!this._newFileDialog.isVisible && !this._newTilesetDialog.isVisible && !this._importTilesetDialog.isVisible) {
+      if (this._characterPreviewVisible) this._characterPreviewWin.onMouseMove(e, appData);
+      if (!this._newFileDialog.isVisible && !this._newTilesetDialog.isVisible && !this._newCharacterChipsetDialog.isVisible && !this._importTilesetDialog.isVisible) {
         this._menuBar.onMouseMove(e);
         if (this._spaceDown) {
           // パンモード: ドラッグ中なら位置を更新
@@ -795,6 +843,7 @@ class EditorScene extends Scene {
       if (this._quarterViewTileDialog.isVisible && !this._colorPickerDialog.isVisible) { this._quarterViewTileDialog.onMouseDown(e); return; }
       if (this._newFileDialog.isVisible)        { this._newFileDialog.onMouseDown(e);        return; }
       if (this._newTilesetDialog.isVisible)     { this._newTilesetDialog.onMouseDown(e);     return; }
+      if (this._newCharacterChipsetDialog.isVisible) { this._newCharacterChipsetDialog.onMouseDown(e); return; }
       if (this._importTilesetDialog.isVisible)  { this._importTilesetDialog.onMouseDown(e);  return; }
       if (this._saveDialog.isVisible)           { this._saveDialog.onMouseDown(e);           return; }
       if (this._colorPickerDialog.isVisible)    { this._colorPickerDialog.onMouseDown(e);    return; }
@@ -813,6 +862,7 @@ class EditorScene extends Scene {
         // UIWindow 群(ツールバーまたはパレット)が消費した場合はピクセル操作に渡さない
         const consumed = this._chipPaletteWin.onMouseDown(e, appData) ||
                          (this._tilePreviewVisible && this._tilePreviewWin.onMouseDown(e, appData)) ||
+                         (this._characterPreviewVisible && this._characterPreviewWin.onMouseDown(e, appData)) ||
                          this._colorPaletteWin.onMouseDown(e, appData) ||
                          this._toolBarWin.onMouseDown(e, appData) ||
                          this._layerPanelWin.onMouseDown(e, appData);
@@ -829,6 +879,7 @@ class EditorScene extends Scene {
       if (this._quarterViewTileDialog.isVisible && !this._colorPickerDialog.isVisible) { this._quarterViewTileDialog.onMouseUp(e); return; }
       if (this._newFileDialog.isVisible)        { this._newFileDialog.onMouseUp(e);        return; }
       if (this._newTilesetDialog.isVisible)     { this._newTilesetDialog.onMouseUp(e);     return; }
+      if (this._newCharacterChipsetDialog.isVisible) { this._newCharacterChipsetDialog.onMouseUp(e); return; }
       if (this._importTilesetDialog.isVisible)  { this._importTilesetDialog.onMouseUp(e);  return; }
       if (this._saveDialog.isVisible)           { this._saveDialog.onMouseUp(e);           return; }
       if (this._colorPickerDialog.isVisible)    { this._colorPickerDialog.onMouseUp(e);    return; }
@@ -842,11 +893,12 @@ class EditorScene extends Scene {
       this._layerPanelWin.onMouseUp(e, appData);
       this._chipPaletteWin.onMouseUp(e, appData);
       if (this._tilePreviewVisible) this._tilePreviewWin.onMouseUp(e, appData);
+      if (this._characterPreviewVisible) this._characterPreviewWin.onMouseUp(e, appData);
       this._menuBar.onMouseUp(e);
       this._pixelCanvas.onMouseUp(e, appData);
     };
     this._onWheel = e => {
-      if (this._quarterViewTileDialog.isVisible || this._newFileDialog.isVisible || this._newTilesetDialog.isVisible || this._importTilesetDialog.isVisible || this._saveDialog.isVisible || this._colorPickerDialog.isVisible) return;
+      if (this._quarterViewTileDialog.isVisible || this._newFileDialog.isVisible || this._newTilesetDialog.isVisible || this._newCharacterChipsetDialog.isVisible || this._importTilesetDialog.isVisible || this._saveDialog.isVisible || this._colorPickerDialog.isVisible) return;
       this._pixelCanvas.zoom(-e.deltaY, e.x, e.y);
     };
     this._onContextMenu = e => {
@@ -910,10 +962,20 @@ class EditorScene extends Scene {
       return;
     }
 
-    if (asset.type === 'tileset' && asset.tilesetData) {
+    if ((asset.type === 'tileset' || asset.type === 'characterChipset') && asset.tilesetData) {
       const selectedChip = appData.projectSession?.editorState?.selectedChip || { col: 0, row: 0 };
-      appData.setTilesetData(asset.tilesetData, selectedChip);
+      const kind = asset.type === 'characterChipset' ? 'characterChipset' : 'standard';
+      appData.setTilesetData(asset.tilesetData, selectedChip, kind);
     }
+  }
+
+  /**
+   * tileset モードへ入る。種別（standard / characterChipset）もここで設定し、取り残しを防ぐ。
+   * @param {'standard'|'characterChipset'} kind
+   */
+  _enterTilesetMode(kind = 'standard') {
+    this._appData.tilesetKind = kind;
+    this._appData.editMode = 'tileset';
   }
 
   _registerImportedPixelDocument(filename, layerData, palette) {
@@ -962,6 +1024,22 @@ class EditorScene extends Scene {
     });
     asset.palette = this._appData.palette?.clone?.() || null;
     this._appData.projectSession.setActiveDocument('tileset', asset.id);
+    this._appData.projectSession.markDirty();
+    this._appData.syncEditorStateToProjectSession();
+  }
+
+  _createProjectCharacterChipset(name) {
+    if (!this._appData?.currentProject || !this._appData.projectSession || !this._appData.tilesetData) return;
+
+    const tilesetData = this._appData.tilesetData;
+    const asset = this._appData.currentProject.addCharacterChipset({
+      name: this._basenameWithoutExtension(name, 'character'),
+      chipWidth: tilesetData.chipWidth,
+      chipHeight: tilesetData.chipHeight,
+      tilesetData,
+    });
+    asset.palette = this._appData.palette?.clone?.() || null;
+    this._appData.projectSession.setActiveDocument('characterChipset', asset.id);
     this._appData.projectSession.markDirty();
     this._appData.syncEditorStateToProjectSession();
   }
@@ -1027,12 +1105,18 @@ class EditorScene extends Scene {
       this._tilePreviewWin.render(ctx, canvas, appData);
     }
 
+    // キャラクタープレビューウィンドウ (キャラクターチップセット編集時のみ表示)
+    if (this._characterPreviewVisible) {
+      this._characterPreviewWin.render(ctx, canvas, appData);
+    }
+
     // カラーパレットウィンドウ (ダイアログより前、ピクセルキャンバスの上)
     this._colorPaletteWin.render(ctx, canvas, appData);
 
     // ダイアログ（メニューバーより前、オーバーレイがメニューを覆う）
     this._newFileDialog.render(ctx, canvas);
     this._newTilesetDialog.render(ctx, canvas);
+    this._newCharacterChipsetDialog.render(ctx, canvas);
     this._importTilesetDialog.render(ctx, canvas);
     this._saveDialog.render(ctx, canvas);
     this._quarterViewTileDialog.render(ctx, canvas);

@@ -3,6 +3,13 @@
  * Transform + Text の最小描画確認用シーン。
  */
 class PlayTestScene extends Scene {
+  static DIRECTION_BY_KEY = {
+    ArrowLeft: 'left', KeyA: 'left',
+    ArrowRight: 'right', KeyD: 'right',
+    ArrowUp: 'up', KeyW: 'up',
+    ArrowDown: 'down', KeyS: 'down',
+  };
+
   constructor() {
     super();
     this._appData = null;
@@ -11,6 +18,12 @@ class PlayTestScene extends Scene {
     this._cameraState = null;
     this._previewRect = null;
     this._imageCanvasCache = new Map();
+    /** 実行用コピー。key: アセット ID, value: PlayUnitData（PlayTest セッション中のみ保持） */
+    this._runtimeUnits = new Map();
+    /** プレイヤーの向きと歩行状態。key: `${unitId}/${objectId}` */
+    this._playerControllers = new Map();
+    /** キャラクターのフレーム画像キャッシュ。key: `${chipsetId}:${direction}:${frameIndex}` */
+    this._chipCanvasCache = new Map();
     this._pointerState = {
       canvasX: 0,
       canvasY: 0,
@@ -47,8 +60,8 @@ class PlayTestScene extends Scene {
   onEnter(input, appData) {
     this._input = input;
     this._appData = appData;
-    const activePlayUnit = appData?.activateStartupPlayUnit?.() || appData?.getActiveProjectAsset?.();
-    this._runtime = PlayUnitRuntime.fromPlayUnit(activePlayUnit, appData);
+    appData?.activateStartupPlayUnit?.();
+    this._runtime = PlayUnitRuntime.fromPlayUnit(this._getActiveRuntimePlayUnit(), appData);
     this._cameraState = this._createCameraState(this._runtime?.camera);
     input.on('keydown', this._onKeyDown);
     input.on('keyup', this._onKeyUp);
@@ -60,6 +73,9 @@ class PlayTestScene extends Scene {
   onLeave() {
     this._pressedKeys.clear();
     this._imageCanvasCache.clear();
+    this._runtimeUnits.clear();
+    this._playerControllers.clear();
+    this._chipCanvasCache.clear();
     this._pointerState.hoveredTriggerMap.clear();
     this._pointerState.pressedTriggerKeys.clear();
     this._pointerState.pressedDragHits.dragStart = null;
@@ -174,6 +190,10 @@ class PlayTestScene extends Scene {
           this._drawRectangleEntry(ctx, entry);
           continue;
         }
+        if (entry.kind === 'character') {
+          this._drawCharacterEntry(ctx, entry, project);
+          continue;
+        }
         this._drawTextEntry(ctx, entry);
       }
       ctx.restore();
@@ -203,8 +223,8 @@ class PlayTestScene extends Scene {
       this._cameraState = null;
     }
 
-    const playUnit = this._appData?.getActiveProjectAsset?.();
-    if (!playUnit || playUnit.type !== 'playUnit') return;
+    const playUnit = this._getActiveRuntimePlayUnit();
+    if (!playUnit) return;
 
     this._applyControllerMovement(dt, playUnit);
 
@@ -255,7 +275,7 @@ class PlayTestScene extends Scene {
   }
 
   _applyControllerMovement(dt, playUnit) {
-    if (!playUnit || !Array.isArray(playUnit.objects) || !this._pressedKeys.size) return;
+    if (!playUnit || !Array.isArray(playUnit.objects)) return;
 
     let moveX = 0;
     let moveY = 0;
@@ -263,12 +283,20 @@ class PlayTestScene extends Scene {
     if (this._pressedKeys.has('ArrowRight') || this._pressedKeys.has('KeyD')) moveX += 1;
     if (this._pressedKeys.has('ArrowUp') || this._pressedKeys.has('KeyW')) moveY -= 1;
     if (this._pressedKeys.has('ArrowDown') || this._pressedKeys.has('KeyS')) moveY += 1;
-    if (!moveX && !moveY) return;
+    const moving = moveX !== 0 || moveY !== 0;
+
+    // Set は挿入順なので、最後に見つかった方向キーが直近に押したキー
+    let facing = null;
+    for (const code of this._pressedKeys) {
+      const direction = PlayTestScene.DIRECTION_BY_KEY[code];
+      if (direction) facing = direction;
+    }
 
     const magnitude = Math.hypot(moveX, moveY) || 1;
     const normalizedX = moveX / magnitude;
     const normalizedY = moveY / magnitude;
-    const deltaSeconds = Number.isFinite(Number(dt)) && Number(dt) > 0 ? Number(dt) / 1000 : 1 / 60;
+    const deltaMs = Number.isFinite(Number(dt)) && Number(dt) > 0 ? Number(dt) : 1000 / 60;
+    const deltaSeconds = deltaMs / 1000;
 
     for (const objectData of playUnit.objects) {
       if (!objectData || objectData.enabled === false) continue;
@@ -280,6 +308,10 @@ class PlayTestScene extends Scene {
         ? controller.data.inputMode.trim()
         : 'player1';
       if (inputMode !== 'player1') continue;
+
+      const playerController = this._getPlayerController(playUnit, objectData);
+      playerController.update(deltaMs, moving, moving ? facing : null);
+      if (!moving) continue;
 
       const moveSpeed = Number.isFinite(Number(controller.data?.moveSpeed)) && Number(controller.data.moveSpeed) > 0
         ? Number(controller.data.moveSpeed)
@@ -472,8 +504,8 @@ class PlayTestScene extends Scene {
     const camera = this._runtime?.camera;
     if (!camera?.followTargetObjectId) return;
 
-    const playUnit = this._appData?.getActiveProjectAsset?.();
-    if (!playUnit || playUnit.type !== 'playUnit' || typeof playUnit.findObjectById !== 'function') return;
+    const playUnit = this._getActiveRuntimePlayUnit();
+    if (!playUnit || typeof playUnit.findObjectById !== 'function') return;
 
     const targetObject = playUnit.findObjectById(camera.followTargetObjectId);
     const targetTransform = targetObject?.findComponentByType?.('Transform') || null;
@@ -691,6 +723,109 @@ class PlayTestScene extends Scene {
     ctx.restore();
   }
 
+  /**
+   * 編集中のアセットではなく、PlayTest 用の実行用コピーを返す。
+   * 初回に作成し、セッション中は同じコピーを使う。
+   * @returns {PlayUnitData|null}
+   */
+  _getActiveRuntimePlayUnit() {
+    const asset = this._appData?.getActiveProjectAsset?.();
+    if (!asset || asset.type !== 'playUnit') return null;
+    if (!this._runtimeUnits.has(asset.id)) {
+      this._runtimeUnits.set(asset.id, PlayTestScene._createRuntimeCopy(asset));
+    }
+    return this._runtimeUnits.get(asset.id);
+  }
+
+  /**
+   * アセットの実行用コピーを作る。アセット本体は変更しない。
+   * PlayUnitData のメソッドを保つため PlayUnitData.from を使い、data は深くコピーする。
+   * @param {PlayUnitData} asset
+   * @returns {PlayUnitData}
+   */
+  static _createRuntimeCopy(asset) {
+    const copy = PlayUnitData.from(asset);
+    copy.id = asset.id;
+    copy.type = 'playUnit';
+    copy.name = asset.name;
+    for (const objectData of copy.objects) {
+      for (const component of objectData.components) {
+        component.data = ProjectData._cloneJsonLikeValue(component.data);
+      }
+    }
+    return copy;
+  }
+
+  /**
+   * @param {PlayUnitData} playUnit  実行用コピー
+   * @param {PlayObjectData} objectData
+   * @returns {PlayerController}
+   */
+  _getPlayerController(playUnit, objectData) {
+    const key = `${playUnit.id}/${objectData.id}`;
+    if (!this._playerControllers.has(key)) {
+      this._playerControllers.set(key, new PlayerController());
+    }
+    return this._playerControllers.get(key);
+  }
+
+  _drawCharacterEntry(ctx, entry, project) {
+    const chipset = project?.findCharacterChipsetById?.(entry.characterChipsetId) || null;
+    if (!chipset?.tilesetData) return;
+
+    const unitId = this._getActiveRuntimePlayUnit()?.id || '';
+    const playerController = this._playerControllers.get(`${unitId}/${entry.objectId}`) || null;
+    const direction = playerController?.direction || 'down';
+    const frameIndex = playerController ? playerController.getFrameIndex() : 0;
+
+    const sourceCanvas = this._getChipCanvas(chipset, direction, frameIndex);
+    if (!sourceCanvas) return;
+
+    const drawWidth = sourceCanvas.width * entry.scale;
+    const drawHeight = sourceCanvas.height * entry.scale;
+    const drawX = entry.x - drawWidth * entry.originX;
+    const drawY = entry.y - drawHeight * entry.originY;
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(sourceCanvas, drawX, drawY, drawWidth, drawHeight);
+    ctx.restore();
+  }
+
+  /**
+   * 向きとフレームに対応するチップ画像を canvas にして返す（キャッシュ付き）。
+   * @param {{ id: string, tilesetData: TilesetData }} chipset
+   * @param {string} direction
+   * @param {number} frameIndex
+   * @returns {HTMLCanvasElement|null}
+   */
+  _getChipCanvas(chipset, direction, frameIndex) {
+    const key = `${chipset.id}:${direction}:${frameIndex}`;
+    if (this._chipCanvasCache.has(key)) return this._chipCanvasCache.get(key);
+
+    const pixelData = CharacterChipset.getFrameLayerData(chipset.tilesetData, direction, frameIndex)?.composite?.() || null;
+    if (!pixelData?.pixels || !pixelData.width || !pixelData.height) return null;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = pixelData.width;
+    canvas.height = pixelData.height;
+    const canvasCtx = canvas.getContext('2d');
+    const imageData = canvasCtx.createImageData(pixelData.width, pixelData.height);
+    const data = imageData.data;
+    const pixels = pixelData.pixels;
+    for (let i = 0; i < pixels.length; i++) {
+      const c = pixels[i];
+      const j = i * 4;
+      data[j] = (c >>> 16) & 0xFF;
+      data[j + 1] = (c >>> 8) & 0xFF;
+      data[j + 2] = c & 0xFF;
+      data[j + 3] = (c >>> 24) & 0xFF;
+    }
+    canvasCtx.putImageData(imageData, 0, 0);
+    this._chipCanvasCache.set(key, canvas);
+    return canvas;
+  }
+
   _drawImageEntry(ctx, entry, project) {
     const pixelDocument = project?.findPixelDocumentById?.(entry.pixelDocumentId) || null;
     const layerData = pixelDocument?.layerData || null;
@@ -882,7 +1017,10 @@ class PlayTestScene extends Scene {
     const rectangleEntries = Array.isArray(runtime?.rectangleEntries)
       ? runtime.rectangleEntries.map((entry) => ({ ...entry, kind: 'rectangle' }))
       : [];
-    return [...imageEntries, ...textEntries, ...rectangleEntries].sort((a, b) => {
+    const characterEntries = Array.isArray(runtime?.characterEntries)
+      ? runtime.characterEntries.map((entry) => ({ ...entry, kind: 'character' }))
+      : [];
+    return [...imageEntries, ...characterEntries, ...textEntries, ...rectangleEntries].sort((a, b) => {
       if (a.z !== b.z) return a.z - b.z;
       return (a.order || 0) - (b.order || 0);
     });
@@ -1054,8 +1192,8 @@ class PlayTestScene extends Scene {
   }
 
   _getPointerTriggerHits() {
-    const playUnit = this._appData?.getActiveProjectAsset?.();
-    if (!this._pointerState.insidePreview || !playUnit || playUnit.type !== 'playUnit' || !Array.isArray(playUnit.objects)) {
+    const playUnit = this._getActiveRuntimePlayUnit();
+    if (!this._pointerState.insidePreview || !playUnit || !Array.isArray(playUnit.objects)) {
       return [];
     }
 

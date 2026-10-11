@@ -75,6 +75,13 @@ class AppData {
     this.tilesetData = null;
 
     /**
+     * tileset モードで編集中のアセット種別。
+     * editMode は 'tileset' のまま、種別はここで持つ。
+     * @type {'standard'|'characterChipset'}
+     */
+    this.tilesetKind = 'standard';
+
+    /**
      * タイルセットモード時の選択中チップ位置。
      * @type {{ col: number, row: number }}
      */
@@ -830,9 +837,10 @@ class AppData {
    * @param {{ col?: number, row?: number }} [selectedChip]
    * @returns {boolean}
    */
-  setTilesetData(tilesetData, selectedChip = null) {
+  setTilesetData(tilesetData, selectedChip = null, kind = 'standard') {
     if (!tilesetData) return false;
     this.tilesetData = this._cloneTilesetData(tilesetData);
+    this.tilesetKind = kind === 'characterChipset' ? 'characterChipset' : 'standard';
     this.editMode = 'tileset';
     this.selectedChip = {
       col: selectedChip?.col | 0,
@@ -904,7 +912,7 @@ class AppData {
       asset.width = this._layerData.width;
       asset.height = this._layerData.height;
       asset.layerData = this._cloneLayerData(this._layerData);
-    } else if (asset.type === 'tileset' && this.tilesetData) {
+    } else if ((asset.type === 'tileset' || asset.type === 'characterChipset') && this.tilesetData) {
       asset.chipWidth = this.tilesetData.chipWidth;
       asset.chipHeight = this.tilesetData.chipHeight;
       asset.columns = this.tilesetData.columns;

@@ -23,6 +23,7 @@ class PlayUnitRuntime {
       zoom: 1,
     };
     this.imageEntries = [];
+    this.characterEntries = [];
     this.textEntries = [];
     this.rectangleEntries = [];
     this.uiEntries = [];
@@ -43,6 +44,7 @@ class PlayUnitRuntime {
     const imageEntries = [];
     const textEntries = [];
     const rectangleEntries = [];
+    const characterEntries = [];
     for (let index = 0; index < objects.length; index++) {
       const objectData = objects[index];
       if (!objectData || objectData.enabled === false) continue;
@@ -64,6 +66,25 @@ class PlayUnitRuntime {
             keepAspect: image.data?.keepAspect !== false,
             originX: PlayUnitRuntime._normalizeUnitInterval(image.data?.originX, 0),
             originY: PlayUnitRuntime._normalizeUnitInterval(image.data?.originY, 0),
+            x: Number.isFinite(Number(transform.data?.x)) ? Number(transform.data.x) : 0,
+            y: Number.isFinite(Number(transform.data?.y)) ? Number(transform.data.y) : 0,
+            z: Number.isFinite(Number(transform.data?.z)) ? Number(transform.data.z) : 0,
+            order: index,
+          });
+        }
+      }
+
+      const character = PlayUnitRuntime._findEnabledComponent(objectData, 'Character');
+      if (character) {
+        const characterChipsetId = typeof character.data?.characterChipsetId === 'string' ? character.data.characterChipsetId.trim() : '';
+        if (characterChipsetId) {
+          characterEntries.push({
+            objectId: objectData.id || '',
+            objectName: objectData.name || 'Object',
+            characterChipsetId,
+            scale: PlayUnitRuntime._normalizePositiveNumber(character.data?.scale, 1),
+            originX: PlayUnitRuntime._normalizeUnitInterval(character.data?.origin?.x, 0.5),
+            originY: PlayUnitRuntime._normalizeUnitInterval(character.data?.origin?.y, 1),
             x: Number.isFinite(Number(transform.data?.x)) ? Number(transform.data.x) : 0,
             y: Number.isFinite(Number(transform.data?.y)) ? Number(transform.data.y) : 0,
             z: Number.isFinite(Number(transform.data?.z)) ? Number(transform.data.z) : 0,
@@ -138,6 +159,10 @@ class PlayUnitRuntime {
       return a.order - b.order;
     });
     runtime.rectangleEntries = rectangleEntries.sort((a, b) => {
+      if (a.z !== b.z) return a.z - b.z;
+      return a.order - b.order;
+    });
+    runtime.characterEntries = characterEntries.sort((a, b) => {
       if (a.z !== b.z) return a.z - b.z;
       return a.order - b.order;
     });

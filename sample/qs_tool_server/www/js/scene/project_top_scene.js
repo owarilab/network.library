@@ -54,9 +54,10 @@ class ProjectTopScene extends Scene {
     ctx.font = '15px sans-serif';
     const docCount = project ? project.assets.pixelDocuments.length : 0;
     const tilesetCount = project ? project.assets.tilesets.length : 0;
+    const characterCount = project ? (project.assets.characterChipsets || []).length : 0;
     const mapCount = project ? project.assets.maps.length : 0;
     const playUnitCount = project ? (project.assets.playUnits || []).length : 0;
-    ctx.fillText(`Pixel Docs: ${docCount}  /  Tilesets: ${tilesetCount}  /  Maps: ${mapCount}  /  PlayUnits: ${playUnitCount}`, centerX, topY + 34);
+    ctx.fillText(`Pixel Docs: ${docCount}  /  Tilesets: ${tilesetCount}  /  Characters: ${characterCount}  /  Maps: ${mapCount}  /  PlayUnits: ${playUnitCount}`, centerX, topY + 34);
 
     ctx.fillStyle = '#64748b';
     ctx.font = '13px sans-serif';
@@ -205,6 +206,8 @@ class ProjectTopScene extends Scene {
     const { x, y, w, h } = item.rect;
     const accent = item.asset.type === 'tileset'
       ? '#f59e0b'
+      : item.asset.type === 'characterChipset'
+        ? '#a3e635'
       : item.asset.type === 'map'
         ? '#38bdf8'
         : item.asset.type === 'playUnit'
@@ -226,6 +229,8 @@ class ProjectTopScene extends Scene {
     ctx.fillText(
       item.asset.type === 'tileset'
         ? 'TILESET'
+        : item.asset.type === 'characterChipset'
+          ? 'CHARACTER'
         : item.asset.type === 'map'
           ? 'MAP'
           : item.asset.type === 'playUnit'
@@ -285,6 +290,7 @@ class ProjectTopScene extends Scene {
     return [
       ...(project.assets.pixelDocuments || []),
       ...(project.assets.tilesets || []),
+      ...(project.assets.characterChipsets || []),
       ...(project.assets.maps || []),
       ...(project.assets.playUnits || []),
     ];
@@ -294,6 +300,9 @@ class ProjectTopScene extends Scene {
     if (!asset) return '';
     if (asset.type === 'tileset') {
       return `${asset.columns | 0}x${asset.rows | 0} chips / ${asset.chipWidth | 0}x${asset.chipHeight | 0}px`;
+    }
+    if (asset.type === 'characterChipset') {
+      return `3x4 frames / ${asset.chipWidth | 0}x${asset.chipHeight | 0}px`;
     }
     if (asset.type === 'map') {
       return `${asset.width | 0}x${asset.height | 0} cells`;

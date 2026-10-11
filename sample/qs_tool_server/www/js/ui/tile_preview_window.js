@@ -60,7 +60,7 @@ class TilePreviewWindow extends UIWindow {
     this._appDataRef = appData;
 
     // タイルセットモードでなければ描画しない
-    if (!appData || appData.editMode !== 'tileset' || !appData.tilesetData) return;
+    if (!appData || appData.editMode !== 'tileset' || !appData.tilesetData || appData.tilesetKind === 'characterChipset') return;
 
     // 初回: チップパレットの下方に配置
     if (!this._positioned && canvas.width > 0) {
@@ -78,7 +78,7 @@ class TilePreviewWindow extends UIWindow {
    * @override
    */
   onMouseDown(e, appData) {
-    if (!appData || appData.editMode !== 'tileset' || !appData.tilesetData) return false;
+    if (!appData || appData.editMode !== 'tileset' || !appData.tilesetData || appData.tilesetKind === 'characterChipset') return false;
     return super.onMouseDown(e, appData);
   }
 
@@ -87,7 +87,7 @@ class TilePreviewWindow extends UIWindow {
    * @override
    */
   onMouseMove(e, appData) {
-    if (!appData || appData.editMode !== 'tileset' || !appData.tilesetData) return;
+    if (!appData || appData.editMode !== 'tileset' || !appData.tilesetData || appData.tilesetKind === 'characterChipset') return;
     super.onMouseMove(e, appData);
   }
 }

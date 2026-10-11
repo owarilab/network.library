@@ -25,6 +25,7 @@ One playUnit with one camera.
     "assets": {
       "pixelDocuments": [],
       "tilesets": [],
+      "characterChipsets": [],
       "maps": [],
       "playUnits": [
         {
@@ -297,6 +298,7 @@ A minimal project that verifies `user.fixed` / `user.persistent` runtime access.
     "assets": {
       "pixelDocuments": [],
       "tilesets": [],
+      "characterChipsets": [],
       "maps": [],
       "playUnits": [
         {
@@ -363,6 +365,7 @@ Text components can use `${variable_path}` syntax to dynamically display global 
     "assets": {
       "pixelDocuments": [],
       "tilesets": [],
+      "characterChipsets": [],
       "maps": [],
       "playUnits": [
         {
