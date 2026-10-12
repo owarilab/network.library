@@ -333,6 +333,16 @@ www/
 - 検証（Playwright）: 保存と再読込の画素一致、.qsproj 往復、Save As の参照、反転、PlayTest の4方向移動・歩行サイクル・停止時の立ち、斜めの向き、PlayUnit 切替の往復（アセット不変、セッション中の状態保持）、エディタの +Character。
 - 未対応: キャラクターチップの PNG / JSON / QTS 取り込み、Undo、Collider の offset（origin を足元中央にしたとき当たり判定と見た目がずれる）、NPC・壁の衝突、PlayTest の要約表示への Character 件数追加。
 
+### タイルマップの実行時描画と通行判定（P0-1）
+
+- ランタイム: `play_unit/tilemap_runtime.js`（`TilemapRuntime`）。`Tilemap` コンポーネント（`mapAssetId` / `layerId` / `scale` 1〜8 の整数 / `offsetX` / `offsetY`）を `PlayUnitRuntime.tilemapEntries` に解決し、PlayTest で描画する。
+- 描画: タイルセット全体を 1 枚の canvas（アトラス）にキャッシュし、見えているセルだけ `drawImage` する。セルの端は整数座標に丸めて継ぎ目を防ぐ。
+- 通行判定: 通過フラグ `false` のチップを置いたセルを塞ぐ。マップ外も通行不可。`_moveWithTilemapCollision` は X 軸・Y 軸を別々に 1px 単位で進め、塞がれた軸だけ止める（壁沿いに滑る）。移動前から塞がれている位置からは、閉じ込められないよう移動を許可する。
+- エディタ: PlayUnit エディタの `+Tilemap`（マップ選択 → 倍率入力）。JSON 編集では `scale` を 1〜8 の整数に丸める。
+- デモ: `tools/add_tilemap_to_character_demo.py` が `assets/character_walk_demo.qsproj` に 32×32 タイルセット（草・道・壁・水）と 50×50 マップ（外周は壁）を追加する。再実行しても結果は同じ。
+- 検証（Playwright）: 通過フラグ・マップ・外周の壁の読込、PlayTest の描画（倍率 1 と 2）、4 方向の停止位置（外周の壁の手前）、斜め入力での壁沿いの滑り、池の手前での停止、Tilemap が無い場合の移動、アセット本体の不変、`+Tilemap` の追加と重複・倍率の検証、存在しない `layerId` で描画・判定が無いこと。
+- 未対応: コライダ同士の押し戻し、NPC・オブジェクトとの衝突、プレイヤーより手前に描くレイヤー、マップエディタのレイヤー追加 UI、カメラのマップ範囲への clamp、タイルセットの列数変更で既存マップのタイル index がずれる問題（既存の制約）。
+
 ---
 
 ## TODO リスト
@@ -580,9 +590,9 @@ www/
 
 #### PlayUnit Runtime 拡張
 
-- [ ] **Tilemap Component の参照解決**
-  - Map asset との link
-  - PlayTest での map 描画
+- [x] **Tilemap Component の参照解決**
+  - Map asset との link（`mapAssetId`）
+  - PlayTest での map 描画と通過フラグによる通行判定（詳細は「タイルマップの実行時描画と通行判定」）
 
 - [ ] **Trigger Event 実行本体**
   - ログ表示のみから、実際の event 処理へ
@@ -726,7 +736,7 @@ pixel_data.js → pixel_data_converter.js → layer_data.js → app_data.js → 
 → tool_bar.js → tool_bar_window.js
 → layer_panel.js → layer_panel_window.js
 → tileset_data.js → character/character_chipset.js → quarter_view_tile_generator.js
-→ play_unit/player_controller.js
+→ play_unit/player_controller.js → play_unit/tilemap_runtime.js
 → scene.js → scene_manager.js → editor_scene.js
 → canvas_manager.js
 → インラインスクリプト（起動）

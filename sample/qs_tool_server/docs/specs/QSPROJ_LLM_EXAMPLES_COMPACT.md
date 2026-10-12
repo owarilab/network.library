@@ -249,6 +249,30 @@ Task:
 Create a small scene with a title text and one clickable button that changes the title text.
 ```
 
+## Example 7: Tilemap Field (reference only)
+
+A `Tilemap` component needs a `maps` entry and a `tilesets` entry. The tileset `storage.data` is QTS base64 (passability is encoded per pixel), so do not write it by hand. Use the reference script:
+
+```bash
+python3 -I tools/add_tilemap_to_character_demo.py assets/character_walk_demo.qsproj
+```
+
+The map object shape used by the PlayUnit:
+
+```json
+{
+  "id": "obj_field_map",
+  "name": "FieldMap",
+  "enabled": true,
+  "parentId": null,
+  "children": [],
+  "components": [
+    { "type": "Transform", "enabled": true, "data": { "x": 0, "y": 0, "z": 0, "rotation": 0, "scaleX": 1, "scaleY": 1 } },
+    { "type": "Tilemap", "enabled": true, "data": { "mapAssetId": "map_demo_field", "layerId": "", "scale": 1, "offsetX": 0, "offsetY": 0 } }
+  ]
+}
+```
+
 ## Example 5: What to Avoid
 
 Bad patterns:

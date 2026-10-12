@@ -250,7 +250,7 @@ class PlayUnitEditorScene extends Scene {
       { label: '+Rectangle', action: () => this._addComponentToSelectedObject('Rectangle'), disabled: !hasAsset },
       { label: '+Triangle', action: () => this._addShapeComponent('triangle'), disabled: !hasAsset },
       { label: '+Star', action: () => this._addShapeComponent('star'), disabled: !hasAsset },
-      { label: '+Tilemap', action: () => this._addComponentToSelectedObject('Tilemap'), disabled: !hasAsset },
+      { label: '+Tilemap', action: () => this._addTilemapToSelectedObject(), disabled: !hasAsset },
       { label: '+Settings', action: () => this._addComponentToSelectedObject('PlaySettings'), disabled: !hasAsset },
       { label: '+Text', action: () => this._addComponentToSelectedObject('Text'), disabled: !hasAsset },
       { label: '+Trigger', action: () => this._addComponentToSelectedObject('Trigger'), disabled: !hasAsset },
@@ -495,6 +495,91 @@ class PlayUnitEditorScene extends Scene {
     this._markDirty(`Added Character to ${objectData.name || objectData.id}`);
   }
 
+  _addTilemapToSelectedObject() {
+    const objectData = this._getSelectedObject();
+    if (!objectData) {
+      this._statusTone = 'error';
+      this._statusMessage = 'Select an object first';
+      return;
+    }
+
+    if (objectData.findComponentByType('Tilemap')) {
+      this._statusTone = 'error';
+      this._statusMessage = `Tilemap already exists on ${objectData.name || objectData.id}`;
+      return;
+    }
+
+    const selectedMap = this._promptMapSelection();
+    if (selectedMap === false) return;
+
+    const scale = this._promptTilemapScale();
+    if (scale === false) return;
+
+    const data = this._createComponentTemplate('Tilemap');
+    data.mapAssetId = selectedMap?.id || '';
+    data.scale = scale;
+    objectData.addComponent({ type: 'Tilemap', data });
+    this._markDirty(`Added Tilemap to ${objectData.name || objectData.id}`);
+  }
+
+  _promptMapSelection() {
+    const maps = Array.isArray(this._appData?.currentProject?.assets?.maps)
+      ? this._appData.currentProject.assets.maps
+      : [];
+    if (!maps.length) {
+      this._statusTone = 'error';
+      this._statusMessage = 'No map assets available';
+      return false;
+    }
+
+    if (maps.length === 1) {
+      return maps[0];
+    }
+
+    const optionsText = maps
+      .map((map, index) => `${index + 1}: ${map.name || 'map'} (${map.id})`)
+      .join('\n');
+    const nextValue = window.prompt(
+      `Select map for Tilemap\n${optionsText}\nEnter number or asset id`,
+      '1'
+    );
+    if (nextValue == null) return false;
+
+    const trimmed = nextValue.trim();
+    if (!trimmed) return maps[0];
+
+    const selectedByIndex = Number.parseInt(trimmed, 10);
+    if (Number.isFinite(selectedByIndex) && selectedByIndex >= 1 && selectedByIndex <= maps.length) {
+      return maps[selectedByIndex - 1];
+    }
+
+    const selectedById = maps.find((map) => map?.id === trimmed) || null;
+    if (selectedById) return selectedById;
+
+    this._statusTone = 'error';
+    this._statusMessage = 'map selection was invalid';
+    return false;
+  }
+
+  /**
+   * @returns {number|false} 1〜8 の整数。キャンセルや不正値は false
+   */
+  _promptTilemapScale() {
+    const nextValue = window.prompt('Tilemap scale (integer 1-8)', '1');
+    if (nextValue == null) return false;
+
+    const trimmed = nextValue.trim();
+    if (!trimmed) return 1;
+
+    const scale = Number(trimmed);
+    if (!Number.isInteger(scale) || scale < 1 || scale > 8) {
+      this._statusTone = 'error';
+      this._statusMessage = 'Tilemap scale must be an integer 1-8';
+      return false;
+    }
+    return scale;
+  }
+
   _promptCharacterChipsetSelection() {
     const chipsets = Array.isArray(this._appData?.currentProject?.assets?.characterChipsets)
       ? this._appData.currentProject.assets.characterChipsets
@@ -692,6 +777,9 @@ class PlayUnitEditorScene extends Scene {
         return {
           mapAssetId: '',
           layerId: '',
+          scale: 1,
+          offsetX: 0,
+          offsetY: 0,
         };
       case 'PlaySettings':
         return {
@@ -856,8 +944,24 @@ class PlayUnitEditorScene extends Scene {
       return;
     }
 
-    component.data = { ...parsed };
+    component.data = type === 'Tilemap' ? PlayUnitEditorScene._normalizeTilemapData(parsed) : { ...parsed };
     this._markDirty(`Updated ${type} data on ${objectData.name || objectData.id}`);
+  }
+
+  /**
+   * Tilemap の JSON 編集結果を実行時に解釈できる形に揃える（scale は 1〜8 の整数）。
+   * @param {object} data
+   * @returns {object}
+   */
+  static _normalizeTilemapData(data) {
+    return {
+      ...data,
+      mapAssetId: typeof data.mapAssetId === 'string' ? data.mapAssetId.trim() : '',
+      layerId: typeof data.layerId === 'string' ? data.layerId.trim() : '',
+      scale: PlayUnitRuntime._normalizeTilemapScale(data.scale),
+      offsetX: Number.isFinite(Number(data.offsetX)) ? Number(data.offsetX) : 0,
+      offsetY: Number.isFinite(Number(data.offsetY)) ? Number(data.offsetY) : 0,
+    };
   }
 
   _getSelectedObject() {

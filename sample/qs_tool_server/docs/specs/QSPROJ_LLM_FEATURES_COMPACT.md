@@ -96,6 +96,23 @@ Required for almost all objects.
 }
 ```
 
+### Tilemap
+
+Draws a `maps` asset in PlayTest. Cells whose tile has passable `false` block the Controller. Needs a map and its tileset in the project (see the tool script below).
+
+```json
+{
+  "type": "Tilemap",
+  "enabled": true,
+  "data": { "mapAssetId": "map_demo_field", "layerId": "", "scale": 1, "offsetX": 0, "offsetY": 0 }
+}
+```
+
+- `scale`: integer 1-8 (clamped). Cell size = tile chip size * scale.
+- `layerId`: empty = all visible layers.
+- Cells outside the map block movement.
+- Tilemap objects need a `Transform`. Position is the map's top-left.
+
 ### Camera
 
 Used on the main camera object.
@@ -267,7 +284,7 @@ Variable definition shape:
 
 1. Prefer one playUnit first.
 2. Prefer only these components: `Transform`, `Camera`, `PlaySettings`, `Text`, `Rectangle`, `Collider`, `Trigger`, `EventAction`.
-3. Keep `pixelDocuments`, `tilesets`, `characterChipsets`, and `maps` empty unless required.
+3. Keep `pixelDocuments`, `tilesets`, `characterChipsets`, and `maps` empty unless required. A `Tilemap` needs one map and its tileset; tileset `storage.data` is QTS base64, so copy `tools/add_tilemap_to_character_demo.py` instead of writing it by hand.
 4. Use short ASCII names.
 5. Reuse known good component shapes exactly.
 6. If unsure, copy the minimal camera object and one text object.

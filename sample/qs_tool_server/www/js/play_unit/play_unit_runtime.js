@@ -24,6 +24,7 @@ class PlayUnitRuntime {
     };
     this.imageEntries = [];
     this.characterEntries = [];
+    this.tilemapEntries = [];
     this.textEntries = [];
     this.rectangleEntries = [];
     this.uiEntries = [];
@@ -45,6 +46,7 @@ class PlayUnitRuntime {
     const textEntries = [];
     const rectangleEntries = [];
     const characterEntries = [];
+    const tilemapEntries = [];
     for (let index = 0; index < objects.length; index++) {
       const objectData = objects[index];
       if (!objectData || objectData.enabled === false) continue;
@@ -85,6 +87,26 @@ class PlayUnitRuntime {
             scale: PlayUnitRuntime._normalizePositiveNumber(character.data?.scale, 1),
             originX: PlayUnitRuntime._normalizeUnitInterval(character.data?.origin?.x, 0.5),
             originY: PlayUnitRuntime._normalizeUnitInterval(character.data?.origin?.y, 1),
+            x: Number.isFinite(Number(transform.data?.x)) ? Number(transform.data.x) : 0,
+            y: Number.isFinite(Number(transform.data?.y)) ? Number(transform.data.y) : 0,
+            z: Number.isFinite(Number(transform.data?.z)) ? Number(transform.data.z) : 0,
+            order: index,
+          });
+        }
+      }
+
+      const tilemap = PlayUnitRuntime._findEnabledComponent(objectData, 'Tilemap');
+      if (tilemap) {
+        const mapAssetId = typeof tilemap.data?.mapAssetId === 'string' ? tilemap.data.mapAssetId.trim() : '';
+        if (mapAssetId) {
+          tilemapEntries.push({
+            objectId: objectData.id || '',
+            objectName: objectData.name || 'Object',
+            mapAssetId,
+            layerId: typeof tilemap.data?.layerId === 'string' ? tilemap.data.layerId.trim() : '',
+            scale: PlayUnitRuntime._normalizeTilemapScale(tilemap.data?.scale),
+            offsetX: Number.isFinite(Number(tilemap.data?.offsetX)) ? Number(tilemap.data.offsetX) : 0,
+            offsetY: Number.isFinite(Number(tilemap.data?.offsetY)) ? Number(tilemap.data.offsetY) : 0,
             x: Number.isFinite(Number(transform.data?.x)) ? Number(transform.data.x) : 0,
             y: Number.isFinite(Number(transform.data?.y)) ? Number(transform.data.y) : 0,
             z: Number.isFinite(Number(transform.data?.z)) ? Number(transform.data.z) : 0,
@@ -163,6 +185,10 @@ class PlayUnitRuntime {
       return a.order - b.order;
     });
     runtime.characterEntries = characterEntries.sort((a, b) => {
+      if (a.z !== b.z) return a.z - b.z;
+      return a.order - b.order;
+    });
+    runtime.tilemapEntries = tilemapEntries.sort((a, b) => {
       if (a.z !== b.z) return a.z - b.z;
       return a.order - b.order;
     });
@@ -569,6 +595,17 @@ class PlayUnitRuntime {
   static _normalizePositiveNumber(value, fallback) {
     const nextValue = Number(value);
     return Number.isFinite(nextValue) && nextValue > 0 ? nextValue : fallback;
+  }
+
+  /**
+   * タイルマップの倍率を整数 1〜8 に丸める。数値として読めない場合は 1。
+   * @param {number|string|undefined|null} value
+   * @returns {number}
+   */
+  static _normalizeTilemapScale(value) {
+    const nextValue = Math.round(Number(value));
+    if (!Number.isFinite(nextValue)) return 1;
+    return Math.min(8, Math.max(1, nextValue));
   }
 
   /**

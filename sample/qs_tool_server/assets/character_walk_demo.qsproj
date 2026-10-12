@@ -6,7 +6,7 @@
     "version": 1,
     "name": "Character Walk Demo",
     "createdAt": 1791740863588,
-    "updatedAt": 1791740863588,
+    "updatedAt": 1791768994355,
     "settings": {
       "defaultChipWidth": 16,
       "defaultChipHeight": 16
@@ -30,7 +30,22 @@
     },
     "assets": {
       "pixelDocuments": [],
-      "tilesets": [],
+      "tilesets": [
+        {
+          "id": "ts_demo_field",
+          "type": "tileset",
+          "name": "Field Tiles",
+          "chipWidth": 32,
+          "chipHeight": 32,
+          "columns": 4,
+          "rows": 1,
+          "storage": {
+            "type": "embedded",
+            "codec": "qts-base64",
+            "data": "UVNUUwEAAAAgACAABAABAA8AAAAAHyk3//////9fqEr/P4o1/3zEXv/IpG7/qYVP/9y8jP+Kj5j/XGFr/7W6wv87gvb/HU7Y/5PF/f8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEHAExheWVyIDEB/4ODg4ODg4ODg4ODg4ODg4ODg4ODhYODg4ODhIOFg4OFg4ODhIODg4ODg4ODg4ODg4ODg4ODg4OEhYODg4SDg4ODg4SEhIODg4ODg4ODhIOFg4OEg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODhYODg4ODg4ODg4ODg4WDg4SDg4ODg4ODg4ODg4WDhYOEg4SDg4ODg4ODg4ODg4ODg4OEg4ODg4ODg4ODg4ODg4ODg4SDg4ODg4OFg4ODg4ODg4ODg4ODhIODg4ODg4ODg4ODg4ODg4ODhIODg4ODg4ODg4ODg4ODg4ODg4ODg4ODhIODg4OFg4ODg4ODg4ODg4ODg4ODg4ODhIODg4OEg4ODg4SDg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODhIODg4ODg4ODhIODg4ODhIODg4ODg4ODg4ODg4ODg4WDg4ODhIODg4ODg4ODg4OEg4ODg4ODg4SDhIODhIOFg4ODhIODg4ODhIODg4ODg4OFg4ODg4ODg4ODg4OEg4ODg4ODg4ODg4SDg4ODg4ODg4ODg4ODg4ODg4ODhIODg4SDg4ODg4ODg4ODg4SDg4ODg4WDhYODg4ODg4ODhYODhIODg4SDg4ODg4ODhYODg4ODg4ODhIODg4ODg4ODg4ODg4OEg4ODg4SDg4OFg4OFg4ODg4ODg4ODg4ODhIODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4SDg4ODg4ODg4ODg4OEg4ODg4ODg4SDg4SDg4OEg4ODg4ODg4ODg4ODg4WDg4ODg4ODg4ODg4ODg4ODg4OEg4ODhIODg4WDg4ODg4ODhIODg4ODg4ODg4OEg4ODhIODg4ODg4ODg4ODg4ODg4ODg4ODhIODg4ODg4ODg4SDg4ODg4ODg4OEg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4SFhIODg4ODg4ODhIODhIODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODhIODg4ODhYODhIODg4ODg4ODg4ODg4OFg4ODg4ODhIODg4ODg4ODg4ODg4ODg4ODg4ODg4OEg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODhIODg4ODg4ODg4ODhIODg4ODhYODg4SDhIODg4ODg4ODg4OEg4ODg4OEg4ODg4OEg4ODhIOFhIODhYSDg4ODg4ODg4ODg4ODg4ODg4OFg4ODg4ODg4SDg4ODg4ODg4ODg4ODg4WDg4ODg4ODg4ODhYSDg4ODg4ODg4ODhIODhIODg4ODhYODg4OEg4WDg4ODg4WDg4ODg4OFg4ODg4WDg4ODhYOFg4ODg4ODg4WDg4MBBwBMYXllciAxAf+GhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh4aGh4aGhoaGhoaGhoaGhoaHhoaGhoaGhoaGhoaGhoaGhoeHiIaGhoaGhoiGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaIhoaGhoaGhoaGhoaGhoaGhoaGhoaIhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoeGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGiIaGhoeGhoaGhoeGhoaGhoaGh4aGhoaGhoaGhoaGhoaIhoaGhoaGhoaGiIaGhoaGhoaGhoaGhoaGh4aGhoaGhoaGhoaGhoaGhoaGhoaGhoaGiIaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoiGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh4aGhoaGhoaGhoaGhoeGhoaGhoaGhoaGh4aHhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoeGhoaGh4aGhoaGhoaGhoaGhoaGhoaGhoaGhoaHhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaIhoaGh4aGhoaGhoaGhoaGhoaGhoeGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaIiIaGhoaGh4aGhoaGhoeGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGiIaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoiGhoaGh4aGhoiGhoaGhoaGhoaGhoaGhoaGiIaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaHhoaGhoaHhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaHhoaGhoaGhoeGhoeGhoaIhoaGhoaGhoaGhoaGh4aGhoaHhoaGhoaGhoeGhoaGhoaGh4aGhoaGh4aGhoaGhoaGhoaGhoaGh4aGhoaGiIaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoiGhoaGhoaGhoaGhoeGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh4aGhoaGhoaGhoaHhoaGhoaIhoaGhoaGhoaGhoaGhoeGhoeGh4aGhoiHhoaGhoaGhoeHhoeGhoeGhoaGhoaGhoaGhoaGiIaHhoaGhoaGiIaGhoaGhoaGhoaIhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGh4aIhoaGhoeGh4aHhoaGhoaGh4aGh4aGhoaGhoaGhoaGhoaGhoaGhoaGhoaIhoaGh4aGiIaGh4aGhoaGhoaGhoaGhoaGh4aGhoaHhoaGiIaGhoaGhoaGhoaGhoaGAQcATGF5ZXIgMQH/AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBCwkJCQkJCQkJCQkJCQkKCQsJCQkJCQkJCQkJCQkJAQEJCQkJCQkJCQkJCQkJCQoJCQkJCQkJCQkJCQkJCQkBAQkJCQkJCQkJCQkJCQkJCgkJCQkJCQkJCQkJCQkJCQEBCQkJCQkJCQkJCQkJCQkKCQkJCQkJCQkJCQkJCQkJAQEJCQkJCQkJCQkJCQkJCQoJCQkJCQkJCQkJCQkJCQkBAQkJCQkJCQkJCQkJCQkJCgkJCQkJCQkJCQkJCQkJCQEBCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKAQEJCQkJCQkKCQkJCQkJCQkJCQkJCQkJCgkJCQkJCQkBAQkJCQkJCQoJCwkJCQkJCQkJCQkJCQkKCQsJCQkJCQEBCQkJCQkJCgkJCQkJCQkJCQkJCQkJCQoJCQkJCQkJAQEJCQkJCQkKCQkJCQkJCQkJCQkJCQkJCgkJCQkJCQkBAQkJCQkJCQoJCQkJCQkJCQkJCQkJCQkKCQkJCQkJCQEBCQkJCQkJCgkJCQkJCQkJCQkJCQkJCQoJCQkJCQkJAQEJCQkJCQkKCQkJCQkJCQkJCQkJCQkJCgkJCQkJCQkBAQoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgEBCQkJCQkJCQkJCQkJCQkKCQkJCQkJCQkJCQkJCQkJAQELCQkJCQkJCQkJCQkJCQoJCwkJCQkJCQkJCQkJCQkBAQkJCQkJCQkJCQkJCQkJCgkJCQkJCQkJCQkJCQkJCQEBCQkJCQkJCQkJCQkJCQkKCQkJCQkJCQkJCQkJCQkJAQEJCQkJCQkJCQkJCQkJCQoJCQkJCQkJCQkJCQkJCQkBAQkJCQkJCQkJCQkJCQkJCgkJCQkJCQkJCQkJCQkJCQEBCQkJCQkJCQkJCQkJCQkKCQkJCQkJCQkJCQkJCQkJAQEKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoBAQkJCQkJCQoJCQkJCQkJCQkJCQkJCQkKCQkJCQkJCQEBCQkJCQkJCgkLCQkJCQkJCQkJCQkJCQoJCwkJCQkJAQEJCQkJCQkKCQkJCQkJCQkJCQkJCQkJCgkJCQkJCQkBAQkJCQkJCQoJCQkJCQkJCQkJCQkJCQkKCQkJCQkJCQEBCQkJCQkJCgkJCQkJCQkJCQkJCQkJCQoJCQkJCQkJAQEJCQkJCQkKCQkJCQkJCQkJCQkJCQkJCgkJCQkJCQkBAQkJCQkJCQoJCQkJCQkJCQkJCQkJCQkKCQkJCQkJCQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEHAExheWVyIDEB/wwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwODg4ODAwMDAwMDg4ODgwMDAwMDA4ODg4MDAwMDAwODg4ODg4MDAwMDAwODg4ODAwMDAwMDg4ODgwMDAwMDA4ODAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA0NDAwMDAwMDA0NDQ0NDAwMDAwMDA0NDQ0NDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwODg4ODAwMDAwMDg4ODgwMDAwMDA4ODg4MDAwMDAwMDA4ODg4MDAwMDAwODg4ODAwMDAwMDg4ODgwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwNDQwMDAwMDAwNDQ0NDQwMDAwMDAwNDQ0NDQwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA4ODg4MDAwMDAwODg4ODAwMDAwMDg4ODgwMDAwMDA4ODg4ODgwMDAwMDA4ODg4MDAwMDAwODg4ODAwMDAwMDg4MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDQ0MDAwMDAwMDQ0NDQ0MDAwMDAwMDQ0NDQ0MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA4ODg4MDAwMDAwODg4ODAwMDAwMDg4ODgwMDAwMDAwMDg4ODgwMDAwMDA4ODg4MDAwMDAwODg4ODAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA0NDAwMDAwMDA0NDQ0NDAwMDAwMDA0NDQ0NDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAw="
+          }
+        }
+      ],
       "characterChipsets": [
         {
           "id": "cc_character_walk_hero",
@@ -54,13 +69,136 @@
           }
         }
       ],
-      "maps": [],
+      "maps": [
+        {
+          "id": "map_demo_field",
+          "type": "map",
+          "name": "Field Map",
+          "width": 50,
+          "height": 50,
+          "mapData": {
+            "version": 1,
+            "width": 50,
+            "height": 50,
+            "tileWidth": 32,
+            "tileHeight": 32,
+            "tilesetId": "ts_demo_field",
+            "layers": [
+              {
+                "id": "layer_ground",
+                "name": "Ground",
+                "visible": true,
+                "locked": false,
+                "tiles": [
+                  2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2,
+                  2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+                  2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2
+                ]
+              }
+            ],
+            "selectedLayer": 0,
+            "selectedTileRef": {
+              "tilesetId": "ts_demo_field",
+              "col": 0,
+              "row": 0,
+              "index": 0
+            },
+            "cursor": {
+              "x": 0,
+              "y": 0
+            },
+            "view": {
+              "showGrid": true,
+              "zoom": 1
+            }
+          }
+        }
+      ],
       "playUnits": [
         {
           "id": "pu_character_walk_field",
           "type": "playUnit",
           "name": "Field",
           "objects": [
+            {
+              "id": "obj_field_map",
+              "name": "FieldMap",
+              "enabled": true,
+              "parentId": null,
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Tilemap",
+                  "enabled": true,
+                  "data": {
+                    "mapAssetId": "map_demo_field",
+                    "layerId": "",
+                    "scale": 1,
+                    "offsetX": 0,
+                    "offsetY": 0
+                  }
+                }
+              ]
+            },
             {
               "id": "obj_root",
               "name": "Root",
@@ -123,339 +261,6 @@
               ]
             },
             {
-              "id": "ground",
-              "name": "Ground",
-              "enabled": true,
-              "parentId": null,
-              "children": [],
-              "components": [
-                {
-                  "type": "Transform",
-                  "enabled": true,
-                  "data": {
-                    "x": 0,
-                    "y": 0,
-                    "z": 0,
-                    "rotation": 0,
-                    "scaleX": 1,
-                    "scaleY": 1
-                  }
-                },
-                {
-                  "type": "Rectangle",
-                  "enabled": true,
-                  "data": {
-                    "shape": "rectangle",
-                    "width": 640,
-                    "height": 480,
-                    "fillAlpha": 1,
-                    "strokeWidth": 0,
-                    "strokeAlpha": 0,
-                    "rotation": 0,
-                    "originX": 0,
-                    "originY": 0,
-                    "fillColor": "#e8e8e8"
-                  }
-                }
-              ]
-            },
-            {
-              "id": "pebble_0",
-              "name": "Pebble0",
-              "enabled": true,
-              "parentId": null,
-              "children": [],
-              "components": [
-                {
-                  "type": "Transform",
-                  "enabled": true,
-                  "data": {
-                    "x": 96,
-                    "y": 80,
-                    "z": 2,
-                    "rotation": 0,
-                    "scaleX": 1,
-                    "scaleY": 1
-                  }
-                },
-                {
-                  "type": "Rectangle",
-                  "enabled": true,
-                  "data": {
-                    "shape": "rectangle",
-                    "width": 8,
-                    "height": 6,
-                    "fillAlpha": 1,
-                    "strokeWidth": 0,
-                    "strokeAlpha": 0,
-                    "rotation": 0,
-                    "originX": 0,
-                    "originY": 0,
-                    "fillColor": "#8a8a8a"
-                  }
-                }
-              ]
-            },
-            {
-              "id": "pebble_1",
-              "name": "Pebble1",
-              "enabled": true,
-              "parentId": null,
-              "children": [],
-              "components": [
-                {
-                  "type": "Transform",
-                  "enabled": true,
-                  "data": {
-                    "x": 224,
-                    "y": 150,
-                    "z": 2,
-                    "rotation": 0,
-                    "scaleX": 1,
-                    "scaleY": 1
-                  }
-                },
-                {
-                  "type": "Rectangle",
-                  "enabled": true,
-                  "data": {
-                    "shape": "rectangle",
-                    "width": 8,
-                    "height": 6,
-                    "fillAlpha": 1,
-                    "strokeWidth": 0,
-                    "strokeAlpha": 0,
-                    "rotation": 0,
-                    "originX": 0,
-                    "originY": 0,
-                    "fillColor": "#8a8a8a"
-                  }
-                }
-              ]
-            },
-            {
-              "id": "pebble_2",
-              "name": "Pebble2",
-              "enabled": true,
-              "parentId": null,
-              "children": [],
-              "components": [
-                {
-                  "type": "Transform",
-                  "enabled": true,
-                  "data": {
-                    "x": 400,
-                    "y": 60,
-                    "z": 2,
-                    "rotation": 0,
-                    "scaleX": 1,
-                    "scaleY": 1
-                  }
-                },
-                {
-                  "type": "Rectangle",
-                  "enabled": true,
-                  "data": {
-                    "shape": "rectangle",
-                    "width": 8,
-                    "height": 6,
-                    "fillAlpha": 1,
-                    "strokeWidth": 0,
-                    "strokeAlpha": 0,
-                    "rotation": 0,
-                    "originX": 0,
-                    "originY": 0,
-                    "fillColor": "#8a8a8a"
-                  }
-                }
-              ]
-            },
-            {
-              "id": "pebble_3",
-              "name": "Pebble3",
-              "enabled": true,
-              "parentId": null,
-              "children": [],
-              "components": [
-                {
-                  "type": "Transform",
-                  "enabled": true,
-                  "data": {
-                    "x": 512,
-                    "y": 210,
-                    "z": 2,
-                    "rotation": 0,
-                    "scaleX": 1,
-                    "scaleY": 1
-                  }
-                },
-                {
-                  "type": "Rectangle",
-                  "enabled": true,
-                  "data": {
-                    "shape": "rectangle",
-                    "width": 8,
-                    "height": 6,
-                    "fillAlpha": 1,
-                    "strokeWidth": 0,
-                    "strokeAlpha": 0,
-                    "rotation": 0,
-                    "originX": 0,
-                    "originY": 0,
-                    "fillColor": "#8a8a8a"
-                  }
-                }
-              ]
-            },
-            {
-              "id": "pebble_4",
-              "name": "Pebble4",
-              "enabled": true,
-              "parentId": null,
-              "children": [],
-              "components": [
-                {
-                  "type": "Transform",
-                  "enabled": true,
-                  "data": {
-                    "x": 160,
-                    "y": 330,
-                    "z": 2,
-                    "rotation": 0,
-                    "scaleX": 1,
-                    "scaleY": 1
-                  }
-                },
-                {
-                  "type": "Rectangle",
-                  "enabled": true,
-                  "data": {
-                    "shape": "rectangle",
-                    "width": 8,
-                    "height": 6,
-                    "fillAlpha": 1,
-                    "strokeWidth": 0,
-                    "strokeAlpha": 0,
-                    "rotation": 0,
-                    "originX": 0,
-                    "originY": 0,
-                    "fillColor": "#8a8a8a"
-                  }
-                }
-              ]
-            },
-            {
-              "id": "pebble_5",
-              "name": "Pebble5",
-              "enabled": true,
-              "parentId": null,
-              "children": [],
-              "components": [
-                {
-                  "type": "Transform",
-                  "enabled": true,
-                  "data": {
-                    "x": 352,
-                    "y": 380,
-                    "z": 2,
-                    "rotation": 0,
-                    "scaleX": 1,
-                    "scaleY": 1
-                  }
-                },
-                {
-                  "type": "Rectangle",
-                  "enabled": true,
-                  "data": {
-                    "shape": "rectangle",
-                    "width": 8,
-                    "height": 6,
-                    "fillAlpha": 1,
-                    "strokeWidth": 0,
-                    "strokeAlpha": 0,
-                    "rotation": 0,
-                    "originX": 0,
-                    "originY": 0,
-                    "fillColor": "#8a8a8a"
-                  }
-                }
-              ]
-            },
-            {
-              "id": "pebble_6",
-              "name": "Pebble6",
-              "enabled": true,
-              "parentId": null,
-              "children": [],
-              "components": [
-                {
-                  "type": "Transform",
-                  "enabled": true,
-                  "data": {
-                    "x": 560,
-                    "y": 400,
-                    "z": 2,
-                    "rotation": 0,
-                    "scaleX": 1,
-                    "scaleY": 1
-                  }
-                },
-                {
-                  "type": "Rectangle",
-                  "enabled": true,
-                  "data": {
-                    "shape": "rectangle",
-                    "width": 8,
-                    "height": 6,
-                    "fillAlpha": 1,
-                    "strokeWidth": 0,
-                    "strokeAlpha": 0,
-                    "rotation": 0,
-                    "originX": 0,
-                    "originY": 0,
-                    "fillColor": "#8a8a8a"
-                  }
-                }
-              ]
-            },
-            {
-              "id": "pebble_7",
-              "name": "Pebble7",
-              "enabled": true,
-              "parentId": null,
-              "children": [],
-              "components": [
-                {
-                  "type": "Transform",
-                  "enabled": true,
-                  "data": {
-                    "x": 96,
-                    "y": 420,
-                    "z": 2,
-                    "rotation": 0,
-                    "scaleX": 1,
-                    "scaleY": 1
-                  }
-                },
-                {
-                  "type": "Rectangle",
-                  "enabled": true,
-                  "data": {
-                    "shape": "rectangle",
-                    "width": 8,
-                    "height": 6,
-                    "fillAlpha": 1,
-                    "strokeWidth": 0,
-                    "strokeAlpha": 0,
-                    "rotation": 0,
-                    "originX": 0,
-                    "originY": 0,
-                    "fillColor": "#8a8a8a"
-                  }
-                }
-              ]
-            },
-            {
               "id": "obj_player",
               "name": "Player",
               "enabled": true,
@@ -466,8 +271,8 @@
                   "type": "Transform",
                   "enabled": true,
                   "data": {
-                    "x": 320,
-                    "y": 240,
+                    "x": 656.0,
+                    "y": 666.0,
                     "z": 10,
                     "rotation": 0,
                     "scaleX": 1,
@@ -492,6 +297,18 @@
                       "x": 0.5,
                       "y": 1
                     }
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rect",
+                    "offsetX": -6,
+                    "offsetY": -6,
+                    "width": 12,
+                    "height": 6,
+                    "isTrigger": false
                   }
                 }
               ]

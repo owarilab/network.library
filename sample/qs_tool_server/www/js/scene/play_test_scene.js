@@ -9,6 +9,8 @@ class PlayTestScene extends Scene {
     ArrowUp: 'up', KeyW: 'up',
     ArrowDown: 'down', KeyS: 'down',
   };
+  /** 通行判定の移動単位（px）。小さいほど壁際で正確に止まる */
+  static MOVE_STEP_PX = 1;
 
   constructor() {
     super();
@@ -24,6 +26,8 @@ class PlayTestScene extends Scene {
     this._playerControllers = new Map();
     /** キャラクターのフレーム画像キャッシュ。key: `${chipsetId}:${direction}:${frameIndex}` */
     this._chipCanvasCache = new Map();
+    /** タイルマップの描画・通行判定。PlayTest セッション中のキャッシュを持つ */
+    this._tilemaps = new TilemapRuntime();
     this._pointerState = {
       canvasX: 0,
       canvasY: 0,
@@ -61,6 +65,7 @@ class PlayTestScene extends Scene {
     this._input = input;
     this._appData = appData;
     appData?.activateStartupPlayUnit?.();
+    this._tilemaps.clear();
     this._runtime = PlayUnitRuntime.fromPlayUnit(this._getActiveRuntimePlayUnit(), appData);
     this._cameraState = this._createCameraState(this._runtime?.camera);
     input.on('keydown', this._onKeyDown);
@@ -76,6 +81,7 @@ class PlayTestScene extends Scene {
     this._runtimeUnits.clear();
     this._playerControllers.clear();
     this._chipCanvasCache.clear();
+    this._tilemaps.clear();
     this._pointerState.hoveredTriggerMap.clear();
     this._pointerState.pressedTriggerKeys.clear();
     this._pointerState.pressedDragHits.dragStart = null;
@@ -138,7 +144,7 @@ class PlayTestScene extends Scene {
 
     ctx.fillStyle = '#94a3b8';
     ctx.font = '13px sans-serif';
-    ctx.fillText(`Text: ${runtime?.textEntries?.length || 0} / Image: ${runtime?.imageEntries?.length || 0} / Rectangle: ${runtime?.rectangleEntries?.length || 0} / UI: ${runtime?.uiEntries?.length || 0}`, panel.x + 18, panel.y + 52);
+    ctx.fillText(`Text: ${runtime?.textEntries?.length || 0} / Image: ${runtime?.imageEntries?.length || 0} / Tilemap: ${runtime?.tilemapEntries?.length || 0} / Rectangle: ${runtime?.rectangleEntries?.length || 0} / UI: ${runtime?.uiEntries?.length || 0}`, panel.x + 18, panel.y + 52);
     ctx.fillText(`Camera: ${runtime?.camera?.objectName || 'DefaultCamera'} (${Math.round(this._cameraState?.x || runtime?.camera?.x || 0)}, ${Math.round(this._cameraState?.y || runtime?.camera?.y || 0)}) zoom ${runtime?.camera?.zoom || 1}`, panel.x + 18, panel.y + 74);
     if (runtime?.camera?.followTargetObjectId) {
       ctx.fillText(`Follow: ${runtime.camera.followTargetObjectName || runtime.camera.followTargetObjectId} lerp ${runtime.camera.followLerp || 0}`, panel.x + 18, panel.y + 96);
@@ -176,14 +182,26 @@ class PlayTestScene extends Scene {
     const camera = this._cameraState || runtime?.camera || { x: 0, y: 0, zoom: 1 };
     const project = this._appData?.currentProject || null;
     if (renderEntries.length) {
+      const zoom = camera.zoom || 1;
+      // プレビュー枠に見えている世界座標の範囲（タイルマップのカリング用）
+      const view = {
+        left: camera.x || 0,
+        top: camera.y || 0,
+        right: (camera.x || 0) + preview.w / zoom,
+        bottom: (camera.y || 0) + preview.h / zoom,
+      };
       ctx.save();
       ctx.translate(preview.x, preview.y);
-      ctx.scale(camera.zoom || 1, camera.zoom || 1);
+      ctx.scale(zoom, zoom);
       ctx.translate(-(camera.x || 0), -(camera.y || 0));
 
       for (const entry of renderEntries) {
         if (entry.kind === 'image') {
           this._drawImageEntry(ctx, entry, project);
+          continue;
+        }
+        if (entry.kind === 'tilemap') {
+          this._tilemaps.draw(ctx, entry, project, view);
           continue;
         }
         if (entry.kind === 'rectangle') {
@@ -276,6 +294,7 @@ class PlayTestScene extends Scene {
 
   _applyControllerMovement(dt, playUnit) {
     if (!playUnit || !Array.isArray(playUnit.objects)) return;
+    const tilemapEntries = this._getTilemapEntries(playUnit);
 
     let moveX = 0;
     let moveY = 0;
@@ -316,11 +335,99 @@ class PlayTestScene extends Scene {
       const moveSpeed = Number.isFinite(Number(controller.data?.moveSpeed)) && Number(controller.data.moveSpeed) > 0
         ? Number(controller.data.moveSpeed)
         : 120;
-      const currentX = Number.isFinite(Number(transform.data?.x)) ? Number(transform.data.x) : 0;
-      const currentY = Number.isFinite(Number(transform.data?.y)) ? Number(transform.data.y) : 0;
-      transform.data.x = currentX + normalizedX * moveSpeed * deltaSeconds;
-      transform.data.y = currentY + normalizedY * moveSpeed * deltaSeconds;
+      const collider = objectData.findComponentByType?.('Collider') || null;
+      this._moveWithTilemapCollision(
+        transform,
+        collider && collider.enabled !== false ? collider : null,
+        normalizedX * moveSpeed * deltaSeconds,
+        normalizedY * moveSpeed * deltaSeconds,
+        tilemapEntries,
+      );
     }
+  }
+
+  /**
+   * 直前に組み立てた runtime の Tilemap エントリを返す。PlayUnit 切替直後は組み直す。
+   * @param {PlayUnitData} playUnit  実行用コピー
+   * @returns {Array<object>}
+   */
+  _getTilemapEntries(playUnit) {
+    if (this._runtime?.id === playUnit.id) return this._runtime.tilemapEntries;
+    return PlayUnitRuntime.fromPlayUnit(playUnit, this._appData).tilemapEntries;
+  }
+
+  /**
+   * Tilemap の通行判定を使って移動する。X 軸、Y 軸の順に動かし、塞がれた軸だけ止める（壁沿いに滑る）。
+   * @param {ComponentData|object} transform
+   * @param {ComponentData|object|null} collider  有効な Collider（無ければ Transform 位置の点で判定）
+   * @param {number} dx
+   * @param {number} dy
+   * @param {Array<object>} tilemapEntries
+   */
+  _moveWithTilemapCollision(transform, collider, dx, dy, tilemapEntries) {
+    if (!tilemapEntries.length) {
+      transform.data.x = this._readPosition(transform, 'x') + dx;
+      transform.data.y = this._readPosition(transform, 'y') + dy;
+      return;
+    }
+
+    const project = this._appData?.currentProject || null;
+    this._moveAxisWithTilemaps(transform, collider, 'x', dx, tilemapEntries, project);
+    this._moveAxisWithTilemaps(transform, collider, 'y', dy, tilemapEntries, project);
+  }
+
+  _moveAxisWithTilemaps(transform, collider, axis, distance, tilemapEntries, project) {
+    if (!distance) return;
+    const sign = Math.sign(distance);
+    let remaining = Math.abs(distance);
+    while (remaining > 0) {
+      const step = Math.min(PlayTestScene.MOVE_STEP_PX, remaining);
+      remaining -= step;
+
+      const x = this._readPosition(transform, 'x');
+      const y = this._readPosition(transform, 'y');
+      const nextX = axis === 'x' ? x + sign * step : x;
+      const nextY = axis === 'y' ? y + sign * step : y;
+      // 既に塞がれた位置からの移動（閉じ込め時）は許可し、新たに塞がれる移動だけ止める
+      const wasBlocked = this._isPlayerBlocked(x, y, collider, tilemapEntries, project);
+      if (!wasBlocked && this._isPlayerBlocked(nextX, nextY, collider, tilemapEntries, project)) break;
+      transform.data[axis] = axis === 'x' ? nextX : nextY;
+    }
+  }
+
+  _isPlayerBlocked(x, y, collider, tilemapEntries, project) {
+    const bounds = PlayTestScene._createColliderBounds(x, y, collider);
+    return this._tilemaps.isRectBlocked(tilemapEntries, project, bounds);
+  }
+
+  /**
+   * @param {ComponentData|object} transform
+   * @param {'x'|'y'} axis
+   * @returns {number}
+   */
+  _readPosition(transform, axis) {
+    return Number.isFinite(Number(transform.data?.[axis])) ? Number(transform.data[axis]) : 0;
+  }
+
+  /**
+   * 通行判定用の矩形。Collider が無ければ位置の点を返す（_getRectBounds と同じ左上基準）。
+   * @param {number} x
+   * @param {number} y
+   * @param {ComponentData|object|null} collider
+   * @returns {{left: number, top: number, right: number, bottom: number}}
+   */
+  static _createColliderBounds(x, y, collider) {
+    const width = Number(collider?.data?.width);
+    const height = Number(collider?.data?.height);
+    if (!(width > 0 && height > 0)) return { left: x, top: y, right: x, bottom: y };
+    const offsetX = Number(collider.data.offsetX) || 0;
+    const offsetY = Number(collider.data.offsetY) || 0;
+    return {
+      left: x + offsetX,
+      top: y + offsetY,
+      right: x + offsetX + width,
+      bottom: y + offsetY + height,
+    };
   }
 
   _processOverlapTriggers(playUnit) {
@@ -1020,7 +1127,10 @@ class PlayTestScene extends Scene {
     const characterEntries = Array.isArray(runtime?.characterEntries)
       ? runtime.characterEntries.map((entry) => ({ ...entry, kind: 'character' }))
       : [];
-    return [...imageEntries, ...characterEntries, ...textEntries, ...rectangleEntries].sort((a, b) => {
+    const tilemapEntries = Array.isArray(runtime?.tilemapEntries)
+      ? runtime.tilemapEntries.map((entry) => ({ ...entry, kind: 'tilemap' }))
+      : [];
+    return [...imageEntries, ...characterEntries, ...tilemapEntries, ...textEntries, ...rectangleEntries].sort((a, b) => {
       if (a.z !== b.z) return a.z - b.z;
       return (a.order || 0) - (b.order || 0);
     });
