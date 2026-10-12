@@ -343,6 +343,20 @@ www/
 - 検証（Playwright）: 通過フラグ・マップ・外周の壁の読込、PlayTest の描画（倍率 1 と 2）、4 方向の停止位置（外周の壁の手前）、斜め入力での壁沿いの滑り、池の手前での停止、Tilemap が無い場合の移動、アセット本体の不変、`+Tilemap` の追加と重複・倍率の検証、存在しない `layerId` で描画・判定が無いこと。
 - 未対応: コライダ同士の押し戻し、NPC・オブジェクトとの衝突、プレイヤーより手前に描くレイヤー、マップエディタのレイヤー追加 UI、カメラのマップ範囲への clamp、タイルセットの列数変更で既存マップのタイル index がずれる問題（既存の制約）。
 
+### 9 スライスとメッセージウィンドウ（P0-2）
+
+設計: [specs/NINE_SLICE_DESIGN.md](specs/NINE_SLICE_DESIGN.md)、[specs/MESSAGE_WINDOW_DESIGN.md](specs/MESSAGE_WINDOW_DESIGN.md)
+
+- データ: pixelDocument の任意項目 `nineSlice: {left, top, right, bottom}`（ソース画素、0 以上の整数、左右・上下の合計は画像サイズ以下）。.qsproj とブラウザ保存に残る。境界はアセット本体が正で、AppData には複製しない。
+- 描画: `js/nine_slice/nine_slice_renderer.js`（`NineSliceRenderer`）。PlayTest（ワールドと UI）と EditorScene のプレビューで共用する。
+- ランタイム: `NineSlice` コンポーネント（`pixelDocumentId` / `scale` / `width` / `height` / `alpha`）。UI では UITransform の矩形に伸ばす。
+- エディタ: pixelDocument 編集の表示メニューに「9スライスガイド表示」（チェック付き、水色の破線で境界を表示、ドラッグで移動、Esc で取り消し）と「9スライス設定…」（L/T/R/B の数値入力、解除）。「9スライスガイド」の表示中は「9-slice Preview」窓で伸縮結果を確認できる。PlayUnit エディタの `+NineSlice`（境界の無い画像を選ぶと全体伸縮になる旨を表示）。
+- タイプライター: Text の `revealChars`（表示文字数、-1 で全文）と、EventAction の `typewriter` アクション（`targetObjectId` / `valueSource` / `valueVariablePath` / `charsPerSecond` / `statusVariablePath` / `completeEventId`）。空の Text も描画する。
+- デモ: `tools/add_message_window_to_demo.py` が `assets/character_walk_demo.qsproj` に 9 スライスの枠 `px_msg_frame`、変数 `user.fixed.msgBody` / `user.fixed.msgStatus`、窓（MessageCanvas / MessageBox / MessageBody）を追加する。起動 0.5 秒後に表示が始まり、クリックで全文表示、もう一度クリックで閉じる。
+- 検証（Playwright）: 9 領域（角・辺・中央）の画素、縮小・倍率 2・全体伸縮、ワールドと UI の描画、NineSlice の Save As 参照の書き換え、`+NineSlice` と JSON 編集の正規化、境界のドラッグ（上限、Esc で取り消し、ペンとの分離）、設定ダイアログ（不正値の拒否、解除、保存への反映）、表示メニューのチェック、typewriter の進行・完了・スキップ・再開始・PlayUnit 切替、部分表示の描画、デモの窓（自動表示、スキップ、閉じる）。
+- 未対応: 選択肢 UI、話者名の枠組み（Text を追加すれば作れる）、自動送り（P0-3 の wait 後）、キーボードでの送り、句読点の間、9 スライスの Undo、文字ごとの効果音。
+- 既存の制約（今回は変えていない）: UICanvas 配下のオブジェクトに Transform があると、ワールド描画の対象にもなる。UI の部品には Transform を付けない。
+
 ---
 
 ## TODO リスト

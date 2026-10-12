@@ -25,6 +25,7 @@ class PlayUnitRuntime {
     this.imageEntries = [];
     this.characterEntries = [];
     this.tilemapEntries = [];
+    this.nineSliceEntries = [];
     this.textEntries = [];
     this.rectangleEntries = [];
     this.uiEntries = [];
@@ -47,6 +48,7 @@ class PlayUnitRuntime {
     const rectangleEntries = [];
     const characterEntries = [];
     const tilemapEntries = [];
+    const nineSliceEntries = [];
     for (let index = 0; index < objects.length; index++) {
       const objectData = objects[index];
       if (!objectData || objectData.enabled === false) continue;
@@ -104,9 +106,31 @@ class PlayUnitRuntime {
             objectName: objectData.name || 'Object',
             mapAssetId,
             layerId: typeof tilemap.data?.layerId === 'string' ? tilemap.data.layerId.trim() : '',
-            scale: PlayUnitRuntime._normalizeTilemapScale(tilemap.data?.scale),
+            scale: PlayUnitRuntime._normalizeScale(tilemap.data?.scale),
             offsetX: Number.isFinite(Number(tilemap.data?.offsetX)) ? Number(tilemap.data.offsetX) : 0,
             offsetY: Number.isFinite(Number(tilemap.data?.offsetY)) ? Number(tilemap.data.offsetY) : 0,
+            x: Number.isFinite(Number(transform.data?.x)) ? Number(transform.data.x) : 0,
+            y: Number.isFinite(Number(transform.data?.y)) ? Number(transform.data.y) : 0,
+            z: Number.isFinite(Number(transform.data?.z)) ? Number(transform.data.z) : 0,
+            order: index,
+          });
+        }
+      }
+
+      const nineSlice = PlayUnitRuntime._findEnabledComponent(objectData, 'NineSlice');
+      if (nineSlice) {
+        const pixelDocumentId = typeof nineSlice.data?.pixelDocumentId === 'string' ? nineSlice.data.pixelDocumentId.trim() : '';
+        if (pixelDocumentId) {
+          nineSliceEntries.push({
+            objectId: objectData.id || '',
+            objectName: objectData.name || 'Object',
+            pixelDocumentId,
+            scale: PlayUnitRuntime._normalizeScale(nineSlice.data?.scale),
+            width: PlayUnitRuntime._normalizePositiveNumber(nineSlice.data?.width, 0),
+            height: PlayUnitRuntime._normalizePositiveNumber(nineSlice.data?.height, 0),
+            alpha: PlayUnitRuntime._normalizeAlpha(nineSlice.data?.alpha),
+            originX: PlayUnitRuntime._normalizeUnitInterval(nineSlice.data?.originX, 0),
+            originY: PlayUnitRuntime._normalizeUnitInterval(nineSlice.data?.originY, 0),
             x: Number.isFinite(Number(transform.data?.x)) ? Number(transform.data.x) : 0,
             y: Number.isFinite(Number(transform.data?.y)) ? Number(transform.data.y) : 0,
             z: Number.isFinite(Number(transform.data?.z)) ? Number(transform.data.z) : 0,
@@ -118,12 +142,13 @@ class PlayUnitRuntime {
       const text = PlayUnitRuntime._findEnabledComponent(objectData, 'Text');
       if (text) {
         const textValue = typeof text.data?.text === 'string' ? text.data.text : '';
-        if (textValue) {
+        if (typeof text.data?.text === 'string') {
           const resolvedText = PlayUnitRuntime._resolveTemplateText(textValue, appData);
           textEntries.push({
             objectId: objectData.id || '',
             objectName: objectData.name || 'Object',
             text: resolvedText,
+            revealChars: PlayUnitRuntime._normalizeRevealChars(text.data?.revealChars),
             font: typeof text.data?.font === 'string' && text.data.font.trim() ? text.data.font.trim() : '24px sans-serif',
             color: typeof text.data?.color === 'string' && text.data.color.trim() ? text.data.color.trim() : '#ffffff',
             alpha: PlayUnitRuntime._normalizeAlpha(text.data?.alpha),
@@ -189,6 +214,10 @@ class PlayUnitRuntime {
       return a.order - b.order;
     });
     runtime.tilemapEntries = tilemapEntries.sort((a, b) => {
+      if (a.z !== b.z) return a.z - b.z;
+      return a.order - b.order;
+    });
+    runtime.nineSliceEntries = nineSliceEntries.sort((a, b) => {
       if (a.z !== b.z) return a.z - b.z;
       return a.order - b.order;
     });
@@ -349,14 +378,36 @@ class PlayUnitRuntime {
       }
     }
 
+    const nineSlice = PlayUnitRuntime._findEnabledComponent(objectData, 'NineSlice');
+    if (nineSlice) {
+      const pixelDocumentId = typeof nineSlice.data?.pixelDocumentId === 'string' ? nineSlice.data.pixelDocumentId.trim() : '';
+      if (pixelDocumentId) {
+        uiEntries.push({
+          ...baseEntry,
+          kind: 'nineSlice',
+          pixelDocumentId,
+          scale: PlayUnitRuntime._normalizeScale(nineSlice.data?.scale),
+          alpha: PlayUnitRuntime._normalizeAlpha(nineSlice.data?.alpha),
+          width: rect.width,
+          height: rect.height,
+          originX: 0,
+          originY: 0,
+          x: rect.left,
+          y: rect.top,
+        });
+        nextOrder += 1;
+      }
+    }
+
     const text = PlayUnitRuntime._findEnabledComponent(objectData, 'Text');
     if (text) {
       const textValue = typeof text.data?.text === 'string' ? text.data.text : '';
-      if (textValue) {
+      if (typeof text.data?.text === 'string') {
         uiEntries.push({
           ...baseEntry,
           kind: 'text',
           text: PlayUnitRuntime._resolveTemplateText(textValue, params.appData),
+          revealChars: PlayUnitRuntime._normalizeRevealChars(text.data?.revealChars),
           font: typeof text.data?.font === 'string' && text.data.font.trim() ? text.data.font.trim() : '24px sans-serif',
           color: typeof text.data?.color === 'string' && text.data.color.trim() ? text.data.color.trim() : '#ffffff',
           alpha: PlayUnitRuntime._normalizeAlpha(text.data?.alpha),
@@ -602,10 +653,20 @@ class PlayUnitRuntime {
    * @param {number|string|undefined|null} value
    * @returns {number}
    */
-  static _normalizeTilemapScale(value) {
+  static _normalizeScale(value) {
     const nextValue = Math.round(Number(value));
     if (!Number.isFinite(nextValue)) return 1;
     return Math.min(8, Math.max(1, nextValue));
+  }
+
+  /**
+   * タイプライターの表示文字数。0 以上の整数。全文表示は -1。
+   * @param {number|string|undefined|null} value
+   * @returns {number}
+   */
+  static _normalizeRevealChars(value) {
+    const nextValue = Number(value);
+    return Number.isInteger(nextValue) && nextValue >= 0 ? nextValue : -1;
   }
 
   /**

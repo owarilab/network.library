@@ -251,6 +251,7 @@ class PlayUnitEditorScene extends Scene {
       { label: '+Triangle', action: () => this._addShapeComponent('triangle'), disabled: !hasAsset },
       { label: '+Star', action: () => this._addShapeComponent('star'), disabled: !hasAsset },
       { label: '+Tilemap', action: () => this._addTilemapToSelectedObject(), disabled: !hasAsset },
+      { label: '+NineSlice', action: () => this._addNineSliceToSelectedObject(), disabled: !hasAsset },
       { label: '+Settings', action: () => this._addComponentToSelectedObject('PlaySettings'), disabled: !hasAsset },
       { label: '+Text', action: () => this._addComponentToSelectedObject('Text'), disabled: !hasAsset },
       { label: '+Trigger', action: () => this._addComponentToSelectedObject('Trigger'), disabled: !hasAsset },
@@ -495,6 +496,34 @@ class PlayUnitEditorScene extends Scene {
     this._markDirty(`Added Character to ${objectData.name || objectData.id}`);
   }
 
+  _addNineSliceToSelectedObject() {
+    const objectData = this._getSelectedObject();
+    if (!objectData) {
+      this._statusTone = 'error';
+      this._statusMessage = 'Select an object first';
+      return;
+    }
+
+    if (objectData.findComponentByType('NineSlice')) {
+      this._statusTone = 'error';
+      this._statusMessage = `NineSlice already exists on ${objectData.name || objectData.id}`;
+      return;
+    }
+
+    const selectedPixelDocument = this._promptPixelDocumentSelection('NineSlice');
+    if (selectedPixelDocument === false) return;
+
+    const data = this._createComponentTemplate('NineSlice');
+    data.pixelDocumentId = selectedPixelDocument?.id || '';
+    objectData.addComponent({ type: 'NineSlice', data });
+    this._markDirty(`Added NineSlice to ${objectData.name || objectData.id}`);
+    if (!selectedPixelDocument?.nineSlice) {
+      // 9 スライスの境界が無い画像は、全体を伸ばして描かれる
+      this._statusTone = 'info';
+      this._statusMessage = `${selectedPixelDocument?.name || 'pixelDocument'} has no 9-slice guides; it will be stretched as a whole`;
+    }
+  }
+
   _addTilemapToSelectedObject() {
     const objectData = this._getSelectedObject();
     if (!objectData) {
@@ -619,7 +648,11 @@ class PlayUnitEditorScene extends Scene {
     return false;
   }
 
-  _promptPixelDocumentSelection() {
+  /**
+   * @param {string} [purpose='ImageObject']  選択ダイアログの用途名
+   * @returns {object|false}
+   */
+  _promptPixelDocumentSelection(purpose = 'ImageObject') {
     const pixelDocuments = Array.isArray(this._appData?.currentProject?.assets?.pixelDocuments)
       ? this._appData.currentProject.assets.pixelDocuments
       : [];
@@ -637,7 +670,7 @@ class PlayUnitEditorScene extends Scene {
       .map((doc, index) => `${index + 1}: ${doc.name || 'untitled'} (${doc.id})`)
       .join('\n');
     const nextValue = window.prompt(
-      `Select pixelDocument for ImageObject\n${optionsText}\nEnter number or asset id`,
+      `Select pixelDocument for ${purpose}\n${optionsText}\nEnter number or asset id`,
       '1'
     );
     if (nextValue == null) return false;
@@ -773,6 +806,16 @@ class PlayUnitEditorScene extends Scene {
           scaleX: 1,
           scaleY: 1,
         };
+      case 'NineSlice':
+        return {
+          pixelDocumentId: '',
+          scale: 1,
+          width: 0,
+          height: 0,
+          originX: 0,
+          originY: 0,
+          alpha: 1,
+        };
       case 'Tilemap':
         return {
           mapAssetId: '',
@@ -845,6 +888,7 @@ class PlayUnitEditorScene extends Scene {
       case 'Text':
         return {
           text: 'Hello World',
+          revealChars: -1,
           font: '24px sans-serif',
           color: '#ffffff',
           alpha: 1,
@@ -944,8 +988,28 @@ class PlayUnitEditorScene extends Scene {
       return;
     }
 
-    component.data = type === 'Tilemap' ? PlayUnitEditorScene._normalizeTilemapData(parsed) : { ...parsed };
+    component.data = PlayUnitEditorScene._normalizeComponentData(type, parsed);
     this._markDirty(`Updated ${type} data on ${objectData.name || objectData.id}`);
+  }
+
+  /**
+   * JSON 編集の結果を、実行時に解釈できる形に揃える。
+   * @param {string} type
+   * @param {object} data
+   * @returns {object}
+   */
+  static _normalizeComponentData(type, data) {
+    if (type === 'Tilemap') return PlayUnitEditorScene._normalizeTilemapData(data);
+    if (type === 'NineSlice') {
+      return {
+        ...data,
+        pixelDocumentId: typeof data.pixelDocumentId === 'string' ? data.pixelDocumentId.trim() : '',
+        scale: PlayUnitRuntime._normalizeScale(data.scale),
+        width: Number.isFinite(Number(data.width)) && Number(data.width) > 0 ? Number(data.width) : 0,
+        height: Number.isFinite(Number(data.height)) && Number(data.height) > 0 ? Number(data.height) : 0,
+      };
+    }
+    return { ...data };
   }
 
   /**
@@ -958,7 +1022,7 @@ class PlayUnitEditorScene extends Scene {
       ...data,
       mapAssetId: typeof data.mapAssetId === 'string' ? data.mapAssetId.trim() : '',
       layerId: typeof data.layerId === 'string' ? data.layerId.trim() : '',
-      scale: PlayUnitRuntime._normalizeTilemapScale(data.scale),
+      scale: PlayUnitRuntime._normalizeScale(data.scale),
       offsetX: Number.isFinite(Number(data.offsetX)) ? Number(data.offsetX) : 0,
       offsetY: Number.isFinite(Number(data.offsetY)) ? Number(data.offsetY) : 0,
     };

@@ -113,6 +113,21 @@ Draws a `maps` asset in PlayTest. Cells whose tile has passable `false` block th
 - Cells outside the map block movement.
 - Tilemap objects need a `Transform`. Position is the map's top-left.
 
+### NineSlice
+
+Draws a pixelDocument that has `nineSlice` borders (corners fixed, edges and center stretched). In UICanvas, the UITransform rect is used.
+
+```json
+{
+  "type": "NineSlice",
+  "enabled": true,
+  "data": { "pixelDocumentId": "px_msg_frame", "scale": 2, "width": 0, "height": 0, "originX": 0, "originY": 0, "alpha": 1 }
+}
+```
+
+- `pixelDocuments[*].nineSlice`: `{ "left": 8, "top": 8, "right": 8, "bottom": 8 }` (integers >= 0; left+right <= width; top+bottom <= height). Invalid values are dropped.
+- UI objects must not have a `Transform` (the world pass would also draw them).
+
 ### Camera
 
 Used on the main camera object.
@@ -164,10 +179,13 @@ Used with camera object.
     "strokeColor": "",
     "strokeWidth": 0,
     "backgroundColor": "",
-    "padding": 0
+    "padding": 0,
+    "revealChars": -1
   }
 }
 ```
+
+- `revealChars`: visible character count for typewriter. `-1` = all text. Empty `text` is allowed (it is drawn as nothing).
 
 ### Rectangle
 
@@ -242,6 +260,7 @@ Supported `action` values:
 - `setProperty`
 - `setEnabled`
 - `playTween`
+- `typewriter`
 - `fireEvent`
 - `requestPlayUnit`
 - `returnPlayUnit`
@@ -251,6 +270,7 @@ Action-specific fields:
 - `setProperty`: `targetObjectId`, `componentType`, `property`, `value`
 - `setEnabled`: `targetObjectId`, `enabled`
 - `playTween`: `targetObjectId`, `componentType`, `property`, `tweenDuration`, `tweenFrom`, `tweenTo`, `tweenEasing`
+- `typewriter`: `targetObjectId`, `componentType` (`Text`), `valueSource` (`literal` with `value`, or `variable` with `valueVariablePath`), `charsPerSecond`, `statusVariablePath` (optional, `typing` / `done`), `completeEventId` (optional)
 - `fireEvent`: `eventId`
 - `requestPlayUnit`: `playUnitId`
 - `returnPlayUnit`: no extra fields

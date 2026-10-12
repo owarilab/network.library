@@ -912,6 +912,8 @@ class AppData {
       asset.width = this._layerData.width;
       asset.height = this._layerData.height;
       asset.layerData = this._cloneLayerData(this._layerData);
+      // 寸法が変わっていれば、収まらない 9 スライスの境界は無効になる
+      asset.nineSlice = ProjectData.normalizeNineSlice(asset.nineSlice, asset.width, asset.height);
     } else if ((asset.type === 'tileset' || asset.type === 'characterChipset') && this.tilesetData) {
       asset.chipWidth = this.tilesetData.chipWidth;
       asset.chipHeight = this.tilesetData.chipHeight;
@@ -927,6 +929,31 @@ class AppData {
     }
 
     asset.palette = this.palette?.clone?.() || null;
+    this.currentProject.touch();
+    this.projectSession?.markDirty();
+    return true;
+  }
+
+  /**
+   * 編集中の pixelDocument の 9 スライス境界を返す（無効、または pixelDocument 以外なら null）。
+   * @returns {{left: number, top: number, right: number, bottom: number}|null}
+   */
+  getActiveNineSlice() {
+    const asset = this.getActiveProjectAsset();
+    if (!asset || asset.type !== 'pixelDocument' || !this._layerData) return null;
+    return ProjectData.normalizeNineSlice(asset.nineSlice, this._layerData.width, this._layerData.height);
+  }
+
+  /**
+   * 編集中の pixelDocument の 9 スライス境界を設定する（null で解除）。
+   * 不正な値は保存されず、null として扱う。
+   * @param {{left: number, top: number, right: number, bottom: number}|null} insets
+   * @returns {boolean}
+   */
+  setActiveNineSlice(insets) {
+    const asset = this.getActiveProjectAsset();
+    if (!asset || asset.type !== 'pixelDocument' || !this._layerData || !this.currentProject) return false;
+    asset.nineSlice = ProjectData.normalizeNineSlice(insets, this._layerData.width, this._layerData.height);
     this.currentProject.touch();
     this.projectSession?.markDirty();
     return true;

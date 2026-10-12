@@ -10,6 +10,8 @@ class EditorScene extends Scene {
 
     /** @type {PixelCanvas} */
     this._pixelCanvas = new PixelCanvas();
+    // 9スライスガイドのトグルにチェックを付ける
+    this._menuBar.isChecked = (id) => id === MenuConstants.VIEW_NINE_SLICE_GUIDE && this._pixelCanvas.showNineSliceGuide;
 
     // PixelCanvas コールバック ― ツールディスパッチ
     this._pixelCanvas.onPixelDown = (px, py, button, appData) => {
@@ -172,6 +174,22 @@ class EditorScene extends Scene {
     this._characterPreviewWin = new CharacterPreviewWindow();
     /** キャラクタープレビュー表示フラグ */
     this._characterPreviewVisible = true;
+
+    /** 9スライス設定ダイアログ @type {NineSliceDialog} */
+    this._nineSliceDialog = new NineSliceDialog(
+      insets => this._appData?.setActiveNineSlice(insets),
+      () => this._appData?.setActiveNineSlice(null),
+    );
+    /** 9スライスプレビューウィンドウ @type {NineSlicePreviewWindow} */
+    this._nineSlicePreviewWin = new NineSlicePreviewWindow();
+    /** 9スライスプレビュー表示フラグ（9スライスガイドの表示と連動） */
+    this._nineSlicePreviewVisible = false;
+    /** 境界線をドラッグ中の辺（'left' | 'right' | 'top' | 'bottom'）。null なら非ドラッグ */
+    this._nineSliceDragEdge = null;
+    /** ドラッグ開始時の境界（Esc で戻す） */
+    this._nineSliceDragStart = null;
+    /** 境界線のカーソルを出しているか */
+    this._nineSliceCursorActive = false;
     this._chipPaletteWin.onChipSelect = (col, row) => {
       if (!this._appData) return;
       const prev = this._appData.selectedChip;
@@ -711,6 +729,14 @@ class EditorScene extends Scene {
         console.log(`[EditorScene] pass flags display: ${this._appData.showPassFlags ? 'show' : 'hide'}`);
         return;
       }
+      if (id === MenuConstants.VIEW_NINE_SLICE_GUIDE) {
+        this._toggleNineSliceGuide();
+        return;
+      }
+      if (id === MenuConstants.VIEW_NINE_SLICE_SETTINGS) {
+        this._openNineSliceSettings();
+        return;
+      }
 
       // ---- 生成メニュー ----
       if (id === MenuConstants.GENERATE_QUARTER_VIEW_TILE) {
@@ -730,8 +756,16 @@ class EditorScene extends Scene {
       if (this._newFileDialog.isVisible)        { this._newFileDialog.onKeyDown(e);        return; }
       if (this._newTilesetDialog.isVisible)     { this._newTilesetDialog.onKeyDown(e);     return; }
       if (this._newCharacterChipsetDialog.isVisible) { this._newCharacterChipsetDialog.onKeyDown(e); return; }
+      if (this._nineSliceDialog.isVisible)      { this._nineSliceDialog.onKeyDown(e);      return; }
       if (this._importTilesetDialog.isVisible)  { this._importTilesetDialog.onKeyDown(e);  return; }
       if (this._saveDialog.isVisible)           { this._saveDialog.onKeyDown(e);           return; }
+      if (this._nineSliceDragEdge && key === 'Escape') {
+        // 境界線のドラッグを取り消して、開始時の境界に戻す
+        this._appData?.setActiveNineSlice(this._nineSliceDragStart);
+        this._nineSliceDragEdge = null;
+        this._nineSliceDragStart = null;
+        return;
+      }
       if (key === ' ') {
         raw?.preventDefault?.();
         if (!this._spaceDown) {
@@ -820,6 +854,7 @@ class EditorScene extends Scene {
       this._newFileDialog.onMouseMove(e);
       this._newTilesetDialog.onMouseMove(e);
       this._newCharacterChipsetDialog.onMouseMove(e);
+      this._nineSliceDialog.onMouseMove(e);
       this._importTilesetDialog.onMouseMove(e);
       this._saveDialog.onMouseMove(e);
       this._colorPickerDialog.onMouseMove(e);
@@ -829,12 +864,17 @@ class EditorScene extends Scene {
       this._chipPaletteWin.onMouseMove(e, appData);
       if (this._tilePreviewVisible) this._tilePreviewWin.onMouseMove(e, appData);
       if (this._characterPreviewVisible) this._characterPreviewWin.onMouseMove(e, appData);
-      if (!this._newFileDialog.isVisible && !this._newTilesetDialog.isVisible && !this._newCharacterChipsetDialog.isVisible && !this._importTilesetDialog.isVisible) {
+      if (this._nineSlicePreviewVisible) this._nineSlicePreviewWin.onMouseMove(e, appData);
+      if (!this._newFileDialog.isVisible && !this._newTilesetDialog.isVisible && !this._newCharacterChipsetDialog.isVisible && !this._importTilesetDialog.isVisible && !this._nineSliceDialog.isVisible) {
         this._menuBar.onMouseMove(e);
-        if (this._spaceDown) {
+        if (this._nineSliceDragEdge) {
+          // 9スライスの境界線をドラッグ中
+          this._updateNineSliceDrag(e, appData);
+        } else if (this._spaceDown) {
           // パンモード: ドラッグ中なら位置を更新
           this._pixelCanvas.movePan(e.x, e.y);
         } else {
+          this._updateNineSliceCursor(e, appData);
           this._pixelCanvas.onMouseMove(e, appData);
         }
       }
@@ -844,6 +884,7 @@ class EditorScene extends Scene {
       if (this._newFileDialog.isVisible)        { this._newFileDialog.onMouseDown(e);        return; }
       if (this._newTilesetDialog.isVisible)     { this._newTilesetDialog.onMouseDown(e);     return; }
       if (this._newCharacterChipsetDialog.isVisible) { this._newCharacterChipsetDialog.onMouseDown(e); return; }
+      if (this._nineSliceDialog.isVisible)      { this._nineSliceDialog.onMouseDown(e);      return; }
       if (this._importTilesetDialog.isVisible)  { this._importTilesetDialog.onMouseDown(e);  return; }
       if (this._saveDialog.isVisible)           { this._saveDialog.onMouseDown(e);           return; }
       if (this._colorPickerDialog.isVisible)    { this._colorPickerDialog.onMouseDown(e);    return; }
@@ -863,12 +904,15 @@ class EditorScene extends Scene {
         const consumed = this._chipPaletteWin.onMouseDown(e, appData) ||
                          (this._tilePreviewVisible && this._tilePreviewWin.onMouseDown(e, appData)) ||
                          (this._characterPreviewVisible && this._characterPreviewWin.onMouseDown(e, appData)) ||
+                         (this._nineSlicePreviewVisible && this._nineSlicePreviewWin.onMouseDown(e, appData)) ||
                          this._colorPaletteWin.onMouseDown(e, appData) ||
                          this._toolBarWin.onMouseDown(e, appData) ||
                          this._layerPanelWin.onMouseDown(e, appData);
         if (consumed) {
           // ツール切り替え時はカーソルを更新
           this._updateToolCursor();
+        } else if (this._tryBeginNineSliceDrag(e, appData)) {
+          // 9スライスの境界線をつかんだ。ペンは動かさない
         } else {
           this._pixelCanvas.onMouseDown(e, appData);
         }
@@ -880,9 +924,16 @@ class EditorScene extends Scene {
       if (this._newFileDialog.isVisible)        { this._newFileDialog.onMouseUp(e);        return; }
       if (this._newTilesetDialog.isVisible)     { this._newTilesetDialog.onMouseUp(e);     return; }
       if (this._newCharacterChipsetDialog.isVisible) { this._newCharacterChipsetDialog.onMouseUp(e); return; }
+      if (this._nineSliceDialog.isVisible)      { this._nineSliceDialog.onMouseUp(e);      return; }
       if (this._importTilesetDialog.isVisible)  { this._importTilesetDialog.onMouseUp(e);  return; }
       if (this._saveDialog.isVisible)           { this._saveDialog.onMouseUp(e);           return; }
       if (this._colorPickerDialog.isVisible)    { this._colorPickerDialog.onMouseUp(e);    return; }
+      if (this._nineSliceDragEdge) {
+        // 境界線のドラッグ終了（変更はドラッグ中に保存済み）
+        this._nineSliceDragEdge = null;
+        this._nineSliceDragStart = null;
+        return;
+      }
       if (this._pixelCanvas._isPanning) {
         this._pixelCanvas.endPan();
         if (this._canvas) this._canvas.style.cursor = this._spaceDown ? 'grab' : '';
@@ -894,11 +945,12 @@ class EditorScene extends Scene {
       this._chipPaletteWin.onMouseUp(e, appData);
       if (this._tilePreviewVisible) this._tilePreviewWin.onMouseUp(e, appData);
       if (this._characterPreviewVisible) this._characterPreviewWin.onMouseUp(e, appData);
+      if (this._nineSlicePreviewVisible) this._nineSlicePreviewWin.onMouseUp(e, appData);
       this._menuBar.onMouseUp(e);
       this._pixelCanvas.onMouseUp(e, appData);
     };
     this._onWheel = e => {
-      if (this._quarterViewTileDialog.isVisible || this._newFileDialog.isVisible || this._newTilesetDialog.isVisible || this._newCharacterChipsetDialog.isVisible || this._importTilesetDialog.isVisible || this._saveDialog.isVisible || this._colorPickerDialog.isVisible) return;
+      if (this._quarterViewTileDialog.isVisible || this._newFileDialog.isVisible || this._newTilesetDialog.isVisible || this._newCharacterChipsetDialog.isVisible || this._nineSliceDialog.isVisible || this._importTilesetDialog.isVisible || this._saveDialog.isVisible || this._colorPickerDialog.isVisible) return;
       this._pixelCanvas.zoom(-e.deltaY, e.x, e.y);
     };
     this._onContextMenu = e => {
@@ -1110,6 +1162,11 @@ class EditorScene extends Scene {
       this._characterPreviewWin.render(ctx, canvas, appData);
     }
 
+    // 9スライスプレビューウィンドウ (9スライスの境界が有効な pixelDocument 編集時のみ表示)
+    if (this._nineSlicePreviewVisible) {
+      this._nineSlicePreviewWin.render(ctx, canvas, appData);
+    }
+
     // カラーパレットウィンドウ (ダイアログより前、ピクセルキャンバスの上)
     this._colorPaletteWin.render(ctx, canvas, appData);
 
@@ -1117,6 +1174,7 @@ class EditorScene extends Scene {
     this._newFileDialog.render(ctx, canvas);
     this._newTilesetDialog.render(ctx, canvas);
     this._newCharacterChipsetDialog.render(ctx, canvas);
+    this._nineSliceDialog.render(ctx, canvas);
     this._importTilesetDialog.render(ctx, canvas);
     this._saveDialog.render(ctx, canvas);
     this._quarterViewTileDialog.render(ctx, canvas);
@@ -1138,6 +1196,97 @@ class EditorScene extends Scene {
    * @param {AppData} appData
    * @param {boolean} isDown    mousedown なら true、mousemove なら false
    */
+  /**
+   * 9スライスガイドの表示を切り替える。表示にするとき境界が無ければ初期値を設定する。
+   */
+  _toggleNineSliceGuide() {
+    const appData = this._appData;
+    if (!appData || !this._isPixelDocumentEditing(appData)) {
+      console.warn('[EditorScene] 9スライスは pixelDocument の編集中に使えます');
+      return;
+    }
+
+    const pc = this._pixelCanvas;
+    if (pc.showNineSliceGuide) {
+      pc.showNineSliceGuide = false;
+      this._nineSlicePreviewVisible = false;
+      return;
+    }
+
+    if (!appData.getActiveNineSlice()) {
+      // 初期値は短い辺の 1/4（左右・上下で重ならない範囲）
+      const edge = Math.floor(Math.min(appData.layerData.width, appData.layerData.height) / 4);
+      appData.setActiveNineSlice({ left: edge, top: edge, right: edge, bottom: edge });
+    }
+    pc.showNineSliceGuide = true;
+    this._nineSlicePreviewVisible = true;
+  }
+
+  _openNineSliceSettings() {
+    const appData = this._appData;
+    if (!appData || !this._isPixelDocumentEditing(appData)) return;
+    this._nineSliceDialog.showWithInsets(appData.getActiveNineSlice(), appData.layerData.width, appData.layerData.height);
+  }
+
+  /** 編集中のアセットが pixelDocument（free モード）か */
+  _isPixelDocumentEditing(appData) {
+    return appData.editMode === 'free' && appData.getActiveProjectAsset?.()?.type === 'pixelDocument';
+  }
+
+  /**
+   * 境界線の近くでマウスを押したらドラッグを始める。
+   * @returns {boolean} ドラッグを始めたら true（ペン操作は行わない）
+   */
+  _tryBeginNineSliceDrag(e, appData) {
+    const pc = this._pixelCanvas;
+    if (!pc.showNineSliceGuide || appData.editMode !== 'free' || e.button !== 0) return false;
+    const insets = appData.getActiveNineSlice();
+    const edge = pc.getNineSliceGuideAt(e.x, e.y, insets);
+    if (!edge) return false;
+    this._nineSliceDragEdge = edge;
+    this._nineSliceDragStart = { ...insets };
+    return true;
+  }
+
+  /**
+   * ドラッグ中の境界線を、マウス位置のピクセル境界に合わせる。
+   * 左右・上下が重ならないように範囲を制限する。
+   */
+  _updateNineSliceDrag(e, appData) {
+    const insets = appData.getActiveNineSlice();
+    if (!insets) {
+      this._nineSliceDragEdge = null;
+      return;
+    }
+    const pc = this._pixelCanvas;
+    const { width, height } = appData.layerData;
+    const px = Math.round((e.x - pc.offsetX) / pc.scale);
+    const py = Math.round((e.y - pc.offsetY) / pc.scale);
+    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+    const next = { ...insets };
+    if (this._nineSliceDragEdge === 'left') next.left = clamp(px, 0, width - insets.right);
+    if (this._nineSliceDragEdge === 'right') next.right = clamp(width - px, 0, width - insets.left);
+    if (this._nineSliceDragEdge === 'top') next.top = clamp(py, 0, height - insets.bottom);
+    if (this._nineSliceDragEdge === 'bottom') next.bottom = clamp(height - py, 0, height - insets.top);
+    appData.setActiveNineSlice(next);
+  }
+
+  /** 境界線の上にあるときは、動かせる向きのカーソルにする */
+  _updateNineSliceCursor(e, appData) {
+    const pc = this._pixelCanvas;
+    const edge = pc.showNineSliceGuide && appData.editMode === 'free'
+      ? pc.getNineSliceGuideAt(e.x, e.y, appData.getActiveNineSlice())
+      : null;
+    if (edge && this._canvas) {
+      this._canvas.style.cursor = edge === 'left' || edge === 'right' ? 'ew-resize' : 'ns-resize';
+      this._nineSliceCursorActive = true;
+    } else if (this._nineSliceCursorActive && this._canvas) {
+      this._canvas.style.cursor = '';
+      this._nineSliceCursorActive = false;
+    }
+  }
+
   _applyTool(px, py, button, appData, isDown) {
     if (appData.hasFloatingSelection?.() && appData.activeTool !== 'selectRect') {
       if (!this._canModifyActiveLayer(appData, '浮動選択の確定')) return;

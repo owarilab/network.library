@@ -1166,3 +1166,33 @@ assets: {
 5. 既存 `MapEditorScene` と `TilemapComponent` の橋渡し設計
 
 ---
+
+## 12. NineSlice
+
+9 スライスの画像（pixelDocument の `nineSlice` 境界を持つもの）を、矩形いっぱいに伸ばして描く。角は原寸（× `scale`）、辺は一方向、中央は両方向に伸びる。詳細は [NINE_SLICE_DESIGN.md](NINE_SLICE_DESIGN.md)。
+
+```json
+{
+  "type": "NineSlice",
+  "enabled": true,
+  "data": { "pixelDocumentId": "px_msg_frame", "scale": 2, "width": 0, "height": 0, "originX": 0, "originY": 0, "alpha": 1 }
+}
+```
+
+| フィールド | 説明 |
+|---|---|
+| `pixelDocumentId` | 9 スライスの画像。空なら描かない |
+| `scale` | 角と辺の厚みに掛ける整数倍率（1〜8） |
+| `width` / `height` | ワールドの描画サイズ。0 なら画像の原寸 × `scale`。UI では UITransform の矩形を使う |
+| `originX` / `originY` | ワールド描画の基準点（0〜1） |
+| `alpha` | 不透明度（0〜1） |
+
+- UICanvas 配下では UITransform の矩形を使い、`width` / `height` は無視する。
+- `nineSlice` が無い画像は、全体を伸ばして描く（通常の Image と同じ）。
+
+## 13. Text の表示文字数（revealChars）
+
+Text の `revealChars` は、先頭から表示する文字数（整数）。`-1`（既定）は全文表示。タイプライター（EventAction の `typewriter`）が実行用コピーの値を書き換える。
+
+- 文字数は改行を除き、折り返し後の行を先頭から数える。行数は変えないので、背景の箱の高さは全文のときと同じ。
+- 空文字の Text も描画エントリになる（背景は描かない）。

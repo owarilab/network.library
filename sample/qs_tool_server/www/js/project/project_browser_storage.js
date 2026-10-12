@@ -196,6 +196,7 @@ class ProjectBrowserStorage {
     ProjectBrowserStorage._reassignAssetIds(nextProject.assets.maps || [], 'map', activeRef, idMap);
     ProjectBrowserStorage._reassignAssetIds(nextProject.assets.playUnits || [], 'pu', activeRef, idMap);
     ProjectBrowserStorage._rewriteCharacterChipsetRefs(nextProject.assets.playUnits || [], idMap);
+    ProjectBrowserStorage._rewriteComponentRefs(nextProject.assets.playUnits || [], idMap, 'NineSlice', 'pixelDocumentId');
 
     nextSession.projectId = nextProject.id;
     nextSession.dirty = false;
@@ -217,12 +218,23 @@ class ProjectBrowserStorage {
 
   // Save As で振り直した characterChipset の ID を、PlayUnit 内の Character 参照にも反映する
   static _rewriteCharacterChipsetRefs(playUnits, idMap) {
+    ProjectBrowserStorage._rewriteComponentRefs(playUnits, idMap, 'Character', 'characterChipsetId');
+  }
+
+  /**
+   * Save As で振り直した ID を、PlayUnit のコンポーネント参照へ反映する。
+   * @param {Array<object>} playUnits
+   * @param {Map<string, string>} idMap  旧 ID → 新 ID
+   * @param {string} componentType
+   * @param {string} dataKey  参照 ID を持つ data のキー
+   */
+  static _rewriteComponentRefs(playUnits, idMap, componentType, dataKey) {
     for (const playUnit of playUnits) {
       for (const object of playUnit.objects || []) {
         for (const component of object.components || []) {
-          if (component.type !== 'Character') continue;
-          const newId = idMap.get(component.data?.characterChipsetId);
-          if (newId) component.data.characterChipsetId = newId;
+          if (component.type !== componentType) continue;
+          const newId = idMap.get(component.data?.[dataKey]);
+          if (newId) component.data[dataKey] = newId;
         }
       }
     }
@@ -312,6 +324,7 @@ class ProjectBrowserStorage {
         meta: {
           width: layerData.width,
           height: layerData.height,
+          nineSlice: ProjectData.normalizeNineSlice(asset.nineSlice, layerData.width, layerData.height),
         },
       };
     }
@@ -427,6 +440,7 @@ class ProjectBrowserStorage {
         height: layerData.height,
         layerData,
         palette: parsed.palette.clone(),
+        nineSlice: ProjectData.normalizeNineSlice(record.meta?.nineSlice, layerData.width, layerData.height),
       };
     }
 

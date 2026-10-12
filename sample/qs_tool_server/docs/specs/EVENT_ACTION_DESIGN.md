@@ -82,6 +82,26 @@ PlayTestScene._updateTweens() (playTween の場合、毎フレーム値を補間
 循環参照ガード: 同一フレーム内で同一 eventId は最大1回のみ処理。
 フレームをまたいだループは発生しない。
 
+### action = `typewriter` 追加フィールド
+
+文字列を一定速度で Text に表示する。全文表示後に完了イベントを発火する。詳細は [MESSAGE_WINDOW_DESIGN.md](MESSAGE_WINDOW_DESIGN.md)。
+
+| フィールド | 型 | 説明 |
+|---|---|---|
+| `targetObjectId` | string | 表示する Text を持つオブジェクト（必須） |
+| `componentType` | string | `Text` 固定 |
+| `valueSource` | string | `literal`（`value` の文字列）または `variable`（`valueVariablePath` の値） |
+| `value` | string | `valueSource: "literal"` のときの文字列（JSON として解釈しない） |
+| `valueVariablePath` | string | `valueSource: "variable"` のときのグローバル変数パス |
+| `charsPerSecond` | number | 表示速度（既定 30）。0 以下は既定値 |
+| `statusVariablePath` | string | 任意。`typing` / `done` を書く string 変数 |
+| `completeEventId` | string | 任意。全文表示時に一度だけ発火する event ID（次のフレームで処理） |
+
+- 表示中に再実行すると、再開始せず全文表示にして `done` にする（スキップ）。
+- `done` の後の再実行は、新しい文字列で始める。
+- PlayUnit を切り替えると進行中の表示は止まり、Text の表示文字数は全文に戻る。
+- 変更は実行用コピーの Text（`text` と `revealChars`）にだけ書く。
+
 ### action = `returnPlayUnit` 追加フィールド
 
 追加フィールドなし。

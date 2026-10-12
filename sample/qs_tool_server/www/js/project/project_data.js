@@ -369,14 +369,37 @@ class ProjectData {
    * @returns {object}
    */
   _normalizePixelDocument(doc) {
+    const width = this._normalizeSize(doc.width, 32);
+    const height = this._normalizeSize(doc.height, 32);
     return {
       id: this._normalizeId(doc.id, 'px'),
       type: 'pixelDocument',
       name: this._normalizeName(doc.name, 'untitled'),
-      width: this._normalizeSize(doc.width, 32),
-      height: this._normalizeSize(doc.height, 32),
+      width,
+      height,
       layerData: doc.layerData || null,
+      nineSlice: ProjectData.normalizeNineSlice(doc.nineSlice, width, height),
     };
+  }
+
+  /**
+   * 9スライスの境界（ソース画素単位）を検証する。
+   * 各値は 0 以上の整数で、左右・上下の合計が画像サイズを超えてはいけない。不正なら null。
+   * @param {{left?: number, top?: number, right?: number, bottom?: number}|null|undefined} value
+   * @param {number} width
+   * @param {number} height
+   * @returns {{left: number, top: number, right: number, bottom: number}|null}
+   */
+  static normalizeNineSlice(value, width, height) {
+    if (!value || typeof value !== 'object') return null;
+    const insets = {};
+    for (const key of ['left', 'top', 'right', 'bottom']) {
+      const edge = value[key];
+      if (!Number.isInteger(edge) || edge < 0) return null;
+      insets[key] = edge;
+    }
+    if (insets.left + insets.right > width || insets.top + insets.bottom > height) return null;
+    return insets;
   }
 
   /**

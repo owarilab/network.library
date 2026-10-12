@@ -32,6 +32,8 @@ class MenuConstants {
   static VIEW_ZOOM_OUT    = 'view.zoom_out';
   static VIEW_ZOOM_RESET  = 'view.zoom_reset';
   static VIEW_PASS_FLAGS  = 'view.pass_flags';
+  static VIEW_NINE_SLICE_GUIDE    = 'view.nine_slice_guide';
+  static VIEW_NINE_SLICE_SETTINGS = 'view.nine_slice_settings';
 
   // ---- ファイル（タイルセット拡張） ----
   static FILE_NEW_TILESET      = 'file.new_tileset';

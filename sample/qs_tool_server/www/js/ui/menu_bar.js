@@ -67,6 +67,8 @@ class MenuBar {
         dropdown: new DropdownMenu([
           { id: MenuConstants.VIEW_GRID,       label: 'グリッド表示' },
           { id: MenuConstants.VIEW_PASS_FLAGS,  label: '通過フラグ表示' },
+          { id: MenuConstants.VIEW_NINE_SLICE_GUIDE,    label: '9スライスガイド表示' },
+          { id: MenuConstants.VIEW_NINE_SLICE_SETTINGS, label: '9スライス設定…' },
           { id: MenuConstants.SEPARATOR },
           { id: MenuConstants.VIEW_ZOOM_IN,    label: '拡大'       },
           { id: MenuConstants.VIEW_ZOOM_OUT,   label: '縮小'       },
@@ -99,6 +101,15 @@ class MenuBar {
         ]),
       },
     ];
+
+    /**
+     * 項目にチェックを付けるかを返す（EditorScene が設定する）。
+     * @type {(id: string) => boolean}
+     */
+    this.isChecked = () => false;
+    for (const menuDef of this._menuDefs) {
+      if (menuDef.dropdown) menuDef.dropdown.isChecked = (id) => this.isChecked(id);
+    }
 
     /** 各トップレベル項目の描画領域 (render で算出) */
     this._rects = [];

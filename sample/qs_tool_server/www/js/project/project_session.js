@@ -202,12 +202,14 @@ class ProjectSerializer {
     const height = doc.height | 0;
     const layerData = doc.layerData || ProjectSerializer._createEmptyLayerData(width, height);
     const palette = ProjectSerializer._resolvePalette(doc.palette, fallbackPalette);
+    const nineSlice = ProjectData.normalizeNineSlice(doc.nineSlice, width, height);
     return {
       id: doc.id,
       type: 'pixelDocument',
       name: doc.name,
       width,
       height,
+      ...(nineSlice ? { nineSlice } : {}),
       storage: {
         type: 'embedded',
         codec: 'qts-base64',
@@ -358,6 +360,7 @@ class ProjectSerializer {
       height: layerData.height,
       layerData,
       palette: parsed.palette.clone(),
+      nineSlice: ProjectData.normalizeNineSlice(doc.nineSlice, layerData.width, layerData.height),
     };
   }
 

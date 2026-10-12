@@ -20,6 +20,10 @@ class PixelCanvas {
   static BORDER_COLOR   = '#222222';
   /** グリッド線の色 */
   static GRID_COLOR     = 'rgba(0,0,0,0.18)';
+  /** 9 スライスの境界線の色 */
+  static NINE_SLICE_GUIDE_COLOR = '#38bdf8';
+  /** 境界線をつかめる距離（画面 px） */
+  static NINE_SLICE_HIT_PX = 4;
   /** ズーム倍率ステップ一覧 (ピクセルアート向けの細かいステップ) */
   static SCALE_STEPS = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 32, 40, 48, 56, 64];
   /** ズーム倍率の下限・上限 (SCALE_STEPS の先頭・末尾) */
@@ -62,6 +66,10 @@ class PixelCanvas {
      * @type {boolean}
      */
     this.showGrid = true;
+    /** 9 スライスの境界線を表示するか（表示状態のみ。保存しない） */
+    this.showNineSliceGuide = false;
+    /** render 時点のピクセルサイズ（境界線のヒットテストで使う） */
+    this._lastPixelSize = null;
 
     /** パン操作中フラグ */
     this._isPanning    = false;
@@ -145,6 +153,13 @@ class PixelCanvas {
     // ---- グリッド線 ----
     if (this.showGrid && this.scale >= PixelCanvas.GRID_THRESHOLD) {
       this._drawGrid(ctx, pw, ph);
+    }
+
+    // ---- 9 スライスの境界線 ----
+    this._lastPixelSize = { w: pw, h: ph };
+    const nineSlice = appData?.getActiveNineSlice?.() || null;
+    if (this.showNineSliceGuide && nineSlice) {
+      this._drawNineSliceGuides(ctx, pw, ph, nineSlice);
     }
 
     if (appData?.hasFloatingSelection?.()) {
@@ -292,6 +307,80 @@ class PixelCanvas {
   /**
    * ピクセルグリッド線を描画する。
    */
+  /**
+   * 9 スライスの境界線の画面座標（ピクセル座標を拡大・平行移動したもの）。
+   * @param {{left: number, top: number, right: number, bottom: number}} insets
+   * @param {number} pw
+   * @param {number} ph
+   * @returns {{left: number, right: number, top: number, bottom: number}}
+   */
+  _getNineSliceGuideLines(insets, pw, ph) {
+    return {
+      left: this.offsetX + insets.left * this.scale,
+      right: this.offsetX + (pw - insets.right) * this.scale,
+      top: this.offsetY + insets.top * this.scale,
+      bottom: this.offsetY + (ph - insets.bottom) * this.scale,
+    };
+  }
+
+  _drawNineSliceGuides(ctx, pw, ph, insets) {
+    const lines = this._getNineSliceGuideLines(insets, pw, ph);
+    const x0 = this.offsetX;
+    const x1 = this.offsetX + pw * this.scale;
+    const y0 = this.offsetY;
+    const y1 = this.offsetY + ph * this.scale;
+
+    ctx.save();
+    ctx.strokeStyle = PixelCanvas.NINE_SLICE_GUIDE_COLOR;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    const vertical = [lines.left, lines.right];
+    for (const x of vertical) {
+      ctx.moveTo(Math.round(x) + 0.5, y0);
+      ctx.lineTo(Math.round(x) + 0.5, y1);
+    }
+    const horizontal = [lines.top, lines.bottom];
+    for (const y of horizontal) {
+      ctx.moveTo(x0, Math.round(y) + 0.5);
+      ctx.lineTo(x1, Math.round(y) + 0.5);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /**
+   * 画面座標 (x, y) の近くにある 9 スライスの境界線を返す。
+   * @param {number} x
+   * @param {number} y
+   * @param {{left: number, top: number, right: number, bottom: number}|null} insets
+   * @returns {'left'|'right'|'top'|'bottom'|null}
+   */
+  getNineSliceGuideAt(x, y, insets) {
+    if (!insets || !this._lastPixelSize) return null;
+    const { w, h } = this._lastPixelSize;
+    const lines = this._getNineSliceGuideLines(insets, w, h);
+    const hit = PixelCanvas.NINE_SLICE_HIT_PX;
+    const withinY = y >= this.offsetY - hit && y <= this.offsetY + h * this.scale + hit;
+    const withinX = x >= this.offsetX - hit && x <= this.offsetX + w * this.scale + hit;
+
+    const candidates = [];
+    if (withinY) {
+      candidates.push({ edge: 'left', distance: Math.abs(x - lines.left) });
+      candidates.push({ edge: 'right', distance: Math.abs(x - lines.right) });
+    }
+    if (withinX) {
+      candidates.push({ edge: 'top', distance: Math.abs(y - lines.top) });
+      candidates.push({ edge: 'bottom', distance: Math.abs(y - lines.bottom) });
+    }
+    let best = null;
+    for (const candidate of candidates) {
+      if (candidate.distance > hit) continue;
+      if (!best || candidate.distance < best.distance) best = candidate;
+    }
+    return best ? best.edge : null;
+  }
+
   _drawGrid(ctx, pw, ph) {
     const { offsetX: ox, offsetY: oy, scale } = this;
     ctx.save();

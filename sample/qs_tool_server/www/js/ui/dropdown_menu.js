@@ -30,6 +30,9 @@ class DropdownMenu {
     /** @type {{ id: string, label?: string }[]} */
     this._items = items;
 
+    /** 項目がチェック状態かを返す（MenuBar が設定する。未設定ならチェックなし） */
+    this.isChecked = null;
+
     /** ホバー中のアイテムインデックス (-1 = なし) */
     this._hoverIndex = -1;
 
@@ -122,6 +125,9 @@ class DropdownMenu {
 
       ctx.font = FONT;
       const textY = r.y + Math.floor(ITEM_HEIGHT * 0.72);
+      if (this.isChecked?.(item.id)) {
+        ctx.fillText('✓', r.x + 6, textY);
+      }
       ctx.fillText(item.label ?? '', r.x + PADDING_X, textY);
     });
 

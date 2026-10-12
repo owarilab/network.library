@@ -28,6 +28,8 @@ class PlayTestScene extends Scene {
     this._chipCanvasCache = new Map();
     /** タイルマップの描画・通行判定。PlayTest セッション中のキャッシュを持つ */
     this._tilemaps = new TilemapRuntime();
+    /** タイプライター（typewriter アクション）の進行。key: `${unitId}/${objectId}` */
+    this._typewriters = new Map();
     this._pointerState = {
       canvasX: 0,
       canvasY: 0,
@@ -66,6 +68,7 @@ class PlayTestScene extends Scene {
     this._appData = appData;
     appData?.activateStartupPlayUnit?.();
     this._tilemaps.clear();
+    this._typewriters.clear();
     this._runtime = PlayUnitRuntime.fromPlayUnit(this._getActiveRuntimePlayUnit(), appData);
     this._cameraState = this._createCameraState(this._runtime?.camera);
     input.on('keydown', this._onKeyDown);
@@ -82,6 +85,7 @@ class PlayTestScene extends Scene {
     this._playerControllers.clear();
     this._chipCanvasCache.clear();
     this._tilemaps.clear();
+    this._typewriters.clear();
     this._pointerState.hoveredTriggerMap.clear();
     this._pointerState.pressedTriggerKeys.clear();
     this._pointerState.pressedDragHits.dragStart = null;
@@ -204,6 +208,10 @@ class PlayTestScene extends Scene {
           this._tilemaps.draw(ctx, entry, project, view);
           continue;
         }
+        if (entry.kind === 'nineSlice') {
+          this._drawNineSliceEntry(ctx, entry, project);
+          continue;
+        }
         if (entry.kind === 'rectangle') {
           this._drawRectangleEntry(ctx, entry);
           continue;
@@ -239,6 +247,7 @@ class PlayTestScene extends Scene {
       this._statusTone = 'info';
       this._statusMessage = `Switched PlayUnit: ${playUnitSwitch.asset.name || playUnitSwitch.asset.id}`;
       this._cameraState = null;
+      this._resetTypewriters();
     }
 
     const playUnit = this._getActiveRuntimePlayUnit();
@@ -252,6 +261,7 @@ class PlayTestScene extends Scene {
     this._processTimerTriggers(dt, playUnit);
     this._processEventActions(playUnit);
     this._updateTweens(dt, playUnit);
+    this._updateTypewriters(dt);
     if (!this._cameraState || previousCameraObjectId !== (this._runtime?.camera?.objectId || '')) {
       this._cameraState = this._createCameraState(this._runtime?.camera);
     } else if (this._runtime?.camera) {
@@ -774,10 +784,13 @@ class PlayTestScene extends Scene {
   }
 
   _drawTextEntry(ctx, entry) {
+    // 空の Text は描かない（背景も出さない）
+    if (!entry.text) return;
     ctx.save();
     ctx.font = entry.font;
 
     const lines = this._buildTextLines(ctx, entry);
+    const visibleLines = PlayTestScene._revealLines(lines, entry.revealChars);
     const lineHeight = entry.lineHeight > 0 ? entry.lineHeight : 28;
     const padding = entry.padding > 0 ? entry.padding : 0;
     const totalHeight = Math.max(0, (lines.length - 1) * lineHeight);
@@ -818,7 +831,8 @@ class PlayTestScene extends Scene {
 
     for (let index = 0; index < lines.length; index++) {
       const lineY = startY + index * lineHeight;
-      const line = lines[index];
+      const line = visibleLines[index];
+      if (!line) continue;
       if (entry.strokeColor && entry.strokeWidth > 0) {
         if (entry.maxWidth > 0) ctx.strokeText(line, entry.x, lineY, entry.maxWidth);
         else ctx.strokeText(line, entry.x, lineY);
@@ -957,6 +971,35 @@ class PlayTestScene extends Scene {
     ctx.restore();
   }
 
+  /**
+   * 9 スライスの pixelDocument を、エントリの矩形に伸ばして描く。
+   * width / height が 0 のときは画像の原寸 × scale を使う。
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {object} entry
+   * @param {ProjectData|null} project
+   */
+  _drawNineSliceEntry(ctx, entry, project) {
+    const pixelDocument = project?.findPixelDocumentById?.(entry.pixelDocumentId) || null;
+    const pixelData = pixelDocument?.layerData?.composite?.() || null;
+    if (!pixelDocument || !pixelData?.pixels) return;
+
+    const sourceCanvas = this._getPixelDocumentCanvas(pixelDocument, pixelData);
+    if (!sourceCanvas) return;
+
+    const scale = Number.isFinite(Number(entry.scale)) && Number(entry.scale) > 0 ? Number(entry.scale) : 1;
+    const naturalWidth = pixelDocument.width | 0 || pixelData.width | 0 || sourceCanvas.width;
+    const naturalHeight = pixelDocument.height | 0 || pixelData.height | 0 || sourceCanvas.height;
+    const drawWidth = entry.width > 0 ? entry.width : naturalWidth * scale;
+    const drawHeight = entry.height > 0 ? entry.height : naturalHeight * scale;
+    const drawX = entry.x - drawWidth * (Number.isFinite(Number(entry.originX)) ? Number(entry.originX) : 0);
+    const drawY = entry.y - drawHeight * (Number.isFinite(Number(entry.originY)) ? Number(entry.originY) : 0);
+
+    ctx.save();
+    ctx.globalAlpha = typeof entry.alpha === 'number' ? entry.alpha : 1;
+    NineSliceRenderer.draw(ctx, sourceCanvas, pixelDocument.nineSlice || null, { x: drawX, y: drawY, w: drawWidth, h: drawHeight }, scale);
+    ctx.restore();
+  }
+
   _drawUIEntries(ctx, entries, preview, project) {
     if (!Array.isArray(entries) || !entries.length || !preview) return;
 
@@ -974,6 +1017,10 @@ class PlayTestScene extends Scene {
       }
       if (mappedEntry.kind === 'rectangle') {
         this._drawRectangleEntry(ctx, mappedEntry);
+        continue;
+      }
+      if (mappedEntry.kind === 'nineSlice') {
+        this._drawNineSliceEntry(ctx, mappedEntry, project);
         continue;
       }
       this._drawTextEntry(ctx, mappedEntry);
@@ -1015,6 +1062,12 @@ class PlayTestScene extends Scene {
 
     if (typeof entry?.font === 'string') {
       mappedEntry.font = this._scaleFont(entry.font, Math.min(scaleX, scaleY));
+    }
+
+    if (mappedEntry.kind === 'nineSlice') {
+      // 9 スライスの角と辺の厚みは、プレビュー枠に合わせて縮尺する
+      const entryScale = Number.isFinite(Number(entry?.scale)) && Number(entry.scale) > 0 ? Number(entry.scale) : 1;
+      mappedEntry.scale = entryScale * Math.min(scaleX, scaleY);
     }
 
     if (mappedEntry.kind === 'text' && mappedEntry.rect) {
@@ -1130,9 +1183,31 @@ class PlayTestScene extends Scene {
     const tilemapEntries = Array.isArray(runtime?.tilemapEntries)
       ? runtime.tilemapEntries.map((entry) => ({ ...entry, kind: 'tilemap' }))
       : [];
-    return [...imageEntries, ...characterEntries, ...tilemapEntries, ...textEntries, ...rectangleEntries].sort((a, b) => {
+    const nineSliceEntries = Array.isArray(runtime?.nineSliceEntries)
+      ? runtime.nineSliceEntries.map((entry) => ({ ...entry, kind: 'nineSlice' }))
+      : [];
+    return [...imageEntries, ...characterEntries, ...tilemapEntries, ...nineSliceEntries, ...textEntries, ...rectangleEntries].sort((a, b) => {
       if (a.z !== b.z) return a.z - b.z;
       return (a.order || 0) - (b.order || 0);
+    });
+  }
+
+  /**
+   * 表示文字数（改行を除き、折り返し後の行を先頭から数える）で行を切る。
+   * 行数は変えないので、背景の箱の高さは全文のときと同じになる。
+   * @param {string[]} lines
+   * @param {number} revealChars  0 以上で表示文字数。-1 以下は全文
+   * @returns {string[]}
+   */
+  static _revealLines(lines, revealChars) {
+    if (!(revealChars >= 0)) return lines;
+    let remaining = revealChars;
+    return lines.map(line => {
+      const chars = Array.from(line);
+      if (remaining <= 0) return '';
+      const shown = chars.slice(0, remaining).join('');
+      remaining -= chars.length;
+      return shown;
     });
   }
 
@@ -1725,6 +1800,7 @@ class PlayTestScene extends Scene {
       this._statusTone = 'info';
       this._statusMessage = `Returned to PlayUnit: ${asset.name || asset.id}`;
       this._cameraState = null;
+      this._resetTypewriters();
       return true;
     }
 
@@ -1766,9 +1842,108 @@ class PlayTestScene extends Scene {
         component.data[property] = from;
         return true;
       }
+      case 'typewriter':
+        return this._executeTypewriter(playUnit, targetObject, data);
       default:
         return false;
     }
+  }
+
+  /**
+   * 文字列を一定速度で表示する（EventAction の typewriter）。
+   * 表示中に再実行すると全文表示にして完了イベントを発火する（スキップ）。
+   * 全文表示後の再実行は、新しい文字列で始める。
+   * 変更は実行用コピーの Text にだけ書く（アセットは変えない）。
+   * @returns {boolean}
+   */
+  _executeTypewriter(playUnit, targetObject, data) {
+    const component = targetObject.findComponentByType('Text');
+    if (!component) {
+      this._statusTone = 'error';
+      this._statusMessage = `Text component not found on ${targetObject.name || targetObject.id}`;
+      return false;
+    }
+
+    const key = `${playUnit.id}/${targetObject.id}`;
+    const current = this._typewriters.get(key);
+    if (current && !current.done) {
+      this._finishTypewriter(current);
+      return true;
+    }
+
+    const text = this._resolveTypewriterText(data);
+    const state = {
+      component,
+      total: Array.from(text.replace(/\n/g, '')).length,
+      elapsedMs: 0,
+      charsPerSecond: Number.isFinite(Number(data.charsPerSecond)) && Number(data.charsPerSecond) > 0
+        ? Number(data.charsPerSecond) : 30,
+      statusVariablePath: typeof data.statusVariablePath === 'string' ? data.statusVariablePath.trim() : '',
+      completeEventId: typeof data.completeEventId === 'string' ? data.completeEventId.trim() : '',
+      done: false,
+    };
+    this._typewriters.set(key, state);
+    component.data.text = text;
+    component.data.revealChars = 0;
+    if (!this._setTypewriterStatus(state, 'typing')) return false;
+    if (state.total === 0) this._finishTypewriter(state);
+    return true;
+  }
+
+  /**
+   * typewriter の文字列を決める。literal は value、variable はグローバル変数の値。
+   * @returns {string}
+   */
+  _resolveTypewriterText(data) {
+    if (data.valueSource === 'variable') {
+      const path = typeof data.valueVariablePath === 'string' ? data.valueVariablePath.trim() : '';
+      const value = path ? this._appData?.getRuntimeGlobalVariable?.(path) : undefined;
+      return value == null ? '' : String(value);
+    }
+    if (typeof data.value === 'string') return data.value;
+    return data.value == null ? '' : String(data.value);
+  }
+
+  /**
+   * 状態変数（statusVariablePath）へ書く。変数が無い場合はエラーにする。
+   * @returns {boolean}
+   */
+  _setTypewriterStatus(state, value) {
+    if (!state.statusVariablePath) return true;
+    if (this._appData?.setRuntimeGlobalVariable?.(state.statusVariablePath, value) !== false) return true;
+    this._statusTone = 'error';
+    this._statusMessage = `Global variable not found: ${state.statusVariablePath}`;
+    return false;
+  }
+
+  _finishTypewriter(state) {
+    state.component.data.revealChars = -1;
+    state.done = true;
+    this._setTypewriterStatus(state, 'done');
+    if (state.completeEventId) this._pendingEvents.add(state.completeEventId);
+  }
+
+  _updateTypewriters(dt) {
+    if (!this._typewriters.size) return;
+    const deltaMs = Number.isFinite(Number(dt)) && Number(dt) > 0 ? Number(dt) : 0;
+    for (const state of this._typewriters.values()) {
+      if (state.done) continue;
+      state.elapsedMs += deltaMs;
+      const visible = Math.floor(state.elapsedMs * state.charsPerSecond / 1000);
+      if (visible >= state.total) {
+        this._finishTypewriter(state);
+      } else {
+        state.component.data.revealChars = visible;
+      }
+    }
+  }
+
+  /** PlayUnit を切り替えるとき、進行中のタイプライターを止めて表示を全文に戻す */
+  _resetTypewriters() {
+    for (const state of this._typewriters.values()) {
+      state.component.data.revealChars = -1;
+    }
+    this._typewriters.clear();
   }
 
   _updateTweens(dt, playUnit) {

@@ -273,6 +273,34 @@ The map object shape used by the PlayUnit:
 }
 ```
 
+## Example 8: Message Window (reference only)
+
+A message window needs a 9-slice pixelDocument (QTS base64) and two global string variables. Do not write them by hand. Use the reference script:
+
+```bash
+python3 -I tools/add_message_window_to_demo.py assets/character_walk_demo.qsproj
+```
+
+The typewriter action used by the window (`Trigger` with `onTimer` starts it):
+
+```json
+{
+  "type": "EventAction",
+  "enabled": true,
+  "data": {
+    "listenTo": "msg.show",
+    "action": "typewriter",
+    "targetObjectId": "obj_msg_body",
+    "componentType": "Text",
+    "valueSource": "variable",
+    "valueVariablePath": "user.fixed.msgBody",
+    "charsPerSecond": 24,
+    "statusVariablePath": "user.fixed.msgStatus",
+    "completeEventId": "msg.typed"
+  }
+}
+```
+
 ## Example 5: What to Avoid
 
 Bad patterns:
