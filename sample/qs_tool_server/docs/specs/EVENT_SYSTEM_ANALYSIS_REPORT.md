@@ -375,6 +375,8 @@ Text コンポーネントで `${variable_path}` 構文を使用すると、毎�
 
 **実装ロケーション**: `play_test_scene.js` に sequence action 追加
 
+**実装状況（P0-3）**: `sequence` / `wait` / `waitEvent` として実装した（詳細は [EVENT_ACTION_DESIGN.md](EVENT_ACTION_DESIGN.md)）。`delay` という名前は使わず、`wait` の単位は秒（`Trigger.onTimer` と同じ）。この報告書の `tweenDuration` は秒と書いているが、実装はミリ秒である。
+
 ### 8.3 Phase C: 式評価エンジン
 
 **目標**: 簡単な計算式の評価（スコア計算、ダメージ計算など）

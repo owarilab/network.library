@@ -928,6 +928,9 @@ class PlayUnitEditorScene extends Scene {
           tweenFrom: 0,
           tweenTo: 1,
           tweenEasing: 'linear',
+          completeEventId: '',
+          steps: [],
+          onBusy: 'ignore',
         };
       default:
         return {};
@@ -985,6 +988,13 @@ class PlayUnitEditorScene extends Scene {
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
       this._statusTone = 'error';
       this._statusMessage = `${type} data must be a JSON object`;
+      return;
+    }
+
+    // steps が無い sequence は実行時に何も起きないので、保存させない
+    if (type === 'EventAction' && parsed.action === 'sequence' && !Array.isArray(parsed.steps)) {
+      this._statusTone = 'error';
+      this._statusMessage = 'sequence requires a steps array';
       return;
     }
 

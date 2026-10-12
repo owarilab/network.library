@@ -6,7 +6,7 @@
     "version": 1,
     "name": "Character Walk Demo",
     "createdAt": 1791740863588,
-    "updatedAt": 1791785587704,
+    "updatedAt": 1791787162120,
     "settings": {
       "defaultChipWidth": 16,
       "defaultChipHeight": 16
@@ -2823,21 +2823,6 @@
                   }
                 },
                 {
-                  "type": "EventAction",
-                  "enabled": true,
-                  "data": {
-                    "listenTo": "msg.show",
-                    "action": "typewriter",
-                    "targetObjectId": "obj_msg_body",
-                    "componentType": "Text",
-                    "valueSource": "variable",
-                    "valueVariablePath": "user.fixed.msgBody",
-                    "charsPerSecond": 24,
-                    "statusVariablePath": "user.fixed.msgStatus",
-                    "completeEventId": "msg.typed"
-                  }
-                },
-                {
                   "type": "Conditional",
                   "enabled": true,
                   "data": {
@@ -2870,10 +2855,75 @@
                   "type": "EventAction",
                   "enabled": true,
                   "data": {
-                    "listenTo": "msg.next",
-                    "action": "setEnabled",
-                    "targetObjectId": "obj_msg_box",
-                    "enabled": false
+                    "listenTo": "msg.show",
+                    "action": "sequence",
+                    "targetObjectId": "",
+                    "onBusy": "ignore",
+                    "completeEventId": "msg.done",
+                    "steps": [
+                      {
+                        "action": "playTween",
+                        "targetObjectId": "obj_msg_box",
+                        "componentType": "NineSlice",
+                        "property": "alpha",
+                        "tweenFrom": 0,
+                        "tweenTo": 1,
+                        "tweenDuration": 300,
+                        "tweenEasing": "easeOut",
+                        "waitComplete": true
+                      },
+                      {
+                        "action": "typewriter",
+                        "targetObjectId": "obj_msg_body",
+                        "componentType": "Text",
+                        "valueSource": "variable",
+                        "valueVariablePath": "user.fixed.msgBody",
+                        "charsPerSecond": 24,
+                        "statusVariablePath": "user.fixed.msgStatus",
+                        "waitComplete": true
+                      },
+                      {
+                        "action": "waitEvent",
+                        "eventId": "msg.next"
+                      },
+                      {
+                        "action": "typewriter",
+                        "targetObjectId": "obj_msg_body",
+                        "componentType": "Text",
+                        "valueSource": "literal",
+                        "value": "二行目です。文字は、表示が終わるまでクリックするとまとめて出ます。",
+                        "charsPerSecond": 24,
+                        "statusVariablePath": "user.fixed.msgStatus",
+                        "waitComplete": true
+                      },
+                      {
+                        "action": "waitEvent",
+                        "eventId": "msg.next"
+                      },
+                      {
+                        "action": "wait",
+                        "duration": 0.3
+                      },
+                      {
+                        "action": "typewriter",
+                        "targetObjectId": "obj_msg_body",
+                        "componentType": "Text",
+                        "valueSource": "literal",
+                        "value": "最後の文です。クリックすると窓が閉じます。",
+                        "charsPerSecond": 24,
+                        "statusVariablePath": "user.fixed.msgStatus",
+                        "waitComplete": true
+                      },
+                      {
+                        "action": "waitEvent",
+                        "eventId": "msg.next"
+                      },
+                      {
+                        "action": "setEnabled",
+                        "targetObjectId": "obj_msg_box",
+                        "enabled": false
+                      }
+                    ]
                   }
                 }
               ]
@@ -2907,7 +2957,7 @@
                   "data": {
                     "pixelDocumentId": "px_msg_frame",
                     "scale": 2,
-                    "alpha": 1
+                    "alpha": 0
                   }
                 },
                 {

@@ -178,7 +178,7 @@
 | プレイヤー移動 | 部分的 | Controller で移動できる。通行不可はない |
 | 当たり判定 | 部分的 | AABB の進入トリガーのみ。退出イベントや押し戻しはない |
 | BGM / SE | なし | 音声の処理がない。masterVolume は予約名のみ |
-| ターンベース演出 | 部分的 | playTween は複数同時に使える。待機とトゥイーン完了イベントがないため、順次演出は組みにくい |
+| ターンベース演出 | 部分的 | playTween は複数同時に使える。sequence（wait / waitEvent / waitComplete）で順次演出を組める（P0-3）。並列や繰り返しはない |
 | タイマー | あり | system.fixed.timer、onTimer、onUpdate |
 | 乱数 | なし | 実装がない |
 | 式評価 | なし | 四則演算は setGlobalVariable の op のみ |
@@ -299,4 +299,9 @@ P0 の 3（順次実行の基盤）は後続の多くの前提になるため、
   - 残り: コライダ同士の一般的な押し戻し、NPC・オブジェクトとの衝突、プレイヤーより手前に描くレイヤー。
   - 既知の制約: Collider は Transform の左上基準のため、足元中央の origin と併用するには offset が必要（デモは offset で合わせている）。
 - **P0-2（メッセージウィンドウ）**: 9 スライスの枠（pixelDocument の境界、PlayTest と EditorScene）、表示文字数（Text の `revealChars`）、タイプライター（EventAction の `typewriter`、完了イベント、スキップ）、クリックで送るデモを実装した。詳細は [MESSAGE_WINDOW_DESIGN.md](MESSAGE_WINDOW_DESIGN.md) と [NINE_SLICE_DESIGN.md](NINE_SLICE_DESIGN.md)。
-  - 残り: 選択肢 UI、話者名の枠組み（部品の組み合わせで作れる）、自動送り（P0-3 の wait と順次実行の後）。
+  - 残り: 選択肢 UI、話者名の枠組み（部品の組み合わせで作れる）。自動送りは P0-3 の `waitEvent` の `timeout` で作れるようになった。
+- **P0-3（イベントの順次実行）**:
+  - 完了: EventAction の `sequence`（`steps` を順に実行）。step の `wait`（秒）、`waitEvent`（イベント待ち。`timeout` で時間切れでも進む）、`waitComplete`（typewriter、playTween、入れ子の sequence の完了を待つ）、`playTween` と `sequence` の `completeEventId`、`onBusy`（ignore / restart）。Conditional の branch からも sequence を実行できる。詳細は [EVENT_ACTION_DESIGN.md](EVENT_ACTION_DESIGN.md)。
+  - 完了: P0-2 のメッセージウィンドウを sequence で進める形に置き換えた（[MESSAGE_WINDOW_DESIGN.md](MESSAGE_WINDOW_DESIGN.md) の 11）。
+  - 残り: 繰り返し、並列、sequence 内の分岐、途中の中断、専用の編集 UI（現状は JSON 編集のみ）。
+  - 既知の制約: PlayUnit を切り替えると、進行中の sequence は再開しない（窓などの表示は残る）。

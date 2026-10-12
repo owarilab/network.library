@@ -47,7 +47,7 @@
 
 ### D4. 完了後はクリックを待つ
 
-- 全文表示後は次のトリガーを待つ（クリック）。自動送りは P0-3 の wait 実装後に追加する。
+- 全文表示後は次のトリガーを待つ（クリック）。自動送りは P0-3 の `waitEvent` の `timeout` で作れる（section 11）。
 - クリックは UI の Trigger（`triggerOn: click`）で受ける。UI の当たり判定は、Trigger と Collider（`width` / `height` を 0 にすると UITransform の矩形を使う既存の挙動）で成立する。
 
 ### D5. 状態は変数で外に出す
@@ -206,3 +206,13 @@ Root (UICanvas)
 - **デモ**: `tools/add_message_window_to_demo.py`。起動 0.5 秒後に `msg.show` を発火し、`MessageCanvas` の `typewriter` が本文を表示する。クリックは `msg.click` を発火し、`Conditional` が「表示中ならスキップ、そうでなければ `msg.next`」に分ける。`msg.next` で `MessageBox` を無効にして閉じる。
 - **検証**: Playwright で、空の Text の描画、24 文字/秒の進行（0.5 秒後に開始、約 1.5 秒で完了）、完了後の再開始、表示中の再実行で全文表示になり `done` になる、部分表示の描画、デモの窓の表示・スキップ・閉じる（実際のマウス入力経路で確認）。
 
+
+## 11. P0-3 での変更（順次実行）
+
+- **文の進行**: 次の文を出す処理は、EventAction の `sequence` が担当する。`typewriter`（`waitComplete`）で文を出し、`waitEvent`（`msg.next`）でクリックを待つ。`msg.show` で始まる 1 本の sequence に文を並べる。
+- **入力の解釈**: クリックは引き続き `msg.click` の Conditional が受け持つ。表示中ならスキップ（typewriter の再実行）、表示後なら `msg.next` を発火する。進行と入力の解釈を分けたので、Conditional の「単一アクション」の制限に当たらない。
+- **フェードイン**: 窓の枠（NineSlice の alpha）を `playTween` で 0 → 1 にし、`waitComplete` で終わってから本文を出す。
+- **自動送り**: 最後の `waitEvent` に `timeout`（秒）を付けると、クリックが無くても時間で進む。デモはクリック送りのまま。
+- **デモ**: `tools/add_message_sequence_to_demo.py` は、P0-2 で `msg.show` / `msg.next` に付けた EventAction を外し、sequence に置き換える。枠の初期 alpha は 0 にする。再実行しても結果は変わる。前提として `add_message_window_to_demo.py` の実行が必要。
+- **切替**: PlayUnit を切り替えると sequence は止まり、戻っても再開しない。窓は残り、`typewriter` の状態変数は `done` になる。
+- **検証**: 実行用コピーで `scene.update` を直接回し、sequence の各 step（`wait`、`waitEvent`、`waitComplete`、`onBusy`、完了イベント、失敗時の中断、Conditional からの実行）と PlayUnit 切替を確認した。デモは実際の入力経路（キャンバスへの mousedown / mouseup）で、フェード → 1 行目 → スキップ → 2 行目 → 待ち中のクリックは捨てられる → 3 行目 → 閉じる、の順に確認した。

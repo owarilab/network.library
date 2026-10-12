@@ -264,16 +264,22 @@ Supported `action` values:
 - `fireEvent`
 - `requestPlayUnit`
 - `returnPlayUnit`
+- `sequence`
 
 Action-specific fields:
 
 - `setProperty`: `targetObjectId`, `componentType`, `property`, `value`
 - `setEnabled`: `targetObjectId`, `enabled`
-- `playTween`: `targetObjectId`, `componentType`, `property`, `tweenDuration`, `tweenFrom`, `tweenTo`, `tweenEasing`
+- `playTween`: `targetObjectId`, `componentType`, `property`, `tweenDuration` (ms), `tweenFrom`, `tweenTo`, `tweenEasing`, `completeEventId` (optional; fires on natural end only)
 - `typewriter`: `targetObjectId`, `componentType` (`Text`), `valueSource` (`literal` with `value`, or `variable` with `valueVariablePath`), `charsPerSecond`, `statusVariablePath` (optional, `typing` / `done`), `completeEventId` (optional)
 - `fireEvent`: `eventId`
 - `requestPlayUnit`: `playUnitId`
 - `returnPlayUnit`: no extra fields
+- `sequence`: `steps` (required array; each step has the same shape as an EventAction), `onBusy` (`ignore` default, or `restart`), `completeEventId` (optional; fires once after the last step)
+  - Step-only actions: `wait` (`duration` in seconds, default 1), `waitEvent` (`eventId`, optional `timeout` in seconds). Any step with `"waitComplete": true` (`typewriter`, `playTween`, nested `sequence`) waits until that finishes.
+  - Other steps run immediately. A failing step stops the sequence (no completion event).
+  - `wait` and `waitEvent` are only valid inside `steps`.
+  - Can appear wherever an action can: EventAction `action`, Conditional `branches[].action` and `defaultAction`.
 
 ## Global Variables
 

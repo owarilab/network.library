@@ -416,6 +416,31 @@ ev_dismiss
 - `op` は `set`（デフォルト）/ `add` / `subtract` / `multiply` / `divide`
 - 算術演算（add/subtract/multiply/divide）は変数の type が `number` のみ有効
 
+## 例15: 順次実行（sequence）で会話を進める
+
+窓をフェードインし、文を 1 つずつ出す。`typewriter` は（`waitComplete` により）全文が出るまで止まり、`waitEvent` は `msg.next` が発火するまで止まる。`msg.next` はクリックを受ける Conditional が発火する。最後の `waitEvent` に `timeout` を付けると、クリックが無くても 3 秒後に閉じる（自動送りの形）。
+
+```json
+{
+  "type": "EventAction",
+  "enabled": true,
+  "data": {
+    "listenTo": "msg.show",
+    "action": "sequence",
+    "onBusy": "ignore",
+    "completeEventId": "msg.done",
+    "steps": [
+      { "action": "playTween", "targetObjectId": "obj_msg_box", "componentType": "NineSlice", "property": "alpha", "tweenFrom": 0, "tweenTo": 1, "tweenDuration": 300, "waitComplete": true },
+      { "action": "typewriter", "targetObjectId": "obj_msg_body", "componentType": "Text", "valueSource": "literal", "value": "一行目です。", "charsPerSecond": 24, "waitComplete": true },
+      { "action": "waitEvent", "eventId": "msg.next" },
+      { "action": "typewriter", "targetObjectId": "obj_msg_body", "componentType": "Text", "valueSource": "literal", "value": "二行目です。", "charsPerSecond": 24, "waitComplete": true },
+      { "action": "waitEvent", "eventId": "msg.next", "timeout": 3 },
+      { "action": "setEnabled", "targetObjectId": "obj_msg_box", "enabled": false }
+    ]
+  }
+}
+```
+
 ## 4. Conditional Component
 
 複数の条件分岐を順序付きで評価し、最初にマッチした分岐のアクションを実行します（短絡評価）。

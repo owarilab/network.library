@@ -30,6 +30,8 @@ class PlayTestScene extends Scene {
     this._tilemaps = new TilemapRuntime();
     /** タイプライター（typewriter アクション）の進行。key: `${unitId}/${objectId}` */
     this._typewriters = new Map();
+    /** 順次実行（sequence アクション）の進行。key: sequence の data オブジェクト */
+    this._sequences = new Map();
     this._pointerState = {
       canvasX: 0,
       canvasY: 0,
@@ -69,6 +71,7 @@ class PlayTestScene extends Scene {
     appData?.activateStartupPlayUnit?.();
     this._tilemaps.clear();
     this._typewriters.clear();
+    this._sequences.clear();
     this._runtime = PlayUnitRuntime.fromPlayUnit(this._getActiveRuntimePlayUnit(), appData);
     this._cameraState = this._createCameraState(this._runtime?.camera);
     input.on('keydown', this._onKeyDown);
@@ -86,6 +89,7 @@ class PlayTestScene extends Scene {
     this._chipCanvasCache.clear();
     this._tilemaps.clear();
     this._typewriters.clear();
+    this._sequences.clear();
     this._pointerState.hoveredTriggerMap.clear();
     this._pointerState.pressedTriggerKeys.clear();
     this._pointerState.pressedDragHits.dragStart = null;
@@ -247,7 +251,7 @@ class PlayTestScene extends Scene {
       this._statusTone = 'info';
       this._statusMessage = `Switched PlayUnit: ${playUnitSwitch.asset.name || playUnitSwitch.asset.id}`;
       this._cameraState = null;
-      this._resetTypewriters();
+      this._resetEventFlows();
     }
 
     const playUnit = this._getActiveRuntimePlayUnit();
@@ -262,6 +266,7 @@ class PlayTestScene extends Scene {
     this._processEventActions(playUnit);
     this._updateTweens(dt, playUnit);
     this._updateTypewriters(dt);
+    this._updateSequences(dt, playUnit);
     if (!this._cameraState || previousCameraObjectId !== (this._runtime?.camera?.objectId || '')) {
       this._cameraState = this._createCameraState(this._runtime?.camera);
     } else if (this._runtime?.camera) {
@@ -1652,6 +1657,8 @@ class PlayTestScene extends Scene {
       this._pendingEvents.clear();
 
       for (const eventId of batch) {
+        // 待ち（waitEvent）は、待ち始めた後に処理されたイベントだけで解ける
+        this._notifySequenceEvent(eventId);
         if (dispatchedThisFrame.has(eventId)) continue;
         dispatchedThisFrame.add(eventId);
 
@@ -1679,6 +1686,14 @@ class PlayTestScene extends Scene {
     if (!data || !playUnit) return;
     const action = typeof data.action === 'string' ? data.action.trim() : 'setProperty';
     const targetObjectId = typeof data.targetObjectId === 'string' ? data.targetObjectId.trim() : '';
+
+    if (action === 'sequence') return this._startSequence(playUnit, data).ok;
+
+    if (action === 'wait' || action === 'waitEvent') {
+      this._statusTone = 'error';
+      this._statusMessage = `${action} is only valid as a sequence step`;
+      return false;
+    }
 
     if (action === 'fireEvent') {
       const chainId = typeof data.eventId === 'string' ? data.eventId.trim() : '';
@@ -1800,7 +1815,7 @@ class PlayTestScene extends Scene {
       this._statusTone = 'info';
       this._statusMessage = `Returned to PlayUnit: ${asset.name || asset.id}`;
       this._cameraState = null;
-      this._resetTypewriters();
+      this._resetEventFlows();
       return true;
     }
 
@@ -1837,8 +1852,9 @@ class PlayTestScene extends Scene {
         const to = Number.isFinite(Number(data.tweenTo)) ? Number(data.tweenTo) : 1;
         const easing = typeof data.tweenEasing === 'string' && data.tweenEasing.trim()
           ? data.tweenEasing.trim() : 'linear';
+        const completeEventId = typeof data.completeEventId === 'string' ? data.completeEventId.trim() : '';
         const tweenKey = `${targetObjectId}:${componentType}:${property}`;
-        this._activeTweens.set(tweenKey, { targetObjectId, componentType, property, from, to, duration, elapsed: 0, easing });
+        this._activeTweens.set(tweenKey, { targetObjectId, componentType, property, from, to, duration, elapsed: 0, easing, completeEventId });
         component.data[property] = from;
         return true;
       }
@@ -1938,12 +1954,193 @@ class PlayTestScene extends Scene {
     }
   }
 
-  /** PlayUnit を切り替えるとき、進行中のタイプライターを止めて表示を全文に戻す */
+  /**
+   * PlayUnit を切り替えるとき、進行中のタイプライターを止めて表示を全文に戻す。
+   * 状態変数は done にして、表示と状態を揃える。
+   */
   _resetTypewriters() {
     for (const state of this._typewriters.values()) {
       state.component.data.revealChars = -1;
+      if (!state.done && state.statusVariablePath) {
+        this._appData?.setRuntimeGlobalVariable?.(state.statusVariablePath, 'done');
+      }
+      state.done = true;
     }
     this._typewriters.clear();
+  }
+
+  /** PlayUnit の切替・返却で、進行中の sequence・tween・typewriter を止める */
+  _resetEventFlows() {
+    for (const state of this._sequences.values()) {
+      state.done = true;
+      state.wait = null;
+    }
+    this._sequences.clear();
+    this._activeTweens.clear();
+    this._resetTypewriters();
+  }
+
+  /**
+   * sequence アクションを開始する。同じ data が実行中のときは onBusy に従う。
+   * ignore（既定）は新しい実行を捨て、restart は今の実行を止めて最初からやり直す。
+   * @returns {{ok: boolean, state: object|null}}  state が null のときは待つ対象がない（無視された）
+   */
+  _startSequence(playUnit, data) {
+    if (!Array.isArray(data.steps)) {
+      this._statusTone = 'error';
+      this._statusMessage = 'sequence: steps array is missing';
+      return { ok: false, state: null };
+    }
+
+    const existing = this._sequences.get(data);
+    if (existing) {
+      if (data.onBusy !== 'restart') return { ok: true, state: null };
+      this._endSequence(existing);
+    }
+
+    const state = {
+      key: data,
+      steps: data.steps,
+      index: 0,
+      wait: null,
+      done: false,
+      completeEventId: typeof data.completeEventId === 'string' ? data.completeEventId.trim() : '',
+    };
+    this._sequences.set(data, state);
+    this._advanceSequence(playUnit, state);
+    return { ok: true, state };
+  }
+
+  /** 待ちに入るまで、または終わるまで step を順に実行する */
+  _advanceSequence(playUnit, state) {
+    while (!state.done && !state.wait) {
+      if (state.index >= state.steps.length) {
+        this._finishSequence(state);
+        return;
+      }
+
+      const stepNumber = state.index + 1;
+      const step = state.steps[state.index];
+      state.index += 1;
+      const result = this._runSequenceStep(playUnit, step);
+      if (state.done) return;
+
+      if (!result.ok) {
+        this._endSequence(state);
+        this._statusTone = 'error';
+        this._statusMessage = `Sequence stopped at step ${stepNumber} (${step?.action || 'setProperty'})`;
+        return;
+      }
+      state.wait = result.wait;
+    }
+  }
+
+  /**
+   * step を 1 つ実行する。待つ必要があれば wait を返す。
+   * @returns {{ok: boolean, wait: object|null}}
+   */
+  _runSequenceStep(playUnit, step) {
+    if (!step || typeof step !== 'object') return { ok: false, wait: null };
+    const action = typeof step.action === 'string' ? step.action.trim() : '';
+
+    if (action === 'wait') {
+      const seconds = Number.isFinite(Number(step.duration)) ? Number(step.duration) : 1;
+      return { ok: true, wait: seconds > 0 ? { type: 'time', remainingMs: seconds * 1000 } : null };
+    }
+
+    if (action === 'waitEvent') {
+      const eventId = typeof step.eventId === 'string' ? step.eventId.trim() : '';
+      if (!eventId) {
+        this._statusTone = 'error';
+        this._statusMessage = 'waitEvent requires eventId';
+        return { ok: false, wait: null };
+      }
+      const timeoutMs = Number.isFinite(Number(step.timeout)) && Number(step.timeout) > 0 ? Number(step.timeout) * 1000 : 0;
+      return { ok: true, wait: { type: 'event', eventId, timeoutMs, elapsedMs: 0, fired: false } };
+    }
+
+    if (action === 'sequence') {
+      const started = this._startSequence(playUnit, step);
+      if (!started.ok) return { ok: false, wait: null };
+      const wait = step.waitComplete === true && started.state ? this._createDoneWait(started.state) : null;
+      return { ok: true, wait };
+    }
+
+    if (!this._executeAction(playUnit, step)) return { ok: false, wait: null };
+    const wait = step.waitComplete === true ? this._createCompletionWait(playUnit, step, action) : null;
+    return { ok: true, wait };
+  }
+
+  /**
+   * waitComplete の対象（typewriter / playTween）を待ち条件にする。
+   * 置き換えや完了で対象が無効になったら、待ちは解ける。
+   * @returns {object|null}
+   */
+  _createCompletionWait(playUnit, step, action) {
+    const targetObjectId = typeof step.targetObjectId === 'string' ? step.targetObjectId.trim() : '';
+
+    if (action === 'typewriter') {
+      const state = this._typewriters.get(`${playUnit.id}/${targetObjectId}`);
+      return state ? this._createDoneWait(state) : null;
+    }
+
+    if (action === 'playTween') {
+      const componentType = typeof step.componentType === 'string' ? step.componentType.trim() : '';
+      const property = typeof step.property === 'string' ? step.property.trim() : '';
+      const tweenKey = `${targetObjectId}:${componentType}:${property}`;
+      const tween = this._activeTweens.get(tweenKey);
+      return tween ? { type: 'done', isDone: () => this._activeTweens.get(tweenKey) !== tween } : null;
+    }
+
+    return null;
+  }
+
+  _createDoneWait(state) {
+    return { type: 'done', isDone: () => state.done === true };
+  }
+
+  /** 毎フレーム、待ちが解けた sequence を進める */
+  _updateSequences(dt, playUnit) {
+    if (!this._sequences.size || !playUnit) return;
+    const deltaMs = Number.isFinite(Number(dt)) && Number(dt) > 0 ? Number(dt) : 0;
+
+    for (const state of Array.from(this._sequences.values())) {
+      const wait = state.wait;
+      if (!wait || state.done) continue;
+
+      let ready = false;
+      if (wait.type === 'time') {
+        wait.remainingMs -= deltaMs;
+        ready = wait.remainingMs <= 0;
+      } else if (wait.type === 'event') {
+        wait.elapsedMs += deltaMs;
+        ready = wait.fired || (wait.timeoutMs > 0 && wait.elapsedMs >= wait.timeoutMs);
+      } else {
+        ready = wait.isDone();
+      }
+      if (!ready) continue;
+
+      state.wait = null;
+      this._advanceSequence(playUnit, state);
+    }
+  }
+
+  /** waitEvent の待ちに、発火したイベントを伝える */
+  _notifySequenceEvent(eventId) {
+    for (const state of this._sequences.values()) {
+      if (state.wait?.type === 'event' && state.wait.eventId === eventId) state.wait.fired = true;
+    }
+  }
+
+  _finishSequence(state) {
+    this._endSequence(state);
+    if (state.completeEventId) this._pendingEvents.add(state.completeEventId);
+  }
+
+  _endSequence(state) {
+    state.done = true;
+    state.wait = null;
+    if (this._sequences.get(state.key) === state) this._sequences.delete(state.key);
   }
 
   _updateTweens(dt, playUnit) {
@@ -1958,7 +2155,11 @@ class PlayTestScene extends Scene {
       const targetObject = playUnit.findObjectById(tween.targetObjectId);
       const component = targetObject?.findComponentByType(tween.componentType);
       if (component) component.data[tween.property] = value;
-      if (tween.elapsed >= tween.duration) completed.push(key);
+      if (tween.elapsed >= tween.duration) {
+        completed.push(key);
+        // 自然終了したときだけ完了イベントを出す（置き換えられた tween は出さない）
+        if (tween.completeEventId) this._pendingEvents.add(tween.completeEventId);
+      }
     }
     for (const key of completed) this._activeTweens.delete(key);
   }

@@ -279,9 +279,10 @@ A message window needs a 9-slice pixelDocument (QTS base64) and two global strin
 
 ```bash
 python3 -I tools/add_message_window_to_demo.py assets/character_walk_demo.qsproj
+python3 -I tools/add_message_sequence_to_demo.py assets/character_walk_demo.qsproj
 ```
 
-The typewriter action used by the window (`Trigger` with `onTimer` starts it):
+The second script makes the window advance by a `sequence` (started by `msg.show`, which a `Trigger` with `onTimer` fires). Each `typewriter` step waits until its text is fully shown (`waitComplete`), and each `waitEvent` waits for the click (`msg.next`). Click handling (skip while typing, otherwise `msg.next`) stays in the `Conditional` on `msg.click`:
 
 ```json
 {
@@ -289,14 +290,15 @@ The typewriter action used by the window (`Trigger` with `onTimer` starts it):
   "enabled": true,
   "data": {
     "listenTo": "msg.show",
-    "action": "typewriter",
-    "targetObjectId": "obj_msg_body",
-    "componentType": "Text",
-    "valueSource": "variable",
-    "valueVariablePath": "user.fixed.msgBody",
-    "charsPerSecond": 24,
-    "statusVariablePath": "user.fixed.msgStatus",
-    "completeEventId": "msg.typed"
+    "action": "sequence",
+    "onBusy": "ignore",
+    "completeEventId": "msg.done",
+    "steps": [
+      { "action": "playTween", "targetObjectId": "obj_msg_box", "componentType": "NineSlice", "property": "alpha", "tweenFrom": 0, "tweenTo": 1, "tweenDuration": 300, "waitComplete": true },
+      { "action": "typewriter", "targetObjectId": "obj_msg_body", "componentType": "Text", "valueSource": "literal", "value": "First line.", "charsPerSecond": 24, "waitComplete": true },
+      { "action": "waitEvent", "eventId": "msg.next" },
+      { "action": "setEnabled", "targetObjectId": "obj_msg_box", "enabled": false }
+    ]
   }
 }
 ```

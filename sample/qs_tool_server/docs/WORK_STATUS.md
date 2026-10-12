@@ -354,8 +354,19 @@ www/
 - タイプライター: Text の `revealChars`（表示文字数、-1 で全文）と、EventAction の `typewriter` アクション（`targetObjectId` / `valueSource` / `valueVariablePath` / `charsPerSecond` / `statusVariablePath` / `completeEventId`）。空の Text も描画する。
 - デモ: `tools/add_message_window_to_demo.py` が `assets/character_walk_demo.qsproj` に 9 スライスの枠 `px_msg_frame`、変数 `user.fixed.msgBody` / `user.fixed.msgStatus`、窓（MessageCanvas / MessageBox / MessageBody）を追加する。起動 0.5 秒後に表示が始まり、クリックで全文表示、もう一度クリックで閉じる。
 - 検証（Playwright）: 9 領域（角・辺・中央）の画素、縮小・倍率 2・全体伸縮、ワールドと UI の描画、NineSlice の Save As 参照の書き換え、`+NineSlice` と JSON 編集の正規化、境界のドラッグ（上限、Esc で取り消し、ペンとの分離）、設定ダイアログ（不正値の拒否、解除、保存への反映）、表示メニューのチェック、typewriter の進行・完了・スキップ・再開始・PlayUnit 切替、部分表示の描画、デモの窓（自動表示、スキップ、閉じる）。
-- 未対応: 選択肢 UI、話者名の枠組み（Text を追加すれば作れる）、自動送り（P0-3 の wait 後）、キーボードでの送り、句読点の間、9 スライスの Undo、文字ごとの効果音。
+- 未対応: 選択肢 UI、話者名の枠組み（Text を追加すれば作れる）、キーボードでの送り、句読点の間、9 スライスの Undo、文字ごとの効果音。自動送りは P0-3 の `waitEvent` の `timeout` で作れる（デモはクリック送り）。
 - 既存の制約（今回は変えていない）: UICanvas 配下のオブジェクトに Transform があると、ワールド描画の対象にもなる。UI の部品には Transform を付けない。
+
+### イベントの順次実行（P0-3）
+
+- 実装: EventAction の `sequence`（`steps`、`onBusy`、`completeEventId`）。step は `wait`（秒）、`waitEvent`（`eventId`、任意の `timeout`）、`waitComplete` 付きの `typewriter` / `playTween` / 入れ子の `sequence`。`playTween` に `completeEventId` を追加した。PlayUnit 切替で、進行中の sequence・tween・typewriter を止める（typewriter の状態変数は `done`）。
+- 実行順序: `_processEventActions` → `_updateTweens` → `_updateTypewriters` → `_updateSequences`。完了イベントは次のフレームで処理される。`waitEvent` は待ち始めた後に処理されたイベントだけで解ける。
+- 実装箇所: `www/js/scene/play_test_scene.js`（`_startSequence` 以下）、`www/js/scene/play_unit_editor_scene.js`（EventAction の既定値、`steps` が無い sequence の保存時エラー）。
+- デモ: `tools/add_message_sequence_to_demo.py` が窓の進行を sequence に置き換える（前提: `add_message_window_to_demo.py` の実行）。
+- 検証（Playwright、実行用コピーで `scene.update` を直接回す）: wait 0.5 秒（total 500 ms）と wait 0、waitEvent（待ち始める前のイベントでは進まない、timeout 200 ms）、typewriter の waitComplete（600 ms。表示中のスキップで即解除）、playTween の waitComplete と completeEventId（自然終了で 1 回。置き換えでは発火しない）、onBusy（ignore は元の開始から 1000 ms、restart は再発火から 1000 ms）、完了イベントの 1 回性、失敗時の中断（step 2 で止まり、完了イベントは出ない）、Conditional の branch に sequence、入れ子の sequence、`steps` 無しと単体 `wait` のエラー、PlayUnit 切替で止まり状態が残らないこと。デモはキャンバスへの mousedown / mouseup で、フェード → 1 行目 → スキップ → 2 行目 → 待ち中のクリックは捨てられる → 3 行目 → 閉じる、の順に確認した。
+- 未対応: 繰り返し、並列、sequence 内の分岐、途中の中断、専用の編集 UI（JSON 編集のみ）。wait は開始フレームの分だけ最大 1 フレーム短くなることがある。
+- 既存の挙動の変更: PlayUnit 切替で `playTween` の tween も消えるようになった（以前は残り、対象が見つからず実質無効だった）。
+- 検証の注意: `system.fixed.requestedPlayUnitId` はデモの project に宣言されていない。宣言が無いと PlayUnit の切替要求は黙って失敗する（既存の仕様。検証では宣言を足して確認した）。
 
 ---
 
