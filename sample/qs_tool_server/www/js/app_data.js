@@ -35,6 +35,13 @@ class AppData {
     this.globalVariableState = null;
 
     /**
+     * Runtime 上の可変 DB（mutable テーブル）のセルの値。
+     * project.database の定義から起動時に生成する。定義（行・列・初期値）は書き換えない。
+     * @type {{ [tableName: string]: { [rowKey: string]: { [columnName: string]: any } } }|null}
+     */
+    this.databaseState = null;
+
+    /**
      * free モード用の LayerData。
      * layerData getter 経由でアクセスされる。
      * @type {LayerData}
@@ -157,6 +164,7 @@ class AppData {
     if (!project) {
       this.projectSession = null;
       this.globalVariableState = null;
+      this.databaseState = null;
       this.mapData = null;
       return null;
     }
@@ -164,6 +172,7 @@ class AppData {
     const nextSession = session || ProjectSession.createForProject(project);
     this.projectSession = nextSession;
     this.globalVariableState = this._createGlobalVariableRuntimeState(project.globalVariables);
+    this.databaseState = DatabaseData.createMutableState(project.database);
     this.applyProjectSessionEditorState();
     return this.projectSession;
   }
@@ -221,6 +230,7 @@ class AppData {
    * @returns {boolean}
    */
   hasRuntimeGlobalVariable(path) {
+    if (DatabaseData.parsePath(path)) return this._hasRuntimeDatabaseValue(path);
     const resolved = this._resolveGlobalVariablePath(path);
     if (!resolved) return false;
     const definition = this._getGlobalVariableBucketDefinition(resolved.scope, resolved.tier);
@@ -266,6 +276,7 @@ class AppData {
    * @returns {any}
    */
   getRuntimeGlobalVariable(path) {
+    if (DatabaseData.parsePath(path)) return this._getRuntimeDatabaseValue(path);
     const resolved = this._resolveGlobalVariablePath(path);
     if (!resolved) return undefined;
     if (!this.hasRuntimeGlobalVariable(path)) return undefined;
@@ -279,6 +290,7 @@ class AppData {
    * @returns {boolean}
    */
   setRuntimeGlobalVariable(path, value) {
+    if (DatabaseData.parsePath(path)) return this._setRuntimeDatabaseValue(path, value);
     const resolved = this._resolveGlobalVariablePath(path);
     if (!resolved) {
       this._lastRuntimeGlobalVariableError = 'invalid variable path';
@@ -299,6 +311,145 @@ class AppData {
       return false;
     }
     this.globalVariableState[resolved.scope][resolved.tier][resolved.name] = this._cloneJsonLikeValue(normalized.value);
+    this._lastRuntimeGlobalVariableError = '';
+    return true;
+  }
+
+  /**
+   * 変数パスの値の型を返す（'string' | 'number' | 'boolean' | 'json'）。存在しなければ ''。
+   * グローバル変数と、DB のセル（db.<kind>.<table>.<row>.<column>）の両方を扱う。
+   * DB の列は、integer を number、string / text / enum / ref / asset を string として返す。
+   * @param {string} path
+   * @returns {string}
+   */
+  getRuntimeVariableType(path) {
+    if (DatabaseData.parsePath(path)) {
+      const target = this._resolveDatabaseTarget(path);
+      if (!target || target.error || !target.column) return '';
+      switch (target.column.type) {
+        case 'number':
+        case 'integer':
+          return 'number';
+        case 'boolean':
+          return 'boolean';
+        case 'json':
+          return 'json';
+        default:
+          return 'string';
+      }
+    }
+    const resolved = this._resolveGlobalVariablePath(path);
+    if (!resolved) return '';
+    const definition = this._getGlobalVariableDefinition(resolved.scope, resolved.tier, resolved.name);
+    return typeof definition?.type === 'string' ? definition.type.trim() : '';
+  }
+
+  /**
+   * 可変 DB の実行時の値を、project 定義から作り直す。PlayTest の開始時に呼ぶ。
+   * @returns {object}
+   */
+  resetRuntimeDatabase() {
+    this.databaseState = DatabaseData.createMutableState(this.currentProject?.database);
+    return this.databaseState;
+  }
+
+  /**
+   * 将来のセーブ用: 可変 DB の現在値（テーブル → 行 key → 列名 → 値）を取り出す。
+   * @returns {object}
+   */
+  exportMutableDatabaseState() {
+    return this._cloneJsonLikeValue(this._getDatabaseState());
+  }
+
+  /**
+   * 将来のセーブ用: 保存した値を、今の定義に合わせて読み込む（無いセル・型違いは定義の初期値のまま）。
+   * @param {object} savedState
+   */
+  importMutableDatabaseState(savedState) {
+    this.databaseState = DatabaseData.applySavedState(this.currentProject?.database, savedState);
+  }
+
+  _getDatabaseState() {
+    if (!this.databaseState) this.resetRuntimeDatabase();
+    return this.databaseState;
+  }
+
+  /**
+   * db パスが指す表・行・列と、その値の置き場所を調べる。
+   * @param {string} path
+   * @returns {{ kind: string, table: object, row: object|null, column: object|null, cells: object|null }|{ error: string }|null}
+   */
+  _resolveDatabaseTarget(path) {
+    const parsed = DatabaseData.parsePath(path);
+    if (!parsed) return null;
+    if (parsed.error) return { error: parsed.error };
+
+    const database = parsed.kind === 'system' ? SystemDatabase.getDatabase() : this.currentProject?.database;
+    const table = DatabaseData.findTableByName(database, parsed.table);
+    if (!table || (parsed.kind !== 'system' && table.kind !== parsed.kind)) {
+      return { error: `Database table not found: db.${parsed.kind}.${parsed.table}` };
+    }
+    if (parsed.row === null) return { kind: parsed.kind, table, row: null, column: null, cells: null };
+
+    const row = DatabaseData.findRowByKey(table, parsed.row);
+    if (!row) return { error: `Database row not found: db.${parsed.kind}.${parsed.table}.${parsed.row}` };
+    const cells = parsed.kind === 'mutable' ? this._getDatabaseState()[table.name]?.[row.key] || null : row.cells;
+    if (parsed.column === null) return { kind: parsed.kind, table, row, column: null, cells };
+
+    const column = DatabaseData.findColumnByName(table, parsed.column);
+    if (!column) return { error: `Database column not found: ${path}` };
+    return { kind: parsed.kind, table, row, column, cells };
+  }
+
+  _hasRuntimeDatabaseValue(path) {
+    const target = this._resolveDatabaseTarget(path);
+    return !!target && !target.error;
+  }
+
+  /**
+   * db パスの値を返す。5 部分はセルの値、4 部分は行（列名 → 値）、3 部分は表（行 key → 行）。常にコピーを返す。
+   * @param {string} path
+   * @returns {any}
+   */
+  _getRuntimeDatabaseValue(path) {
+    const target = this._resolveDatabaseTarget(path);
+    if (!target || target.error) return undefined;
+    if (target.column) return this._cloneJsonLikeValue(target.cells?.[target.column.name]);
+
+    const readRow = (row) => {
+      const cells = target.kind === 'mutable' ? this._getDatabaseState()[target.table.name]?.[row.key] : row.cells;
+      return this._cloneJsonLikeValue(cells || {});
+    };
+    if (target.row) return readRow(target.row);
+    const rows = {};
+    for (const row of target.table.rows) rows[row.key] = readRow(row);
+    return rows;
+  }
+
+  /**
+   * db.mutable のセルの値を書き換える。const / system と、行・表への書き込みは失敗する。
+   * 値は列の型へ変換し、enum の選択肢と ref の行も確認する。
+   * @param {string} path
+   * @param {any} value
+   * @returns {boolean}
+   */
+  _setRuntimeDatabaseValue(path, value) {
+    const fail = (message) => {
+      this._lastRuntimeGlobalVariableError = message;
+      return false;
+    };
+    const target = this._resolveDatabaseTarget(path);
+    if (target?.error) return fail(target.error);
+    if (!target) return fail('invalid database path');
+    if (target.kind !== 'mutable') {
+      return fail(`db.${target.kind} is read-only at runtime (only db.mutable can be changed): ${path}`);
+    }
+    if (!target.column) return fail(`Only a cell can be written (db.mutable.<table>.<row>.<column>): ${path}`);
+    if (!target.cells) return fail(`Database state is missing for: ${path}`);
+
+    const result = DatabaseData.coerceCellValue(value, target.column, DatabaseData.createContext(this.currentProject));
+    if (!result.ok) return fail(`${path}: ${result.message}`);
+    target.cells[target.column.name] = this._cloneJsonLikeValue(result.value);
     this._lastRuntimeGlobalVariableError = '';
     return true;
   }

@@ -285,6 +285,27 @@ Action-specific fields:
   - `wait` and `waitEvent` are only valid inside `steps`.
   - Can appear wherever an action can: EventAction `action`, Conditional `branches[].action` and `defaultAction`.
 
+## Database (tables)
+
+Top-level `project.database` (next to `globalVariables`; older files without it load as empty). Do not write large tables by hand when a tool script exists. Tools: `tools/add_database_to_demo.py`.
+
+```json
+"database": { "version": 1, "tables": [
+  { "id": "tbl_items", "name": "items", "label": "Items", "kind": "const",
+    "columns": [
+      { "id": "col_items_label", "name": "label", "label": "", "type": "string", "default": "" },
+      { "id": "col_items_heal", "name": "heal", "label": "", "type": "integer", "default": 0 } ],
+    "rows": [ { "key": "potion", "cells": { "label": "Potion", "heal": 30 } } ] }
+] }
+```
+
+- `kind`: `const` (read-only at runtime) or `mutable` (cell values can change at runtime; reset to the defined values at each Play Test start).
+- Names (`name` of table / column, row `key`) are identifiers `[A-Za-z_][A-Za-z0-9_]*`, no dots. Every table and column needs a unique `id` (`tbl_...`, `col_...`).
+- Column `type`: `string`, `text`, `number`, `integer`, `boolean`, `enum` (needs `options`), `ref` (needs `refTableId`, the target table's `id`; the value is a row key or `""`), `asset` (needs `assetType`: `map` / `playUnit` / `pixelDocument` / `tileset` / `characterChipset`; the value is an asset id or `""`), `json`. Each column needs a `default` that fits its type.
+- Every row needs all columns in `cells` (missing cells fall back to the column `default`; invalid values are reset on load).
+- Read or write with a path: `db.<system|const|mutable>.<table>.<row>.<column>` (e.g. `db.mutable.party.hero.hp`). Works wherever a variable path works: `setGlobalVariable` (`variablePath`, `valueVariablePath`), `typewriter` `valueVariablePath`, Conditional `${...}` / `exists`, Text `${...}`.
+- Only `db.mutable` cells can be written. `db.const` and `db.system` (built-in tables: `direction`, `easing`, `variableType`, `columnType`, `assetType`) are read-only.
+
 ## Global Variables
 
 Use only if needed. Keep minimal.

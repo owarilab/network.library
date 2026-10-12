@@ -168,6 +168,19 @@ PlayUnit が切り替わると、次の処理を行う。
 PlayUnit に入るたびに 1 回だけ発火する予約イベント。PlayTest の開始、requestPlayUnit、returnPlayUnit、別の PlayUnit への warp で送られる。同じ PlayUnit 内の warp では送られない。
 `listenTo: "system.playUnitEnter"` の EventAction で、フェードインなどの到着演出を書く。切替と同じ update の `_processEventActions` で処理される。
 
+### 変数のパスとデータベース（`setGlobalVariable` / `typewriter` ほか）
+
+変数のパスを受けるフィールド（`setGlobalVariable` の `variablePath` と `valueVariablePath`、`typewriter` の `valueVariablePath`）は、グローバル変数（`user.fixed.gold`）に加えて、**データベースのセル**（`db.<kind>.<table>.<row>.<column>`）も受ける。詳細は [DATABASE_DESIGN.md](DATABASE_DESIGN.md)。
+
+- 書き込めるのは `db.mutable` のセルだけ。`db.const` / `db.system` への書き込みは失敗し、ステータスに「read-only」と出る（sequence の step なら中断）。
+- 型は列の型で決まる（`integer` / `number` は四則が使える、`enum` は選択肢のみ、`ref` は存在する行 key のみ）。
+- 存在しないパスは「Database value not found」。
+
+```json
+{ "listenTo": "hud.potion", "action": "setGlobalVariable", "variablePath": "db.mutable.party.hero.hp",
+  "op": "add", "valueSource": "variable", "valueVariablePath": "db.const.items.potion.heal" }
+```
+
 ### action = `returnPlayUnit` 追加フィールド
 
 追加フィールドなし。

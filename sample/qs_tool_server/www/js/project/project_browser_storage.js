@@ -197,6 +197,7 @@ class ProjectBrowserStorage {
     ProjectBrowserStorage._reassignAssetIds(nextProject.assets.playUnits || [], 'pu', activeRef, idMap);
     ProjectBrowserStorage._rewriteCharacterChipsetRefs(nextProject.assets.playUnits || [], idMap);
     ProjectBrowserStorage._rewriteComponentRefs(nextProject.assets.playUnits || [], idMap, 'NineSlice', 'pixelDocumentId');
+    ProjectBrowserStorage._rewriteDatabaseAssetRefs(nextProject.database, idMap);
 
     nextSession.projectId = nextProject.id;
     nextSession.dirty = false;
@@ -240,6 +241,25 @@ class ProjectBrowserStorage {
     }
   }
 
+  /**
+   * Save As で振り直したアセット ID を、DB の asset 列のセルへ反映する。
+   * @param {object} database
+   * @param {Map<string, string>} idMap  旧 ID → 新 ID
+   */
+  static _rewriteDatabaseAssetRefs(database, idMap) {
+    for (const table of database?.tables || []) {
+      for (const column of table.columns || []) {
+        if (column.type !== 'asset') continue;
+        const defaultId = idMap.get(column.default);
+        if (defaultId) column.default = defaultId;
+        for (const row of table.rows || []) {
+          const newId = idMap.get(row.cells?.[column.name]);
+          if (newId) row.cells[column.name] = newId;
+        }
+      }
+    }
+  }
+
   static _serializeProjectRecord(project, assets) {
     const createdAt = ProjectBrowserStorage._normalizeTimestamp(project.createdAt, Date.now());
     const updatedAt = ProjectBrowserStorage._normalizeTimestamp(project.updatedAt, createdAt);
@@ -259,6 +279,8 @@ class ProjectBrowserStorage {
         defaultChipWidth: project.settings?.defaultChipWidth | 0,
         defaultChipHeight: project.settings?.defaultChipHeight | 0,
       },
+      globalVariables: ProjectData.normalizeGlobalVariables(project.globalVariables),
+      database: DatabaseData.normalize(project.database),
       assetRefs,
       assetCounts: {
         pixelDocuments: (project.assets?.pixelDocuments || []).length,
@@ -384,6 +406,10 @@ class ProjectBrowserStorage {
       defaultChipWidth: projectRecord.settings?.defaultChipWidth | 0 || 16,
       defaultChipHeight: projectRecord.settings?.defaultChipHeight | 0 || 16,
     };
+
+    // 以前のレコードには無い。無ければ既定値（空の変数定義と空の DB）にする
+    project.globalVariables = ProjectData.normalizeGlobalVariables(projectRecord.globalVariables);
+    project.database = DatabaseData.normalize(projectRecord.database);
 
     project.assets.pixelDocuments = [];
     project.assets.tilesets = [];

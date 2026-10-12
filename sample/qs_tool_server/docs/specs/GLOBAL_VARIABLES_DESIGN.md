@@ -596,7 +596,19 @@ globals.importPersistentState(saveData)
 
 ---
 
+## データベース（DB）との関係
+
+表の形のデータ（アイテム、敵、パーティなど）は、変数ではなく [DATABASE_DESIGN.md](DATABASE_DESIGN.md) の DB に置く。
+
+- 変数（`system` / `user` × `fixed` / `persistent`）は、1 つずつの値（フラグ、カウンタ、文字列）を持つ。DB は、同じ形の行を持つ表（`db.<kind>.<table>.<row>.<column>`）を持つ。
+- 両方とも**同じパスの入り口**（`getRuntimeGlobalVariable` など）で読み書きするので、`setGlobalVariable`、Conditional、Text の `${…}` はどちらにもそのまま使える。パスが `db.` で始まれば DB として扱う。
+- 可変 DB（`db.mutable`）は `user.persistent` と同じく、将来のセーブ対象になる（状態の形は DATABASE_DESIGN.md の 5）。
+- **PlayTest を始めるたびに、変数の現在値と可変 DB を定義から作り直す**（`fixed` は起動のたびに初期化する、という本書の方針どおり）。以前は PlayTest の開始で作り直しておらず、前回の実行の値（`timer` を含む）が残っていた。
+- IndexedDB にも `globalVariables` を保存するようにした（以前は `.qsproj` の書き出しだけが運んでいた）。
+
 ## VariablesEditorScene 方針
+
+> 実装の更新: `VariablesEditorScene` は、Database Editor と同じ表の部品（`www/js/ui/grid/`）の上に作り直した。画面名とデータ（`project.globalVariables`）は変わらない。左のナビで 4 区画を選び、表の列は name / type / initial value / description。初期値は型に合わせて編集する（boolean はチェックボックス、number は数値、json は複数行）。Undo / Redo、コピー&ペースト（TSV）、検索、行の追加・削除・移動、保存時の検証（`ProjectData.validateGlobalVariables`）がある。`window.prompt` と `window.confirm` は使わない。`system` 変数のうち実行時が参照する名前（`timer`、`startupPlayUnitId` など）を消す・改名すると警告を出す。以前は Ctrl+S が効いていなかった（キーの判定の誤り）のも直した。
 
 変数エディタは `ProjectTopScene` に埋め込まず、専用 `VariablesEditorScene` として実装する方針とする。
 

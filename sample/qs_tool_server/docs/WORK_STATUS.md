@@ -57,7 +57,17 @@ www/
     │   ├── scene.js                # Scene: 基底クラス
     │   ├── title_scene.js          # TitleScene: 起動時の入口
     │   ├── project_top_scene.js    # ProjectTopScene: プロジェクト単位のハブ
+    │   ├── variables_editor_scene.js # VariablesEditorScene: グローバル変数の編集（表の部品の上に作り直した）
+    │   ├── database_editor_scene.js  # DatabaseEditorScene: データベースの編集（画面と入力）
+    │   ├── database_editor_actions.js  # 同 編集処理（セル・行・列・テーブル、クリップボード、Undo）
+    │   ├── database_editor_inspector.js # 同 Inspector（テーブル・列・行の設定、使用箇所）
     │   └── editor_scene.js         # EditorScene: ドット絵エディタシーン
+    ├── database/
+    │   ├── database_data.js        # DatabaseData: 定義の正規化・検証・型変換・パス・実行用状態
+    │   ├── system_database.js      # SystemDatabase: エンジンの列挙・定数（読み取り専用）
+    │   └── database_ops.js         # DatabaseOps: 行・列・テーブルの編集操作、TSV
+    ├── command/
+    │   └── database_command.js     # DatabaseSetCellsCommand / DatabaseTablesCommand（Undo）
     ├── ui/
         ├── menu_constants.js       # MenuConstants: メニューID定数
         ├── menu_bar.js             # MenuBar: メニューバー描画
@@ -75,6 +85,11 @@ www/
         ├── layer_panel.js          # LayerPanel: レイヤー一覧コンテンツクラス
         ├── layer_panel_window.js   # LayerPanelWindow: UIWindow継承のレイヤーパネル
         ├── ui_window.js            # UIWindow: ドラッグ可能ウィンドウ共通基底クラス
+        ├── grid/                   # 表の部品（Database Editor / Variables Editor が使う）
+        │   ├── grid_theme.js       # GridTheme: 色・フォント・描画ヘルパー
+        │   ├── grid_view.js        # GridView: 仮想化した表（選択、スクロール、列幅、キー操作）
+        │   ├── cell_editor.js      # CellEditor: DOM 入力欄のオーバーレイ（IME 対応）
+        │   └── popup_list.js       # PopupList: 選択リスト・メニュー（絞り込み検索つき）
         └── dialog/
             ├── dialog_base.js      # DialogBase: モーダルダイアログ基底クラス
             ├── new_file_dialog.js   # NewFileDialog: 新規作成ダイアログ
@@ -102,6 +117,7 @@ www/
 - [Rectangle component JSON 例集](specs/RECTANGLE_COMPONENT_JSON_EXAMPLES.md)
 - [ブラウザ保存（IndexedDB）最小設計書](specs/BROWSER_STORAGE_PLAN.md)
 - [マップエディタシーン実装計画書](specs/MAP_EDITOR_SCENE_PLAN.md)
+- [データベース設計書](specs/DATABASE_DESIGN.md)
 
 ---
 
@@ -381,6 +397,18 @@ www/
 - 検証（エディタ）: `_editComponentData` に warp の JSON を渡して、出現位置の無い値と空の spawnX が保存されず、spawnObjectId と数値の spawnX / spawnY が保存されることを確認した。
 - 未対応: プレイヤーの持ち回り（共有オブジェクト）、遷移中の入力ロック、マップ名の表示、warp 専用の編集フォーム（JSON 編集のみ）、出現位置の通行判定と自動補正。
 - 既知の制約: 窓が開いたまま扉を踏むと窓は残る（P0-3 と同じ）。出現位置を壁の上に置くと身動きが取れない。
+
+### データベース（P1-7 の土台）と Variables Editor の作り直し
+
+- 設計: [DATABASE_DESIGN.md](specs/DATABASE_DESIGN.md)。システム DB（エンジンの列挙・定数、読み取り専用）、定数 DB（`const`）、可変 DB（`mutable`。実行時は定義のコピーで管理し、Play Test のたびに初期値へ戻る）。実行時のパスは `db.<kind>.<table>.<row>.<column>`。新しいアクションは足さず、変数のパスを受ける場所（`setGlobalVariable`、`typewriter`、Conditional、Text の `${…}`）がそのまま DB を扱える。
+- 実装箇所: `www/js/database/`（データ層、システム DB、編集操作）、`www/js/command/database_command.js`、`www/js/app_data.js`（`databaseState`、`db.` の振り分け、`getRuntimeVariableType`、`resetRuntimeDatabase`、セーブ用の `export/importMutableDatabaseState`）、`www/js/ui/grid/`（表の部品）、`www/js/scene/database_editor_*.js`。保存は `project_session.js`（.qsproj）と `project_browser_storage.js`（IndexedDB、Save As の asset 参照の書き換え）。
+- **既存の挙動の変更**:
+  - PlayTest を始めるたびに、グローバル変数の現在値と可変 DB を定義から作り直す（以前は前回の実行の値が残った。`timer` も 0 から数え直す）。
+  - IndexedDB にも `globalVariables` を保存する（以前は保存されず、`.qsproj` の書き出しだけが運んでいた）。
+  - `VariablesEditorScene` を表の部品の上に作り直した（Undo / Redo、コピー&ペースト、検索、型に合わせた編集。Ctrl+S が効かなかった不具合も直った）。画面名とデータ（`project.globalVariables`）は同じ。
+- デモ: `tools/add_database_to_demo.py` が `character_walk_demo.qsproj` に items / hazards（const）、party（mutable）、HP の HUD、ポーションのボタン、罠を足す（前提: `add_tilemap_to_character_demo.py`）。
+- 検証（Playwright。単体テストの枠組みは無いので、ブラウザで関数と画面を直接動かした）: データ層（正規化、検証、パス、可変状態、システム DB の凍結、往復、古いファイル）、IndexedDB と Save As、実行時の読み書き（型、const / system の書き込み拒否、アクション、Conditional、テンプレート、リセット）、`DatabaseOps` と Undo コマンド、5000 行（描画は 1 フレーム約 0.5 ms）、エディタの操作（選択、編集、IME の変換中の Enter、Tab、blur、複数行、JSON、ポップアップ、列幅、固定列、範囲・ヘッダ選択、右クリック、行・列・テーブルの操作、型変更と変換できないセルの報告、key の改名で ref が追従、システムテーブルの読み取り専用、保存の拒否と成功、画面遷移）、Variables Editor、デモを実際のマウス・キー入力で（HUD の表示、ポーションの回復と上限、罠のダメージと 0 で止まる、再開で初期値に戻る）。回帰: 扉でのマップ遷移、メッセージの sequence、return_playunit_demo、timer_sample_basic、戦闘サンプル。検証中に見つけて直した不具合: Inspector の項目が Undo と同じフレームで古い列を触りうる点（操作の時点で列を引き直すようにした）、Variables Editor でランタイム名の改名の警告が選択の変更で上書きされる点、Ctrl+S が効かない旧 Variables Editor の不具合（作り直しで解消）。
+- 未対応: 実行中の行・列の追加と削除、ゲーム内のセーブとロード本体（P2-19）、`list` / 辞書の専用セル（json で代用）、CSV の入出力、行・列のドラッグでの並べ替え（Alt+矢印と右クリックで行う）、表示だけのソート、名前を変えたときの PlayUnit 内のパスの自動書き換え、IME の最初の 1 打（Enter / F2 / ダブルクリックで編集を始める）。
 
 ## TODO リスト
 
@@ -759,25 +787,32 @@ PixelData.rgba(r, g, b, a) でパック、PixelData.unpack(color) でアンパ�
 
 ### スクリプト読み込み順（index.html）
 
+`www/index.html` の `<script>` の順（クラスは `extends` / 静的参照の都合で、依存される側が先）:
+
 ```
-pixel_data.js → pixel_data_converter.js → layer_data.js → app_data.js → input.js
-→ menu_constants.js → dropdown_menu.js → menu_bar.js
-→ ui_window.js
-→ pixel_canvas.js
-→ dialog_base.js → new_file_dialog.js → new_tileset_dialog.js → new_character_chipset_dialog.js → import_tileset_dialog.js
-→ save_dialog.js → color_picker_dialog.js → quarter_view_tile_dialog.js
-→ color_palette.js → color_palette_16.js → editable_palette_32.js → color_palette_window.js
-→ chip_palette.js → chip_palette_window.js
-→ tile_preview.js → tile_preview_window.js
-→ character_preview.js → character_preview_window.js
-→ tool_bar.js → tool_bar_window.js
-→ layer_panel.js → layer_panel_window.js
-→ tileset_data.js → character/character_chipset.js → quarter_view_tile_generator.js
-→ play_unit/player_controller.js → play_unit/tilemap_runtime.js
-→ scene.js → scene_manager.js → editor_scene.js
-→ canvas_manager.js
+pixel_data → util/pixel_data_converter → util/quarter_view_tile_generator → layer_data → tileset_data
+→ character/character_chipset → play_unit/play_unit_data → play_unit/play_unit_runtime
+→ component/conditional_action
+→ database/database_data → database/system_database → database/database_ops
+→ project/project_data → project/project_session → project/project_browser_storage
+→ command/command_base → command/{pixel_stroke,flood_fill,transform,new_file,layer,database}_command
+→ history_manager → app_data → input
+→ ui/menu_constants → ui/dropdown_menu → ui/menu_bar → ui/ui_window → pixel_canvas
+→ ui/dialog/*（dialog_base が先）
+→ ui/color_palette* → ui/tool_bar* → ui/layer_panel* → ui/chip_palette* → ui/tile_preview*
+→ ui/character_preview* → ui/nine_slice_preview* → ui/map_editor_menu_bar → ui/map_*_window
+→ scene/scene → scene_manager → scene/title_scene → scene/project_top_scene
+→ scene/variables_editor_scene
+→ ui/grid/{grid_theme,grid_view,cell_editor,popup_list}
+→ scene/database_editor_scene → scene/database_editor_actions → scene/database_editor_inspector
+→ scene/editor_scene → scene/map_editor_scene → scene/play_unit_editor_scene
+→ play_unit/player_controller → play_unit/tilemap_runtime → nine_slice/nine_slice_renderer
+→ scene/play_test_scene
+→ canvas_manager
 → インラインスクリプト（起動）
 ```
+
+注意: `database_editor_actions.js` と `database_editor_inspector.js` は `Object.assign(DatabaseEditorScene.prototype, …)` でメソッドを足すので、`database_editor_scene.js` の後に読み込む。
 
 ### 主要クラスの関係
 

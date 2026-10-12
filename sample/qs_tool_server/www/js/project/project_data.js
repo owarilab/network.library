@@ -42,6 +42,12 @@ class ProjectData {
      * @type {{ version: number, system: { fixed: object, persistent: object }, user: { fixed: object, persistent: object } }}
      */
     this.globalVariables = ProjectData.createDefaultGlobalVariables();
+
+    /**
+     * Project 全体で共有するデータベース定義（const / mutable のテーブル）。
+     * @type {{ version: number, tables: object[] }}
+     */
+    this.database = DatabaseData.createDefault();
   }
 
   /**

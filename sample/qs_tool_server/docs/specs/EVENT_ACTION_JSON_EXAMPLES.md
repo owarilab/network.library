@@ -501,6 +501,63 @@ ev_dismiss
 
 ---
 
+## 例17: データベースの値を使う（HP の回復と罠のダメージ）
+
+前提: 可変 DB `party`（行 `hero` に `hp` / `maxHp`）と、定数 DB `items`（行 `potion` に `heal`）、`hazards`（行 `spike` に `damage`）がある。デモは `tools/add_database_to_demo.py` で作れる。
+
+### HP の表示（Text。`${…}` に DB のパスを書ける）
+
+```json
+{ "type": "Text", "enabled": true, "data": { "text": "${db.mutable.party.hero.label}  HP ${db.mutable.party.hero.hp} / ${db.mutable.party.hero.maxHp}" } }
+```
+
+### ポーション: HP が最大より少ないときだけ、定数 DB の回復量を足す
+
+```json
+{
+  "type": "Conditional",
+  "enabled": true,
+  "data": {
+    "listenTo": "hud.potion",
+    "branches": [{
+      "condition": { "type": "compare", "left": "${db.mutable.party.hero.hp}", "operator": "<", "right": "${db.mutable.party.hero.maxHp}" },
+      "action": {
+        "action": "sequence",
+        "steps": [
+          { "action": "setGlobalVariable", "variablePath": "db.mutable.party.hero.hp", "op": "add", "valueSource": "variable", "valueVariablePath": "db.const.items.potion.heal" },
+          { "action": "fireEvent", "eventId": "party.clamp" }
+        ]
+      }
+    }]
+  }
+}
+```
+
+### HP を 0 〜 最大 HP に収める
+
+```json
+{
+  "type": "Conditional",
+  "enabled": true,
+  "data": {
+    "listenTo": "party.clamp",
+    "branches": [
+      { "condition": { "type": "compare", "left": "${db.mutable.party.hero.hp}", "operator": ">", "right": "${db.mutable.party.hero.maxHp}" },
+        "action": { "action": "setGlobalVariable", "variablePath": "db.mutable.party.hero.hp", "op": "set", "valueSource": "variable", "valueVariablePath": "db.mutable.party.hero.maxHp" } },
+      { "condition": { "type": "compare", "left": "${db.mutable.party.hero.hp}", "operator": "<", "right": 0 },
+        "action": { "action": "setGlobalVariable", "variablePath": "db.mutable.party.hero.hp", "op": "set", "valueSource": "literal", "value": 0 } }
+    ]
+  }
+}
+```
+
+**補足**:
+- `db.const` と `db.system` は読み取り専用。書き込むとエラーになる
+- 可変 DB は Play Test を始めるたびに、定義の初期値へ戻る
+- 存在確認は Conditional の `exists`（例: `db.const.items.potion`）
+
+---
+
 ## 4. Conditional Component
 
 複数の条件分岐を順序付きで評価し、最初にマッチした分岐のアクションを実行します（短絡評価）。

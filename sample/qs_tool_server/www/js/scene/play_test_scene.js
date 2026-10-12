@@ -76,6 +76,9 @@ class PlayTestScene extends Scene {
   onEnter(input, appData) {
     this._input = input;
     this._appData = appData;
+    // 前回の PlayTest の値を持ち越さない（fixed は起動のたびに初期値へ戻す）。startup の PlayUnit の設定より先に行う
+    appData?.resetRuntimeGlobalVariables?.();
+    appData?.resetRuntimeDatabase?.();
     appData?.activateStartupPlayUnit?.();
     this._tilemaps.clear();
     this._typewriters.clear();
@@ -1927,16 +1930,17 @@ class PlayTestScene extends Scene {
       }
       if (!this._appData?.hasRuntimeGlobalVariable?.(variablePath)) {
         this._statusTone = 'error';
-        this._statusMessage = `Global variable not found: ${variablePath}`;
+        this._statusMessage = variablePath.startsWith('db.')
+          ? `Database value not found: ${variablePath}`
+          : `Global variable not found: ${variablePath}`;
         return false;
       }
 
       const op = typeof data.op === 'string' && data.op.trim() ? data.op.trim() : 'set';
       const arithmeticOps = new Set(['add', 'subtract', 'multiply', 'divide']);
       const currentValue = this._appData.getRuntimeGlobalVariable(variablePath);
-      const resolved = this._appData.resolveRuntimeGlobalVariablePath(variablePath);
-      const varDefinition = resolved ? this._appData.currentProject?.globalVariables?.[resolved.scope]?.[resolved.tier]?.[resolved.name] : null;
-      const varType = typeof varDefinition?.type === 'string' ? varDefinition.type.trim() : '';
+      // グローバル変数と DB のセル（db.mutable...）の両方の型を引く
+      const varType = this._appData.getRuntimeVariableType(variablePath);
 
       if (arithmeticOps.has(op) && varType !== 'number') {
         this._statusTone = 'error';

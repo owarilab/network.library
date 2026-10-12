@@ -329,6 +329,33 @@ The door is an overlap `Trigger`. Its `EventAction` is a `sequence`: fade out (`
 }
 ```
 
+## Example 10: Database (reference only)
+
+Use the reference script (needs `add_tilemap_to_character_demo.py` first). It adds const tables `items` and `hazards`, a mutable table `party`, a HUD that shows `${db.mutable.party.hero.hp}`, a potion button and a trap:
+
+```bash
+python3 -I tools/add_database_to_demo.py assets/character_walk_demo.qsproj
+```
+
+Heal by a value from a const table (the path works in `valueVariablePath`):
+
+```json
+{
+  "type": "EventAction",
+  "enabled": true,
+  "data": {
+    "listenTo": "hud.potion",
+    "action": "setGlobalVariable",
+    "variablePath": "db.mutable.party.hero.hp",
+    "op": "add",
+    "valueSource": "variable",
+    "valueVariablePath": "db.const.items.potion.heal"
+  }
+}
+```
+
+Only `db.mutable` can be written. Writing `db.const` or `db.system` fails.
+
 ## Example 5: What to Avoid
 
 Bad patterns:

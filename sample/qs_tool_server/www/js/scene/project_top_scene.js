@@ -125,6 +125,10 @@ class ProjectTopScene extends Scene {
         action: () => this._openVariablesEditor(),
       },
       {
+        label: 'Open Database Editor',
+        action: () => this._openDatabaseEditor(),
+      },
+      {
         label: 'Back to Title',
         action: () => this._appData?.changeScene(new TitleScene()),
       },
@@ -386,6 +390,10 @@ class ProjectTopScene extends Scene {
       this._openVariablesEditor();
       return;
     }
+    if (e.key === 'b' || e.key === 'B') {
+      this._openDatabaseEditor();
+      return;
+    }
     if (e.key === 's' || e.key === 'S') {
       this._saveProject();
       return;
@@ -528,6 +536,12 @@ class ProjectTopScene extends Scene {
     if (!this._appData?.currentProject || !this._appData.projectSession) return;
     this._appData.syncEditorStateToProjectSession();
     this._appData.changeScene(new VariablesEditorScene());
+  }
+
+  _openDatabaseEditor() {
+    if (!this._appData?.currentProject || !this._appData.projectSession) return;
+    this._appData.syncEditorStateToProjectSession();
+    this._appData.changeScene(new DatabaseEditorScene());
   }
 
   _saveProject() {
