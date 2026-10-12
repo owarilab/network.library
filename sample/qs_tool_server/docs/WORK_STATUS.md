@@ -370,6 +370,18 @@ www/
 
 ---
 
+### マップ間の遷移（P0-4）
+
+- 実装: EventAction の `warp`（`playUnitId`、`spawnObjectId` または `spawnX` / `spawnY`、`targetObjectId`、`facing`）。検証は実行時に行い、切替と配置は次フレームの冒頭（`_applyPendingWarp`）で行う。`system.playUnitEnter` を PlayUnit に入るたびに送る。PlayUnit 切替時の後始末は `_onPlayUnitChanged` にまとめ、requestPlayUnit、returnPlayUnit、warp で共通に使う。
+- 既存の挙動の変更: 切替でタイマー（onTimer）の経過時間、overlap の重なり、ポインタの hover / pressed が消える。到着位置で重なっているトリガーは発火しない。`once` の発火済みは PlayUnit ごとに分かれる（以前は PlayUnit をまたいで共有していた）。
+- 実装箇所: `www/js/scene/play_test_scene.js`（`_queueWarp`、`_applyPendingWarp`、`_onPlayUnitChanged`、`_processOverlapTriggers` の silent、`_getOnceKey`）、`www/js/scene/play_unit_editor_scene.js`（warp の既定値と、出現位置の保存時チェック `_hasWarpSpawn`）。
+- デモ: `tools/add_map_transition_to_demo.py` が室内マップ `map_demo_house` と PlayUnit `pu_character_walk_house` を追加し、Field に扉を置く（前提: `add_tilemap_to_character_demo.py` の実行）。保存形式は既存と同じ（差分は追加分と updatedAt のみ）。
+- 検証（Playwright、実行用の PlayUnit で `scene.update` を回す。27 件すべて通過）: 扉 A→B の出現位置と向き、到着で扉が再発火しないこと、B→A で移動元の向きを引き継ぐこと、扉から出て入り直すと再発火すること、切替フレームのカメラのスナップ、検証失敗（存在しない PlayUnit、出現位置、不正な facing、座標なし、対象の不在、同フレームの 2 つ目）で切替せずエラーになること、同じ PlayUnit 内の warp で sequence が止まらないこと、returnPlayUnit の即時切替と到着イベントの次フレーム配送、requestPlayUnit（宣言済みの変数）、once の PlayUnit ごとの分離、宣言の無い requestedPlayUnitId でも warp が動くこと。
+- 検証（デモ、実際の入力経路。window の keydown で移動）: 扉 → 室内（フェードアウト 250 ms の後に切替）→ 出口 → 扉の真下へ戻り、戻った後に再発火しない。フェードの後の幕は alpha 0 に戻る。室内の描画をスクリーンショットで確認。既存の回帰（return_playunit_demo の往復、timer_sample_basic の onTimer と once、onUpdate の Conditional）は、イベントを直接送って確認した。
+- 検証（エディタ）: `_editComponentData` に warp の JSON を渡して、出現位置の無い値と空の spawnX が保存されず、spawnObjectId と数値の spawnX / spawnY が保存されることを確認した。
+- 未対応: プレイヤーの持ち回り（共有オブジェクト）、遷移中の入力ロック、マップ名の表示、warp 専用の編集フォーム（JSON 編集のみ）、出現位置の通行判定と自動補正。
+- 既知の制約: 窓が開いたまま扉を踏むと窓は残る（P0-3 と同じ）。出現位置を壁の上に置くと身動きが取れない。
+
 ## TODO リスト
 
 ### 優先度: 高（基本描画機能の完成）

@@ -303,6 +303,32 @@ The second script makes the window advance by a `sequence` (started by `msg.show
 }
 ```
 
+## Example 9: Map Transition by Door (reference only)
+
+A door moves the player to another PlayUnit (a room). Use the reference script (needs `add_tilemap_to_character_demo.py` first):
+
+```bash
+python3 -I tools/add_map_transition_to_demo.py assets/character_walk_demo.qsproj
+```
+
+The door is an overlap `Trigger`. Its `EventAction` is a `sequence`: fade out (`playTween`, `waitComplete`), then `warp` to a spawn marker in the target PlayUnit. The target PlayUnit fades in on `system.playUnitEnter`:
+
+```json
+{
+  "type": "EventAction",
+  "enabled": true,
+  "data": {
+    "listenTo": "door.house",
+    "action": "sequence",
+    "onBusy": "ignore",
+    "steps": [
+      { "action": "playTween", "targetObjectId": "obj_field_fade_box", "componentType": "Rectangle", "property": "fillAlpha", "tweenFrom": 0, "tweenTo": 1, "tweenDuration": 250, "waitComplete": true },
+      { "action": "warp", "playUnitId": "pu_character_walk_house", "spawnObjectId": "obj_spawn_from_field", "facing": "up" }
+    ]
+  }
+}
+```
+
 ## Example 5: What to Avoid
 
 Bad patterns:

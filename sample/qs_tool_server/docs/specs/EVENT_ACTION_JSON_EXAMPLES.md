@@ -441,6 +441,66 @@ ev_dismiss
 }
 ```
 
+## 例16: 扉で別マップへ移動する（warp、フェード付き）
+
+前提:
+- 行き先の PlayUnit（室内）に、同じ ID の操作対象（`obj_player`）と出現位置（`obj_spawn_from_field`）がある
+- 両方の PlayUnit に、フェード用の黒い幕がある（UICanvas の子に全画面の Rectangle。`fillAlpha` は 0）
+- 扉は overlap の Trigger（Collider の `isTrigger: true`）
+
+### 扉（Field 側）
+
+```json
+{ "type": "Trigger", "enabled": true, "data": { "eventId": "door.house", "triggerOn": "overlap", "once": false, "targetObjectId": "" } }
+```
+
+### 扉を踏んだら幕を閉じてから移動（Field 側の UICanvas `obj_field_fade` が持つ）
+
+```json
+{
+  "type": "EventAction",
+  "enabled": true,
+  "data": {
+    "listenTo": "door.house",
+    "action": "sequence",
+    "targetObjectId": "",
+    "onBusy": "ignore",
+    "steps": [
+      { "action": "playTween", "targetObjectId": "obj_field_fade_box", "componentType": "Rectangle", "property": "fillAlpha", "tweenFrom": 0, "tweenTo": 1, "tweenDuration": 250, "tweenEasing": "linear", "waitComplete": true },
+      { "action": "warp", "playUnitId": "pu_character_walk_house", "spawnObjectId": "obj_spawn_from_field", "facing": "up" }
+    ]
+  }
+}
+```
+
+### 到着したら幕を開ける（行き先の UICanvas `obj_house_fade` が持つ）
+
+```json
+{
+  "type": "EventAction",
+  "enabled": true,
+  "data": {
+    "listenTo": "system.playUnitEnter",
+    "action": "playTween",
+    "targetObjectId": "obj_house_fade_box",
+    "componentType": "Rectangle",
+    "property": "fillAlpha",
+    "tweenFrom": 1,
+    "tweenTo": 0,
+    "tweenDuration": 250,
+    "tweenEasing": "easeOut",
+    "completeEventId": ""
+  }
+}
+```
+
+**補足**:
+- 出口は同じ形で、`listenTo: "house.exit"`、`playUnitId: "pu_character_walk_field"`、`spawnObjectId: "obj_spawn_from_house"`、`facing: "down"` にする
+- `warp` は sequence の最後に置く（後ろの step は旧 PlayUnit の状態で走る）
+- 出現位置は通行可能なマスに置く。実際のデモは `tools/add_map_transition_to_demo.py` で作れる
+
+---
+
 ## 4. Conditional Component
 
 複数の条件分岐を順序付きで評価し、最初にマッチした分岐のアクションを実行します（短絡評価）。

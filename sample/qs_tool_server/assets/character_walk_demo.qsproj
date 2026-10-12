@@ -6,7 +6,7 @@
     "version": 1,
     "name": "Character Walk Demo",
     "createdAt": 1791740863588,
-    "updatedAt": 1791787162120,
+    "updatedAt": 1791799906136,
     "settings": {
       "defaultChipWidth": 16,
       "defaultChipHeight": 16
@@ -2639,6 +2639,166 @@
               "zoom": 1
             }
           }
+        },
+        {
+          "id": "map_demo_house",
+          "type": "map",
+          "name": "House Map",
+          "width": 12,
+          "height": 10,
+          "mapData": {
+            "version": 1,
+            "width": 12,
+            "height": 10,
+            "tileWidth": 32,
+            "tileHeight": 32,
+            "tilesetId": "ts_demo_field",
+            "layers": [
+              {
+                "id": "layer_ground",
+                "name": "Ground",
+                "visible": true,
+                "locked": false,
+                "tiles": [
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  2,
+                  2,
+                  1,
+                  2,
+                  2,
+                  1,
+                  1,
+                  1,
+                  1,
+                  2,
+                  2,
+                  1,
+                  2,
+                  2,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  2,
+                  2,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  2,
+                  2,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  2,
+                  2,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  2,
+                  2,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  2,
+                  2,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  1,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  1,
+                  1,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2
+                ]
+              }
+            ],
+            "selectedLayer": 0,
+            "selectedTileRef": {
+              "tilesetId": "ts_demo_field",
+              "col": 1,
+              "row": 0,
+              "index": 1
+            },
+            "cursor": {
+              "x": 0,
+              "y": 0
+            },
+            "view": {
+              "showGrid": true,
+              "zoom": 1
+            }
+          }
         }
       ],
       "playUnits": [
@@ -3023,6 +3183,543 @@
                     "backgroundColor": "",
                     "padding": 0,
                     "revealChars": -1
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_house_door",
+              "name": "HouseDoor",
+              "enabled": true,
+              "parentId": null,
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 320,
+                    "y": 352,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 32,
+                    "height": 32,
+                    "fillColor": "#7c4a2d",
+                    "fillAlpha": 1,
+                    "strokeColor": "#3f2a1a",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rect",
+                    "offsetX": 0,
+                    "offsetY": 0,
+                    "width": 32,
+                    "height": 32,
+                    "isTrigger": true
+                  }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": {
+                    "eventId": "door.house",
+                    "triggerOn": "overlap",
+                    "once": false,
+                    "targetObjectId": ""
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_spawn_from_house",
+              "name": "SpawnFromHouse",
+              "enabled": true,
+              "parentId": null,
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 336,
+                    "y": 412,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_field_fade",
+              "name": "FieldFade",
+              "enabled": true,
+              "parentId": null,
+              "children": [
+                "obj_field_fade_box"
+              ],
+              "components": [
+                {
+                  "type": "UICanvas",
+                  "enabled": true,
+                  "data": {
+                    "referenceWidth": 640,
+                    "referenceHeight": 360,
+                    "sortOrder": 100
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "system.playUnitEnter",
+                    "action": "playTween",
+                    "targetObjectId": "obj_field_fade_box",
+                    "componentType": "Rectangle",
+                    "property": "fillAlpha",
+                    "tweenFrom": 1,
+                    "tweenTo": 0,
+                    "tweenDuration": 250,
+                    "tweenEasing": "easeOut",
+                    "completeEventId": ""
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "door.house",
+                    "action": "sequence",
+                    "targetObjectId": "",
+                    "onBusy": "ignore",
+                    "steps": [
+                      {
+                        "action": "playTween",
+                        "targetObjectId": "obj_field_fade_box",
+                        "componentType": "Rectangle",
+                        "property": "fillAlpha",
+                        "tweenFrom": 0,
+                        "tweenTo": 1,
+                        "tweenDuration": 250,
+                        "tweenEasing": "linear",
+                        "waitComplete": true
+                      },
+                      {
+                        "action": "warp",
+                        "playUnitId": "pu_character_walk_house",
+                        "spawnObjectId": "obj_spawn_from_field",
+                        "facing": "up"
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_field_fade_box",
+              "name": "FieldFadeBox",
+              "enabled": true,
+              "parentId": "obj_field_fade",
+              "children": [],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": {
+                    "anchorX": 0,
+                    "anchorY": 0,
+                    "pivotX": 0,
+                    "pivotY": 0,
+                    "x": 0,
+                    "y": 0,
+                    "width": 640,
+                    "height": 360
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 640,
+                    "height": 360,
+                    "fillColor": "#000000",
+                    "fillAlpha": 0,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "pu_character_walk_house",
+          "type": "playUnit",
+          "name": "House",
+          "objects": [
+            {
+              "id": "obj_root",
+              "name": "Root",
+              "enabled": true,
+              "parentId": null,
+              "children": [
+                "obj_camera",
+                "obj_settings"
+              ],
+              "components": []
+            },
+            {
+              "id": "obj_camera",
+              "name": "CameraObject",
+              "enabled": true,
+              "parentId": "obj_root",
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Camera",
+                  "enabled": true,
+                  "data": {
+                    "zoom": 2,
+                    "viewportX": 0,
+                    "viewportY": 0,
+                    "viewportWidth": 0,
+                    "viewportHeight": 0,
+                    "followTargetObjectId": "obj_player",
+                    "followLerp": 0.15
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_settings",
+              "name": "PlaySettingsObject",
+              "enabled": true,
+              "parentId": "obj_root",
+              "children": [],
+              "components": [
+                {
+                  "type": "PlaySettings",
+                  "enabled": true,
+                  "data": {
+                    "defaultCameraObjectId": "obj_camera"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_house_map",
+              "name": "HouseMap",
+              "enabled": true,
+              "parentId": null,
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Tilemap",
+                  "enabled": true,
+                  "data": {
+                    "mapAssetId": "map_demo_house",
+                    "layerId": "",
+                    "scale": 1,
+                    "offsetX": 0,
+                    "offsetY": 0
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_player",
+              "name": "Player",
+              "enabled": true,
+              "parentId": null,
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 176,
+                    "y": 280,
+                    "z": 10,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Controller",
+                  "enabled": true,
+                  "data": {
+                    "inputMode": "player1",
+                    "moveSpeed": 120
+                  }
+                },
+                {
+                  "type": "Character",
+                  "enabled": true,
+                  "data": {
+                    "characterChipsetId": "cc_character_walk_hero",
+                    "scale": 2,
+                    "origin": {
+                      "x": 0.5,
+                      "y": 1
+                    }
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rect",
+                    "offsetX": -6,
+                    "offsetY": -6,
+                    "width": 12,
+                    "height": 6,
+                    "isTrigger": false
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_spawn_from_field",
+              "name": "SpawnFromField",
+              "enabled": true,
+              "parentId": null,
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 176,
+                    "y": 280,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_house_exit",
+              "name": "HouseExit",
+              "enabled": true,
+              "parentId": null,
+              "children": [],
+              "components": [
+                {
+                  "type": "Transform",
+                  "enabled": true,
+                  "data": {
+                    "x": 160,
+                    "y": 288,
+                    "z": 0,
+                    "rotation": 0,
+                    "scaleX": 1,
+                    "scaleY": 1
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 64,
+                    "height": 32,
+                    "fillColor": "#7c4a2d",
+                    "fillAlpha": 1,
+                    "strokeColor": "#3f2a1a",
+                    "strokeWidth": 2,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
+                  }
+                },
+                {
+                  "type": "Collider",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rect",
+                    "offsetX": 0,
+                    "offsetY": 0,
+                    "width": 64,
+                    "height": 32,
+                    "isTrigger": true
+                  }
+                },
+                {
+                  "type": "Trigger",
+                  "enabled": true,
+                  "data": {
+                    "eventId": "house.exit",
+                    "triggerOn": "overlap",
+                    "once": false,
+                    "targetObjectId": ""
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_house_fade",
+              "name": "HouseFade",
+              "enabled": true,
+              "parentId": null,
+              "children": [
+                "obj_house_fade_box"
+              ],
+              "components": [
+                {
+                  "type": "UICanvas",
+                  "enabled": true,
+                  "data": {
+                    "referenceWidth": 640,
+                    "referenceHeight": 360,
+                    "sortOrder": 100
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "system.playUnitEnter",
+                    "action": "playTween",
+                    "targetObjectId": "obj_house_fade_box",
+                    "componentType": "Rectangle",
+                    "property": "fillAlpha",
+                    "tweenFrom": 1,
+                    "tweenTo": 0,
+                    "tweenDuration": 250,
+                    "tweenEasing": "easeOut",
+                    "completeEventId": ""
+                  }
+                },
+                {
+                  "type": "EventAction",
+                  "enabled": true,
+                  "data": {
+                    "listenTo": "house.exit",
+                    "action": "sequence",
+                    "targetObjectId": "",
+                    "onBusy": "ignore",
+                    "steps": [
+                      {
+                        "action": "playTween",
+                        "targetObjectId": "obj_house_fade_box",
+                        "componentType": "Rectangle",
+                        "property": "fillAlpha",
+                        "tweenFrom": 0,
+                        "tweenTo": 1,
+                        "tweenDuration": 250,
+                        "tweenEasing": "linear",
+                        "waitComplete": true
+                      },
+                      {
+                        "action": "warp",
+                        "playUnitId": "pu_character_walk_field",
+                        "spawnObjectId": "obj_spawn_from_house",
+                        "facing": "down"
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "id": "obj_house_fade_box",
+              "name": "HouseFadeBox",
+              "enabled": true,
+              "parentId": "obj_house_fade",
+              "children": [],
+              "components": [
+                {
+                  "type": "UITransform",
+                  "enabled": true,
+                  "data": {
+                    "anchorX": 0,
+                    "anchorY": 0,
+                    "pivotX": 0,
+                    "pivotY": 0,
+                    "x": 0,
+                    "y": 0,
+                    "width": 640,
+                    "height": 360
+                  }
+                },
+                {
+                  "type": "Rectangle",
+                  "enabled": true,
+                  "data": {
+                    "shape": "rectangle",
+                    "width": 640,
+                    "height": 360,
+                    "fillColor": "#000000",
+                    "fillAlpha": 0,
+                    "strokeColor": "",
+                    "strokeWidth": 0,
+                    "strokeAlpha": 1,
+                    "rotation": 0,
+                    "originX": 0,
+                    "originY": 0,
+                    "sides": 4,
+                    "points": 5,
+                    "innerRadius": 0.4
                   }
                 }
               ]

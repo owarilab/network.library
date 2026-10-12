@@ -11,6 +11,8 @@ class PlayTestScene extends Scene {
   };
   /** 通行判定の移動単位（px）。小さいほど壁際で正確に止まる */
   static MOVE_STEP_PX = 1;
+  /** PlayUnit に入ったときに発火する予約イベント（startup、requestPlayUnit、returnPlayUnit、warp） */
+  static PLAY_UNIT_ENTER_EVENT_ID = 'system.playUnitEnter';
 
   constructor() {
     super();
@@ -32,6 +34,12 @@ class PlayTestScene extends Scene {
     this._typewriters = new Map();
     /** 順次実行（sequence アクション）の進行。key: sequence の data オブジェクト */
     this._sequences = new Map();
+    /** 予約された warp。次フレーム冒頭で適用する（_applyPendingWarp） */
+    this._pendingWarp = null;
+    /** PlayUnit の到着イベントを次の update で送るかどうか */
+    this._playUnitEnterPending = false;
+    /** 次のカメラ更新でプレイヤー位置へ瞬時に合わせるかどうか */
+    this._snapCameraOnce = false;
     this._pointerState = {
       canvasX: 0,
       canvasY: 0,
@@ -72,6 +80,8 @@ class PlayTestScene extends Scene {
     this._tilemaps.clear();
     this._typewriters.clear();
     this._sequences.clear();
+    this._pendingWarp = null;
+    this._playUnitEnterPending = true;
     this._runtime = PlayUnitRuntime.fromPlayUnit(this._getActiveRuntimePlayUnit(), appData);
     this._cameraState = this._createCameraState(this._runtime?.camera);
     input.on('keydown', this._onKeyDown);
@@ -90,16 +100,22 @@ class PlayTestScene extends Scene {
     this._tilemaps.clear();
     this._typewriters.clear();
     this._sequences.clear();
+    this._pendingWarp = null;
+    this._playUnitEnterPending = false;
+    this._resetPointerState();
+    this._activeOverlapKeys.clear();
+    this._activeTimerTriggers.clear();
+    this._pendingEvents.clear();
+    this._activeTweens.clear();
+  }
+
+  _resetPointerState() {
     this._pointerState.hoveredTriggerMap.clear();
     this._pointerState.pressedTriggerKeys.clear();
     this._pointerState.pressedDragHits.dragStart = null;
     this._pointerState.pressedDragHits.dragMove = null;
     this._pointerState.pressedDragHits.dragEnd = null;
     this._pointerState.dragActivated = false;
-    this._activeOverlapKeys.clear();
-    this._activeTimerTriggers.clear();
-    this._pendingEvents.clear();
-    this._activeTweens.clear();
   }
 
   render(ctx, canvas) {
@@ -243,6 +259,8 @@ class PlayTestScene extends Scene {
       this._appData.globalVariableState.system.fixed.timer = (this._appData.globalVariableState.system.fixed.timer || 0) + deltaSeconds;
     }
 
+    this._applyPendingWarp();
+
     const playUnitSwitch = this._appData?.consumeRequestedRuntimePlayUnitSwitch?.();
     if (playUnitSwitch?.invalid) {
       this._statusTone = 'error';
@@ -250,8 +268,13 @@ class PlayTestScene extends Scene {
     } else if (playUnitSwitch?.changed && playUnitSwitch.asset) {
       this._statusTone = 'info';
       this._statusMessage = `Switched PlayUnit: ${playUnitSwitch.asset.name || playUnitSwitch.asset.id}`;
-      this._cameraState = null;
-      this._resetEventFlows();
+      this._onPlayUnitChanged();
+    }
+
+    // 到着イベントは切替の後に送る（切替先の EventAction が受け取る）
+    if (this._playUnitEnterPending) {
+      this._playUnitEnterPending = false;
+      this._pendingEvents.add(PlayTestScene.PLAY_UNIT_ENTER_EVENT_ID);
     }
 
     const playUnit = this._getActiveRuntimePlayUnit();
@@ -279,13 +302,15 @@ class PlayTestScene extends Scene {
 
     if (!this._cameraState || !this._runtime?.camera) return;
     this._refreshCameraFollowTarget();
+    const snapCamera = this._snapCameraOnce;
+    this._snapCameraOnce = false;
     if (!this._runtime.camera.followTargetObjectId) return;
 
     const targetX = Number.isFinite(Number(this._runtime.camera.targetX)) ? Number(this._runtime.camera.targetX) : this._cameraState.x;
     const targetY = Number.isFinite(Number(this._runtime.camera.targetY)) ? Number(this._runtime.camera.targetY) : this._cameraState.y;
     const followLerp = Number.isFinite(Number(this._runtime.camera.followLerp)) ? Number(this._runtime.camera.followLerp) : 1;
 
-    if (followLerp >= 1) {
+    if (followLerp >= 1 || snapCamera) {
       this._cameraState.x = targetX;
       this._cameraState.y = targetY;
       return;
@@ -445,7 +470,12 @@ class PlayTestScene extends Scene {
     };
   }
 
-  _processOverlapTriggers(playUnit) {
+  /**
+   * overlap の重なりを更新して発火する。silent なら発火せず重なりの状態だけ更新する（到着時に使う）。
+   * @param {PlayUnitData} playUnit
+   * @param {boolean} [silent=false]
+   */
+  _processOverlapTriggers(playUnit, silent = false) {
     if (!playUnit || !Array.isArray(playUnit.objects)) return;
 
     const controllerSources = this._getControllerOverlapSources(playUnit.objects);
@@ -485,7 +515,7 @@ class PlayTestScene extends Scene {
 
           const overlapKey = `${objectData.id}:${triggerIndex}:${source.objectId}`;
           nextOverlapKeys.add(overlapKey);
-          if (this._activeOverlapKeys.has(overlapKey)) continue;
+          if (silent || this._activeOverlapKeys.has(overlapKey)) continue;
 
           this._fireTrigger({
             objectId: typeof objectData.id === 'string' ? objectData.id : '',
@@ -553,7 +583,7 @@ class PlayTestScene extends Scene {
             const once = trigger.data?.once === true;
             const triggerKey = `${triggerId}:${triggerIndex}:${eventId}:onTimer`;
 
-            if (!once || !this._firedOnceTriggerKeys.has(triggerKey)) {
+            if (!once || !this._firedOnceTriggerKeys.has(this._getOnceKey(triggerKey))) {
               if (eventId) {
                 this._fireTrigger({
                   objectId: triggerId,
@@ -565,7 +595,7 @@ class PlayTestScene extends Scene {
                 }, 'onTimer');
               }
               if (once) {
-                this._firedOnceTriggerKeys.add(triggerKey);
+                this._firedOnceTriggerKeys.add(this._getOnceKey(triggerKey));
               }
             }
 
@@ -857,6 +887,15 @@ class PlayTestScene extends Scene {
   _getActiveRuntimePlayUnit() {
     const asset = this._appData?.getActiveProjectAsset?.();
     if (!asset || asset.type !== 'playUnit') return null;
+    return this._resolveRuntimeUnit(asset);
+  }
+
+  /**
+   * 指定アセットの実行用コピーを返す。初回に作成し、セッション中は同じコピーを使う。
+   * @param {object} asset  type が playUnit のアセット
+   * @returns {PlayUnitData}
+   */
+  _resolveRuntimeUnit(asset) {
     if (!this._runtimeUnits.has(asset.id)) {
       this._runtimeUnits.set(asset.id, PlayTestScene._createRuntimeCopy(asset));
     }
@@ -893,6 +932,171 @@ class PlayTestScene extends Scene {
       this._playerControllers.set(key, new PlayerController());
     }
     return this._playerControllers.get(key);
+  }
+
+  /**
+   * 操作対象（inputMode が player1 の Controller 付きオブジェクト）を返す。
+   * @param {PlayUnitData} playUnit  実行用コピー
+   * @returns {PlayObjectData|null}
+   */
+  _findPlayerObject(playUnit) {
+    for (const objectData of playUnit?.objects || []) {
+      if (!objectData || objectData.enabled === false) continue;
+      const controller = objectData.findComponentByType?.('Controller') || null;
+      const transform = objectData.findComponentByType?.('Transform') || null;
+      if (!controller || controller.enabled === false || !transform || transform.enabled === false) continue;
+
+      const inputMode = typeof controller.data?.inputMode === 'string' && controller.data.inputMode.trim()
+        ? controller.data.inputMode.trim()
+        : 'player1';
+      if (inputMode === 'player1') return objectData;
+    }
+    return null;
+  }
+
+  /**
+   * warp アクションを検証し、次フレーム冒頭（_applyPendingWarp）で適用するために予約する。
+   * 切替と配置はここでは行わない（sequence や処理の途中で PlayUnit が変わるのを避ける）。
+   * @param {PlayUnitData} playUnit  実行元（実行用コピー）
+   * @param {object} data
+   * @returns {boolean}
+   */
+  _queueWarp(playUnit, data) {
+    const fail = (message) => {
+      this._statusTone = 'error';
+      this._statusMessage = message;
+      return false;
+    };
+    if (this._pendingWarp) return fail('warp is already pending in this frame');
+
+    const requestedId = typeof data.playUnitId === 'string' ? data.playUnitId.trim() : '';
+    let targetUnit = playUnit;
+    if (requestedId && requestedId !== playUnit.id) {
+      const asset = this._appData?.currentProject?.findPlayUnitById?.(requestedId) || null;
+      if (!asset) return fail(`warp: PlayUnit not found: ${requestedId}`);
+      targetUnit = this._resolveRuntimeUnit(asset);
+    }
+
+    const targetObjectId = typeof data.targetObjectId === 'string' ? data.targetObjectId.trim() : '';
+    const targetObject = targetObjectId ? targetUnit.findObjectById(targetObjectId) : this._findPlayerObject(targetUnit);
+    if (!targetObject?.findComponentByType?.('Transform')) {
+      return fail(targetObjectId
+        ? `warp: target object not found: ${targetObjectId}`
+        : `warp: no player object in PlayUnit: ${targetUnit.id}`);
+    }
+
+    let spawnX = null;
+    let spawnY = null;
+    const spawnObjectId = typeof data.spawnObjectId === 'string' ? data.spawnObjectId.trim() : '';
+    if (spawnObjectId) {
+      const markerTransform = targetUnit.findObjectById(spawnObjectId)?.findComponentByType?.('Transform') || null;
+      if (!markerTransform) return fail(`warp: spawn object not found: ${spawnObjectId}`);
+      spawnX = PlayTestScene._parseCoordinate(markerTransform.data?.x) ?? 0;
+      spawnY = PlayTestScene._parseCoordinate(markerTransform.data?.y) ?? 0;
+    } else {
+      spawnX = PlayTestScene._parseCoordinate(data.spawnX);
+      spawnY = PlayTestScene._parseCoordinate(data.spawnY);
+    }
+    if (spawnX === null || spawnY === null) {
+      return fail('warp: spawnObjectId or numeric spawnX / spawnY is required');
+    }
+
+    const requestedFacing = typeof data.facing === 'string' ? data.facing.trim() : '';
+    if (requestedFacing && !CharacterChipset.DIRECTIONS.includes(requestedFacing)) {
+      return fail(`warp: invalid facing: ${requestedFacing}`);
+    }
+    // 省略時は移動元のプレイヤーの向きを引き継ぐ（切替前に読む）
+    const sourceObject = this._findPlayerObject(playUnit);
+    const sourceFacing = sourceObject ? this._getPlayerController(playUnit, sourceObject).direction : 'down';
+
+    this._pendingWarp = {
+      playUnitId: targetUnit.id,
+      targetObjectId: targetObject.id,
+      x: spawnX,
+      y: spawnY,
+      facing: requestedFacing || sourceFacing,
+    };
+    this._statusTone = 'info';
+    this._statusMessage = `Warp to ${targetUnit.name || targetUnit.id}`;
+    return true;
+  }
+
+  /**
+   * 予約された warp を適用する。別 PlayUnit なら切り替えて後始末し、対象を出現位置に置く。
+   * 同じ PlayUnit 内の移動では進行中の sequence・tween は止めない。
+   */
+  _applyPendingWarp() {
+    const warp = this._pendingWarp;
+    if (!warp) return;
+    this._pendingWarp = null;
+
+    const switching = warp.playUnitId !== this._getActiveRuntimePlayUnit()?.id;
+    if (switching) {
+      const asset = this._appData?.activateRuntimePlayUnitById?.(warp.playUnitId, {
+        updateReturnPlayUnitId: true,
+        clearRequestedPlayUnitId: false,
+      }) || null;
+      if (!asset) {
+        this._statusTone = 'error';
+        this._statusMessage = `warp: PlayUnit not found: ${warp.playUnitId}`;
+        return;
+      }
+    }
+
+    const playUnit = this._getActiveRuntimePlayUnit();
+    const objectData = playUnit?.findObjectById?.(warp.targetObjectId) || null;
+    const transform = objectData?.findComponentByType?.('Transform') || null;
+    if (transform) {
+      transform.data.x = warp.x;
+      transform.data.y = warp.y;
+    }
+    if (objectData) this._getPlayerController(playUnit, objectData).direction = warp.facing;
+    this._snapCameraOnce = true;
+
+    if (switching) {
+      this._onPlayUnitChanged();
+    } else {
+      this._processOverlapTriggers(playUnit, true);
+    }
+  }
+
+  /**
+   * PlayUnit が切り替わったとき（requestPlayUnit、returnPlayUnit、warp）の後始末。
+   * 旧 PlayUnit の進行状態を持ち越さず、到着位置での重なりは発火済みとして扱う。
+   * 到着イベント（system.playUnitEnter）は次の update で送る。
+   */
+  _onPlayUnitChanged() {
+    this._cameraState = null;
+    this._snapCameraOnce = true;
+    this._resetEventFlows();
+    this._activeTimerTriggers.clear();
+    this._resetPointerState();
+    this._pendingEvents.clear();
+    this._processOverlapTriggers(this._getActiveRuntimePlayUnit(), true);
+    this._playUnitEnterPending = true;
+  }
+
+  /**
+   * once の発火済み判定を PlayUnit ごとに分ける（別マップで同じ ID のトリガーを区別する）。
+   * @param {string} triggerKey
+   * @returns {string}
+   */
+  _getOnceKey(triggerKey) {
+    return `${this._getActiveRuntimePlayUnit()?.id || ''}|${triggerKey}`;
+  }
+
+  /**
+   * 座標として使える数値を返す。数値でなければ null。
+   * @param {*} value
+   * @returns {number|null}
+   */
+  static _parseCoordinate(value) {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+    if (typeof value === 'string' && value.trim() !== '') {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
   }
 
   _drawCharacterEntry(ctx, entry, project) {
@@ -1633,9 +1837,9 @@ class PlayTestScene extends Scene {
 
   _fireTrigger(hit, reason) {
     if (!hit || hit.triggerOn !== reason) return false;
-    const triggerKey = hit.triggerKey || `${hit.objectId}:${hit.eventId}:${reason}`;
-    if (hit.once && this._firedOnceTriggerKeys.has(triggerKey)) return false;
-    if (hit.once) this._firedOnceTriggerKeys.add(triggerKey);
+    const onceKey = this._getOnceKey(hit.triggerKey || `${hit.objectId}:${hit.eventId}:${reason}`);
+    if (hit.once && this._firedOnceTriggerKeys.has(onceKey)) return false;
+    if (hit.once) this._firedOnceTriggerKeys.add(onceKey);
 
     if (hit.eventId) this._pendingEvents.add(hit.eventId);
     const eventLabel = hit.eventId || '(no eventId)';
@@ -1814,10 +2018,11 @@ class PlayTestScene extends Scene {
       }
       this._statusTone = 'info';
       this._statusMessage = `Returned to PlayUnit: ${asset.name || asset.id}`;
-      this._cameraState = null;
-      this._resetEventFlows();
+      this._onPlayUnitChanged();
       return true;
     }
+
+    if (action === 'warp') return this._queueWarp(playUnit, data);
 
     const targetObject = targetObjectId ? playUnit.findObjectById(targetObjectId) : null;
 

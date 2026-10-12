@@ -170,7 +170,7 @@
 | メニュー画面 | 部分的 | PlayUnit の切替で画面遷移はできる。カーソル操作などの UI はない |
 | セーブ / ロード（ゲーム内） | なし | プロジェクト保存は別機能としてある |
 | フラグ管理 | あり | boolean 変数、set、truthy と equals |
-| マップ遷移 | 部分的 | PlayUnit 単位の切替のみ。タイルマップ間のワープはない |
+| マップ遷移 | 部分的 | PlayUnit を別マップとして切り替え、出現位置と向きを指定できる（warp、P0-4）。扉は overlap と sequence で組める。マップ間で持ち回るオブジェクトはない（プレイヤーは各マップに複製する） |
 | タイルマップ編集 | あり | MapEditorScene。ただし単一レイヤー実質、タイルセットは 1 つ前提 |
 | タイルセットの通過フラグ | 部分的 | 編集はできるが、実行時に使われない |
 | NPC 配置 | 部分的 | Image や Rectangle と Transform で配置できる。タイルマップ上の配置物の概念はない |
@@ -305,3 +305,7 @@ P0 の 3（順次実行の基盤）は後続の多くの前提になるため、
   - 完了: P0-2 のメッセージウィンドウを sequence で進める形に置き換えた（[MESSAGE_WINDOW_DESIGN.md](MESSAGE_WINDOW_DESIGN.md) の 11）。
   - 残り: 繰り返し、並列、sequence 内の分岐、途中の中断、専用の編集 UI（現状は JSON 編集のみ）。
   - 既知の制約: PlayUnit を切り替えると、進行中の sequence は再開しない（窓などの表示は残る）。
+- **P0-4（マップ間の遷移）**:
+  - 完了: EventAction の `warp`（行き先の PlayUnit、出現位置の `spawnObjectId` または `spawnX` / `spawnY`、`facing`）。同じ PlayUnit 内の移動にも使える。PlayUnit に入るたびに `system.playUnitEnter` を送る（到着演出用）。PlayUnit 切替時の後始末（タイマー、重なり、保留イベント、進行中の sequence・tween・typewriter）を requestPlayUnit、returnPlayUnit、warp で共通化した。カメラは切替で瞬時に追従する。デモは扉で室内へ移り、フェードで切り替える（[EVENT_ACTION_DESIGN.md](EVENT_ACTION_DESIGN.md) の warp と PlayUnit 切替時の後始末）。
+  - 残り: プレイヤーの持ち回り（共有オブジェクト）、遷移中の入力ロック、マップ名の表示、warp 専用の編集フォーム（JSON 編集のみ）。
+  - 既知の制約: 出現位置を通行不可のマスに置くと身動きが取れなくなる（自動補正はない）。窓が開いたまま扉を踏むと、窓は残る（P0-3 と同じ）。

@@ -915,6 +915,10 @@ class PlayUnitEditorScene extends Scene {
           action: 'setProperty',
           targetObjectId: '',
           playUnitId: '',
+          spawnObjectId: '',
+          spawnX: '',
+          spawnY: '',
+          facing: '',
           componentType: 'Text',
           property: 'text',
           value: '',
@@ -998,6 +1002,13 @@ class PlayUnitEditorScene extends Scene {
       return;
     }
 
+    // 出現位置の無い warp は実行時に何もできないので、保存させない
+    if (type === 'EventAction' && parsed.action === 'warp' && !PlayUnitEditorScene._hasWarpSpawn(parsed)) {
+      this._statusTone = 'error';
+      this._statusMessage = 'warp requires spawnObjectId or spawnX and spawnY';
+      return;
+    }
+
     component.data = PlayUnitEditorScene._normalizeComponentData(type, parsed);
     this._markDirty(`Updated ${type} data on ${objectData.name || objectData.id}`);
   }
@@ -1008,6 +1019,18 @@ class PlayUnitEditorScene extends Scene {
    * @param {object} data
    * @returns {object}
    */
+  /**
+   * warp の出現位置が指定されているか（spawnObjectId、または数値の spawnX と spawnY）。
+   * @param {object} data
+   * @returns {boolean}
+   */
+  static _hasWarpSpawn(data) {
+    if (typeof data.spawnObjectId === 'string' && data.spawnObjectId.trim()) return true;
+    const isNumeric = (value) => (typeof value === 'number' && Number.isFinite(value))
+      || (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value)));
+    return isNumeric(data.spawnX) && isNumeric(data.spawnY);
+  }
+
   static _normalizeComponentData(type, data) {
     if (type === 'Tilemap') return PlayUnitEditorScene._normalizeTilemapData(data);
     if (type === 'NineSlice') {

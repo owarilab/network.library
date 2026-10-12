@@ -265,6 +265,7 @@ Supported `action` values:
 - `requestPlayUnit`
 - `returnPlayUnit`
 - `sequence`
+- `warp`
 
 Action-specific fields:
 
@@ -275,6 +276,9 @@ Action-specific fields:
 - `fireEvent`: `eventId`
 - `requestPlayUnit`: `playUnitId`
 - `returnPlayUnit`: no extra fields
+- `warp`: `spawnObjectId` (or numeric `spawnX` and `spawnY`; one is required), `playUnitId` (optional; omit for a move inside the same PlayUnit), `targetObjectId` (optional; default is the player1 Controller object), `facing` (optional `down` / `left` / `right` / `up`; default is the source player's facing)
+  - Applied on the next frame. Put it last in a sequence. Only one warp per frame (a second one fails).
+  - Switching PlayUnit clears timers, overlap state, pending events and running sequences/tweens/typewriters. A trigger under the arrival point does not fire.
 - `sequence`: `steps` (required array; each step has the same shape as an EventAction), `onBusy` (`ignore` default, or `restart`), `completeEventId` (optional; fires once after the last step)
   - Step-only actions: `wait` (`duration` in seconds, default 1), `waitEvent` (`eventId`, optional `timeout` in seconds). Any step with `"waitComplete": true` (`typewriter`, `playTween`, nested `sequence`) waits until that finishes.
   - Other steps run immediately. A failing step stops the sequence (no completion event).
@@ -292,6 +296,7 @@ Current useful system keys:
 - `system.fixed.currentPlayUnitId`
 - `system.fixed.returnPlayUnitId`
 - `system.fixed.isPaused`
+- Event `system.playUnitEnter` (not a variable): fires once each time a PlayUnit is entered (startup, requestPlayUnit, returnPlayUnit, warp to another PlayUnit). Use it as `listenTo` for fade-in.
 - `system.persistent.masterVolume`
 
 Variable definition shape:

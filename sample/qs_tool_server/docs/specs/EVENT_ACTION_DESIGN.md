@@ -25,7 +25,7 @@ PlayTestScene._processEventActions()
     └─ 全オブジェクトの EventAction を走査
     └─ listenTo === eventId のものを _executeAction() で実行
             ↓
-アクション実行（setProperty / setEnabled / playTween / fireEvent / returnPlayUnit）
+アクション実行（setProperty / setEnabled / playTween / fireEvent / returnPlayUnit / warp）
             ↓
 PlayTestScene._updateTweens() (playTween の場合、毎フレーム値を補間)
 ```
@@ -37,8 +37,8 @@ PlayTestScene._updateTweens() (playTween の場合、毎フレーム値を補間
 | フィールド | 型 | 必須 | 説明 |
 |---|---|---|---|
 | `listenTo` | string | ○ | 反応するイベント ID |
-| `action` | string | ○ | `setProperty` / `setEnabled` / `playTween` / `fireEvent` / `returnPlayUnit` / `setGlobalVariable` / `typewriter` / `sequence` |
-| `targetObjectId` | string | action 依存 | 操作対象オブジェクトの ID。`fireEvent`、`returnPlayUnit`、`setGlobalVariable`、`sequence` では不要 |
+| `action` | string | ○ | `setProperty` / `setEnabled` / `playTween` / `fireEvent` / `returnPlayUnit` / `warp` / `setGlobalVariable` / `typewriter` / `sequence` |
+| `targetObjectId` | string | action 依存 | 操作対象オブジェクトの ID。`fireEvent`、`returnPlayUnit`、`setGlobalVariable`、`sequence` では不要。`warp` では省略可（行き先の操作対象になる） |
 
 ### action = `setProperty` 追加フィールド
 
@@ -133,6 +133,41 @@ step のその他のアクション（`setGlobalVariable`、`setEnabled`、`fire
 - 時間の単位の対応: `wait` と `waitEvent.timeout` は**秒**（`Trigger.onTimer` と同じ）。`playTween` の `tweenDuration` と `typewriter` の `charsPerSecond` は、それぞれ**ミリ秒**と**文字毎秒**。
 - PlayUnit を切り替えると、進行中の sequence は止まり、再開しない（窓などの表示は残る）。
 
+### action = `warp` 追加フィールド
+
+| フィールド | 型 | 既定値 | 説明 |
+|---|---|---|---|
+| `playUnitId` | string | 現在の PlayUnit | 行き先の PlayUnit ID。省略、または現在と同じなら、同じ PlayUnit 内の移動になる |
+| `spawnObjectId` | string | — | 行き先にある出現位置のオブジェクト ID。その Transform の x / y に置く |
+| `spawnX` / `spawnY` | number | — | `spawnObjectId` を使わない場合の座標（両方が数値であること） |
+| `targetObjectId` | string | 行き先の操作対象 | 動かすオブジェクト。省略時は行き先の `inputMode: player1` の Controller オブジェクト |
+| `facing` | string | 移動元の向き | `down` / `left` / `right` / `up`。省略時は移動元のプレイヤーの向きを引き継ぐ |
+
+- 出現位置（`spawnObjectId`、または `spawnX` と `spawnY`）は必須。無いとエラーになり、エディタでも保存させない。
+- 検証は action を実行した時点で行う。失敗すると何も起きず、エラーのステータスを出す。sequence の step なら、その sequence を中断する。
+- 切替と配置は**次のフレームの冒頭**で行う（`_applyPendingWarp`）。同じフレームに 2 つ目の warp を置くとエラーになる。
+- warp は sequence の最後に置く。warp より後ろの step は、同じフレームの旧 PlayUnit の状態で実行されてしまう。
+- 同じ PlayUnit 内の移動では、進行中の sequence・tween・typewriter は止まらない。PlayUnit が変わるときは止まる（下の「PlayUnit 切替時の後始末」）。
+
+### PlayUnit 切替時の後始末（requestPlayUnit / returnPlayUnit / warp 共通）
+
+PlayUnit が切り替わると、次の処理を行う。
+
+1. 進行中の sequence・tween・typewriter を止める（P0-3 と同じ）。
+2. タイマー（onTimer）の経過時間と、ポインタの hover / pressed の状態を捨てる。
+3. 保留中のイベント（`_pendingEvents`）を捨てる。旧 PlayUnit の完了イベントは新しい PlayUnit に届かない。
+4. 到着位置で重なっている overlap トリガーは**発火済み**として扱う。出てから入り直したときに発火する。
+5. カメラは、プレイヤー追従のときその位置へ瞬時に合わせる（`followLerp` が小さくても滑らない）。
+6. `system.playUnitEnter` を送る（下の「system.playUnitEnter」）。
+
+- `once` の発火済み判定は PlayUnit ごとに分かれる。別の PlayUnit に同じ ID のトリガーがあっても干渉しない。
+- 既存の挙動の変更: 切替でタイマーと重なりの状態が消えるため、戻ったときに onTimer は最初から数え直す。overlap は到着位置では発火しない（以前は重なっていれば即時に発火した）。
+
+### system.playUnitEnter
+
+PlayUnit に入るたびに 1 回だけ発火する予約イベント。PlayTest の開始、requestPlayUnit、returnPlayUnit、別の PlayUnit への warp で送られる。同じ PlayUnit 内の warp では送られない。
+`listenTo: "system.playUnitEnter"` の EventAction で、フェードインなどの到着演出を書く。切替と同じ update の `_processEventActions` で処理される。
+
 ### action = `returnPlayUnit` 追加フィールド
 
 追加フィールドなし。
@@ -152,6 +187,7 @@ Runtime global variable `system.fixed.returnPlayUnitId` を参照し、その Pl
 6. `_updateSequences(dt)` が待ちの条件（時間、イベント、typewriter・tween・入れ子の完了）を評価し、解けた sequence を次の step へ進める
 7. `returnPlayUnit` は実行フレーム内で即時に active PlayUnit を差し替え、進行中の sequence・tween・typewriter を止める
 8. 完了イベント（tween・typewriter・sequence の `completeEventId`）は、追加されたフレームの次に処理される
+9. `warp` は実行フレームで検証して予約する。次のフレームの冒頭（`update` の先頭）で、別の PlayUnit への切替と「PlayUnit 切替時の後始末」、出現位置への配置を行う。`returnPlayUnit` と違い、切替は処理の途中では起きない
 
 ---
 
@@ -166,3 +202,8 @@ Runtime global variable `system.fixed.returnPlayUnitId` を参照し、その Pl
 - sequence の step を JSON で手書きする必要がある（専用の編集 UI はない）。`steps` が無い sequence は保存時にエラーになる
 - `wait` の長さは、開始したフレームの分だけ最大 1 フレーム短くなることがある
 - 同じフレームで同じ eventId を複数回発火しても、1 回にまとめて処理される
+- `warp` の出現位置は通行可能なマスに置く。壁の上に出現すると身動きが取れなくなる（自動補正はない）
+- 遷移中も入力は止まらない。同じ扉の二重発火は `onBusy: "ignore"` の sequence で防ぐ
+- プレイヤーは PlayUnit ごとに置く（同じ ID のオブジェクトを各マップに複製する）。PlayUnit の間で持ち回る仕組みはない
+- 戻ったときは、前回離れたときの状態のまま（オブジェクトの位置や無効化、`once` の発火済みなど）。切替で初期化するのは、タイマーと重なりの状態だけ
+- `warp` は同じフレームに 1 回だけ受ける。2 つ目はエラーになり、その扉は出て入り直すまで再発火しない（overlap の状態が残るため）
