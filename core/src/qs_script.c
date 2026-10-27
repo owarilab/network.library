@@ -3020,6 +3020,52 @@ void* qs_script_system_function_rand( QS_MEMORY_POOL* _ppool, void* args )
 	return pret;
 }
 
+void* qs_script_system_function_to_int( QS_MEMORY_POOL* _ppool, void* args )
+{
+	QS_ARRAY* parray = (QS_ARRAY*)args;
+	QS_ARRAY_ELEMENT* elm;
+	QS_FUNCTION_RETURN* pret;
+	int32_t memid_return = -1;
+	memid_return = qs_create_memory_block( _ppool, sizeof( QS_FUNCTION_RETURN ) );
+	if( -1 == memid_return ){
+		return NULL;
+	}
+	pret = (QS_FUNCTION_RETURN*)qs_upointer( _ppool, memid_return );
+	pret->id	= 0;
+	pret->munit	= -1;
+	pret->refid = memid_return;
+	if( parray != NULL )
+	{
+		elm = (QS_ARRAY_ELEMENT*)qs_upointer( _ppool, parray->memid );
+		if( elm != NULL )
+		{
+			if( parray->len > 0 )
+			{
+				int32_t value = 0;
+				if( elm[0].id == ELEMENT_LITERAL_NUM )
+				{
+					value = QS_INT32( _ppool, elm[0].memid_array_element_data );
+				}
+				else if( elm[0].id == ELEMENT_LITERAL_STR )
+				{
+					value = atoi( (char*)QS_GET_POINTER( _ppool, elm[0].memid_array_element_data ) );
+				}
+				int32_t len_munit = qs_create_memory_block( _ppool, NUMERIC_BUFFER_SIZE );
+				if( len_munit <= 0 ){
+					return pret;
+				}
+				char* pbuf = (char*)QS_GET_POINTER(_ppool,len_munit);
+				qs_itoa( value, pbuf, QS_PUNIT_USIZE(_ppool,len_munit) );
+				int32_t* pv = QS_PINT32(_ppool,len_munit);
+				*pv = value;
+				pret->munit = len_munit;
+				pret->id = ELEMENT_LITERAL_NUM;
+			}
+		}
+	}
+	return pret;
+}
+
 void* qs_script_system_function_csv_read( QS_MEMORY_POOL* _ppool, void* args )
 {
 	QS_ARRAY* parray = (QS_ARRAY*)args;
