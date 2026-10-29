@@ -1,25 +1,9 @@
 #include "tool_url_whitelist_get.h"
 #include "../agent_core.h"
+#include "qs_string.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-/* JSON-escape a string into dst. Returns 0 on success, -1 if too small. */
-static int json_escape_str(const char* src, size_t src_len, char* dst, size_t dst_size)
-{
-    size_t i = 0;
-    for (size_t si = 0; si < src_len && i < dst_size - 1; si++) {
-        char c = src[si];
-        if (c == '"')       { if (i + 2 > dst_size - 1) return -1; dst[i++] = '\\'; dst[i++] = '"'; }
-        else if (c == '\\') { if (i + 2 > dst_size - 1) return -1; dst[i++] = '\\'; dst[i++] = '\\'; }
-        else if (c == '\n') { if (i + 2 > dst_size - 1) return -1; dst[i++] = '\\'; dst[i++] = 'n'; }
-        else if (c == '\r') { if (i + 2 > dst_size - 1) return -1; dst[i++] = '\\'; dst[i++] = 'r'; }
-        else if (c == '\t') { if (i + 2 > dst_size - 1) return -1; dst[i++] = '\\'; dst[i++] = 't'; }
-        else                { dst[i++] = c; }
-    }
-    dst[i] = '\0';
-    return 0;
-}
 
 int tool_url_whitelist_get_execute(const char* json_args, char* output, size_t output_size)
 {
@@ -42,13 +26,16 @@ int tool_url_whitelist_get_execute(const char* json_args, char* output, size_t o
         if (i > 0) pos += snprintf(buf + pos, buf_cap - (size_t)pos, ",");
 
         char escaped_host[2048];
-        json_escape_str(agent_get_whitelist_host(i), strlen(agent_get_whitelist_host(i)),
-                        escaped_host, sizeof(escaped_host));
+        if (QS_SYSTEM_OK != qs_json_escape(agent_get_whitelist_host(i), escaped_host, sizeof(escaped_host))) {
+            escaped_host[0] = '\0';
+        }
 
         const char* desc = agent_get_whitelist_desc(i);
         char escaped_desc[1024] = "";
         if (desc && desc[0]) {
-            json_escape_str(desc, strlen(desc), escaped_desc, sizeof(escaped_desc));
+            if (QS_SYSTEM_OK != qs_json_escape(desc, escaped_desc, sizeof(escaped_desc))) {
+                escaped_desc[0] = '\0';
+            }
         }
 
         pos += snprintf(buf + pos, buf_cap - (size_t)pos,
