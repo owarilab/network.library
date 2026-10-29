@@ -12,6 +12,9 @@
 - CSV: [sample/csv/main.c](sample/csv/main.c)
 - Base64/SHA1: [sample/encode/main.c](sample/encode/main.c)
 
+## メモリ
+- メモリアロケーター挙動テスト: [sample/memory_allocator_test/main.c](sample/memory_allocator_test/main.c)
+
 ## KVS
 - メモリ KVS: [sample/cache/main.c](sample/cache/main.c)
 - 永続化 KVS: [sample/persistence_cache/main.c](sample/persistence_cache/main.c)
