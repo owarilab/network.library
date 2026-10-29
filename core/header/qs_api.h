@@ -403,7 +403,7 @@ char* api_qs_base64_decode(QS_MEMORY_CONTEXT* memory_context, const char* data);
 char* api_qs_sha1_encode(QS_MEMORY_CONTEXT* memory_context, const void* data, size_t length);
 
 /* JSON string escape utility */
-void api_qs_json_escape(const char* src, char* dst, size_t dst_size);
+int api_qs_json_escape(const char* src, char* dst, size_t dst_size);
 
 #endif /*_QS_API_H_*/
 

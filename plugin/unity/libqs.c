@@ -752,9 +752,9 @@ UNITY_INTERFACE_EXPORT char* UNITY_INTERFACE_API libqs_api_sha1_encode(QS_MEMORY
 	return api_qs_sha1_encode(memory_context, data, length);
 }
 
-UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API libqs_api_json_escape(const char* src, char* dst, size_t dst_size)
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_json_escape(const char* src, char* dst, size_t dst_size)
 {
-	api_qs_json_escape(src, dst, dst_size);
+	return api_qs_json_escape(src, dst, dst_size);
 }
 
 UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_connection, int32_t server_type)

@@ -519,14 +519,24 @@ void qs_print_hex( uint8_t* hex, size_t size, size_t view_max )
 	printf("\n");
 }
 
-void qs_json_escape( const char* src, char* dst, size_t dst_size )
+int qs_json_escape( const char* src, char* dst, size_t dst_size )
 {
 	size_t pos = 0;
-	if( dst_size == 0 || dst == NULL ){
-		return;
+	if( src == NULL || dst == NULL || dst_size == 0 ){
+		return QS_SYSTEM_ERROR;
 	}
-	for( ; src && *src != '\0' && pos + 7 < dst_size; src++ ){
+	for( ; *src != '\0'; src++ ){
 		unsigned char c = (unsigned char)*src;
+		size_t need = 1;
+		if( c == '"' || c == '\\' || c == '\n' || c == '\r' || c == '\t' ){
+			need = 2;
+		} else if( c < 0x20 ){
+			need = 6;
+		}
+		if( pos + need >= dst_size ){
+			dst[pos] = '\0';
+			return QS_SYSTEM_ERROR;
+		}
 		if( c == '"' || c == '\\' ){
 			dst[pos++] = '\\';
 			dst[pos++] = (char)c;
@@ -540,10 +550,17 @@ void qs_json_escape( const char* src, char* dst, size_t dst_size )
 			dst[pos++] = '\\';
 			dst[pos++] = 't';
 		} else if( c < 0x20 ){
-			pos += (size_t)snprintf( dst + pos, dst_size - pos, "\\u%04x", c );
+			const char* hex = "0123456789abcdef";
+			dst[pos++] = '\\';
+			dst[pos++] = 'u';
+			dst[pos++] = '0';
+			dst[pos++] = '0';
+			dst[pos++] = hex[(c >> 4) & 0x0f];
+			dst[pos++] = hex[c & 0x0f];
 		} else {
 			dst[pos++] = (char)c;
 		}
 	}
 	dst[pos] = '\0';
+	return QS_SYSTEM_OK;
 }

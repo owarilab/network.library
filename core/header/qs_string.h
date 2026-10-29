@@ -41,7 +41,7 @@ int qs_urlencode( char* dest, size_t dest_size, char* src );
 int qs_urldecode( char* dest, size_t dest_size, char* src );
 int qs_get_extension( char* dest, size_t dest_size, char* src );
 void qs_print_hex( uint8_t* hex, size_t size, size_t view_max );
-void qs_json_escape( const char* src, char* dst, size_t dst_size );
+int qs_json_escape( const char* src, char* dst, size_t dst_size );
 
 #endif /*_QS_STRING_H_*/
 
