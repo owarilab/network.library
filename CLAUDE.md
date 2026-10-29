@@ -135,6 +135,14 @@ HTTP API と WebSocket を組み合わせた最小構成の実装例として、
 
 coreライブラリを使用する際は内部の実装を見てからアプリケーションを実装すること。
 
+## qs_api公開時の更新箇所
+
+- `core/header/qs_api.h`（宣言）
+- `core/src/qs_api.c`（実装）
+- `plugin/linux/header/libqs.h`（Linuxプラグイン公開ヘッダ）
+- `plugin/unity/libqs.h`（Unityプラグイン公開ヘッダ）
+- `plugin/unity/libqs.c`（Unityエクスポート関数）
+
 ## よくあるミス
 
 api_qs_memory_clean関数はmemsetと同じ意味でヒープが初期化される。
