@@ -438,31 +438,16 @@ static char* json_escape_string(const char* text)
 		return NULL;
 	}
 	size_t src_len = strlen(text);
-	size_t cap = src_len * 2 + 1;
+	/* Worst case: each byte becomes "\\u00xx" (6 chars). */
+	size_t cap = src_len * 6 + 1;
 	char* out = (char*)malloc(cap);
 	if (out == NULL) {
 		return NULL;
 	}
-	size_t w = 0;
-	for (size_t i = 0; i < src_len; i++) {
-		char c = text[i];
-		if (c == '"' || c == '\\') {
-			out[w++] = '\\';
-			out[w++] = c;
-		} else if (c == '\n') {
-			out[w++] = '\\';
-			out[w++] = 'n';
-		} else if (c == '\r') {
-			out[w++] = '\\';
-			out[w++] = 'r';
-		} else if (c == '\t') {
-			out[w++] = '\\';
-			out[w++] = 't';
-		} else {
-			out[w++] = c;
-		}
+	if (QS_SYSTEM_OK != api_qs_json_escape(text, out, cap)) {
+		free(out);
+		return NULL;
 	}
-	out[w] = '\0';
 	return out;
 }
 
