@@ -194,36 +194,6 @@ static void svs_whisper_log(enum ggml_log_level level, const char* text, void* u
     }
 }
 
-static void svs_json_escape(const char* src, char* dst, size_t dst_size)
-{
-    size_t pos = 0;
-    if(dst_size == 0){
-        return;
-    }
-    for(; src && *src != '\0' && pos + 7 < dst_size; src++)
-    {
-        unsigned char c = (unsigned char)*src;
-        if(c == '"' || c == '\\'){
-            dst[pos++] = '\\';
-            dst[pos++] = (char)c;
-        } else if (c == '\n'){
-            dst[pos++] = '\\';
-            dst[pos++] = 'n';
-        } else if (c == '\r'){
-            dst[pos++] = '\\';
-            dst[pos++] = 'r';
-        } else if (c == '\t'){
-            dst[pos++] = '\\';
-            dst[pos++] = 't';
-        } else if (c < 0x20){
-            pos += (size_t)snprintf(dst + pos, dst_size - pos, "\\u%04x", c);
-        } else {
-            dst[pos++] = (char)c;
-        }
-    }
-    dst[pos] = '\0';
-}
-
 /* 送信キューにJSONを積む。どのスレッドからでも呼べる */
 static void svs_post_message(int slot_index, uint32_t generation, const char* fmt, ...)
 {
@@ -524,7 +494,7 @@ static void svs_transcribe(int slot_index, uint32_t generation, const float* pcm
     }
 
     printf("[SVS][infer] slot=%d %lld-%lldms infer_ms=%lld text=%s\n", slot_index, (long long)t0_ms, (long long)t1_ms, (long long)infer_ms, p);
-    svs_json_escape(p, escaped, sizeof(escaped));
+    api_qs_json_escape(p, escaped, sizeof(escaped));
     svs_post_message(slot_index,generation, "{\"type\":\"result\",\"t0\":%lld,\"t1\":%lld,\"text\":\"%s\",\"infer_ms\":%lld}",
         (long long)t0_ms, (long long)t1_ms, escaped, (long long)infer_ms);
 }

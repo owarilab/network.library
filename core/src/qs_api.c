@@ -3101,3 +3101,8 @@ char* api_qs_sha1_encode(QS_MEMORY_CONTEXT* memory_context, const void* data, si
 	encoded[20] = '\0'; // Null-terminate the string
 	return encoded;
 }
+
+void api_qs_json_escape(const char* src, char* dst, size_t dst_size)
+{
+	qs_json_escape(src, dst, dst_size);
+}

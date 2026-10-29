@@ -250,6 +250,9 @@ UNITY_INTERFACE_EXPORT char* UNITY_INTERFACE_API libqs_api_base64_encode(QS_MEMO
 UNITY_INTERFACE_EXPORT char* UNITY_INTERFACE_API libqs_api_base64_decode(QS_MEMORY_CONTEXT* memory_context, const char* data);
 UNITY_INTERFACE_EXPORT char* UNITY_INTERFACE_API libqs_api_sha1_encode(QS_MEMORY_CONTEXT* memory_context, const void* data, size_t length);
 
+/* JSON string escape utility */
+UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API libqs_api_json_escape(const char* src, char* dst, size_t dst_size);
+
 void libqs_api_debug_log(char* str);
 
 #ifdef __cplusplus

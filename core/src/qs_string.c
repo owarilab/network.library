@@ -518,3 +518,32 @@ void qs_print_hex( uint8_t* hex, size_t size, size_t view_max )
 	}
 	printf("\n");
 }
+
+void qs_json_escape( const char* src, char* dst, size_t dst_size )
+{
+	size_t pos = 0;
+	if( dst_size == 0 || dst == NULL ){
+		return;
+	}
+	for( ; src && *src != '\0' && pos + 7 < dst_size; src++ ){
+		unsigned char c = (unsigned char)*src;
+		if( c == '"' || c == '\\' ){
+			dst[pos++] = '\\';
+			dst[pos++] = (char)c;
+		} else if( c == '\n' ){
+			dst[pos++] = '\\';
+			dst[pos++] = 'n';
+		} else if( c == '\r' ){
+			dst[pos++] = '\\';
+			dst[pos++] = 'r';
+		} else if( c == '\t' ){
+			dst[pos++] = '\\';
+			dst[pos++] = 't';
+		} else if( c < 0x20 ){
+			pos += (size_t)snprintf( dst + pos, dst_size - pos, "\\u%04x", c );
+		} else {
+			dst[pos++] = (char)c;
+		}
+	}
+	dst[pos] = '\0';
+}
