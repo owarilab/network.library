@@ -1,4 +1,5 @@
 #include "tool_common.h"
+#include "qs_api.h"
 #include <string.h>
 #include <ctype.h>
 #include <stdlib.h>
@@ -130,80 +131,32 @@ int tool_json_extract_int(const char* json, const char* key, int defaultval)
 
 /* ---------------------------------------------------------------
  * JSON-escape src into dst buffer
- * Handles: ", \, \n, \r, \t, and control characters
+ * Delegates to the core implementation (api_qs_json_escape).
+ * Handles: ", \, \n, \r, \t, and control characters (\u00xx).
  * --------------------------------------------------------------- */
 int tool_json_escape(const char* src, char* dst, size_t dst_size)
 {
-    if (!src || !dst || dst_size == 0) return -1;
-    
-    size_t w = 0;
-    for (size_t i = 0; src[i] && w + 2 < dst_size; i++) {
-        unsigned char c = (unsigned char)src[i];
-        
-        if (c == '"') {
-            dst[w++] = '\\';
-            dst[w++] = '"';
-        } else if (c == '\\') {
-            dst[w++] = '\\';
-            dst[w++] = '\\';
-        } else if (c == '\n') {
-            dst[w++] = '\\';
-            dst[w++] = 'n';
-        } else if (c == '\r') {
-            dst[w++] = '\\';
-            dst[w++] = 'r';
-        } else if (c == '\t') {
-            dst[w++] = '\\';
-            dst[w++] = 't';
-        } else if (c < 0x20) {
-            /* skip other control chars */
-        } else {
-            dst[w++] = (char)c;
-        }
-    }
-    
-    if (w >= dst_size - 1) return -1;
-    dst[w] = '\0';
-    return 0;
+    return api_qs_json_escape(src, dst, dst_size);
 }
 
 /* ---------------------------------------------------------------
  * JSON-escape src into a newly malloc'd string
+ * Delegates to the core implementation (api_qs_json_escape).
+ * Worst case: every byte becomes \u00xx (6 bytes), so allocate
+ * src_len * 6 + 1.
  * --------------------------------------------------------------- */
 char* tool_json_escape_alloc(const char* src, size_t src_len)
 {
     if (!src) return NULL;
-    
-    /* Worst case: every char becomes 2 chars */
-    char* out = (char*)malloc(src_len * 2 + 1);
+
+    size_t cap = src_len * 6 + 1;
+    char* out = (char*)malloc(cap);
     if (!out) return NULL;
-    
-    size_t w = 0;
-    for (size_t i = 0; i < src_len && w + 2 < src_len * 2; i++) {
-        unsigned char c = (unsigned char)src[i];
-        
-        if (c == '"') {
-            out[w++] = '\\';
-            out[w++] = '"';
-        } else if (c == '\\') {
-            out[w++] = '\\';
-            out[w++] = '\\';
-        } else if (c == '\n') {
-            out[w++] = '\\';
-            out[w++] = 'n';
-        } else if (c == '\r') {
-            out[w++] = '\\';
-            out[w++] = 'r';
-        } else if (c == '\t') {
-            out[w++] = '\\';
-            out[w++] = 't';
-        } else if (c < 0x20) {
-            /* skip other control chars */
-        } else {
-            out[w++] = (char)c;
-        }
+
+    if (0 != api_qs_json_escape(src, out, cap)) {
+        free(out);
+        return NULL;
     }
-    out[w] = '\0';
     return out;
 }
 

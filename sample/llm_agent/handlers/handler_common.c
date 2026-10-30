@@ -610,26 +610,21 @@ int hc_extract_obj_raw(const char* json, const char* key, char* out, size_t out_
 
 /* ---------------------------------------------------------------
  * JSON string escape
+ * Delegates to the core implementation (api_qs_json_escape).
+ * Worst case: every byte becomes \u00xx (6 bytes).
  * --------------------------------------------------------------- */
 char* hc_json_escape(const char* src)
 {
     if (!src) return NULL;
     size_t src_len = strlen(src);
-    char*  out     = (char*)malloc(src_len * 2 + 1);
+    size_t cap     = src_len * 6 + 1;
+    char*  out     = (char*)malloc(cap);
     if (!out) return NULL;
 
-    size_t w = 0;
-    for (size_t i = 0; i < src_len; i++) {
-        unsigned char c = (unsigned char)src[i];
-        if      (c == '"')  { out[w++] = '\\'; out[w++] = '"';  }
-        else if (c == '\\') { out[w++] = '\\'; out[w++] = '\\'; }
-        else if (c == '\n') { out[w++] = '\\'; out[w++] = 'n';  }
-        else if (c == '\r') { out[w++] = '\\'; out[w++] = 'r';  }
-        else if (c == '\t') { out[w++] = '\\'; out[w++] = 't';  }
-        else if (c < 0x20)  { /* skip control chars */ }
-        else                { out[w++] = (char)c; }
+    if (0 != api_qs_json_escape(src, out, cap)) {
+        free(out);
+        return NULL;
     }
-    out[w] = '\0';
     return out;
 }
 
