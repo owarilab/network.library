@@ -10,6 +10,53 @@
 
 #include "qs_api.h"
 
+void demo_json_escape(void)
+{
+    printf("=== api_qs_json_escape demo ===\n");
+
+    // case 1: basic escape (quote, backslash, newline, carriage return, tab)
+    {
+        const char* src = "line1\nline2\t\"quoted\"\\backslash\r";
+        char dst[256];
+        int ret = api_qs_json_escape(src, dst, sizeof(dst));
+        printf("[basic] ret=%d\n", ret);
+        printf("[basic] src : %s\n", src);
+        printf("[basic] dst : %s\n", dst);
+    }
+
+    // case 2: control character (0x01 -> \u0001)
+    // note: place the control char at the end of the literal,
+    // because a hex escape like "\x01b" would consume the following 'b'.
+    {
+        const char* src = "a\x01";
+        char dst[256];
+        int ret = api_qs_json_escape(src, dst, sizeof(dst));
+        printf("[ctrl] ret=%d\n", ret);
+        printf("[ctrl] dst : %s\n", dst);
+    }
+
+    // case 3: buffer too small -> QS_SYSTEM_ERROR (partial write)
+    {
+        const char* src = "this is a long string that will not fit";
+        char dst[8];
+        int ret = api_qs_json_escape(src, dst, sizeof(dst));
+        printf("[overflow] ret=%d\n", ret);
+        printf("[overflow] dst : %s\n", dst);
+    }
+
+    // case 4: Japanese (UTF-8 multibyte) passes through unchanged,
+    // but embedded control chars are still escaped
+    {
+        const char* src = "日本語テスト\n\"引用\"";
+        char dst[256];
+        int ret = api_qs_json_escape(src, dst, sizeof(dst));
+        printf("[japanese] ret=%d\n", ret);
+        printf("[japanese] dst : %s\n", dst);
+    }
+
+    printf("=== end demo ===\n");
+}
+
 int main()
 {
     // memory context
@@ -28,6 +75,9 @@ int main()
     // root array
     QS_JSON_ELEMENT_ARRAY root_array;
     api_qs_array_create(&memory_context, &root_array);
+
+    // json escape demo (no memory pool needed)
+    demo_json_escape();
 
     if(1)
     {
