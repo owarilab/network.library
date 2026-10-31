@@ -1,0 +1,11 @@
+// script_argv_test.qscript
+// argv 変数（name / greeting / count / config）を使用するテストスクリプト
+
+echo("name=" + name + "\n");
+echo("greeting=" + greeting + "\n");
+echo("count=" + to_int(count) + "\n");
+echo("port=" + to_int(config["port"]) + "\n");
+
+// 計算結果を result 変数に格納（api_qs_script_get_parameter で読み戻す）
+result = "done:" + name + ":" + to_int(count);
+echo(result + "\n");
