@@ -776,10 +776,10 @@ void api_qs_client_set_lowlevel_recv_hook(QS_CLIENT_CONTEXT* context, QS_SOCKET_
 }
 int api_qs_server_init(QS_SERVER_CONTEXT** ppcontext, int port, int32_t max_connection, int32_t server_type)
 {
-	if( ( (*ppcontext) = ( QS_SERVER_CONTEXT * )malloc( sizeof( QS_SERVER_CONTEXT ) ) ) == NULL ){
+	if(max_connection<=0){
 		return -1;
 	}
-	if(max_connection<=0){
+	if( ( (*ppcontext) = ( QS_SERVER_CONTEXT * )malloc( sizeof( QS_SERVER_CONTEXT ) ) ) == NULL ){
 		return -1;
 	}
 	QS_SERVER_CONTEXT* context = *ppcontext;
