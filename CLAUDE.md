@@ -10,6 +10,7 @@
 |---|---|
 | `core/` | メインライブラリ。HTTP/WebSocketサーバー、JSON/CSV処理、メモリ管理など |
 | `sample/` | 各機能のサンプル実装。Makefile付きで即座にビルド・実行可能 |
+| `test/` | 各機能のテスト実装。Makefile付きで即座にビルド・実行可能 |
 | `documents/` | 実装ドキュメント。`README.md` から読み始めることを推奨 |
 | `llm/` | LLM関連モジュール（llama.cpp等の統合） |
 | `stt/` | 音声認識モジュール（whisper.cpp、C++/CMake） |
