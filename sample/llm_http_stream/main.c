@@ -13,8 +13,7 @@ static char* make_effective_prompt(const char* user_prompt);
 static char* make_json_mode_prompt(const char* user_prompt);
 static char* make_json_repair_prompt(const char* broken_text);
 static int send_json_http_response(QS_EVENT_PARAMETER params, int status_code, const char* body);
-static int validate_json_object_text(const char* json_text);
-static char* extract_json_object_text(const char* text);
+static char* extract_and_validate_json_object(const char* text);
 static char* json_escape_string(const char* text);
 static void strip_markdown_code_fences_in_place(char* text);
 static int handle_embed_store(QS_EVENT_PARAMETER params);
@@ -354,26 +353,27 @@ static int send_json_http_response(QS_EVENT_PARAMETER params, int status_code, c
 	return 0;
 }
 
-static int validate_json_object_text(const char* json_text)
+static char* extract_and_validate_json_object(const char* text)
 {
-	if (json_text == NULL || json_text[0] == '\0') {
-		return -1;
-	}
-	QS_MEMORY_CONTEXT memory;
-	if (-1 == api_qs_memory_alloc(&memory, 1024 * 1024)) {
-		return -1;
-	}
-	QS_JSON_ELEMENT_OBJECT object;
-	int result = api_qs_json_decode_object(&memory, &object, json_text);
-	api_qs_memory_free(&memory);
-	return (result == 0) ? 0 : -1;
-}
-
-static char* extract_json_object_text(const char* text)
-{
-	if (text == NULL) {
+	if (text == NULL || text[0] == '\0') {
 		return NULL;
 	}
+
+	/* Fast path: try decoding the entire text as a JSON object */
+	api_qs_memory_clean(&g_temporary_memory);
+	{
+		QS_JSON_ELEMENT_OBJECT object;
+		if (0 == api_qs_json_decode_object(&g_temporary_memory, &object, text)) {
+			size_t size = strlen(text);
+			char* out = (char*)malloc(size + 1);
+			if (out == NULL) return NULL;
+			memcpy(out, text, size);
+			out[size] = '\0';
+			return out;
+		}
+	}
+
+	/* Slow path: extract {..} via brace matching, then validate */
 	const char* start = NULL;
 	const char* end = NULL;
 	int depth = 0;
@@ -395,7 +395,6 @@ static char* extract_json_object_text(const char* text)
 			}
 			continue;
 		}
-
 		if (c == '"') {
 			in_string = 1;
 			continue;
@@ -422,14 +421,22 @@ static char* extract_json_object_text(const char* text)
 	if (start == NULL || end == NULL || end < start) {
 		return NULL;
 	}
-	size_t size = (size_t)(end - start + 1);
-	char* out = (char*)malloc(size + 1);
-	if (out == NULL) {
-		return NULL;
+
+	/* Validate the extracted substring using core JSON API */
+	api_qs_memory_clean(&g_temporary_memory);
+	{
+		QS_JSON_ELEMENT_OBJECT object;
+		size_t size = (size_t)(end - start + 1);
+		char* candidate = (char*)malloc(size + 1);
+		if (candidate == NULL) return NULL;
+		memcpy(candidate, start, size);
+		candidate[size] = '\0';
+		if (0 != api_qs_json_decode_object(&g_temporary_memory, &object, candidate)) {
+			free(candidate);
+			return NULL;
+		}
+		return candidate;
 	}
-	memcpy(out, start, size);
-	out[size] = '\0';
-	return out;
 }
 
 static char* json_escape_string(const char* text)
@@ -1243,13 +1250,11 @@ static int on_http_event(QS_EVENT_PARAMETER params)
 
 		char* json_body = context.buffer;
 		int is_valid = 0;
-		char* extracted = extract_json_object_text(json_body);
-		if (extracted != NULL && validate_json_object_text(extracted) == 0) {
+		char* extracted = extract_and_validate_json_object(json_body);
+		if (extracted != NULL) {
 			free(context.buffer);
 			json_body = extracted;
 			is_valid = 1;
-		} else if (extracted != NULL) {
-			free(extracted);
 		}
 
 		if (!is_valid) {
@@ -1262,16 +1267,13 @@ static int on_http_event(QS_EVENT_PARAMETER params)
 				if (repair_context.buffer != NULL) {
 					repair_context.buffer[0] = '\0';
 					if (0 == qs_llama_module_stream_text(repair_prompt, on_json_token, &repair_context)) {
-						char* repair_extracted = extract_json_object_text(repair_context.buffer);
-						if (repair_extracted != NULL && validate_json_object_text(repair_extracted) == 0) {
+						char* repair_extracted = extract_and_validate_json_object(repair_context.buffer);
+						if (repair_extracted != NULL) {
 							free(json_body);
 							free(repair_context.buffer);
 							json_body = repair_extracted;
 							is_valid = 1;
 						} else {
-							if (repair_extracted != NULL) {
-								free(repair_extracted);
-							}
 							free(repair_context.buffer);
 						}
 					} else {
