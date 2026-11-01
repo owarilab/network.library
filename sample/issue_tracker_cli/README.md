@@ -49,6 +49,7 @@ make
 - `issue.db`
 - `issue_index.db`
 - `system.db`（連番カウンタ等のシステムデータ）
+- `system_settings.json`（システム設定。現状は issue.statuses を定義）
 - `schema_user.json`
 - `schema_label.json`
 - `schema_issue.json`
@@ -137,12 +138,19 @@ make
 
 `assigneeIds` に指定した user、`labelIds` に指定した label が存在しない場合はエラーになります。
 また create/update 時は schema ファイルに基づいて不足フィールドへデフォルト値を補完し、schema 未定義フィールドはエラーになります。
+`status` は `system_settings.json` の `issue.statuses` で定義された値のみ許可されます。
 
 ### get
 
 ```bash
 ./qs_issue_tracker_cli issue get --id iss1
 ```
+
+
+./qs_issue_tracker_cli issue create --id iss2 --json '{"id":"iss1","title":"bug","status":"open","assigneeIds":["u1"],"labelIds":["bug"]}'
+
+
+./qs_issue_tracker_cli issue update --id iss_000001 --json '{"id":"iss_000001","title":"bug2","status":"in_progress","assigneeIds":[],"labelIds":[]}'
 
 ### update
 
@@ -290,7 +298,24 @@ schema は次の形式です。
 
 ---
 
-## 9. オプション共通
+## 9. system_settings.json の書き方（status定義）
+
+issue の `status` は `system_settings.json` で管理します。
+
+```json
+{
+  "issue": {
+    "statuses": ["open", "in_progress", "closed", "review"]
+  }
+}
+```
+
+- `statuses` に含まれない文字列を issue の `status` に指定すると create/update でエラーになります。
+- 起動時に `system_settings.json` を読み込みます。
+
+---
+
+## 10. オプション共通
 
 多くのコマンドで以下を指定できます。
 
@@ -304,7 +329,7 @@ schema は次の形式です。
 
 ---
 
-## 10. 補足
+## 11. 補足
 
 - 本サンプルは固定容量 KVS 前提です（容量不足時はエラー）。
 - compaction は「新ファイル再構築→切替」方式です。
@@ -312,7 +337,7 @@ schema は次の形式です。
 
 ---
 
-## 11. issue update の利用ケース（運用手順）
+## 12. issue update の利用ケース（運用手順）
 
 `issue update` は実運用で使うケースが多いため、代表ケースを手順化します。  
 共通の基本フローは次の通りです。

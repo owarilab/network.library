@@ -22,6 +22,7 @@
 #define DEFAULT_BASE_DIR "./issue_data"
 #define INDEX_JSON_BUFFER_SIZE (64 * 1024)
 #define MAX_SCHEMA_FIELDS 128
+#define MAX_ISSUE_STATUS_VALUES 64
 
 typedef enum SCHEMA_FIELD_TYPE {
     SCHEMA_FIELD_TYPE_INT32 = 1,
@@ -41,6 +42,8 @@ typedef struct APP_STORES {
     QS_KVS_CONTEXT issue;
     QS_KVS_CONTEXT index;
     QS_KVS_CONTEXT system;
+    int issue_status_count;
+    char issue_statuses[MAX_ISSUE_STATUS_VALUES][64];
     char base_dir[4096];
 } APP_STORES;
 
@@ -74,6 +77,7 @@ static int load_schema(const char* base_dir, const char* schema_file_name, SCHEM
 static int is_allowed_extra_field(const char* entity_name, const char* key);
 static int apply_schema_on_write(const char* entity_name, const char* base_dir, const char* schema_file_name, const char* src_json, char** out_json);
 static int validate_and_fill_schema_object(const char* entity_name, SCHEMA_DEF* schema, QS_JSON_ELEMENT_OBJECT* obj, QS_MEMORY_CONTEXT* context);
+static int load_system_settings(const char* base_dir, APP_STORES* stores);
 
 static void print_usage(const char* program_name)
 {
@@ -232,6 +236,28 @@ static int write_schema_file(const char* base_dir, const char* file_name, const 
     }
     if (write_text_file(path, content) != 0) {
         fprintf(stderr, "error: failed to write schema file: %s\n", path);
+        return -1;
+    }
+    return 0;
+}
+
+static int write_system_settings_file(const char* base_dir, int force)
+{
+    static const char* SYSTEM_SETTINGS =
+        "{\n"
+        "  \"issue\": {\n"
+        "    \"statuses\": [\"open\", \"in_progress\", \"closed\", \"review\"]\n"
+        "  }\n"
+        "}\n";
+    char path[4096];
+    if (build_store_path(path, sizeof(path), base_dir, "system_settings.json") != 0) {
+        return -1;
+    }
+    if (!force && file_exists(path)) {
+        return 0;
+    }
+    if (write_text_file(path, SYSTEM_SETTINGS) != 0) {
+        fprintf(stderr, "error: failed to write system settings file: %s\n", path);
         return -1;
     }
     return 0;
@@ -675,6 +701,77 @@ static int parse_schema_type(const char* type_text, SCHEMA_FIELD_TYPE* out_type)
         return 0;
     }
     return -1;
+}
+
+static int load_system_settings(const char* base_dir, APP_STORES* stores)
+{
+    char path[4096];
+    char* text = NULL;
+    stores->issue_status_count = 0;
+    if (build_store_path(path, sizeof(path), base_dir, "system_settings.json") != 0) {
+        return -1;
+    }
+    if (read_text_file(path, &text) != 0) {
+        fprintf(stderr, "error: failed to read system settings file: %s\n", path);
+        return -1;
+    }
+
+    QS_MEMORY_CONTEXT context;
+    if (create_temp_memory(&context, 2 * 1024 * 1024) != 0) {
+        free(text);
+        return -1;
+    }
+    QS_JSON_ELEMENT_OBJECT root;
+    if (-1 == api_qs_json_decode_object(&context, &root, text)) {
+        free(text);
+        api_qs_memory_free(&context);
+        fprintf(stderr, "error: invalid system settings json: %s\n", path);
+        return -1;
+    }
+    free(text);
+
+    QS_JSON_ELEMENT_OBJECT issue_obj;
+    if (-1 == api_qs_object_get_object(&root, "issue", &issue_obj)) {
+        api_qs_memory_free(&context);
+        fprintf(stderr, "error: issue settings not found: %s\n", path);
+        return -1;
+    }
+    QS_JSON_ELEMENT_ARRAY statuses;
+    if (-1 == api_qs_object_get_array(&issue_obj, "statuses", &statuses)) {
+        api_qs_memory_free(&context);
+        fprintf(stderr, "error: issue.statuses not found: %s\n", path);
+        return -1;
+    }
+    int32_t len = api_qs_array_get_length(&statuses);
+    if (len <= 0 || len > MAX_ISSUE_STATUS_VALUES) {
+        api_qs_memory_free(&context);
+        fprintf(stderr, "error: issue.statuses count is invalid: %d\n", len);
+        return -1;
+    }
+    int32_t i;
+    for (i = 0; i < len; i++) {
+        char* s = api_qs_array_get_string(&statuses, i);
+        if (s == NULL || s[0] == '\0') {
+            api_qs_memory_free(&context);
+            fprintf(stderr, "error: issue.statuses contains non-string or empty value\n");
+            return -1;
+        }
+        snprintf(stores->issue_statuses[stores->issue_status_count], sizeof(stores->issue_statuses[0]), "%s", s);
+        stores->issue_status_count++;
+    }
+    api_qs_memory_free(&context);
+    return 0;
+}
+
+static int is_allowed_issue_status(APP_STORES* stores, const char* status)
+{
+    int i;
+    for (i = 0; i < stores->issue_status_count; i++) {
+        if (strcmp(stores->issue_statuses[i], status) == 0) {
+            return 1;
+        }
+    }
+    return 0;
 }
 
 static int load_schema(const char* base_dir, const char* schema_file_name, SCHEMA_DEF* out_schema)
@@ -1198,12 +1295,18 @@ static int validate_reference_array(QS_JSON_ELEMENT_OBJECT* obj, const char* fie
 static int validate_issue_references(APP_STORES* stores, const char* issue_json)
 {
     QS_MEMORY_CONTEXT context;
-    if (create_temp_memory(&context, 2 * 1024 * 1024) != 0) {
+    if (create_temp_memory(&context, 1024 * 1024) != 0) {
         return -1;
     }
     QS_JSON_ELEMENT_OBJECT obj;
     if (-1 == api_qs_json_decode_object(&context, &obj, issue_json)) {
         fprintf(stderr, "error: invalid issue json\n");
+        api_qs_memory_free(&context);
+        return -1;
+    }
+    char* status = api_qs_object_get_string(&obj, "status");
+    if (status != NULL && !is_allowed_issue_status(stores, status)) {
+        fprintf(stderr, "error: issue status is not allowed: %s\n", status);
         api_qs_memory_free(&context);
         return -1;
     }
@@ -1267,7 +1370,7 @@ static int cb_remove_label_index(const char* value, void* user_data)
 static int issue_apply_indexes(APP_STORES* stores, const char* issue_id, const char* issue_json, int is_add)
 {
     QS_MEMORY_CONTEXT context;
-    if (create_temp_memory(&context, 2 * 1024 * 1024) != 0) {
+    if (create_temp_memory(&context, 1024 * 1024) != 0) {
         return -1;
     }
 
@@ -1370,7 +1473,6 @@ static int issue_update(APP_STORES* stores, const char* id, const char* issue_js
     if (validate_issue_references(stores, issue_json) != 0) {
         return EXIT_USAGE;
     }
-
     char* old_copy = strdup(old_json);
     if (old_copy == NULL) {
         return EXIT_IO;
@@ -1657,6 +1759,9 @@ static int command_init(int argc, char* argv[])
     if (init_schema_files(base_dir, force) != 0) {
         return EXIT_IO;
     }
+    if (write_system_settings_file(base_dir, force) != 0) {
+        return EXIT_IO;
+    }
     printf("init done: base_dir=%s\n", base_dir);
     return EXIT_OK;
 }
@@ -1841,8 +1946,9 @@ static int command_issue(int argc, char* argv[], APP_STORES* stores)
 
     if (strcmp(action, "create") == 0) {
         char generated_id[128];
+        char issue_seed_json[256];
         const char* final_id = id;
-        char* schema_json = NULL;
+        char* id_probe = NULL;
         char* final_json = NULL;
         if (json == NULL) {
             fprintf(stderr, "error: --json is required for create\n");
@@ -1856,18 +1962,23 @@ static int command_issue(int argc, char* argv[], APP_STORES* stores)
             final_id = generated_id;
             printf("generated id: %s\n", final_id);
         }
-        if (apply_schema_on_write("issue", stores->base_dir, "schema_issue.json", json, &schema_json) != 0) {
+        if (id != NULL) {
+            int probe_rc = json_with_forced_id(json, final_id, 1, &id_probe);
+            free(id_probe);
+            if (probe_rc == -2) {
+                fprintf(stderr, "error: --id and json.id mismatch for issue create\n");
+                return EXIT_USAGE;
+            }
+            if (probe_rc != 0) {
+                fprintf(stderr, "error: invalid json for issue create\n");
+                return EXIT_USAGE;
+            }
+        }
+        if (snprintf(issue_seed_json, sizeof(issue_seed_json), "{\"id\":\"%s\"}", final_id) <= 0) {
+            return EXIT_IO;
+        }
+        if (build_merged_update_json_with_schema("issue", stores->base_dir, "schema_issue.json", issue_seed_json, json, &final_json) != 0) {
             fprintf(stderr, "error: schema validation failed for issue create\n");
-            return EXIT_USAGE;
-        }
-        int json_rc = json_with_forced_id(schema_json, final_id, id != NULL, &final_json);
-        free(schema_json);
-        if (json_rc == -2) {
-            fprintf(stderr, "error: --id and json.id mismatch for issue create\n");
-            return EXIT_USAGE;
-        }
-        if (json_rc != 0) {
-            fprintf(stderr, "error: invalid json for issue create\n");
             return EXIT_USAGE;
         }
         int rc = issue_create(stores, final_id, final_json);
@@ -2093,6 +2204,10 @@ int main(int argc, char* argv[])
 
     APP_STORES stores;
     if (open_all_stores(base_dir, &stores) != 0) {
+        return EXIT_IO;
+    }
+    if (load_system_settings(base_dir, &stores) != 0) {
+        close_all_stores(&stores);
         return EXIT_IO;
     }
 

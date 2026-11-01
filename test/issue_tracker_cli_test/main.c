@@ -69,6 +69,8 @@ int main(void)
 
     snprintf(cmd, sizeof(cmd), "test -f \"%s/system.db\"", data_dir);
     check_exit("system store created", 0, cmd);
+    snprintf(cmd, sizeof(cmd), "test -f \"%s/system_settings.json\"", data_dir);
+    check_exit("system settings created", 0, cmd);
     snprintf(cmd, sizeof(cmd), "test -f \"%s/schema_user.json\"", data_dir);
     check_exit("schema_user created", 0, cmd);
     snprintf(cmd, sizeof(cmd), "test -f \"%s/schema_label.json\"", data_dir);
@@ -252,6 +254,14 @@ int main(void)
         data_dir
     );
     check_exit("issue create with missing assignee fails", 2, cmd);
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue create --base-dir \"%s\" --id iss_bad_status --json '{\"id\":\"iss_bad_status\",\"title\":\"bad\",\"status\":\"invalid_status\",\"assigneeIds\":[\"u1\"],\"labelIds\":[\"bug\"]}' >/dev/null 2>&1",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue create with invalid status fails", 2, cmd);
 
     snprintf(
         cmd,
@@ -363,6 +373,14 @@ int main(void)
         data_dir
     );
     check_exit("issue update with missing label fails", 2, cmd);
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue update --base-dir \"%s\" --id iss1 --json '{\"id\":\"iss1\",\"status\":\"invalid_status\"}' >/dev/null 2>&1",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue update with invalid status fails", 2, cmd);
 
     snprintf(
         cmd,
