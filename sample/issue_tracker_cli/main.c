@@ -32,12 +32,17 @@ typedef struct APP_STORES {
     QS_KVS_CONTEXT label;
     QS_KVS_CONTEXT issue;
     QS_KVS_CONTEXT index;
+    QS_KVS_CONTEXT system;
+    char base_dir[4096];
 } APP_STORES;
 
 static const STORE_CONFIG STORE_USER = {"user", "user.db", api_qs_kvs_create_b1mb_persistence};
 static const STORE_CONFIG STORE_LABEL = {"label", "label.db", api_qs_kvs_create_b1mb_persistence};
 static const STORE_CONFIG STORE_ISSUE = {"issue", "issue.db", api_qs_kvs_create_b8mb_persistence};
 static const STORE_CONFIG STORE_INDEX = {"index", "issue_index.db", api_qs_kvs_create_b1mb_persistence};
+static const STORE_CONFIG STORE_SYSTEM = {"system", "system.db", api_qs_kvs_create_b1mb_persistence};
+
+static int compact_store(const STORE_CONFIG* cfg, const char* base_dir);
 
 static void print_usage(const char* program_name)
 {
@@ -49,11 +54,11 @@ static void print_usage(const char* program_name)
     printf("  %s label list [--base-dir <dir>]\n", program_name);
     printf("  %s issue <create|get|update|delete> --id <id> [--json <json>] [--base-dir <dir>]\n", program_name);
     printf("  %s issue list [--status <status> | --assignee <userId> | --label <label>] [--base-dir <dir>]\n", program_name);
-    printf("  %s compact [--store user|label|issue|index|all] [--base-dir <dir>]\n", program_name);
+    printf("  %s compact [--store user|label|issue|index|system|all] [--base-dir <dir>]\n", program_name);
     printf("\n");
     printf("Examples:\n");
     printf("  %s init --base-dir ./issue_data\n", program_name);
-    printf("  %s issue create --id iss_1 --json '{\"title\":\"t\",\"status\":\"open\",\"assigneeIds\":[\"u1\"],\"labelIds\":[\"bug\"]}'\n", program_name);
+    printf("  %s issue create --json '{\"title\":\"t\",\"status\":\"open\",\"assigneeIds\":[\"u1\"],\"labelIds\":[\"bug\"]}'\n", program_name);
     printf("  %s issue list --status open\n", program_name);
 }
 
@@ -154,6 +159,7 @@ static int open_store_checked(const STORE_CONFIG* config, const char* base_dir, 
 
 static int open_all_stores(const char* base_dir, APP_STORES* stores)
 {
+    snprintf(stores->base_dir, sizeof(stores->base_dir), "%s", base_dir);
     if (open_store_checked(&STORE_USER, base_dir, &stores->user) != 0) {
         return -1;
     }
@@ -172,6 +178,13 @@ static int open_all_stores(const char* base_dir, APP_STORES* stores)
         api_qs_persistence_kvs_memory_free(&stores->issue);
         return -1;
     }
+    if (open_store_checked(&STORE_SYSTEM, base_dir, &stores->system) != 0) {
+        api_qs_persistence_kvs_memory_free(&stores->user);
+        api_qs_persistence_kvs_memory_free(&stores->label);
+        api_qs_persistence_kvs_memory_free(&stores->issue);
+        api_qs_persistence_kvs_memory_free(&stores->index);
+        return -1;
+    }
     return 0;
 }
 
@@ -181,6 +194,7 @@ static void close_all_stores(APP_STORES* stores)
     api_qs_persistence_kvs_memory_free(&stores->label);
     api_qs_persistence_kvs_memory_free(&stores->issue);
     api_qs_persistence_kvs_memory_free(&stores->index);
+    api_qs_persistence_kvs_memory_free(&stores->system);
 }
 
 static int create_temp_memory(QS_MEMORY_CONTEXT* context, size_t size)
@@ -201,13 +215,94 @@ static int build_entity_key(char* out_key, size_t out_size, const char* entity_n
     return 0;
 }
 
-static int entity_create(QS_KVS_CONTEXT* store, const char* key, const char* json)
+static int reopen_store(APP_STORES* stores, QS_KVS_CONTEXT* store, const STORE_CONFIG* cfg)
+{
+    api_qs_persistence_kvs_memory_free(store);
+    if (open_store_checked(cfg, stores->base_dir, store) != 0) {
+        return -1;
+    }
+    return 0;
+}
+
+static int kvs_set_with_compact_retry(APP_STORES* stores, QS_KVS_CONTEXT* store, const STORE_CONFIG* cfg, const char* key, const char* value)
+{
+    if (-1 != api_qs_kvs_set(store, key, value, 0)) {
+        return 0;
+    }
+    if (compact_store(cfg, stores->base_dir) != 0) {
+        return -1;
+    }
+    if (reopen_store(stores, store, cfg) != 0) {
+        return -1;
+    }
+    return (api_qs_kvs_set(store, key, value, 0) == -1) ? -1 : 0;
+}
+
+static int json_with_forced_id(const char* src_json, const char* id, int strict_id_match, char** out_json)
+{
+    QS_MEMORY_CONTEXT temp;
+    if (-1 == api_qs_memory_alloc(&temp, 1024 * 1024)) {
+        return -1;
+    }
+    QS_JSON_ELEMENT_OBJECT obj;
+    if (-1 == api_qs_json_decode_object(&temp, &obj, src_json)) {
+        api_qs_memory_free(&temp);
+        return -1;
+    }
+    if (strict_id_match) {
+        char* existing_id = api_qs_object_get_string(&obj, "id");
+        if (existing_id != NULL && strcmp(existing_id, id) != 0) {
+            api_qs_memory_free(&temp);
+            return -2;
+        }
+    }
+    if (-1 == api_qs_object_push_string(&obj, "id", id)) {
+        api_qs_memory_free(&temp);
+        return -1;
+    }
+    size_t src_len = strlen(src_json);
+    size_t buffer_size = (src_len + 4096 > 65536) ? (src_len + 4096) : 65536;
+    char* encoded = api_qs_json_encode_object(&obj, buffer_size);
+    if (encoded == NULL) {
+        api_qs_memory_free(&temp);
+        return -1;
+    }
+    *out_json = strdup(encoded);
+    api_qs_memory_free(&temp);
+    return (*out_json == NULL) ? -1 : 0;
+}
+
+static int next_counter_id(APP_STORES* stores, const char* counter_key, const char* id_prefix, char* out_id, size_t out_size)
+{
+    char* cur_text = api_qs_kvs_get(&stores->system, counter_key);
+    long current = 0;
+    if (cur_text != NULL) {
+        current = strtol(cur_text, NULL, 10);
+        if (current < 0) {
+            current = 0;
+        }
+    }
+    long next = current + 1;
+    char next_text[64];
+    if (snprintf(next_text, sizeof(next_text), "%ld", next) <= 0) {
+        return -1;
+    }
+    if (kvs_set_with_compact_retry(stores, &stores->system, &STORE_SYSTEM, counter_key, next_text) != 0) {
+        return -1;
+    }
+    if (snprintf(out_id, out_size, "%s%06ld", id_prefix, next) <= 0) {
+        return -1;
+    }
+    return 0;
+}
+
+static int entity_create(APP_STORES* stores, QS_KVS_CONTEXT* store, const STORE_CONFIG* cfg, const char* key, const char* json)
 {
     if (api_qs_kvs_get(store, key) != NULL) {
         fprintf(stderr, "error: key already exists: %s\n", key);
         return EXIT_KVS;
     }
-    if (-1 == api_qs_kvs_set(store, key, json, 0)) {
+    if (kvs_set_with_compact_retry(stores, store, cfg, key, json) != 0) {
         fprintf(stderr, "error: failed to set key: %s\n", key);
         return EXIT_KVS;
     }
@@ -226,13 +321,13 @@ static int entity_get(QS_KVS_CONTEXT* store, const char* key)
     return EXIT_OK;
 }
 
-static int entity_update(QS_KVS_CONTEXT* store, const char* key, const char* json)
+static int entity_update(APP_STORES* stores, QS_KVS_CONTEXT* store, const STORE_CONFIG* cfg, const char* key, const char* json)
 {
     if (api_qs_kvs_get(store, key) == NULL) {
         fprintf(stderr, "error: key not found: %s\n", key);
         return EXIT_NOT_FOUND;
     }
-    if (-1 == api_qs_kvs_set(store, key, json, 0)) {
+    if (kvs_set_with_compact_retry(stores, store, cfg, key, json) != 0) {
         fprintf(stderr, "error: failed to update key: %s\n", key);
         return EXIT_KVS;
     }
@@ -370,14 +465,14 @@ static int remove_string_and_build(QS_MEMORY_CONTEXT* context, QS_JSON_ELEMENT_A
     return 0;
 }
 
-static int index_add_id(QS_KVS_CONTEXT* index_store, const char* index_key, const char* issue_id)
+static int index_add_id(APP_STORES* stores, const char* index_key, const char* issue_id)
 {
     QS_MEMORY_CONTEXT context;
     if (create_temp_memory(&context, 1024 * 1024) != 0) {
         return -1;
     }
 
-    char* old_value = api_qs_kvs_get(index_store, index_key);
+    char* old_value = api_qs_kvs_get(&stores->index, index_key);
     QS_JSON_ELEMENT_ARRAY ids;
     if (decode_index_array(&context, old_value, &ids) != 0) {
         api_qs_memory_free(&context);
@@ -394,14 +489,14 @@ static int index_add_id(QS_KVS_CONTEXT* index_store, const char* index_key, cons
         return -1;
     }
 
-    int rc = api_qs_kvs_set(index_store, index_key, encoded, 0);
+    int rc = kvs_set_with_compact_retry(stores, &stores->index, &STORE_INDEX, index_key, encoded);
     api_qs_memory_free(&context);
-    return (rc == -1) ? -1 : 0;
+    return (rc != 0) ? -1 : 0;
 }
 
-static int index_remove_id(QS_KVS_CONTEXT* index_store, const char* index_key, const char* issue_id)
+static int index_remove_id(APP_STORES* stores, const char* index_key, const char* issue_id)
 {
-    char* old_value = api_qs_kvs_get(index_store, index_key);
+    char* old_value = api_qs_kvs_get(&stores->index, index_key);
     if (old_value == NULL) {
         return 0;
     }
@@ -426,18 +521,18 @@ static int index_remove_id(QS_KVS_CONTEXT* index_store, const char* index_key, c
     int32_t len = api_qs_array_get_length(&filtered);
     int rc;
     if (len == 0) {
-        rc = api_qs_kvs_delete(index_store, index_key);
+        rc = api_qs_kvs_delete(&stores->index, index_key);
     } else {
         char* encoded = api_qs_json_encode_array(&filtered, INDEX_JSON_BUFFER_SIZE);
         if (encoded == NULL) {
             api_qs_memory_free(&context);
             return -1;
         }
-        rc = api_qs_kvs_set(index_store, index_key, encoded, 0);
+        rc = kvs_set_with_compact_retry(stores, &stores->index, &STORE_INDEX, index_key, encoded);
     }
 
     api_qs_memory_free(&context);
-    return (rc == -1) ? -1 : 0;
+    return (rc == -1 || rc != 0) ? -1 : 0;
 }
 
 static int for_each_string_in_array(QS_JSON_ELEMENT_ARRAY* array, int (*cb)(const char* value, void* user_data), void* user_data)
@@ -456,8 +551,64 @@ static int for_each_string_in_array(QS_JSON_ELEMENT_ARRAY* array, int (*cb)(cons
     return 0;
 }
 
+typedef struct REF_VALIDATE_DATA {
+    QS_KVS_CONTEXT* store;
+    const char* entity_name;
+} REF_VALIDATE_DATA;
+
+static int cb_validate_reference_id(const char* value, void* user_data)
+{
+    REF_VALIDATE_DATA* data = (REF_VALIDATE_DATA*)user_data;
+    char key[1024];
+    if (snprintf(key, sizeof(key), "%s:%s", data->entity_name, value) <= 0) {
+        return -1;
+    }
+    if (api_qs_kvs_get(data->store, key) == NULL) {
+        fprintf(stderr, "error: %s id not found: %s\n", data->entity_name, value);
+        return -1;
+    }
+    return 0;
+}
+
+static int validate_reference_array(QS_JSON_ELEMENT_OBJECT* obj, const char* field_name, QS_KVS_CONTEXT* store, const char* entity_name)
+{
+    QS_JSON_ELEMENT_ARRAY ids;
+    if (api_qs_object_get_array(obj, field_name, &ids) != 0) {
+        return 0;
+    }
+    REF_VALIDATE_DATA data = {store, entity_name};
+    if (for_each_string_in_array(&ids, cb_validate_reference_id, &data) != 0) {
+        return -1;
+    }
+    return 0;
+}
+
+static int validate_issue_references(APP_STORES* stores, const char* issue_json)
+{
+    QS_MEMORY_CONTEXT context;
+    if (create_temp_memory(&context, 2 * 1024 * 1024) != 0) {
+        return -1;
+    }
+    QS_JSON_ELEMENT_OBJECT obj;
+    if (-1 == api_qs_json_decode_object(&context, &obj, issue_json)) {
+        fprintf(stderr, "error: invalid issue json\n");
+        api_qs_memory_free(&context);
+        return -1;
+    }
+    if (validate_reference_array(&obj, "assigneeIds", &stores->user, "user") != 0) {
+        api_qs_memory_free(&context);
+        return -1;
+    }
+    if (validate_reference_array(&obj, "labelIds", &stores->label, "label") != 0) {
+        api_qs_memory_free(&context);
+        return -1;
+    }
+    api_qs_memory_free(&context);
+    return 0;
+}
+
 typedef struct ISSUE_INDEX_DATA {
-    QS_KVS_CONTEXT* index_store;
+    APP_STORES* stores;
     const char* issue_id;
 } ISSUE_INDEX_DATA;
 
@@ -468,7 +619,7 @@ static int cb_add_assignee_index(const char* value, void* user_data)
     if (snprintf(key, sizeof(key), "index:assignee:%s", value) <= 0) {
         return -1;
     }
-    return index_add_id(d->index_store, key, d->issue_id);
+    return index_add_id(d->stores, key, d->issue_id);
 }
 
 static int cb_add_label_index(const char* value, void* user_data)
@@ -478,7 +629,7 @@ static int cb_add_label_index(const char* value, void* user_data)
     if (snprintf(key, sizeof(key), "index:label:%s", value) <= 0) {
         return -1;
     }
-    return index_add_id(d->index_store, key, d->issue_id);
+    return index_add_id(d->stores, key, d->issue_id);
 }
 
 static int cb_remove_assignee_index(const char* value, void* user_data)
@@ -488,7 +639,7 @@ static int cb_remove_assignee_index(const char* value, void* user_data)
     if (snprintf(key, sizeof(key), "index:assignee:%s", value) <= 0) {
         return -1;
     }
-    return index_remove_id(d->index_store, key, d->issue_id);
+    return index_remove_id(d->stores, key, d->issue_id);
 }
 
 static int cb_remove_label_index(const char* value, void* user_data)
@@ -498,10 +649,10 @@ static int cb_remove_label_index(const char* value, void* user_data)
     if (snprintf(key, sizeof(key), "index:label:%s", value) <= 0) {
         return -1;
     }
-    return index_remove_id(d->index_store, key, d->issue_id);
+    return index_remove_id(d->stores, key, d->issue_id);
 }
 
-static int issue_apply_indexes(QS_KVS_CONTEXT* index_store, const char* issue_id, const char* issue_json, int is_add)
+static int issue_apply_indexes(APP_STORES* stores, const char* issue_id, const char* issue_json, int is_add)
 {
     QS_MEMORY_CONTEXT context;
     if (create_temp_memory(&context, 2 * 1024 * 1024) != 0) {
@@ -520,19 +671,19 @@ static int issue_apply_indexes(QS_KVS_CONTEXT* index_store, const char* issue_id
         char status_key[1024];
         snprintf(status_key, sizeof(status_key), "index:status:%s", status);
         if (is_add) {
-            if (index_add_id(index_store, status_key, issue_id) != 0) {
+            if (index_add_id(stores, status_key, issue_id) != 0) {
                 api_qs_memory_free(&context);
                 return -1;
             }
         } else {
-            if (index_remove_id(index_store, status_key, issue_id) != 0) {
+            if (index_remove_id(stores, status_key, issue_id) != 0) {
                 api_qs_memory_free(&context);
                 return -1;
             }
         }
     }
 
-    ISSUE_INDEX_DATA data = {index_store, issue_id};
+    ISSUE_INDEX_DATA data = {stores, issue_id};
     QS_JSON_ELEMENT_ARRAY assignee_ids;
     if (api_qs_object_get_array(&obj, "assigneeIds", &assignee_ids) == 0) {
         if (is_add) {
@@ -577,11 +728,14 @@ static int issue_create(APP_STORES* stores, const char* id, const char* issue_js
         fprintf(stderr, "error: issue already exists: %s\n", key);
         return EXIT_KVS;
     }
-    if (-1 == api_qs_kvs_set(&stores->issue, key, issue_json, 0)) {
+    if (validate_issue_references(stores, issue_json) != 0) {
+        return EXIT_USAGE;
+    }
+    if (kvs_set_with_compact_retry(stores, &stores->issue, &STORE_ISSUE, key, issue_json) != 0) {
         fprintf(stderr, "error: failed to create issue: %s\n", key);
         return EXIT_KVS;
     }
-    if (issue_apply_indexes(&stores->index, id, issue_json, 1) != 0) {
+    if (issue_apply_indexes(stores, id, issue_json, 1) != 0) {
         api_qs_kvs_delete(&stores->issue, key);
         fprintf(stderr, "error: failed to update index on issue create\n");
         return EXIT_KVS;
@@ -601,26 +755,29 @@ static int issue_update(APP_STORES* stores, const char* id, const char* issue_js
         fprintf(stderr, "error: issue not found: %s\n", key);
         return EXIT_NOT_FOUND;
     }
+    if (validate_issue_references(stores, issue_json) != 0) {
+        return EXIT_USAGE;
+    }
 
     char* old_copy = strdup(old_json);
     if (old_copy == NULL) {
         return EXIT_IO;
     }
 
-    if (issue_apply_indexes(&stores->index, id, old_copy, 0) != 0) {
+    if (issue_apply_indexes(stores, id, old_copy, 0) != 0) {
         free(old_copy);
         fprintf(stderr, "error: failed to remove old index on issue update\n");
         return EXIT_KVS;
     }
-    if (-1 == api_qs_kvs_set(&stores->issue, key, issue_json, 0)) {
-        issue_apply_indexes(&stores->index, id, old_copy, 1);
+    if (kvs_set_with_compact_retry(stores, &stores->issue, &STORE_ISSUE, key, issue_json) != 0) {
+        issue_apply_indexes(stores, id, old_copy, 1);
         free(old_copy);
         fprintf(stderr, "error: failed to update issue: %s\n", key);
         return EXIT_KVS;
     }
-    if (issue_apply_indexes(&stores->index, id, issue_json, 1) != 0) {
-        api_qs_kvs_set(&stores->issue, key, old_copy, 0);
-        issue_apply_indexes(&stores->index, id, old_copy, 1);
+    if (issue_apply_indexes(stores, id, issue_json, 1) != 0) {
+        kvs_set_with_compact_retry(stores, &stores->issue, &STORE_ISSUE, key, old_copy);
+        issue_apply_indexes(stores, id, old_copy, 1);
         free(old_copy);
         fprintf(stderr, "error: failed to add new index on issue update\n");
         return EXIT_KVS;
@@ -647,13 +804,13 @@ static int issue_delete(APP_STORES* stores, const char* id)
         return EXIT_IO;
     }
 
-    if (issue_apply_indexes(&stores->index, id, old_copy, 0) != 0) {
+    if (issue_apply_indexes(stores, id, old_copy, 0) != 0) {
         free(old_copy);
         fprintf(stderr, "error: failed to remove issue index\n");
         return EXIT_KVS;
     }
     if (-1 == api_qs_kvs_delete(&stores->issue, key)) {
-        issue_apply_indexes(&stores->index, id, old_copy, 1);
+        issue_apply_indexes(stores, id, old_copy, 1);
         free(old_copy);
         fprintf(stderr, "error: failed to delete issue key\n");
         return EXIT_KVS;
@@ -871,7 +1028,7 @@ static int command_init(int argc, char* argv[])
         return EXIT_IO;
     }
 
-    const STORE_CONFIG* stores[] = {&STORE_USER, &STORE_LABEL, &STORE_ISSUE, &STORE_INDEX};
+    const STORE_CONFIG* stores[] = {&STORE_USER, &STORE_LABEL, &STORE_ISSUE, &STORE_INDEX, &STORE_SYSTEM};
     size_t store_len = sizeof(stores) / sizeof(stores[0]);
     size_t i;
     for (i = 0; i < store_len; i++) {
@@ -889,7 +1046,7 @@ static int command_init(int argc, char* argv[])
     return EXIT_OK;
 }
 
-static int command_entity_common(int argc, char* argv[], const char* entity_name, QS_KVS_CONTEXT* store)
+static int command_entity_common(int argc, char* argv[], APP_STORES* stores, const char* entity_name, const char* id_prefix, const char* counter_key, QS_KVS_CONTEXT* store, const STORE_CONFIG* cfg)
 {
     if (argc < 3) {
         return EXIT_USAGE;
@@ -903,6 +1060,39 @@ static int command_entity_common(int argc, char* argv[], const char* entity_name
         return entity_list_all(store, entity_name);
     }
 
+    if (strcmp(action, "create") == 0) {
+        char generated_id[128];
+        const char* final_id = id;
+        char* final_json = NULL;
+        if (json == NULL) {
+            fprintf(stderr, "error: --json is required for create\n");
+            return EXIT_USAGE;
+        }
+        if (final_id == NULL) {
+            if (next_counter_id(stores, counter_key, id_prefix, generated_id, sizeof(generated_id)) != 0) {
+                fprintf(stderr, "error: failed to generate id for %s\n", entity_name);
+                return EXIT_KVS;
+            }
+            final_id = generated_id;
+            printf("generated id: %s\n", final_id);
+        }
+        if (build_entity_key(key, sizeof(key), entity_name, final_id) != 0) {
+            return EXIT_IO;
+        }
+        int json_rc = json_with_forced_id(json, final_id, id != NULL, &final_json);
+        if (json_rc == -2) {
+            fprintf(stderr, "error: --id and json.id mismatch for create\n");
+            return EXIT_USAGE;
+        }
+        if (json_rc != 0) {
+            fprintf(stderr, "error: invalid json for create\n");
+            return EXIT_USAGE;
+        }
+        int rc = entity_create(stores, store, cfg, key, final_json);
+        free(final_json);
+        return rc;
+    }
+
     if (id == NULL) {
         fprintf(stderr, "error: --id is required\n");
         return EXIT_USAGE;
@@ -911,22 +1101,27 @@ static int command_entity_common(int argc, char* argv[], const char* entity_name
         return EXIT_IO;
     }
 
-    if (strcmp(action, "create") == 0) {
-        if (json == NULL) {
-            fprintf(stderr, "error: --json is required for create\n");
-            return EXIT_USAGE;
-        }
-        return entity_create(store, key, json);
-    }
     if (strcmp(action, "get") == 0) {
         return entity_get(store, key);
     }
     if (strcmp(action, "update") == 0) {
+        char* final_json = NULL;
         if (json == NULL) {
             fprintf(stderr, "error: --json is required for update\n");
             return EXIT_USAGE;
         }
-        return entity_update(store, key, json);
+        int json_rc = json_with_forced_id(json, id, 1, &final_json);
+        if (json_rc == -2) {
+            fprintf(stderr, "error: --id and json.id mismatch for update\n");
+            return EXIT_USAGE;
+        }
+        if (json_rc != 0) {
+            fprintf(stderr, "error: invalid json for update\n");
+            return EXIT_USAGE;
+        }
+        int rc = entity_update(stores, store, cfg, key, final_json);
+        free(final_json);
+        return rc;
     }
     if (strcmp(action, "delete") == 0) {
         return entity_delete(store, key);
@@ -971,17 +1166,39 @@ static int command_issue(int argc, char* argv[], APP_STORES* stores)
         return issue_list_by_index(stores, index_key);
     }
 
-    if (id == NULL) {
-        fprintf(stderr, "error: --id is required\n");
-        return EXIT_USAGE;
-    }
-
     if (strcmp(action, "create") == 0) {
+        char generated_id[128];
+        const char* final_id = id;
+        char* final_json = NULL;
         if (json == NULL) {
             fprintf(stderr, "error: --json is required for create\n");
             return EXIT_USAGE;
         }
-        return issue_create(stores, id, json);
+        if (final_id == NULL) {
+            if (next_counter_id(stores, "counter:issue", "iss_", generated_id, sizeof(generated_id)) != 0) {
+                fprintf(stderr, "error: failed to generate issue id\n");
+                return EXIT_KVS;
+            }
+            final_id = generated_id;
+            printf("generated id: %s\n", final_id);
+        }
+        int json_rc = json_with_forced_id(json, final_id, id != NULL, &final_json);
+        if (json_rc == -2) {
+            fprintf(stderr, "error: --id and json.id mismatch for issue create\n");
+            return EXIT_USAGE;
+        }
+        if (json_rc != 0) {
+            fprintf(stderr, "error: invalid json for issue create\n");
+            return EXIT_USAGE;
+        }
+        int rc = issue_create(stores, final_id, final_json);
+        free(final_json);
+        return rc;
+    }
+
+    if (id == NULL) {
+        fprintf(stderr, "error: --id is required\n");
+        return EXIT_USAGE;
     }
     if (strcmp(action, "get") == 0) {
         char key[1024];
@@ -991,11 +1208,23 @@ static int command_issue(int argc, char* argv[], APP_STORES* stores)
         return entity_get(&stores->issue, key);
     }
     if (strcmp(action, "update") == 0) {
+        char* final_json = NULL;
         if (json == NULL) {
             fprintf(stderr, "error: --json is required for update\n");
             return EXIT_USAGE;
         }
-        return issue_update(stores, id, json);
+        int json_rc = json_with_forced_id(json, id, 1, &final_json);
+        if (json_rc == -2) {
+            fprintf(stderr, "error: --id and json.id mismatch for issue update\n");
+            return EXIT_USAGE;
+        }
+        if (json_rc != 0) {
+            fprintf(stderr, "error: invalid json for issue update\n");
+            return EXIT_USAGE;
+        }
+        int rc = issue_update(stores, id, final_json);
+        free(final_json);
+        return rc;
     }
     if (strcmp(action, "delete") == 0) {
         return issue_delete(stores, id);
@@ -1018,7 +1247,7 @@ static int command_compact(int argc, char* argv[])
     }
 
     if (strcmp(store_arg, "all") == 0) {
-        const STORE_CONFIG* stores[] = {&STORE_USER, &STORE_LABEL, &STORE_ISSUE, &STORE_INDEX};
+        const STORE_CONFIG* stores[] = {&STORE_USER, &STORE_LABEL, &STORE_ISSUE, &STORE_INDEX, &STORE_SYSTEM};
         size_t i;
         for (i = 0; i < sizeof(stores) / sizeof(stores[0]); i++) {
             if (compact_store(stores[i], base_dir) != 0) {
@@ -1038,6 +1267,9 @@ static int command_compact(int argc, char* argv[])
     }
     if (strcmp(store_arg, "index") == 0) {
         return (compact_store(&STORE_INDEX, base_dir) == 0) ? EXIT_OK : EXIT_KVS;
+    }
+    if (strcmp(store_arg, "system") == 0) {
+        return (compact_store(&STORE_SYSTEM, base_dir) == 0) ? EXIT_OK : EXIT_KVS;
     }
     fprintf(stderr, "error: invalid --store value: %s\n", store_arg);
     return EXIT_USAGE;
@@ -1077,9 +1309,9 @@ int main(int argc, char* argv[])
 
     int rc = EXIT_USAGE;
     if (strcmp(argv[1], "user") == 0) {
-        rc = command_entity_common(argc, argv, "user", &stores.user);
+        rc = command_entity_common(argc, argv, &stores, "user", "usr_", "counter:user", &stores.user, &STORE_USER);
     } else if (strcmp(argv[1], "label") == 0) {
-        rc = command_entity_common(argc, argv, "label", &stores.label);
+        rc = command_entity_common(argc, argv, &stores, "label", "lbl_", "counter:label", &stores.label, &STORE_LABEL);
     } else if (strcmp(argv[1], "issue") == 0) {
         rc = command_issue(argc, argv, &stores);
     } else {

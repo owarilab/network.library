@@ -48,6 +48,7 @@ make
 - `label.db`
 - `issue.db`
 - `issue_index.db`
+- `system.db`（連番カウンタ等のシステムデータ）
 
 ---
 
@@ -58,6 +59,13 @@ make
 ```bash
 ./qs_issue_tracker_cli user create --id u1 --json '{"id":"u1","name":"alice"}'
 ./qs_issue_tracker_cli label create --id bug --json '{"id":"bug","name":"Bug"}'
+```
+
+`--id` を省略すると自動採番します。
+
+```bash
+./qs_issue_tracker_cli user create --json '{"name":"alice"}'
+./qs_issue_tracker_cli label create --json '{"name":"Bug"}'
 ```
 
 ### get
@@ -81,6 +89,8 @@ make
 ./qs_issue_tracker_cli label update --id bug --json '{"id":"bug","name":"Bug Fix"}'
 ```
 
+`--id` と JSON 内 `id` が不一致の場合はエラーになります。
+
 ### delete
 
 ```bash
@@ -98,6 +108,14 @@ make
 ./qs_issue_tracker_cli issue create --id iss1 --json '{"id":"iss1","title":"bug","status":"open","assigneeIds":["u1"],"labelIds":["bug"]}'
 ```
 
+`--id` を省略すると `iss_000001` のような連番IDを自動採番します。
+
+```bash
+./qs_issue_tracker_cli issue create --json '{"title":"bug","status":"open","assigneeIds":["u1"],"labelIds":["bug"]}'
+```
+
+`assigneeIds` に指定した user、`labelIds` に指定した label が存在しない場合はエラーになります。
+
 ### get
 
 ```bash
@@ -106,12 +124,16 @@ make
 
 ### update
 
+./qs_issue_tracker_cli issue update --id iss_000001 --json '{"id":"iss_000001","title":"bug2","status":"in_progress","assigneeIds":["u2"],"labelIds":["feature"]}'
+
 ```bash
 ./qs_issue_tracker_cli issue update --id iss1 --json '{"id":"iss1","title":"bug2","status":"in_progress","assigneeIds":["u2"],"labelIds":["feature"]}'
 ```
 
 > `issue update` は「差分パッチ」ではなく、**issue JSON 全体の再保存**です。  
 > 更新時は `status` / `assigneeIds` / `labelIds` を含めて送る運用を推奨します。
+> また `--id` と JSON 内 `id` が不一致の場合はエラーになります。
+> `assigneeIds` / `labelIds` に存在しないIDが含まれる場合もエラーになります。
 
 ### delete
 
@@ -169,6 +191,7 @@ make
 - `label`
 - `issue`
 - `index`
+- `system`
 - `all`
 
 ---
@@ -191,6 +214,7 @@ make
 
 - 本サンプルは固定容量 KVS 前提です（容量不足時はエラー）。
 - compaction は「新ファイル再構築→切替」方式です。
+- `create` 時に `--id` 省略した場合は `system.db` のカウンタを使って自動採番します。
 
 ---
 

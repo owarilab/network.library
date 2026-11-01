@@ -67,6 +67,9 @@ int main(void)
     snprintf(cmd, sizeof(cmd), "%s init --base-dir \"%s\" >/dev/null", cli_bin, data_dir);
     check_exit("init stores", 0, cmd);
 
+    snprintf(cmd, sizeof(cmd), "test -f \"%s/system.db\"", data_dir);
+    check_exit("system store created", 0, cmd);
+
     snprintf(cmd, sizeof(cmd), "%s init --base-dir \"%s\" >/dev/null 2>&1", cli_bin, data_dir);
     check_exit("init without force fails", 4, cmd);
 
@@ -85,11 +88,29 @@ int main(void)
     snprintf(
         cmd,
         sizeof(cmd),
+        "%s user create --base-dir \"%s\" --json '{\"name\":\"bob\"}' | grep -q 'generated id: usr_'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("user auto id create", 0, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
         "%s label create --base-dir \"%s\" --id bug --json '{\"id\":\"bug\",\"name\":\"Bug\"}' >/dev/null",
         cli_bin,
         data_dir
     );
     check_exit("label create", 0, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s label create --base-dir \"%s\" --json '{\"name\":\"Feature\"}' | grep -q 'generated id: lbl_'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("label auto id create", 0, cmd);
 
     snprintf(
         cmd,
@@ -112,11 +133,38 @@ int main(void)
     snprintf(
         cmd,
         sizeof(cmd),
+        "%s user update --base-dir \"%s\" --id u1 --json '{\"id\":\"u999\",\"name\":\"alice3\"}' >/dev/null 2>&1",
+        cli_bin,
+        data_dir
+    );
+    check_exit("user update id mismatch fails", 2, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
         "%s issue create --base-dir \"%s\" --id iss1 --json '{\"id\":\"iss1\",\"title\":\"bug\",\"status\":\"open\",\"assigneeIds\":[\"u1\"],\"labelIds\":[\"bug\"]}' >/dev/null",
         cli_bin,
         data_dir
     );
     check_exit("issue create", 0, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue create --base-dir \"%s\" --id iss_bad_ref --json '{\"id\":\"iss_bad_ref\",\"title\":\"bad\",\"status\":\"open\",\"assigneeIds\":[\"u999\"],\"labelIds\":[\"bug\"]}' >/dev/null 2>&1",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue create with missing assignee fails", 2, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue create --base-dir \"%s\" --json '{\"title\":\"auto\",\"status\":\"open\"}' | grep -q 'generated id: iss_'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue auto id create", 0, cmd);
 
     snprintf(
         cmd,
@@ -130,11 +178,47 @@ int main(void)
     snprintf(
         cmd,
         sizeof(cmd),
+        "%s user create --base-dir \"%s\" --id u2 --json '{\"id\":\"u2\",\"name\":\"bob\"}' >/dev/null",
+        cli_bin,
+        data_dir
+    );
+    check_exit("user create u2", 0, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s label create --base-dir \"%s\" --id feature --json '{\"id\":\"feature\",\"name\":\"Feature\"}' >/dev/null",
+        cli_bin,
+        data_dir
+    );
+    check_exit("label create feature", 0, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
         "%s issue update --base-dir \"%s\" --id iss1 --json '{\"id\":\"iss1\",\"title\":\"bug2\",\"status\":\"in_progress\",\"assigneeIds\":[\"u2\"],\"labelIds\":[\"feature\"]}' >/dev/null",
         cli_bin,
         data_dir
     );
     check_exit("issue update", 0, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue update --base-dir \"%s\" --id iss1 --json '{\"id\":\"iss1\",\"title\":\"badref\",\"status\":\"in_progress\",\"assigneeIds\":[\"u2\"],\"labelIds\":[\"not_exists\"]}' >/dev/null 2>&1",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue update with missing label fails", 2, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue update --base-dir \"%s\" --id iss1 --json '{\"id\":\"iss999\",\"title\":\"x\",\"status\":\"in_progress\"}' >/dev/null 2>&1",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue update id mismatch fails", 2, cmd);
 
     snprintf(
         cmd,
