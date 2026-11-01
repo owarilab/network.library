@@ -100,6 +100,36 @@ size_t api_qs_memory_get_size(QS_MEMORY_CONTEXT* context, int32_t memid)
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
 	return qs_usize(memory, memid);
 }
+size_t api_qs_memory_block_used(QS_MEMORY_CONTEXT* context, int32_t memid)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	return qs_memory_unit_used(memory, memid);
+}
+size_t api_qs_memory_block_remaining(QS_MEMORY_CONTEXT* context, int32_t memid)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	return qs_memory_unit_remaining(memory, memid);
+}
+int api_qs_memory_block_append(QS_MEMORY_CONTEXT* context, int32_t memid, const void* src, size_t len)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	return (qs_memory_unit_append(memory, memid, src, len) == QS_SYSTEM_OK) ? 0 : -1;
+}
+int api_qs_memory_block_write(QS_MEMORY_CONTEXT* context, int32_t memid, size_t offset, const void* src, size_t len)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	return (qs_memory_unit_write(memory, memid, offset, src, len) == QS_SYSTEM_OK) ? 0 : -1;
+}
+int api_qs_memory_block_read(QS_MEMORY_CONTEXT* context, int32_t memid, size_t offset, void* dst, size_t len)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	return (qs_memory_unit_read(memory, memid, offset, dst, len) == QS_SYSTEM_OK) ? 0 : -1;
+}
+int api_qs_memory_block_clear(QS_MEMORY_CONTEXT* context, int32_t memid)
+{
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;
+	return (qs_memory_unit_clear(memory, memid) == QS_SYSTEM_OK) ? 0 : -1;
+}
 int api_qs_memory_free_block(QS_MEMORY_CONTEXT* context, int32_t* memid)
 {
 	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory;

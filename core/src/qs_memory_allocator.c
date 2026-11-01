@@ -1011,6 +1011,43 @@ QS_MEMORY_UNIT* qs_get_memory_block( QS_MEMORY_POOL* memory, int32_t id )
 	return unit;
 }
 
+static QS_MEMORY_UNIT* qs_memory_unit_resolve( QS_MEMORY_POOL* memory, int32_t unit_id )
+{
+	QS_MEMORY_UNIT* unit = NULL;
+	if( memory == NULL || memory->memory == NULL ){
+		return NULL;
+	}
+	if( unit_id < 0 || unit_id >= memory->block_size ){
+		return NULL;
+	}
+	unit = (QS_MEMORY_UNIT*)( ( (uint8_t*)memory->memory + memory->end ) - ( memory->memory_block_size_one * ( unit_id + 1 ) ) );
+	return unit;
+}
+
+static QS_MEMORY_UNIT* qs_memory_unit_resolve_used( QS_MEMORY_POOL* memory, int32_t unit_id )
+{
+	QS_MEMORY_UNIT* unit = qs_memory_unit_resolve(memory, unit_id);
+	if( unit == NULL ){
+		if( memory != NULL && memory->debug ){
+			printf( "[qs_memory_unit] unit id out of range[%d]\n", unit_id );
+		}
+		return NULL;
+	}
+	if( unit->status != MEMORY_STATUS_USE ){
+		if( memory->debug ){
+			printf( "[qs_memory_unit] unit is not use status[%d]\n", unit_id );
+		}
+		return NULL;
+	}
+	if( unit->top < unit->p || ( unit->top - unit->p ) > unit->size ){
+		if( memory->debug ){
+			printf( "[qs_memory_unit] invalid top/p relation[%d]\n", unit_id );
+		}
+		return NULL;
+	}
+	return unit;
+}
+
 void* qs_upointer( QS_MEMORY_POOL* memory, int32_t id )
 {
 	void* pt = NULL;
@@ -1071,6 +1108,143 @@ size_t qs_usize( QS_MEMORY_POOL* memory, int32_t id )
 	}
 	unit = (QS_MEMORY_UNIT*)( ( (uint8_t*)memory->memory + memory->end ) - ( memory->memory_block_size_one * ( id + 1 ) ) );
 	return unit->size;
+}
+
+void* qs_memory_unit_data( QS_MEMORY_POOL* memory, int32_t unit_id )
+{
+	QS_MEMORY_UNIT* unit = qs_memory_unit_resolve_used(memory, unit_id);
+	if( unit == NULL ){
+		return NULL;
+	}
+	return ( (uint8_t*)memory->memory + unit->p );
+}
+
+size_t qs_memory_unit_capacity( QS_MEMORY_POOL* memory, int32_t unit_id )
+{
+	QS_MEMORY_UNIT* unit = qs_memory_unit_resolve_used(memory, unit_id);
+	if( unit == NULL ){
+		return 0;
+	}
+	return unit->size;
+}
+
+size_t qs_memory_unit_used( QS_MEMORY_POOL* memory, int32_t unit_id )
+{
+	QS_MEMORY_UNIT* unit = qs_memory_unit_resolve_used(memory, unit_id);
+	if( unit == NULL ){
+		return 0;
+	}
+	return (size_t)( unit->top - unit->p );
+}
+
+size_t qs_memory_unit_remaining( QS_MEMORY_POOL* memory, int32_t unit_id )
+{
+	size_t capacity = qs_memory_unit_capacity(memory, unit_id);
+	size_t used = qs_memory_unit_used(memory, unit_id);
+	if( capacity < used ){
+		return 0;
+	}
+	return capacity - used;
+}
+
+int32_t qs_memory_unit_reset( QS_MEMORY_POOL* memory, int32_t unit_id )
+{
+	QS_MEMORY_UNIT* unit = qs_memory_unit_resolve_used(memory, unit_id);
+	if( unit == NULL ){
+		return QS_SYSTEM_ERROR;
+	}
+	unit->top = unit->p;
+	return QS_SYSTEM_OK;
+}
+
+int32_t qs_memory_unit_append( QS_MEMORY_POOL* memory, int32_t unit_id, const void* src, size_t len )
+{
+	size_t used = 0;
+	size_t capacity = 0;
+	uint8_t* data = NULL;
+	QS_MEMORY_UNIT* unit = qs_memory_unit_resolve_used(memory, unit_id);
+	if( unit == NULL ){
+		return QS_SYSTEM_ERROR;
+	}
+	if( len == 0 ){
+		return QS_SYSTEM_OK;
+	}
+	if( src == NULL ){
+		return QS_SYSTEM_ERROR;
+	}
+	used = (size_t)( unit->top - unit->p );
+	capacity = unit->size;
+	if( len > ( capacity - used ) ){
+		return QS_SYSTEM_ERROR;
+	}
+	data = (uint8_t*)memory->memory + unit->p;
+	memcpy(data + used, src, len);
+	unit->top += len;
+	return QS_SYSTEM_OK;
+}
+
+int32_t qs_memory_unit_write( QS_MEMORY_POOL* memory, int32_t unit_id, size_t offset, const void* src, size_t len )
+{
+	size_t used = 0;
+	uint8_t* data = NULL;
+	size_t new_used = 0;
+	QS_MEMORY_UNIT* unit = qs_memory_unit_resolve_used(memory, unit_id);
+	if( unit == NULL ){
+		return QS_SYSTEM_ERROR;
+	}
+	if( len == 0 ){
+		return QS_SYSTEM_OK;
+	}
+	if( src == NULL ){
+		return QS_SYSTEM_ERROR;
+	}
+	if( offset > unit->size || len > ( unit->size - offset ) ){
+		return QS_SYSTEM_ERROR;
+	}
+	data = (uint8_t*)memory->memory + unit->p;
+	memcpy(data + offset, src, len);
+	used = (size_t)( unit->top - unit->p );
+	new_used = offset + len;
+	if( new_used > used ){
+		unit->top = unit->p + new_used;
+	}
+	return QS_SYSTEM_OK;
+}
+
+int32_t qs_memory_unit_read( QS_MEMORY_POOL* memory, int32_t unit_id, size_t offset, void* dst, size_t len )
+{
+	QS_MEMORY_UNIT* unit = qs_memory_unit_resolve_used(memory, unit_id);
+	uint8_t* data = NULL;
+	size_t used = 0;
+	if( unit == NULL ){
+		return QS_SYSTEM_ERROR;
+	}
+	if( len == 0 ){
+		return QS_SYSTEM_OK;
+	}
+	if( dst == NULL ){
+		return QS_SYSTEM_ERROR;
+	}
+	used = (size_t)( unit->top - unit->p );
+	if( offset > used || len > ( used - offset ) ){
+		return QS_SYSTEM_ERROR;
+	}
+	data = (uint8_t*)memory->memory + unit->p;
+	memcpy(dst, data + offset, len);
+	return QS_SYSTEM_OK;
+}
+
+int32_t qs_memory_unit_clear( QS_MEMORY_POOL* memory, int32_t unit_id )
+{
+	uint8_t* data = NULL;
+	QS_MEMORY_UNIT* unit = qs_memory_unit_resolve_used(memory, unit_id);
+	if( unit == NULL ){
+		return QS_SYSTEM_ERROR;
+	}
+	data = (uint8_t*)memory->memory + unit->p;
+	memset(data, 0, unit->size);
+	unit->top = unit->p;
+	return QS_SYSTEM_OK;
 }
 
 size_t qs_free( QS_MEMORY_POOL* memory )

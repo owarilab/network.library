@@ -7,6 +7,7 @@
 #include <string.h>
 #include <stdint.h>
 #include "qs_api.h"
+#include "qs_memory_allocator.h"
 
 static int pass_count = 0;
 static int fail_count = 0;
@@ -157,6 +158,77 @@ cleanup:
     return result;
 }
 
+static int scenario_memory_unit_binary_operations(void)
+{
+    QS_MEMORY_CONTEXT context;
+    QS_MEMORY_POOL* pool = NULL;
+    int result = -1;
+    int32_t memid = -1;
+    uint8_t out[8];
+    uint8_t append_data[] = {0x11, 0x22, 0x33};
+    uint8_t write_data[] = {0xaa, 0xbb};
+    uint8_t* p = NULL;
+    size_t cap = 0;
+
+    if (-1 == api_qs_memory_alloc(&context, 1024 * 1024 * 2)) {
+        printf("api_qs_memory_alloc failed (scenario_memory_unit_binary_operations)\n");
+        return -1;
+    }
+    pool = (QS_MEMORY_POOL*)context.memory;
+
+    memid = api_qs_memory_create_block(&context, 64);
+    check_pass("unit: create block", memid != -1);
+    if (memid == -1) {
+        goto cleanup;
+    }
+
+    p = (uint8_t*)qs_memory_unit_data(pool, memid);
+    check_pass("unit: data pointer", p != NULL);
+    if (p == NULL) {
+        goto cleanup;
+    }
+
+    cap = qs_memory_unit_capacity(pool, memid);
+    check_pass("unit: capacity", cap >= 64);
+    check_pass("unit: used initial 0", qs_memory_unit_used(pool, memid) == 0);
+    check_pass("unit: remaining initial", qs_memory_unit_remaining(pool, memid) == cap);
+
+    check_pass("unit: append", qs_memory_unit_append(pool, memid, append_data, sizeof(append_data)) == QS_SYSTEM_OK);
+    check_pass("unit: used after append", qs_memory_unit_used(pool, memid) == sizeof(append_data));
+
+    check_pass("unit: write with expand used", qs_memory_unit_write(pool, memid, 5, write_data, sizeof(write_data)) == QS_SYSTEM_OK);
+    check_pass("unit: used after write", qs_memory_unit_used(pool, memid) == 7);
+
+    memset(out, 0, sizeof(out));
+    check_pass("unit: read range", qs_memory_unit_read(pool, memid, 0, out, sizeof(append_data)) == QS_SYSTEM_OK);
+    check_pass("unit: read value", out[0] == append_data[0] && out[1] == append_data[1] && out[2] == append_data[2]);
+    check_pass("unit: read out of used range fails", qs_memory_unit_read(pool, memid, 7, out, 1) == QS_SYSTEM_ERROR);
+
+    check_pass("unit: reset", qs_memory_unit_reset(pool, memid) == QS_SYSTEM_OK);
+    check_pass("unit: used after reset", qs_memory_unit_used(pool, memid) == 0);
+
+    check_pass("unit: append for clear", qs_memory_unit_append(pool, memid, append_data, sizeof(append_data)) == QS_SYSTEM_OK);
+    check_pass("unit: clear", qs_memory_unit_clear(pool, memid) == QS_SYSTEM_OK);
+    check_pass("unit: used after clear", qs_memory_unit_used(pool, memid) == 0);
+    check_pass("unit: clear zero fill", p[0] == 0 && p[1] == 0 && p[2] == 0);
+
+    check_pass("api block: append", api_qs_memory_block_append(&context, memid, append_data, sizeof(append_data)) == 0);
+    check_pass("api block: used", api_qs_memory_block_used(&context, memid) == sizeof(append_data));
+    check_pass("api block: remaining", api_qs_memory_block_remaining(&context, memid) == (cap - sizeof(append_data)));
+    memset(out, 0, sizeof(out));
+    check_pass("api block: read", api_qs_memory_block_read(&context, memid, 0, out, sizeof(append_data)) == 0);
+    check_pass("api block: read value", out[0] == append_data[0] && out[1] == append_data[1] && out[2] == append_data[2]);
+    check_pass("api block: write", api_qs_memory_block_write(&context, memid, 1, write_data, sizeof(write_data)) == 0);
+    check_pass("api block: clear", api_qs_memory_block_clear(&context, memid) == 0);
+    check_pass("api block: used after clear", api_qs_memory_block_used(&context, memid) == 0);
+
+    result = 0;
+
+cleanup:
+    api_qs_memory_free(&context);
+    return result;
+}
+
 int main(int argc, char* argv[], char* envp[])
 {
     int ok = 1;
@@ -180,6 +252,11 @@ int main(int argc, char* argv[], char* envp[])
 
     printf("\n[Scenario 3] Persistent and Temporary Separation\n");
     if (0 != scenario_persistent_and_temporary_separation()) {
+        ok = 0;
+    }
+
+    printf("\n[Scenario 4] Memory Unit Binary Operations\n");
+    if (0 != scenario_memory_unit_binary_operations()) {
         ok = 0;
     }
 

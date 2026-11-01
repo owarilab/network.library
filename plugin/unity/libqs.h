@@ -97,6 +97,12 @@ UNITY_INTERFACE_EXPORT int32_t UNITY_INTERFACE_API libqs_api_memory_create_block
 UNITY_INTERFACE_EXPORT void* UNITY_INTERFACE_API libqs_api_memory_get_pointer(QS_MEMORY_CONTEXT* context, int32_t memid);
 UNITY_INTERFACE_EXPORT void* UNITY_INTERFACE_API libqs_api_memory_get_offset_pointer(QS_MEMORY_CONTEXT* context, int32_t memid, size_t size, int32_t offset);
 UNITY_INTERFACE_EXPORT size_t UNITY_INTERFACE_API libqs_api_memory_get_size(QS_MEMORY_CONTEXT* context, int32_t memid);
+UNITY_INTERFACE_EXPORT size_t UNITY_INTERFACE_API libqs_api_memory_block_used(QS_MEMORY_CONTEXT* context, int32_t memid);
+UNITY_INTERFACE_EXPORT size_t UNITY_INTERFACE_API libqs_api_memory_block_remaining(QS_MEMORY_CONTEXT* context, int32_t memid);
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_memory_block_append(QS_MEMORY_CONTEXT* context, int32_t memid, const void* src, size_t len);
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_memory_block_write(QS_MEMORY_CONTEXT* context, int32_t memid, size_t offset, const void* src, size_t len);
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_memory_block_read(QS_MEMORY_CONTEXT* context, int32_t memid, size_t offset, void* dst, size_t len);
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_memory_block_clear(QS_MEMORY_CONTEXT* context, int32_t memid);
 UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_memory_free_block(QS_MEMORY_CONTEXT* context, int32_t* memid);
 
 UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_array_create(QS_MEMORY_CONTEXT* context, QS_JSON_ELEMENT_ARRAY* array);

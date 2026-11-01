@@ -342,6 +342,36 @@ UNITY_INTERFACE_EXPORT size_t UNITY_INTERFACE_API libqs_api_memory_get_size(QS_M
 	return api_qs_memory_get_size(context, memid);
 }
 
+UNITY_INTERFACE_EXPORT size_t UNITY_INTERFACE_API libqs_api_memory_block_used(QS_MEMORY_CONTEXT* context, int32_t memid)
+{
+	return api_qs_memory_block_used(context, memid);
+}
+
+UNITY_INTERFACE_EXPORT size_t UNITY_INTERFACE_API libqs_api_memory_block_remaining(QS_MEMORY_CONTEXT* context, int32_t memid)
+{
+	return api_qs_memory_block_remaining(context, memid);
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_memory_block_append(QS_MEMORY_CONTEXT* context, int32_t memid, const void* src, size_t len)
+{
+	return api_qs_memory_block_append(context, memid, src, len);
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_memory_block_write(QS_MEMORY_CONTEXT* context, int32_t memid, size_t offset, const void* src, size_t len)
+{
+	return api_qs_memory_block_write(context, memid, offset, src, len);
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_memory_block_read(QS_MEMORY_CONTEXT* context, int32_t memid, size_t offset, void* dst, size_t len)
+{
+	return api_qs_memory_block_read(context, memid, offset, dst, len);
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_memory_block_clear(QS_MEMORY_CONTEXT* context, int32_t memid)
+{
+	return api_qs_memory_block_clear(context, memid);
+}
+
 UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_memory_free_block(QS_MEMORY_CONTEXT* context, int32_t* memid)
 {
 	return api_qs_memory_free_block(context, memid);
@@ -1050,4 +1080,3 @@ void libqs_api_debug_log(char* str)
         debug_log(str);
     }
 }
-
