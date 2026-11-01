@@ -493,7 +493,7 @@ int32_t qs_json_decode_parser_hash( QS_MEMORY_POOL* _ppool, QS_NODE* node, QS_TO
 				qs_add_hash( _ppool, working_munit, token_list[ptokens->workpos].buf_munit, token_list[ptokens->workpos+2].buf_munit, ELEMENT_LITERAL_STR );
 				ptokens->workpos+=2;
 			}
-			if( token_list[ptokens->workpos+2].type == ID_OP && *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+2].buf_munit)) == '-'){
+			else if( token_list[ptokens->workpos+2].type == ID_OP && *((char*)QS_GET_POINTER(_ppool,token_list[ptokens->workpos+2].buf_munit)) == '-'){
 				if( ptokens->workpos+3 >= ptokens->currentpos ){
 					//printf( "invalid json format1\n" );
 					working_munit = -1;
