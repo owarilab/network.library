@@ -114,6 +114,13 @@ make
 ./qs_issue_tracker_cli issue create --json '{"title":"bug","status":"open","assigneeIds":["u1"],"labelIds":["bug"]}'
 ```
 
+シンプル版
+
+```bash
+./qs_issue_tracker_cli issue create --json '{"title":"bug","status":"open","assigneeIds":[],"labelIds":[]}'
+./qs_issue_tracker_cli issue create --json '{"title":"ビルドに失敗する原因の調査","status":"open"}'
+```
+
 `assigneeIds` に指定した user、`labelIds` に指定した label が存在しない場合はエラーになります。
 
 ### get
