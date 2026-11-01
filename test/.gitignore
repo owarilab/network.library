@@ -2,6 +2,7 @@ base64_test/qs_base64_test
 base64_test/qs_verify_decode
 chain_array_test/qs_chain_array_test
 csv_api_test/qs_csv_api_test
+http_param_test/qs_http_param_test
 io_test/qs_io_test
 json_ext_test/qs_json_ext_test
 kvs_ext_test/qs_kvs_ext_test
@@ -9,8 +10,10 @@ memory_allocator_test/qs_memory_allocator_test
 packet_route_test/qs_packet_route_test
 random_test/qs_random_test
 ranking_ext_test/qs_ranking_ext_test
+room_test/qs_room_test
 script_argv_test/qs_script_argv_test
 sha1_test/qs_sha1_test
 static_file_test/qs_static_file_test
 string_test/qs_string_test
 websocket_protocol_test/qs_websocket_protocol_test
+ws_binary_test/qs_ws_binary_test
