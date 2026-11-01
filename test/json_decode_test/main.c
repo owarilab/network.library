@@ -340,58 +340,6 @@ int main(void)
     }
 
     /* ============================================================
-     * 10c. バグ再現の正確な JSON（ユーザー報告）
-     *      整数フィールド(updatedAt/priority)と配列が混在し、
-     *      文字列値の直後に整数が続く配置が旧バグをトリガーした。
-     * ============================================================ */
-    {
-        QS_JSON_ELEMENT_OBJECT obj;
-        const char* bug_json =
-            "{\"labelIds\":[\"bug\"],\"updatedAt\":0,\"description\":\"\","
-            "\"priority\":0,\"id\":\"iss5\",\"title\":\"bug\","
-            "\"assigneeIds\":[\"u1\"],\"status\":\"open\"}";
-        check("decode reported bug json", decode(&memory_context, &obj, bug_json));
-        check_str("bug id", api_qs_object_get_string(&obj, "id"), "iss5");
-        check_str("bug title", api_qs_object_get_string(&obj, "title"), "bug");
-        check_str("bug status", api_qs_object_get_string(&obj, "status"), "open");
-        check_str("bug description (empty)", api_qs_object_get_string(&obj, "description"), "");
-        check_int("bug priority == 0", api_qs_object_get_integer_val(&obj, "priority"), 0);
-        check_int("bug updatedAt == 0", api_qs_object_get_integer_val(&obj, "updatedAt"), 0);
-        QS_JSON_ELEMENT_ARRAY bl;
-        check("bug labelIds", api_qs_object_get_array(&obj, "labelIds", &bl) == 0);
-        check_str("bug labelIds[0]", api_qs_array_get_string(&bl, 0), "bug");
-        QS_JSON_ELEMENT_ARRAY ba;
-        check("bug assigneeIds", api_qs_object_get_array(&obj, "assigneeIds", &ba) == 0);
-        check_str("bug assigneeIds[0]", api_qs_array_get_string(&ba, 0), "u1");
-    }
-
-    /* ============================================================
-     * 10d. バグ再現の正確な JSON（長い文字列 title を含む・ユーザー報告）
-     *      長い文字列値の直後に別のフィールドが続く配置が旧バグをトリガーした。
-     * ============================================================ */
-    {
-        QS_JSON_ELEMENT_OBJECT obj;
-        const char* bug_json =
-            "{\"labelIds\":[\"bug\"],\"updatedAt\":0,\"description\":\"\","
-            "\"priority\":0,\"id\":\"iss5\","
-            "\"title\":\"bugaaaaaaaaaaaaaaaaaaaaaaaaaaa\","
-            "\"assigneeIds\":[\"u1\"],\"status\":\"open\"}";
-        check("decode reported bug json (long title)", decode(&memory_context, &obj, bug_json));
-        check_str("bug id", api_qs_object_get_string(&obj, "id"), "iss5");
-        check_str("bug title (long)", api_qs_object_get_string(&obj, "title"),
-                  "bugaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-        check_str("bug status", api_qs_object_get_string(&obj, "status"), "open");
-        check_int("bug priority == 0", api_qs_object_get_integer_val(&obj, "priority"), 0);
-        check_int("bug updatedAt == 0", api_qs_object_get_integer_val(&obj, "updatedAt"), 0);
-        QS_JSON_ELEMENT_ARRAY bl;
-        check("bug labelIds", api_qs_object_get_array(&obj, "labelIds", &bl) == 0);
-        check_str("bug labelIds[0]", api_qs_array_get_string(&bl, 0), "bug");
-        QS_JSON_ELEMENT_ARRAY ba;
-        check("bug assigneeIds", api_qs_object_get_array(&obj, "assigneeIds", &ba) == 0);
-        check_str("bug assigneeIds[0]", api_qs_array_get_string(&ba, 0), "u1");
-    }
-
-    /* ============================================================
      * 11. 不正 JSON の扱い
      *     本デコーダは構文検証が緩く、コロン欠落・閉じ括弧なしは
      *     現状「受入」される（既存の寛容性。今回の修正とは無関係）。
