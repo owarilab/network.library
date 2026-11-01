@@ -408,7 +408,6 @@ schema は次の形式です。
 
 ### 運用上の注意（update）
 
-- `issue update` は **全体置換**なので、必要フィールドを落とさないこと
 - `issue update` は **差分更新**。未指定フィールドは既存値が保持される
 - 更新後は必ず `issue list --status / --assignee / --label` で索引整合を確認すること
 - 大量更新後は必要に応じて `compact --store issue` / `compact --store index` を実行すること
