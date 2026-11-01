@@ -7,7 +7,7 @@ encode/qs_base64
 hash/qs_hash
 http_client/qs_http_client
 http_client/response_body.txt
-http_client_reconnect/qs_http_client_reconnect
+http_bench/qs_http_bench
 http_server_simple/qs_http_server
 json/qs_json
 llm_agent/qs_llm_agent_server

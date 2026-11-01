@@ -1,4 +1,4 @@
-PROGRAM = qs_http_client_reconnect
+PROGRAM = qs_http_bench
 UNAME_S := $(shell uname -s)
 CC      = $(if $(filter Darwin,$(UNAME_S)),clang,gcc)
 DEFINE  = $(if $(filter Darwin,$(UNAME_S)),,-D_LINUX)
