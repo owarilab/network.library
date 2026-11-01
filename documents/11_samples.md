@@ -30,7 +30,7 @@
 ## テスト（test/）
 
 各テストは `make && ./<program>` で実行でき、pass/fail 集計を出力する（fail 0 で exit code 0）。
-一括で全テストを clean するには `test/clean_all.sh` を実行する。
+一括で全テストをビルド・実行するには `test/run_all.sh` を、全テストを clean するには `test/clean_all.sh` を実行する。
 
 | テスト | 対象API | 検証内容 |
 |---|---|---|
