@@ -12,6 +12,12 @@ extern "C"{
 #include <sys/types.h>
 #include <inttypes.h>
 
+#ifdef _WINDOWS
+#ifndef __WINDOWS__
+#define __WINDOWS__
+#endif
+#endif
+
 #define QS_SERVER_TYPE_PLAIN 100
 #define QS_SERVER_TYPE_SIMPLE 200
 #define QS_SERVER_TYPE_HTTP 300
@@ -56,7 +62,7 @@ typedef struct QS_WEBSOCKET_CLIENT QS_WEBSOCKET_CLIENT;
 #ifndef _QS_SOCKET_ID_DEFINED_
 #define _QS_SOCKET_ID_DEFINED_
 #ifdef __WINDOWS__
-typedef SOCKET QS_SOCKET_ID;
+typedef intptr_t QS_SOCKET_ID;
 #else
 typedef int QS_SOCKET_ID;
 #endif
