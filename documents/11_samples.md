@@ -1,26 +1,54 @@
-# サンプル対応表
+# サンプル・テスト対応表
 
-## ネットワーク
+## サンプル（sample/）
+
+### ネットワーク
 - TCP/UDP サーバ: [sample/server/main.c](sample/server/main.c)
 - TCP/UDP クライアント: [sample/client/main.c](sample/client/main.c)
 - 簡易クライアント: [sample/client_simple/main.c](sample/client_simple/main.c)
 - HTTP サーバ（簡易）: [sample/http_server_simple/main.c](sample/http_server_simple/main.c)
 - HTTP クライアント: [sample/http_client/main.c](sample/http_client/main.c)
 
-## データ処理
+### データ処理
 - JSON: [sample/json/main.c](sample/json/main.c)
 - CSV: [sample/csv/main.c](sample/csv/main.c)
 - Base64/SHA1: [sample/encode/main.c](sample/encode/main.c)
 
-## メモリ
+### メモリ
 - メモリアロケーター挙動テスト: [sample/memory_allocator_test/main.c](sample/memory_allocator_test/main.c)
 
-## KVS
+### KVS
 - メモリ KVS: [sample/cache/main.c](sample/cache/main.c)
 - 永続化 KVS: [sample/persistence_cache/main.c](sample/persistence_cache/main.c)
 
-## スクリプト
+### スクリプト
 - Script 実行: [sample/script/main.c](sample/script/main.c)
 
-## Unity
+### Unity
 - ビルド手順は [README.md](README.md) を参照
+
+## テスト（test/）
+
+各テストは `make && ./<program>` で実行でき、pass/fail 集計を出力する（fail 0 で exit code 0）。
+一括で全テストを clean するには `test/clean_all.sh` を実行する。
+
+| テスト | 対象API | 検証内容 |
+|---|---|---|
+| [test/string_test/](test/string_test/) | `qs_string` 全21関数 | 文字列変換・検索・URLエンコード/デコード・エスケープ等 |
+| [test/sha1_test/](test/sha1_test/) | `qs_sha1` / `api_qs_sha1_encode` | FIPS 180-1 ベクトル・ブロック境界・バイナリデータ |
+| [test/http_param_test/](test/http_param_test/) | `api_qs_get_http_get_parameter` / `post_parameter` / `cookie_parameter` / `api_qs_get_http_post_json_object` / `api_qs_http_response_json` | GETクエリ（URLデコード）・POSTフォーム・POST JSON（ネスト）・Cookie |
+| [test/room_test/](test/room_test/) | ルーム組み込みAPI（`/api/v1/room/*`）+ `api_qs_server_create_router` + WSクライアントAPI | room create/list/join/leave + WSブロードキャスト |
+| [test/random_test/](test/random_test/) | `api_qs_rand` / `api_qs_uniqid` / `qs_rand_32/64` / `qs_srand_32/64` / `qs_uniqid_r32/r64` | 値の変化・再現性・uniqid の一意性 |
+| [test/chain_array_test/](test/chain_array_test/) | `qs_create_chain_array` 等（低レベル版） | 追加・イテレーション・削除・resize |
+| [test/io_test/](test/io_test/) | `qs_fread_range` 等（低レベル版） | ファイル読み書き・範囲読み込み |
+| [test/ws_binary_test/](test/ws_binary_test/) | `api_qs_get_ws_opcode` / `api_qs_get_ws_message(_size)` / `api_qs_send_ws_binary` / `api_qs_websocket_client_send` | テキスト（opcode 1）・バイナリ（opcode 2・NULバイト含む）往復 |
+| [test/packet_route_test/](test/packet_route_test/) | `qs_add_packet_route_connection` / `qs_get_route_info(s)` 等 | 接続管理・ルーター情報取得 |
+| [test/json_ext_test/](test/json_ext_test/) | JSON 拡張API | 複雑なJSON構造のエンコード/デコード |
+| [test/csv_api_test/](test/csv_api_test/) | `api_qs_csv_read_file` / `api_qs_csv_parse` / `api_qs_csv_get_row` 等 | ファイル読み込み・引用符フィールド・日本語マルチバイト |
+| [test/script_argv_test/](test/script_argv_test/) | Script 引数API | スクリプト実行時の引数処理 |
+| [test/ranking_ext_test/](test/ranking_ext_test/) | ランキング拡張API | ランキング登録・取得・更新 |
+| [test/kvs_ext_test/](test/kvs_ext_test/) | KVS 拡張API（`api_qs_kvs_keys` 等） | キー列挙・ソートキー |
+| [test/static_file_test/](test/static_file_test/) | 静的ファイル配信（`http_request_common`） | Content-Type・キャッシュ制御・304 Not Modified |
+| [test/base64_test/](test/base64_test/) | `qs_base64` 系 | Base64 エンコード/デコード（Python で検証） |
+| [test/websocket_protocol_test/](test/websocket_protocol_test/) | WebSocket フレーム処理 | フレーム構築・マスク・opcode |
+| [test/memory_allocator_test/](test/memory_allocator_test/) | メモリアロケーター | 確保・解放・クリーン挙動 |
