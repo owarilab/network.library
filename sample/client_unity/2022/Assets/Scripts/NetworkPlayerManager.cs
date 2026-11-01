@@ -96,6 +96,9 @@ namespace QS
         public static extern uint libqs_api_rand();
 
         static Dictionary<string, PlayerCharacterData> networkPlayerCharacterInfos = new Dictionary<string, PlayerCharacterData>();
+        private static libqs_api_callback_unity_debug_log debugLogCallback = DebugLog;
+        private static libqs_api_callback_unity_on_recv_http_request onRecvHttpRequestCallback = OnRecvHttpRequest;
+        private static bool isInitialized = false;
 
         Dictionary<string, NetworkPlayerController> networkPlayerControllers = new Dictionary<string, NetworkPlayerController>();
 
@@ -157,6 +160,9 @@ namespace QS
 
         void FixedUpdate()
         {
+            if(!isInitialized){
+                return;
+            }
             libqs_api_update();
         }
 
@@ -164,20 +170,37 @@ namespace QS
         void OnDestroy()
         {
             Debug.Log("OnDestroy");
+            if(!isInitialized){
+                return;
+            }
             libqs_api_free();
+            isInitialized = false;
+            libqs_api_set_debug_log(null);
+            libqs_api_set_on_recv_http_request(null);
             System.GC.Collect();
             Resources.UnloadUnusedAssets();
         }
 
         public static void Initialize()
         {
+            if(isInitialized){
+                return;
+            }
             int result = libqs_api_init();
             Debug.Log("libqs_api_init() = " + result);
-            libqs_api_set_debug_log(NetworkPlayerManager.DebugLog);
+            if(result < 0){
+                return;
+            }
+            libqs_api_set_debug_log(debugLogCallback);
 
             result = libqs_api_init_http_server(8080, 100);
             Debug.Log("libqs_api_init_http_server(8080, 100) = " + result);
-            libqs_api_set_on_recv_http_request(NetworkPlayerManager.OnRecvHttpRequest);
+            if(result < 0){
+                libqs_api_free();
+                return;
+            }
+            libqs_api_set_on_recv_http_request(onRecvHttpRequestCallback);
+            isInitialized = true;
 
             uint rand = libqs_api_rand();
             Debug.Log("libqs_api_rand() = " + rand);
@@ -216,8 +239,7 @@ namespace QS
 
                     HttpResponse httpResponse = new HttpResponse(method, path, "OK", "200");
                     string json = JsonUtility.ToJson(httpResponse);
-                    IntPtr json_ptr = Marshal.StringToHGlobalAnsi(json);
-                    return libqs_api_send_http_response_json(http_request_parameter, json_ptr);
+                    return libqs_api_send_http_response_json(http_request_parameter, json);
                 }
             }
 
@@ -229,8 +251,7 @@ namespace QS
                     HttpResponse httpResponse = new HttpResponse(method, path, "OK", "200");
                     httpResponse.players = networkPlayerCharacterInfos.Values.ToList();
                     string json = JsonUtility.ToJson(httpResponse);
-                    IntPtr json_ptr = Marshal.StringToHGlobalAnsi(json);
-                    return libqs_api_send_http_response_json(http_request_parameter, json_ptr);
+                    return libqs_api_send_http_response_json(http_request_parameter, json);
                 }
             }
 
