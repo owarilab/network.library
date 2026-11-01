@@ -49,6 +49,9 @@ make
 - `issue.db`
 - `issue_index.db`
 - `system.db`（連番カウンタ等のシステムデータ）
+- `schema_user.json`
+- `schema_label.json`
+- `schema_issue.json`
 
 ---
 
@@ -122,6 +125,7 @@ make
 ```
 
 `assigneeIds` に指定した user、`labelIds` に指定した label が存在しない場合はエラーになります。
+また create/update 時は schema ファイルに基づいて不足フィールドへデフォルト値を補完し、schema 未定義フィールドはエラーになります。
 
 ### get
 
@@ -141,6 +145,8 @@ make
 > 更新時は `status` / `assigneeIds` / `labelIds` を含めて送る運用を推奨します。
 > また `--id` と JSON 内 `id` が不一致の場合はエラーになります。
 > `assigneeIds` / `labelIds` に存在しないIDが含まれる場合もエラーになります。
+
+※ schema でのデフォルト補完・未定義フィールド検証は create/update の両方で適用されます。
 
 ### delete
 
@@ -203,7 +209,63 @@ make
 
 ---
 
-## 7. オプション共通
+## 7. schema 取得
+
+利用可能なスキーマ一覧:
+
+```bash
+./qs_issue_tracker_cli schema list
+```
+
+特定エンティティのスキーマ取得:
+
+```bash
+./qs_issue_tracker_cli schema get --entity user
+./qs_issue_tracker_cli schema get --entity label
+./qs_issue_tracker_cli schema get --entity issue
+```
+
+`--base-dir` を指定して別ディレクトリの schema を読むことも可能です。
+
+```bash
+./qs_issue_tracker_cli schema get --base-dir ./my_issue_data --entity issue
+```
+
+---
+
+## 8. schema ファイルの書き方
+
+schema は次の形式です。
+
+```json
+{
+  "fields": [
+    {"name":"id","type":"string","maxLength":64,"required":0},
+    {"name":"title","type":"string","maxLength":256,"default":"","required":1},
+    {"name":"priority","type":"int32","default":0,"required":0},
+    {"name":"updatedAt","type":"int64","default":0,"required":0}
+  ]
+}
+```
+
+各フィールド定義の意味:
+
+- `name`: 項目名
+- `type`: `string` / `int32` / `int64`
+- `required`: `1` なら必須、`0` なら任意
+- `default`: 未指定時に補完する値（型に一致している必要あり）
+- `maxLength`: `type=string` のときのみ有効（最大文字数）
+
+運用ルール:
+
+- create/update 時に schema が適用されます。
+- schema にない項目はエラーです（ただし issue の `assigneeIds` / `labelIds` は例外で許可されています）。
+- `required=1` かつ `default` がない項目を未指定で送るとエラーになります。
+- `maxLength` 超過、型不一致はエラーになります。
+
+---
+
+## 9. オプション共通
 
 多くのコマンドで以下を指定できます。
 
@@ -217,7 +279,7 @@ make
 
 ---
 
-## 8. 補足
+## 10. 補足
 
 - 本サンプルは固定容量 KVS 前提です（容量不足時はエラー）。
 - compaction は「新ファイル再構築→切替」方式です。
@@ -225,7 +287,7 @@ make
 
 ---
 
-## 9. issue update の利用ケース（運用手順）
+## 11. issue update の利用ケース（運用手順）
 
 `issue update` は実運用で使うケースが多いため、代表ケースを手順化します。  
 共通の基本フローは次の通りです。

@@ -69,6 +69,36 @@ int main(void)
 
     snprintf(cmd, sizeof(cmd), "test -f \"%s/system.db\"", data_dir);
     check_exit("system store created", 0, cmd);
+    snprintf(cmd, sizeof(cmd), "test -f \"%s/schema_user.json\"", data_dir);
+    check_exit("schema_user created", 0, cmd);
+    snprintf(cmd, sizeof(cmd), "test -f \"%s/schema_label.json\"", data_dir);
+    check_exit("schema_label created", 0, cmd);
+    snprintf(cmd, sizeof(cmd), "test -f \"%s/schema_issue.json\"", data_dir);
+    check_exit("schema_issue created", 0, cmd);
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s schema list --base-dir \"%s\" | grep -q '\"entity\":\"issue\"'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("schema list", 0, cmd);
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s schema get --base-dir \"%s\" --entity issue | grep -q '\"name\":\"status\"'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("schema get issue", 0, cmd);
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s schema get --base-dir \"%s\" --entity invalid >/dev/null 2>&1",
+        cli_bin,
+        data_dir
+    );
+    check_exit("schema get invalid entity fails", 2, cmd);
 
     snprintf(cmd, sizeof(cmd), "%s init --base-dir \"%s\" >/dev/null 2>&1", cli_bin, data_dir);
     check_exit("init without force fails", 4, cmd);
@@ -115,6 +145,15 @@ int main(void)
     snprintf(
         cmd,
         sizeof(cmd),
+        "%s user create --base-dir \"%s\" --json '{\"name\":\"x\",\"unknown\":1}' >/dev/null 2>&1",
+        cli_bin,
+        data_dir
+    );
+    check_exit("user create unknown field fails", 2, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
         "%s user list --base-dir \"%s\" | grep -q '\"id\":\"u1\"'",
         cli_bin,
         data_dir
@@ -138,6 +177,14 @@ int main(void)
         data_dir
     );
     check_exit("user update id mismatch fails", 2, cmd);
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s user update --base-dir \"%s\" --id u1 --json '{\"id\":\"u1\",\"name\":\"alice3\",\"unknown\":1}' >/dev/null 2>&1",
+        cli_bin,
+        data_dir
+    );
+    check_exit("user update unknown field fails", 2, cmd);
 
     snprintf(
         cmd,
@@ -151,11 +198,29 @@ int main(void)
     snprintf(
         cmd,
         sizeof(cmd),
+        "%s issue create --base-dir \"%s\" --json '{\"assigneeIds\":[\"u1\"],\"labelIds\":[\"bug\"]}' >/dev/null",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue create default title/status", 0, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
         "%s issue create --base-dir \"%s\" --id iss_bad_ref --json '{\"id\":\"iss_bad_ref\",\"title\":\"bad\",\"status\":\"open\",\"assigneeIds\":[\"u999\"],\"labelIds\":[\"bug\"]}' >/dev/null 2>&1",
         cli_bin,
         data_dir
     );
     check_exit("issue create with missing assignee fails", 2, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue create --base-dir \"%s\" --json '{\"title\":\"bad\",\"status\":\"open\",\"unknown\":1}' >/dev/null 2>&1",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue create unknown field fails", 2, cmd);
 
     snprintf(
         cmd,
@@ -219,6 +284,14 @@ int main(void)
         data_dir
     );
     check_exit("issue update id mismatch fails", 2, cmd);
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue update --base-dir \"%s\" --id iss1 --json '{\"id\":\"iss1\",\"title\":\"x\",\"status\":\"in_progress\",\"unknown\":1}' >/dev/null 2>&1",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue update unknown field fails", 2, cmd);
 
     snprintf(
         cmd,

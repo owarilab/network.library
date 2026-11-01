@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <errno.h>
 #include <unistd.h>
+#include <stdint.h>
 
 #include "qs_api.h"
 
@@ -20,6 +21,13 @@
 
 #define DEFAULT_BASE_DIR "./issue_data"
 #define INDEX_JSON_BUFFER_SIZE (64 * 1024)
+#define MAX_SCHEMA_FIELDS 128
+
+typedef enum SCHEMA_FIELD_TYPE {
+    SCHEMA_FIELD_TYPE_INT32 = 1,
+    SCHEMA_FIELD_TYPE_INT64 = 2,
+    SCHEMA_FIELD_TYPE_STRING = 3
+} SCHEMA_FIELD_TYPE;
 
 typedef struct STORE_CONFIG {
     const char* name;
@@ -35,6 +43,23 @@ typedef struct APP_STORES {
     QS_KVS_CONTEXT system;
     char base_dir[4096];
 } APP_STORES;
+
+typedef struct SCHEMA_FIELD_DEF {
+    char name[128];
+    SCHEMA_FIELD_TYPE type;
+    int required;
+    int has_default;
+    int has_max_length;
+    int32_t default_i32;
+    int64_t default_i64;
+    char default_str[1024];
+    size_t max_length;
+} SCHEMA_FIELD_DEF;
+
+typedef struct SCHEMA_DEF {
+    SCHEMA_FIELD_DEF fields[MAX_SCHEMA_FIELDS];
+    int field_count;
+} SCHEMA_DEF;
 
 static const STORE_CONFIG STORE_USER = {"user", "user.db", api_qs_kvs_create_b1mb_persistence};
 static const STORE_CONFIG STORE_LABEL = {"label", "label.db", api_qs_kvs_create_b1mb_persistence};
@@ -54,12 +79,14 @@ static void print_usage(const char* program_name)
     printf("  %s label list [--base-dir <dir>]\n", program_name);
     printf("  %s issue <create|get|update|delete> --id <id> [--json <json>] [--base-dir <dir>]\n", program_name);
     printf("  %s issue list [--status <status> | --assignee <userId> | --label <label>] [--base-dir <dir>]\n", program_name);
+    printf("  %s schema <list|get> [--entity user|label|issue] [--base-dir <dir>]\n", program_name);
     printf("  %s compact [--store user|label|issue|index|system|all] [--base-dir <dir>]\n", program_name);
     printf("\n");
     printf("Examples:\n");
     printf("  %s init --base-dir ./issue_data\n", program_name);
     printf("  %s issue create --json '{\"title\":\"t\",\"status\":\"open\",\"assigneeIds\":[\"u1\"],\"labelIds\":[\"bug\"]}'\n", program_name);
     printf("  %s issue list --status open\n", program_name);
+    printf("  %s schema get --entity issue\n", program_name);
 }
 
 static const char* get_option_value(int argc, char* argv[], const char* key)
@@ -138,6 +165,123 @@ static int create_store_file(const STORE_CONFIG* config, const char* path, int f
     }
     api_qs_persistence_kvs_memory_free(&kvs);
     return 0;
+}
+
+static int read_text_file(const char* path, char** out_text)
+{
+    FILE* fp = fopen(path, "rb");
+    if (fp == NULL) {
+        return -1;
+    }
+    if (fseek(fp, 0, SEEK_END) != 0) {
+        fclose(fp);
+        return -1;
+    }
+    long sz = ftell(fp);
+    if (sz < 0) {
+        fclose(fp);
+        return -1;
+    }
+    if (fseek(fp, 0, SEEK_SET) != 0) {
+        fclose(fp);
+        return -1;
+    }
+    char* buf = (char*)malloc((size_t)sz + 1);
+    if (buf == NULL) {
+        fclose(fp);
+        return -1;
+    }
+    size_t read_size = fread(buf, 1, (size_t)sz, fp);
+    fclose(fp);
+    if (read_size != (size_t)sz) {
+        free(buf);
+        return -1;
+    }
+    buf[sz] = '\0';
+    *out_text = buf;
+    return 0;
+}
+
+static int write_text_file(const char* path, const char* text)
+{
+    FILE* fp = fopen(path, "wb");
+    if (fp == NULL) {
+        return -1;
+    }
+    size_t len = strlen(text);
+    size_t written = fwrite(text, 1, len, fp);
+    fclose(fp);
+    return (written == len) ? 0 : -1;
+}
+
+static int write_schema_file(const char* base_dir, const char* file_name, const char* content, int force)
+{
+    char path[4096];
+    if (build_store_path(path, sizeof(path), base_dir, file_name) != 0) {
+        return -1;
+    }
+    if (!force && file_exists(path)) {
+        return 0;
+    }
+    if (write_text_file(path, content) != 0) {
+        fprintf(stderr, "error: failed to write schema file: %s\n", path);
+        return -1;
+    }
+    return 0;
+}
+
+static int init_schema_files(const char* base_dir, int force)
+{
+    static const char* USER_SCHEMA =
+        "{\n"
+        "  \"fields\": [\n"
+        "    {\"name\":\"id\",\"type\":\"string\",\"maxLength\":64,\"required\":0},\n"
+        "    {\"name\":\"name\",\"type\":\"string\",\"maxLength\":128,\"default\":\"\",\"required\":1}\n"
+        "  ]\n"
+        "}\n";
+    static const char* LABEL_SCHEMA =
+        "{\n"
+        "  \"fields\": [\n"
+        "    {\"name\":\"id\",\"type\":\"string\",\"maxLength\":64,\"required\":0},\n"
+        "    {\"name\":\"name\",\"type\":\"string\",\"maxLength\":128,\"default\":\"\",\"required\":1}\n"
+        "  ]\n"
+        "}\n";
+    static const char* ISSUE_SCHEMA =
+        "{\n"
+        "  \"fields\": [\n"
+        "    {\"name\":\"id\",\"type\":\"string\",\"maxLength\":64,\"required\":0},\n"
+        "    {\"name\":\"title\",\"type\":\"string\",\"maxLength\":256,\"default\":\"\",\"required\":1},\n"
+        "    {\"name\":\"description\",\"type\":\"string\",\"maxLength\":4096,\"default\":\"\",\"required\":0},\n"
+        "    {\"name\":\"status\",\"type\":\"string\",\"maxLength\":64,\"default\":\"open\",\"required\":1},\n"
+        "    {\"name\":\"priority\",\"type\":\"int32\",\"default\":0,\"required\":0},\n"
+        "    {\"name\":\"updatedAt\",\"type\":\"int64\",\"default\":0,\"required\":0}\n"
+        "  ]\n"
+        "}\n";
+
+    if (write_schema_file(base_dir, "schema_user.json", USER_SCHEMA, force) != 0) {
+        return -1;
+    }
+    if (write_schema_file(base_dir, "schema_label.json", LABEL_SCHEMA, force) != 0) {
+        return -1;
+    }
+    if (write_schema_file(base_dir, "schema_issue.json", ISSUE_SCHEMA, force) != 0) {
+        return -1;
+    }
+    return 0;
+}
+
+static const char* schema_file_name_from_entity(const char* entity_name)
+{
+    if (strcmp(entity_name, "user") == 0) {
+        return "schema_user.json";
+    }
+    if (strcmp(entity_name, "label") == 0) {
+        return "schema_label.json";
+    }
+    if (strcmp(entity_name, "issue") == 0) {
+        return "schema_issue.json";
+    }
+    return NULL;
 }
 
 static int open_store_checked(const STORE_CONFIG* config, const char* base_dir, QS_KVS_CONTEXT* out)
@@ -294,6 +438,262 @@ static int next_counter_id(APP_STORES* stores, const char* counter_key, const ch
         return -1;
     }
     return 0;
+}
+
+static SCHEMA_FIELD_DEF* schema_find_field(SCHEMA_DEF* schema, const char* name)
+{
+    int i;
+    for (i = 0; i < schema->field_count; i++) {
+        if (strcmp(schema->fields[i].name, name) == 0) {
+            return &schema->fields[i];
+        }
+    }
+    return NULL;
+}
+
+static int parse_schema_type(const char* type_text, SCHEMA_FIELD_TYPE* out_type)
+{
+    if (strcmp(type_text, "int32") == 0) {
+        *out_type = SCHEMA_FIELD_TYPE_INT32;
+        return 0;
+    }
+    if (strcmp(type_text, "int64") == 0) {
+        *out_type = SCHEMA_FIELD_TYPE_INT64;
+        return 0;
+    }
+    if (strcmp(type_text, "string") == 0) {
+        *out_type = SCHEMA_FIELD_TYPE_STRING;
+        return 0;
+    }
+    return -1;
+}
+
+static int load_schema(const char* base_dir, const char* schema_file_name, SCHEMA_DEF* out_schema)
+{
+    memset(out_schema, 0, sizeof(*out_schema));
+
+    char schema_path[4096];
+    if (build_store_path(schema_path, sizeof(schema_path), base_dir, schema_file_name) != 0) {
+        return -1;
+    }
+    char* schema_text = NULL;
+    if (read_text_file(schema_path, &schema_text) != 0) {
+        fprintf(stderr, "error: failed to read schema file: %s\n", schema_path);
+        return -1;
+    }
+
+    QS_MEMORY_CONTEXT context;
+    if (create_temp_memory(&context, 2 * 1024 * 1024) != 0) {
+        free(schema_text);
+        return -1;
+    }
+    QS_JSON_ELEMENT_OBJECT root;
+    if (-1 == api_qs_json_decode_object(&context, &root, schema_text)) {
+        free(schema_text);
+        api_qs_memory_free(&context);
+        fprintf(stderr, "error: invalid schema json: %s\n", schema_path);
+        return -1;
+    }
+    free(schema_text);
+
+    QS_JSON_ELEMENT_ARRAY fields;
+    if (-1 == api_qs_object_get_array(&root, "fields", &fields)) {
+        api_qs_memory_free(&context);
+        fprintf(stderr, "error: schema fields not found: %s\n", schema_path);
+        return -1;
+    }
+    int32_t len = api_qs_array_get_length(&fields);
+    if (len > MAX_SCHEMA_FIELDS) {
+        api_qs_memory_free(&context);
+        fprintf(stderr, "error: schema field count over limit: %d\n", len);
+        return -1;
+    }
+
+    int32_t i;
+    for (i = 0; i < len; i++) {
+        QS_JSON_ELEMENT_OBJECT fobj;
+        if (-1 == api_qs_array_get_object(&fields, i, &fobj)) {
+            api_qs_memory_free(&context);
+            return -1;
+        }
+        SCHEMA_FIELD_DEF* f = &out_schema->fields[out_schema->field_count];
+        memset(f, 0, sizeof(*f));
+
+        char* name = api_qs_object_get_string(&fobj, "name");
+        char* type = api_qs_object_get_string(&fobj, "type");
+        if (name == NULL || type == NULL) {
+            api_qs_memory_free(&context);
+            return -1;
+        }
+        snprintf(f->name, sizeof(f->name), "%s", name);
+        if (parse_schema_type(type, &f->type) != 0) {
+            api_qs_memory_free(&context);
+            fprintf(stderr, "error: unsupported schema type: %s\n", type);
+            return -1;
+        }
+
+        if (api_qs_object_exist(&fobj, "required")) {
+            f->required = api_qs_object_get_integer_val(&fobj, "required") ? 1 : 0;
+        }
+
+        if (f->type == SCHEMA_FIELD_TYPE_STRING && api_qs_object_exist(&fobj, "maxLength")) {
+            f->has_max_length = 1;
+            f->max_length = (size_t)api_qs_object_get_big_integer_val(&fobj, "maxLength");
+        }
+
+        if (api_qs_object_exist(&fobj, "default")) {
+            f->has_default = 1;
+            if (f->type == SCHEMA_FIELD_TYPE_INT32) {
+                int32_t* p = api_qs_object_get_integer(&fobj, "default");
+                if (p == NULL) {
+                    api_qs_memory_free(&context);
+                    return -1;
+                }
+                f->default_i32 = *p;
+            } else if (f->type == SCHEMA_FIELD_TYPE_INT64) {
+                f->default_i64 = api_qs_object_get_big_integer_val(&fobj, "default");
+            } else {
+                char* s = api_qs_object_get_string(&fobj, "default");
+                if (s == NULL) {
+                    api_qs_memory_free(&context);
+                    return -1;
+                }
+                snprintf(f->default_str, sizeof(f->default_str), "%s", s);
+            }
+        }
+
+        out_schema->field_count++;
+    }
+
+    api_qs_memory_free(&context);
+    return 0;
+}
+
+static int is_allowed_extra_field(const char* entity_name, const char* key)
+{
+    if (strcmp(entity_name, "issue") == 0) {
+        if (strcmp(key, "assigneeIds") == 0 || strcmp(key, "labelIds") == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int validate_schema_value(QS_JSON_ELEMENT_OBJECT* obj, SCHEMA_FIELD_DEF* field)
+{
+    if (field->type == SCHEMA_FIELD_TYPE_INT32) {
+        if (api_qs_object_get_integer(obj, field->name) == NULL) {
+            fprintf(stderr, "error: schema type mismatch(int32): %s\n", field->name);
+            return -1;
+        }
+        return 0;
+    }
+    if (field->type == SCHEMA_FIELD_TYPE_INT64) {
+        if (api_qs_object_get_integer(obj, field->name) == NULL &&
+            api_qs_object_get_big_integer(obj, field->name) == NULL &&
+            api_qs_object_get_unsigned_big_integer(obj, field->name) == NULL) {
+            fprintf(stderr, "error: schema type mismatch(int64): %s\n", field->name);
+            return -1;
+        }
+        return 0;
+    }
+
+    char* s = api_qs_object_get_string(obj, field->name);
+    if (s == NULL) {
+        fprintf(stderr, "error: schema type mismatch(string): %s\n", field->name);
+        return -1;
+    }
+    if (field->has_max_length && strlen(s) > field->max_length) {
+        fprintf(stderr, "error: schema maxLength exceeded: %s\n", field->name);
+        return -1;
+    }
+    return 0;
+}
+
+static int apply_schema_on_write(const char* entity_name, const char* base_dir, const char* schema_file_name, const char* src_json, char** out_json)
+{
+    SCHEMA_DEF schema;
+    if (load_schema(base_dir, schema_file_name, &schema) != 0) {
+        return -1;
+    }
+
+    QS_MEMORY_CONTEXT context;
+    if (create_temp_memory(&context, 2 * 1024 * 1024) != 0) {
+        return -1;
+    }
+    QS_JSON_ELEMENT_OBJECT obj;
+    if (-1 == api_qs_json_decode_object(&context, &obj, src_json)) {
+        api_qs_memory_free(&context);
+        return -1;
+    }
+
+    QS_JSON_ELEMENT_ARRAY keys;
+    if (-1 == api_qs_array_create(&context, &keys)) {
+        api_qs_memory_free(&context);
+        return -1;
+    }
+    if (-1 == api_qs_object_get_keys(&obj, &keys)) {
+        api_qs_memory_free(&context);
+        return -1;
+    }
+    int32_t klen = api_qs_array_get_length(&keys);
+    int32_t i;
+    for (i = 0; i < klen; i++) {
+        char* key = api_qs_array_get_string(&keys, i);
+        if (key == NULL) {
+            continue;
+        }
+        if (schema_find_field(&schema, key) == NULL && !is_allowed_extra_field(entity_name, key)) {
+            fprintf(stderr, "error: field not defined in schema: %s\n", key);
+            api_qs_memory_free(&context);
+            return -1;
+        }
+    }
+
+    for (i = 0; i < schema.field_count; i++) {
+        SCHEMA_FIELD_DEF* f = &schema.fields[i];
+        int exists = api_qs_object_exist(&obj, f->name);
+        if (!exists) {
+            if (f->has_default) {
+                if (f->type == SCHEMA_FIELD_TYPE_INT32) {
+                    if (-1 == api_qs_object_push_integer(&obj, f->name, f->default_i32)) {
+                        api_qs_memory_free(&context);
+                        return -1;
+                    }
+                } else if (f->type == SCHEMA_FIELD_TYPE_INT64) {
+                    if (-1 == api_qs_object_push_big_integer(&obj, f->name, f->default_i64)) {
+                        api_qs_memory_free(&context);
+                        return -1;
+                    }
+                } else {
+                    if (-1 == api_qs_object_push_string(&obj, f->name, f->default_str)) {
+                        api_qs_memory_free(&context);
+                        return -1;
+                    }
+                }
+                exists = 1;
+            }
+        }
+
+        if (!exists && f->required) {
+            fprintf(stderr, "error: required field missing: %s\n", f->name);
+            api_qs_memory_free(&context);
+            return -1;
+        }
+        if (exists && validate_schema_value(&obj, f) != 0) {
+            api_qs_memory_free(&context);
+            return -1;
+        }
+    }
+
+    char* encoded = api_qs_json_encode_object(&obj, strlen(src_json) + 8192);
+    if (encoded == NULL) {
+        api_qs_memory_free(&context);
+        return -1;
+    }
+    *out_json = strdup(encoded);
+    api_qs_memory_free(&context);
+    return (*out_json == NULL) ? -1 : 0;
 }
 
 static int entity_create(APP_STORES* stores, QS_KVS_CONTEXT* store, const STORE_CONFIG* cfg, const char* key, const char* json)
@@ -1042,6 +1442,9 @@ static int command_init(int argc, char* argv[])
         }
         printf("created: %s (%s)\n", stores[i]->name, path);
     }
+    if (init_schema_files(base_dir, force) != 0) {
+        return EXIT_IO;
+    }
     printf("init done: base_dir=%s\n", base_dir);
     return EXIT_OK;
 }
@@ -1063,6 +1466,7 @@ static int command_entity_common(int argc, char* argv[], APP_STORES* stores, con
     if (strcmp(action, "create") == 0) {
         char generated_id[128];
         const char* final_id = id;
+        char* schema_json = NULL;
         char* final_json = NULL;
         if (json == NULL) {
             fprintf(stderr, "error: --json is required for create\n");
@@ -1079,7 +1483,13 @@ static int command_entity_common(int argc, char* argv[], APP_STORES* stores, con
         if (build_entity_key(key, sizeof(key), entity_name, final_id) != 0) {
             return EXIT_IO;
         }
-        int json_rc = json_with_forced_id(json, final_id, id != NULL, &final_json);
+        const char* schema_file = (strcmp(entity_name, "user") == 0) ? "schema_user.json" : "schema_label.json";
+        if (apply_schema_on_write(entity_name, stores->base_dir, schema_file, json, &schema_json) != 0) {
+            fprintf(stderr, "error: schema validation failed for create\n");
+            return EXIT_USAGE;
+        }
+        int json_rc = json_with_forced_id(schema_json, final_id, id != NULL, &final_json);
+        free(schema_json);
         if (json_rc == -2) {
             fprintf(stderr, "error: --id and json.id mismatch for create\n");
             return EXIT_USAGE;
@@ -1105,12 +1515,19 @@ static int command_entity_common(int argc, char* argv[], APP_STORES* stores, con
         return entity_get(store, key);
     }
     if (strcmp(action, "update") == 0) {
+        char* schema_json = NULL;
         char* final_json = NULL;
         if (json == NULL) {
             fprintf(stderr, "error: --json is required for update\n");
             return EXIT_USAGE;
         }
-        int json_rc = json_with_forced_id(json, id, 1, &final_json);
+        const char* schema_file = (strcmp(entity_name, "user") == 0) ? "schema_user.json" : "schema_label.json";
+        if (apply_schema_on_write(entity_name, stores->base_dir, schema_file, json, &schema_json) != 0) {
+            fprintf(stderr, "error: schema validation failed for update\n");
+            return EXIT_USAGE;
+        }
+        int json_rc = json_with_forced_id(schema_json, id, 1, &final_json);
+        free(schema_json);
         if (json_rc == -2) {
             fprintf(stderr, "error: --id and json.id mismatch for update\n");
             return EXIT_USAGE;
@@ -1169,6 +1586,7 @@ static int command_issue(int argc, char* argv[], APP_STORES* stores)
     if (strcmp(action, "create") == 0) {
         char generated_id[128];
         const char* final_id = id;
+        char* schema_json = NULL;
         char* final_json = NULL;
         if (json == NULL) {
             fprintf(stderr, "error: --json is required for create\n");
@@ -1182,7 +1600,12 @@ static int command_issue(int argc, char* argv[], APP_STORES* stores)
             final_id = generated_id;
             printf("generated id: %s\n", final_id);
         }
-        int json_rc = json_with_forced_id(json, final_id, id != NULL, &final_json);
+        if (apply_schema_on_write("issue", stores->base_dir, "schema_issue.json", json, &schema_json) != 0) {
+            fprintf(stderr, "error: schema validation failed for issue create\n");
+            return EXIT_USAGE;
+        }
+        int json_rc = json_with_forced_id(schema_json, final_id, id != NULL, &final_json);
+        free(schema_json);
         if (json_rc == -2) {
             fprintf(stderr, "error: --id and json.id mismatch for issue create\n");
             return EXIT_USAGE;
@@ -1208,12 +1631,18 @@ static int command_issue(int argc, char* argv[], APP_STORES* stores)
         return entity_get(&stores->issue, key);
     }
     if (strcmp(action, "update") == 0) {
+        char* schema_json = NULL;
         char* final_json = NULL;
         if (json == NULL) {
             fprintf(stderr, "error: --json is required for update\n");
             return EXIT_USAGE;
         }
-        int json_rc = json_with_forced_id(json, id, 1, &final_json);
+        if (apply_schema_on_write("issue", stores->base_dir, "schema_issue.json", json, &schema_json) != 0) {
+            fprintf(stderr, "error: schema validation failed for issue update\n");
+            return EXIT_USAGE;
+        }
+        int json_rc = json_with_forced_id(schema_json, id, 1, &final_json);
+        free(schema_json);
         if (json_rc == -2) {
             fprintf(stderr, "error: --id and json.id mismatch for issue update\n");
             return EXIT_USAGE;
@@ -1275,6 +1704,57 @@ static int command_compact(int argc, char* argv[])
     return EXIT_USAGE;
 }
 
+static int command_schema(int argc, char* argv[])
+{
+    if (argc < 3) {
+        fprintf(stderr, "error: schema action is required\n");
+        return EXIT_USAGE;
+    }
+    const char* action = argv[2];
+    const char* base_dir = DEFAULT_BASE_DIR;
+    const char* base_dir_arg = get_option_value(argc, argv, "--base-dir");
+    if (base_dir_arg != NULL) {
+        base_dir = base_dir_arg;
+    }
+
+    if (strcmp(action, "list") == 0) {
+        printf("{\"schemas\":[");
+        printf("{\"entity\":\"user\",\"file\":\"schema_user.json\"},");
+        printf("{\"entity\":\"label\",\"file\":\"schema_label.json\"},");
+        printf("{\"entity\":\"issue\",\"file\":\"schema_issue.json\"}");
+        printf("]}\n");
+        return EXIT_OK;
+    }
+
+    if (strcmp(action, "get") == 0) {
+        char path[4096];
+        char* schema_text = NULL;
+        const char* entity_name = get_option_value(argc, argv, "--entity");
+        if (entity_name == NULL) {
+            fprintf(stderr, "error: --entity is required for schema get\n");
+            return EXIT_USAGE;
+        }
+        const char* file_name = schema_file_name_from_entity(entity_name);
+        if (file_name == NULL) {
+            fprintf(stderr, "error: invalid --entity value: %s\n", entity_name);
+            return EXIT_USAGE;
+        }
+        if (build_store_path(path, sizeof(path), base_dir, file_name) != 0) {
+            return EXIT_IO;
+        }
+        if (read_text_file(path, &schema_text) != 0) {
+            fprintf(stderr, "error: schema file not found or unreadable: %s\n", path);
+            return EXIT_IO;
+        }
+        printf("%s", schema_text);
+        free(schema_text);
+        return EXIT_OK;
+    }
+
+    fprintf(stderr, "error: unsupported schema action: %s\n", action);
+    return EXIT_USAGE;
+}
+
 int main(int argc, char* argv[])
 {
     api_qs_init();
@@ -1294,6 +1774,9 @@ int main(int argc, char* argv[])
     }
     if (strcmp(argv[1], "compact") == 0) {
         return command_compact(argc, argv);
+    }
+    if (strcmp(argv[1], "schema") == 0) {
+        return command_schema(argc, argv);
     }
 
     const char* base_dir = DEFAULT_BASE_DIR;
