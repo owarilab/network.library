@@ -93,6 +93,7 @@ make
 ```
 
 `--id` と JSON 内 `id` が不一致の場合はエラーになります。
+`update` は差分更新なので、変更したい項目だけを渡せます。
 
 ### delete
 
@@ -100,6 +101,16 @@ make
 ./qs_issue_tracker_cli user delete --id u1
 ./qs_issue_tracker_cli label delete --id bug
 ```
+
+### unset（1項目リセット/削除）
+
+```bash
+./qs_issue_tracker_cli user unset --id u1 --field name
+./qs_issue_tracker_cli label unset --id bug --field name
+```
+
+- 指定フィールドに schema の `default` がある場合: その値へ戻します
+- `default` がない場合: そのフィールドを削除します
 
 ---
 
@@ -141,8 +152,8 @@ make
 ./qs_issue_tracker_cli issue update --id iss1 --json '{"id":"iss1","title":"bug2","status":"in_progress","assigneeIds":["u2"],"labelIds":["feature"]}'
 ```
 
-> `issue update` は「差分パッチ」ではなく、**issue JSON 全体の再保存**です。  
-> 更新時は `status` / `assigneeIds` / `labelIds` を含めて送る運用を推奨します。
+> `issue update` は **差分更新**です。  
+> 送信した項目だけを更新し、未指定項目は既存値を維持します。
 > また `--id` と JSON 内 `id` が不一致の場合はエラーになります。
 > `assigneeIds` / `labelIds` に存在しないIDが含まれる場合もエラーになります。
 
@@ -153,6 +164,16 @@ make
 ```bash
 ./qs_issue_tracker_cli issue delete --id iss1
 ```
+
+### unset（1項目リセット/削除）
+
+```bash
+./qs_issue_tracker_cli issue unset --id iss1 --field description
+./qs_issue_tracker_cli issue unset --id iss1 --field status
+```
+
+- `status` のように schema `default` がある項目は default 値へ戻ります（例: `open`）
+- `unsettable=1` が schema に定義された項目のみ unset できます
 
 ---
 
@@ -240,10 +261,10 @@ schema は次の形式です。
 ```json
 {
   "fields": [
-    {"name":"id","type":"string","maxLength":64,"required":0},
-    {"name":"title","type":"string","maxLength":256,"default":"","required":1},
-    {"name":"priority","type":"int32","default":0,"required":0},
-    {"name":"updatedAt","type":"int64","default":0,"required":0}
+    {"name":"id","type":"string","maxLength":64,"required":0,"unsettable":0},
+    {"name":"title","type":"string","maxLength":256,"default":"","required":1,"unsettable":1},
+    {"name":"priority","type":"int32","default":0,"required":0,"unsettable":1},
+    {"name":"updatedAt","type":"int64","default":0,"required":0,"unsettable":1}
   ]
 }
 ```
@@ -255,13 +276,17 @@ schema は次の形式です。
 - `required`: `1` なら必須、`0` なら任意
 - `default`: 未指定時に補完する値（型に一致している必要あり）
 - `maxLength`: `type=string` のときのみ有効（最大文字数）
+- `unsettable`: `1` なら `unset` 可能、`0` なら `unset` 不可
 
 運用ルール:
 
 - create/update 時に schema が適用されます。
-- schema にない項目はエラーです（ただし issue の `assigneeIds` / `labelIds` は例外で許可されています）。
+- unset 時も schema を参照します。
+- schema にない項目は create/update でエラーです（issue の `assigneeIds` / `labelIds` は create/update でのみ例外許可）。
 - `required=1` かつ `default` がない項目を未指定で送るとエラーになります。
 - `maxLength` 超過、型不一致はエラーになります。
+- unset で `default` がある項目は default に戻り、`default` がない項目は削除されます。
+- unset は `unsettable=1` の項目のみ実行できます。
 
 ---
 
@@ -292,8 +317,8 @@ schema は次の形式です。
 `issue update` は実運用で使うケースが多いため、代表ケースを手順化します。  
 共通の基本フローは次の通りです。
 
-1. 現在値取得: `issue get --id <id>`
-2. JSON を編集（必要項目を維持したまま変更）
+1. 現在値取得（任意）: `issue get --id <id>`
+2. 変更したい項目だけ JSON を作成
 3. `issue update --id <id> --json '<edited-json>'`
 4. 検索で確認（`issue list --status ...` など）
 
@@ -360,11 +385,11 @@ schema は次の形式です。
 
 ### Case E: タイトル/本文だけ更新（索引対象を維持）
 
-索引対象（`status` / `assigneeIds` / `labelIds`）を変えない場合でも、  
-更新JSONにはそれらを含めるのが安全です。
+索引対象（`status` / `assigneeIds` / `labelIds`）を変えない場合は、  
+その項目を省略しても既存値が維持されます。
 
 ```bash
-./qs_issue_tracker_cli issue update --id iss1 --json '{"id":"iss1","title":"title updated","description":"desc updated","status":"open","assigneeIds":["u1"],"labelIds":["bug"]}'
+./qs_issue_tracker_cli issue update --id iss1 --json '{"id":"iss1","title":"title updated","description":"desc updated"}'
 ```
 
 ### Case F: 誤更新のリカバリ
@@ -384,5 +409,6 @@ schema は次の形式です。
 ### 運用上の注意（update）
 
 - `issue update` は **全体置換**なので、必要フィールドを落とさないこと
+- `issue update` は **差分更新**。未指定フィールドは既存値が保持される
 - 更新後は必ず `issue list --status / --assignee / --label` で索引整合を確認すること
 - 大量更新後は必要に応じて `compact --store issue` / `compact --store index` を実行すること

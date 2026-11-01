@@ -48,6 +48,7 @@ typedef struct SCHEMA_FIELD_DEF {
     char name[128];
     SCHEMA_FIELD_TYPE type;
     int required;
+    int unsettable;
     int has_default;
     int has_max_length;
     int32_t default_i32;
@@ -68,16 +69,21 @@ static const STORE_CONFIG STORE_INDEX = {"index", "issue_index.db", api_qs_kvs_c
 static const STORE_CONFIG STORE_SYSTEM = {"system", "system.db", api_qs_kvs_create_b1mb_persistence};
 
 static int compact_store(const STORE_CONFIG* cfg, const char* base_dir);
+static SCHEMA_FIELD_DEF* schema_find_field(SCHEMA_DEF* schema, const char* name);
+static int load_schema(const char* base_dir, const char* schema_file_name, SCHEMA_DEF* out_schema);
+static int is_allowed_extra_field(const char* entity_name, const char* key);
+static int apply_schema_on_write(const char* entity_name, const char* base_dir, const char* schema_file_name, const char* src_json, char** out_json);
+static int validate_and_fill_schema_object(const char* entity_name, SCHEMA_DEF* schema, QS_JSON_ELEMENT_OBJECT* obj, QS_MEMORY_CONTEXT* context);
 
 static void print_usage(const char* program_name)
 {
     printf("Usage:\n");
     printf("  %s init [--base-dir <dir>] [--force]\n", program_name);
-    printf("  %s user  <create|get|update|delete> --id <id> [--json <json>] [--base-dir <dir>]\n", program_name);
+    printf("  %s user  <create|get|update|delete|unset> --id <id> [--json <json>] [--field <name>] [--base-dir <dir>]\n", program_name);
     printf("  %s user  list [--base-dir <dir>]\n", program_name);
-    printf("  %s label <create|get|update|delete> --id <id> [--json <json>] [--base-dir <dir>]\n", program_name);
+    printf("  %s label <create|get|update|delete|unset> --id <id> [--json <json>] [--field <name>] [--base-dir <dir>]\n", program_name);
     printf("  %s label list [--base-dir <dir>]\n", program_name);
-    printf("  %s issue <create|get|update|delete> --id <id> [--json <json>] [--base-dir <dir>]\n", program_name);
+    printf("  %s issue <create|get|update|delete|unset> --id <id> [--json <json>] [--field <name>] [--base-dir <dir>]\n", program_name);
     printf("  %s issue list [--status <status> | --assignee <userId> | --label <label>] [--base-dir <dir>]\n", program_name);
     printf("  %s schema <list|get> [--entity user|label|issue] [--base-dir <dir>]\n", program_name);
     printf("  %s compact [--store user|label|issue|index|system|all] [--base-dir <dir>]\n", program_name);
@@ -87,6 +93,7 @@ static void print_usage(const char* program_name)
     printf("  %s issue create --json '{\"title\":\"t\",\"status\":\"open\",\"assigneeIds\":[\"u1\"],\"labelIds\":[\"bug\"]}'\n", program_name);
     printf("  %s issue list --status open\n", program_name);
     printf("  %s schema get --entity issue\n", program_name);
+    printf("  %s issue unset --id iss1 --field description\n", program_name);
 }
 
 static const char* get_option_value(int argc, char* argv[], const char* key)
@@ -235,26 +242,26 @@ static int init_schema_files(const char* base_dir, int force)
     static const char* USER_SCHEMA =
         "{\n"
         "  \"fields\": [\n"
-        "    {\"name\":\"id\",\"type\":\"string\",\"maxLength\":64,\"required\":0},\n"
-        "    {\"name\":\"name\",\"type\":\"string\",\"maxLength\":128,\"default\":\"\",\"required\":1}\n"
+        "    {\"name\":\"id\",\"type\":\"string\",\"maxLength\":64,\"required\":0,\"unsettable\":0},\n"
+        "    {\"name\":\"name\",\"type\":\"string\",\"maxLength\":128,\"default\":\"\",\"required\":1,\"unsettable\":1}\n"
         "  ]\n"
         "}\n";
     static const char* LABEL_SCHEMA =
         "{\n"
         "  \"fields\": [\n"
-        "    {\"name\":\"id\",\"type\":\"string\",\"maxLength\":64,\"required\":0},\n"
-        "    {\"name\":\"name\",\"type\":\"string\",\"maxLength\":128,\"default\":\"\",\"required\":1}\n"
+        "    {\"name\":\"id\",\"type\":\"string\",\"maxLength\":64,\"required\":0,\"unsettable\":0},\n"
+        "    {\"name\":\"name\",\"type\":\"string\",\"maxLength\":128,\"default\":\"\",\"required\":1,\"unsettable\":1}\n"
         "  ]\n"
         "}\n";
     static const char* ISSUE_SCHEMA =
         "{\n"
         "  \"fields\": [\n"
-        "    {\"name\":\"id\",\"type\":\"string\",\"maxLength\":64,\"required\":0},\n"
-        "    {\"name\":\"title\",\"type\":\"string\",\"maxLength\":256,\"default\":\"\",\"required\":1},\n"
-        "    {\"name\":\"description\",\"type\":\"string\",\"maxLength\":4096,\"default\":\"\",\"required\":0},\n"
-        "    {\"name\":\"status\",\"type\":\"string\",\"maxLength\":64,\"default\":\"open\",\"required\":1},\n"
-        "    {\"name\":\"priority\",\"type\":\"int32\",\"default\":0,\"required\":0},\n"
-        "    {\"name\":\"updatedAt\",\"type\":\"int64\",\"default\":0,\"required\":0}\n"
+        "    {\"name\":\"id\",\"type\":\"string\",\"maxLength\":64,\"required\":0,\"unsettable\":0},\n"
+        "    {\"name\":\"title\",\"type\":\"string\",\"maxLength\":256,\"default\":\"\",\"required\":1,\"unsettable\":1},\n"
+        "    {\"name\":\"description\",\"type\":\"string\",\"maxLength\":4096,\"default\":\"\",\"required\":0,\"unsettable\":1},\n"
+        "    {\"name\":\"status\",\"type\":\"string\",\"maxLength\":64,\"default\":\"open\",\"required\":1,\"unsettable\":1},\n"
+        "    {\"name\":\"priority\",\"type\":\"int32\",\"default\":0,\"required\":0,\"unsettable\":1},\n"
+        "    {\"name\":\"updatedAt\",\"type\":\"int64\",\"default\":0,\"required\":0,\"unsettable\":1}\n"
         "  ]\n"
         "}\n";
 
@@ -416,6 +423,208 @@ static int json_with_forced_id(const char* src_json, const char* id, int strict_
     return (*out_json == NULL) ? -1 : 0;
 }
 
+static int copy_object_field(QS_JSON_ELEMENT_OBJECT* dst, QS_JSON_ELEMENT_OBJECT* src, const char* key)
+{
+    int32_t* i32 = api_qs_object_get_integer(src, key);
+    if (i32 != NULL) {
+        return api_qs_object_push_integer(dst, key, *i32);
+    }
+    int64_t* i64 = api_qs_object_get_big_integer(src, key);
+    if (i64 != NULL) {
+        return api_qs_object_push_big_integer(dst, key, *i64);
+    }
+    uint64_t* u64 = api_qs_object_get_unsigned_big_integer(src, key);
+    if (u64 != NULL) {
+        return api_qs_object_push_unsigned_big_integer(dst, key, *u64);
+    }
+    char* s = api_qs_object_get_string(src, key);
+    if (s != NULL) {
+        return api_qs_object_push_string(dst, key, s);
+    }
+    QS_JSON_ELEMENT_ARRAY arr;
+    if (api_qs_object_get_array(src, key, &arr) == 0) {
+        return api_qs_object_push_array(dst, key, &arr);
+    }
+    QS_JSON_ELEMENT_OBJECT obj;
+    if (api_qs_object_get_object(src, key, &obj) == 0) {
+        return api_qs_object_push_object(dst, key, &obj);
+    }
+    fprintf(stderr, "error: unsupported json field type: %s\n", key);
+    return -1;
+}
+
+static int copy_missing_object_fields(QS_MEMORY_CONTEXT* context, QS_JSON_ELEMENT_OBJECT* dst, QS_JSON_ELEMENT_OBJECT* src)
+{
+    QS_JSON_ELEMENT_ARRAY keys;
+    if (-1 == api_qs_array_create(context, &keys)) {
+        return -1;
+    }
+    if (-1 == api_qs_object_get_keys(src, &keys)) {
+        return -1;
+    }
+    int32_t len = api_qs_array_get_length(&keys);
+    int32_t i;
+    for (i = 0; i < len; i++) {
+        char* key = api_qs_array_get_string(&keys, i);
+        if (key == NULL) {
+            continue;
+        }
+        if (api_qs_object_exist(dst, key)) {
+            continue;
+        }
+        if (-1 == copy_object_field(dst, src, key)) {
+            return -1;
+        }
+    }
+    return 0;
+}
+
+static int copy_object_fields_except(QS_MEMORY_CONTEXT* context, QS_JSON_ELEMENT_OBJECT* dst, QS_JSON_ELEMENT_OBJECT* src, const char* skip_key)
+{
+    QS_JSON_ELEMENT_ARRAY keys;
+    if (-1 == api_qs_array_create(context, &keys)) {
+        return -1;
+    }
+    if (-1 == api_qs_object_get_keys(src, &keys)) {
+        return -1;
+    }
+    int32_t len = api_qs_array_get_length(&keys);
+    int32_t i;
+    for (i = 0; i < len; i++) {
+        char* key = api_qs_array_get_string(&keys, i);
+        if (key == NULL) {
+            continue;
+        }
+        if (strcmp(key, skip_key) == 0) {
+            continue;
+        }
+        if (-1 == copy_object_field(dst, src, key)) {
+            return -1;
+        }
+    }
+    return 0;
+}
+
+static int build_merged_update_json_with_schema(const char* entity_name, const char* base_dir, const char* schema_file_name, const char* old_json, const char* patch_json, char** out_json)
+{
+    SCHEMA_DEF schema;
+    if (load_schema(base_dir, schema_file_name, &schema) != 0) {
+        return -1;
+    }
+
+    QS_MEMORY_CONTEXT context;
+    if (create_temp_memory(&context, 4 * 1024 * 1024) != 0) {
+        return -1;
+    }
+    QS_JSON_ELEMENT_OBJECT old_obj;
+    QS_JSON_ELEMENT_OBJECT patch_obj;
+    if (-1 == api_qs_json_decode_object(&context, &old_obj, old_json)) {
+        api_qs_memory_free(&context);
+        return -1;
+    }
+    if (-1 == api_qs_json_decode_object(&context, &patch_obj, patch_json)) {
+        api_qs_memory_free(&context);
+        return -1;
+    }
+    if (copy_missing_object_fields(&context, &patch_obj, &old_obj) != 0) {
+        api_qs_memory_free(&context);
+        return -1;
+    }
+    if (validate_and_fill_schema_object(entity_name, &schema, &patch_obj, &context) != 0) {
+        api_qs_memory_free(&context);
+        return -1;
+    }
+
+    size_t old_len = strlen(old_json);
+    size_t patch_len = strlen(patch_json);
+    char* encoded = api_qs_json_encode_object(&patch_obj, old_len + patch_len + 8192);
+    if (encoded == NULL) {
+        api_qs_memory_free(&context);
+        return -1;
+    }
+    *out_json = strdup(encoded);
+    api_qs_memory_free(&context);
+    return (*out_json == NULL) ? -1 : 0;
+}
+
+static int build_unset_json_with_schema(const char* entity_name, const char* base_dir, const char* schema_file_name, const char* src_json, const char* field_name, char** out_json)
+{
+    SCHEMA_DEF schema;
+    if (strcmp(field_name, "id") == 0) {
+        fprintf(stderr, "error: id field cannot be unset\n");
+        return -1;
+    }
+    if (load_schema(base_dir, schema_file_name, &schema) != 0) {
+        return -1;
+    }
+
+    QS_MEMORY_CONTEXT context;
+    if (create_temp_memory(&context, 4 * 1024 * 1024) != 0) {
+        return -1;
+    }
+
+    QS_JSON_ELEMENT_OBJECT src_obj;
+    QS_JSON_ELEMENT_OBJECT dst_obj;
+    if (-1 == api_qs_json_decode_object(&context, &src_obj, src_json)) {
+        api_qs_memory_free(&context);
+        return -1;
+    }
+    if (!api_qs_object_exist(&src_obj, field_name)) {
+        fprintf(stderr, "error: field not found: %s\n", field_name);
+        api_qs_memory_free(&context);
+        return -1;
+    }
+    if (-1 == api_qs_object_create(&context, &dst_obj)) {
+        api_qs_memory_free(&context);
+        return -1;
+    }
+
+    SCHEMA_FIELD_DEF* field = schema_find_field(&schema, field_name);
+    if (field == NULL) {
+        fprintf(stderr, "error: field not defined in schema for unset: %s\n", field_name);
+        api_qs_memory_free(&context);
+        return -1;
+    }
+    if (!field->unsettable) {
+        fprintf(stderr, "error: field is not unsettable by schema: %s\n", field_name);
+        api_qs_memory_free(&context);
+        return -1;
+    }
+
+    if (copy_object_fields_except(&context, &dst_obj, &src_obj, field_name) != 0) {
+        api_qs_memory_free(&context);
+        return -1;
+    }
+
+    if (field != NULL && field->has_default) {
+        int rc = 0;
+        if (field->type == SCHEMA_FIELD_TYPE_INT32) {
+            rc = api_qs_object_push_integer(&dst_obj, field->name, field->default_i32);
+        } else if (field->type == SCHEMA_FIELD_TYPE_INT64) {
+            rc = api_qs_object_push_big_integer(&dst_obj, field->name, field->default_i64);
+        } else {
+            rc = api_qs_object_push_string(&dst_obj, field->name, field->default_str);
+        }
+        if (rc == -1) {
+            api_qs_memory_free(&context);
+            return -1;
+        }
+    }
+
+    if (validate_and_fill_schema_object(entity_name, &schema, &dst_obj, &context) != 0) {
+        api_qs_memory_free(&context);
+        return -1;
+    }
+    char* merged = api_qs_json_encode_object(&dst_obj, strlen(src_json) + 8192);
+    if (merged == NULL) {
+        api_qs_memory_free(&context);
+        return -1;
+    }
+    *out_json = strdup(merged);
+    api_qs_memory_free(&context);
+    return (*out_json == NULL) ? -1 : 0;
+}
+
 static int next_counter_id(APP_STORES* stores, const char* counter_key, const char* id_prefix, char* out_id, size_t out_size)
 {
     char* cur_text = api_qs_kvs_get(&stores->system, counter_key);
@@ -535,6 +744,9 @@ static int load_schema(const char* base_dir, const char* schema_file_name, SCHEM
         if (api_qs_object_exist(&fobj, "required")) {
             f->required = api_qs_object_get_integer_val(&fobj, "required") ? 1 : 0;
         }
+        if (api_qs_object_exist(&fobj, "unsettable")) {
+            f->unsettable = api_qs_object_get_integer_val(&fobj, "unsettable") ? 1 : 0;
+        }
 
         if (f->type == SCHEMA_FIELD_TYPE_STRING && api_qs_object_exist(&fobj, "maxLength")) {
             f->has_max_length = 1;
@@ -623,67 +835,14 @@ static int apply_schema_on_write(const char* entity_name, const char* base_dir, 
     }
     QS_JSON_ELEMENT_OBJECT obj;
     if (-1 == api_qs_json_decode_object(&context, &obj, src_json)) {
+        fprintf(stderr, "error: failed to decode target json for schema apply\n");
         api_qs_memory_free(&context);
         return -1;
     }
 
-    QS_JSON_ELEMENT_ARRAY keys;
-    if (-1 == api_qs_array_create(&context, &keys)) {
+    if (validate_and_fill_schema_object(entity_name, &schema, &obj, &context) != 0) {
         api_qs_memory_free(&context);
         return -1;
-    }
-    if (-1 == api_qs_object_get_keys(&obj, &keys)) {
-        api_qs_memory_free(&context);
-        return -1;
-    }
-    int32_t klen = api_qs_array_get_length(&keys);
-    int32_t i;
-    for (i = 0; i < klen; i++) {
-        char* key = api_qs_array_get_string(&keys, i);
-        if (key == NULL) {
-            continue;
-        }
-        if (schema_find_field(&schema, key) == NULL && !is_allowed_extra_field(entity_name, key)) {
-            fprintf(stderr, "error: field not defined in schema: %s\n", key);
-            api_qs_memory_free(&context);
-            return -1;
-        }
-    }
-
-    for (i = 0; i < schema.field_count; i++) {
-        SCHEMA_FIELD_DEF* f = &schema.fields[i];
-        int exists = api_qs_object_exist(&obj, f->name);
-        if (!exists) {
-            if (f->has_default) {
-                if (f->type == SCHEMA_FIELD_TYPE_INT32) {
-                    if (-1 == api_qs_object_push_integer(&obj, f->name, f->default_i32)) {
-                        api_qs_memory_free(&context);
-                        return -1;
-                    }
-                } else if (f->type == SCHEMA_FIELD_TYPE_INT64) {
-                    if (-1 == api_qs_object_push_big_integer(&obj, f->name, f->default_i64)) {
-                        api_qs_memory_free(&context);
-                        return -1;
-                    }
-                } else {
-                    if (-1 == api_qs_object_push_string(&obj, f->name, f->default_str)) {
-                        api_qs_memory_free(&context);
-                        return -1;
-                    }
-                }
-                exists = 1;
-            }
-        }
-
-        if (!exists && f->required) {
-            fprintf(stderr, "error: required field missing: %s\n", f->name);
-            api_qs_memory_free(&context);
-            return -1;
-        }
-        if (exists && validate_schema_value(&obj, f) != 0) {
-            api_qs_memory_free(&context);
-            return -1;
-        }
     }
 
     char* encoded = api_qs_json_encode_object(&obj, strlen(src_json) + 8192);
@@ -694,6 +853,59 @@ static int apply_schema_on_write(const char* entity_name, const char* base_dir, 
     *out_json = strdup(encoded);
     api_qs_memory_free(&context);
     return (*out_json == NULL) ? -1 : 0;
+}
+
+static int validate_and_fill_schema_object(const char* entity_name, SCHEMA_DEF* schema, QS_JSON_ELEMENT_OBJECT* obj, QS_MEMORY_CONTEXT* context)
+{
+    QS_JSON_ELEMENT_ARRAY keys;
+    if (-1 == api_qs_array_create(context, &keys)) {
+        return -1;
+    }
+    if (-1 == api_qs_object_get_keys(obj, &keys)) {
+        return -1;
+    }
+    int32_t klen = api_qs_array_get_length(&keys);
+    int32_t i;
+    for (i = 0; i < klen; i++) {
+        char* key = api_qs_array_get_string(&keys, i);
+        if (key == NULL) {
+            continue;
+        }
+        if (schema_find_field(schema, key) == NULL && !is_allowed_extra_field(entity_name, key)) {
+            fprintf(stderr, "error: field not defined in schema: %s\n", key);
+            return -1;
+        }
+    }
+
+    for (i = 0; i < schema->field_count; i++) {
+        SCHEMA_FIELD_DEF* f = &schema->fields[i];
+        int exists = api_qs_object_exist(obj, f->name);
+        if (!exists && f->has_default) {
+            if (f->type == SCHEMA_FIELD_TYPE_INT32) {
+                if (-1 == api_qs_object_push_integer(obj, f->name, f->default_i32)) {
+                    return -1;
+                }
+            } else if (f->type == SCHEMA_FIELD_TYPE_INT64) {
+                if (-1 == api_qs_object_push_big_integer(obj, f->name, f->default_i64)) {
+                    return -1;
+                }
+            } else {
+                if (-1 == api_qs_object_push_string(obj, f->name, f->default_str)) {
+                    return -1;
+                }
+            }
+            exists = 1;
+        }
+
+        if (!exists && f->required) {
+            fprintf(stderr, "error: required field missing: %s\n", f->name);
+            return -1;
+        }
+        if (exists && validate_schema_value(obj, f) != 0) {
+            return -1;
+        }
+    }
+    return 0;
 }
 
 static int entity_create(APP_STORES* stores, QS_KVS_CONTEXT* store, const STORE_CONFIG* cfg, const char* key, const char* json)
@@ -1457,6 +1669,7 @@ static int command_entity_common(int argc, char* argv[], APP_STORES* stores, con
     const char* action = argv[2];
     const char* id = get_option_value(argc, argv, "--id");
     const char* json = get_option_value(argc, argv, "--json");
+    const char* field = get_option_value(argc, argv, "--field");
     char key[1024];
 
     if (strcmp(action, "list") == 0) {
@@ -1515,33 +1728,75 @@ static int command_entity_common(int argc, char* argv[], APP_STORES* stores, con
         return entity_get(store, key);
     }
     if (strcmp(action, "update") == 0) {
-        char* schema_json = NULL;
+        char* patch_probe = NULL;
         char* final_json = NULL;
+        char* old_json;
         if (json == NULL) {
             fprintf(stderr, "error: --json is required for update\n");
             return EXIT_USAGE;
         }
-        const char* schema_file = (strcmp(entity_name, "user") == 0) ? "schema_user.json" : "schema_label.json";
-        if (apply_schema_on_write(entity_name, stores->base_dir, schema_file, json, &schema_json) != 0) {
-            fprintf(stderr, "error: schema validation failed for update\n");
-            return EXIT_USAGE;
-        }
-        int json_rc = json_with_forced_id(schema_json, id, 1, &final_json);
-        free(schema_json);
-        if (json_rc == -2) {
+        int probe_rc = json_with_forced_id(json, id, 1, &patch_probe);
+        free(patch_probe);
+        if (probe_rc == -2) {
             fprintf(stderr, "error: --id and json.id mismatch for update\n");
             return EXIT_USAGE;
         }
-        if (json_rc != 0) {
+        if (probe_rc != 0) {
             fprintf(stderr, "error: invalid json for update\n");
             return EXIT_USAGE;
         }
+        old_json = api_qs_kvs_get(store, key);
+        if (old_json == NULL) {
+            fprintf(stderr, "error: key not found: %s\n", key);
+            return EXIT_NOT_FOUND;
+        }
+        const char* schema_file = (strcmp(entity_name, "user") == 0) ? "schema_user.json" : "schema_label.json";
+        if (build_merged_update_json_with_schema(entity_name, stores->base_dir, schema_file, old_json, json, &final_json) != 0) {
+            fprintf(stderr, "error: invalid json for update\n");
+            return EXIT_USAGE;
+        }
+        if (json_with_forced_id(final_json, id, 0, &patch_probe) != 0) {
+            free(final_json);
+            fprintf(stderr, "error: invalid json for update\n");
+            return EXIT_USAGE;
+        }
+        free(final_json);
+        final_json = patch_probe;
+        patch_probe = NULL;
         int rc = entity_update(stores, store, cfg, key, final_json);
         free(final_json);
         return rc;
     }
     if (strcmp(action, "delete") == 0) {
         return entity_delete(store, key);
+    }
+    if (strcmp(action, "unset") == 0) {
+        char* old_json;
+        char* schema_json = NULL;
+        char* final_json = NULL;
+        const char* schema_file = (strcmp(entity_name, "user") == 0) ? "schema_user.json" : "schema_label.json";
+        if (field == NULL) {
+            fprintf(stderr, "error: --field is required for unset\n");
+            return EXIT_USAGE;
+        }
+        old_json = api_qs_kvs_get(store, key);
+        if (old_json == NULL) {
+            fprintf(stderr, "error: key not found: %s\n", key);
+            return EXIT_NOT_FOUND;
+        }
+        if (build_unset_json_with_schema(entity_name, stores->base_dir, schema_file, old_json, field, &schema_json) != 0) {
+            fprintf(stderr, "error: failed to unset field: %s\n", field);
+            return EXIT_USAGE;
+        }
+        if (json_with_forced_id(schema_json, id, 0, &final_json) != 0) {
+            free(schema_json);
+            fprintf(stderr, "error: invalid json for unset\n");
+            return EXIT_USAGE;
+        }
+        free(schema_json);
+        int rc = entity_update(stores, store, cfg, key, final_json);
+        free(final_json);
+        return rc;
     }
 
     fprintf(stderr, "error: unsupported action for %s: %s\n", entity_name, action);
@@ -1556,6 +1811,7 @@ static int command_issue(int argc, char* argv[], APP_STORES* stores)
     const char* action = argv[2];
     const char* id = get_option_value(argc, argv, "--id");
     const char* json = get_option_value(argc, argv, "--json");
+    const char* field = get_option_value(argc, argv, "--field");
 
     if (strcmp(action, "list") == 0) {
         const char* status = get_option_value(argc, argv, "--status");
@@ -1631,32 +1887,82 @@ static int command_issue(int argc, char* argv[], APP_STORES* stores)
         return entity_get(&stores->issue, key);
     }
     if (strcmp(action, "update") == 0) {
-        char* schema_json = NULL;
+        char key[1024];
+        char* old_json;
+        char* patch_probe = NULL;
         char* final_json = NULL;
         if (json == NULL) {
             fprintf(stderr, "error: --json is required for update\n");
             return EXIT_USAGE;
         }
-        if (apply_schema_on_write("issue", stores->base_dir, "schema_issue.json", json, &schema_json) != 0) {
-            fprintf(stderr, "error: schema validation failed for issue update\n");
-            return EXIT_USAGE;
-        }
-        int json_rc = json_with_forced_id(schema_json, id, 1, &final_json);
-        free(schema_json);
-        if (json_rc == -2) {
+        int probe_rc = json_with_forced_id(json, id, 1, &patch_probe);
+        free(patch_probe);
+        if (probe_rc == -2) {
             fprintf(stderr, "error: --id and json.id mismatch for issue update\n");
             return EXIT_USAGE;
         }
+        if (probe_rc != 0) {
+            fprintf(stderr, "error: invalid json for issue update\n");
+            return EXIT_USAGE;
+        }
+        if (build_entity_key(key, sizeof(key), "issue", id) != 0) {
+            return EXIT_IO;
+        }
+        old_json = api_qs_kvs_get(&stores->issue, key);
+        if (old_json == NULL) {
+            fprintf(stderr, "error: issue not found: %s\n", key);
+            return EXIT_NOT_FOUND;
+        }
+        if (build_merged_update_json_with_schema("issue", stores->base_dir, "schema_issue.json", old_json, json, &final_json) != 0) {
+            fprintf(stderr, "error: invalid json for issue update\n");
+            return EXIT_USAGE;
+        }
+        int json_rc = json_with_forced_id(final_json, id, 0, &patch_probe);
+        free(final_json);
+        final_json = NULL;
         if (json_rc != 0) {
             fprintf(stderr, "error: invalid json for issue update\n");
             return EXIT_USAGE;
         }
+        final_json = patch_probe;
+        patch_probe = NULL;
         int rc = issue_update(stores, id, final_json);
         free(final_json);
         return rc;
     }
     if (strcmp(action, "delete") == 0) {
         return issue_delete(stores, id);
+    }
+    if (strcmp(action, "unset") == 0) {
+        char key[1024];
+        char* old_json;
+        char* schema_json = NULL;
+        char* final_json = NULL;
+        if (field == NULL) {
+            fprintf(stderr, "error: --field is required for unset\n");
+            return EXIT_USAGE;
+        }
+        if (build_entity_key(key, sizeof(key), "issue", id) != 0) {
+            return EXIT_IO;
+        }
+        old_json = api_qs_kvs_get(&stores->issue, key);
+        if (old_json == NULL) {
+            fprintf(stderr, "error: issue not found: %s\n", key);
+            return EXIT_NOT_FOUND;
+        }
+        if (build_unset_json_with_schema("issue", stores->base_dir, "schema_issue.json", old_json, field, &schema_json) != 0) {
+            fprintf(stderr, "error: failed to unset issue field: %s\n", field);
+            return EXIT_USAGE;
+        }
+        if (json_with_forced_id(schema_json, id, 0, &final_json) != 0) {
+            free(schema_json);
+            fprintf(stderr, "error: invalid json for issue unset\n");
+            return EXIT_USAGE;
+        }
+        free(schema_json);
+        int rc = issue_update(stores, id, final_json);
+        free(final_json);
+        return rc;
     }
 
     fprintf(stderr, "error: unsupported issue action: %s\n", action);

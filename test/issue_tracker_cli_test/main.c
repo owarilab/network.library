@@ -180,6 +180,46 @@ int main(void)
     snprintf(
         cmd,
         sizeof(cmd),
+        "%s user update --base-dir \"%s\" --id u1 --json '{\"id\":\"u1\"}' >/dev/null",
+        cli_bin,
+        data_dir
+    );
+    check_exit("user partial update", 0, cmd);
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s user get --base-dir \"%s\" --id u1 | grep -q '\"name\":\"alice\"'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("user partial update keeps old value", 0, cmd);
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s user unset --base-dir \"%s\" --id u1 --field name >/dev/null",
+        cli_bin,
+        data_dir
+    );
+    check_exit("user unset name", 0, cmd);
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s user get --base-dir \"%s\" --id u1 | grep -q '\"name\":\"\"'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("user unset resets default", 0, cmd);
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s user unset --base-dir \"%s\" --id u1 --field id >/dev/null 2>&1",
+        cli_bin,
+        data_dir
+    );
+    check_exit("user unset id disallowed", 2, cmd);
+    snprintf(
+        cmd,
+        sizeof(cmd),
         "%s user update --base-dir \"%s\" --id u1 --json '{\"id\":\"u1\",\"name\":\"alice3\",\"unknown\":1}' >/dev/null 2>&1",
         cli_bin,
         data_dir
@@ -266,6 +306,54 @@ int main(void)
         data_dir
     );
     check_exit("issue update", 0, cmd);
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue update --base-dir \"%s\" --id iss1 --json '{\"id\":\"iss1\",\"title\":\"bug3\"}' >/dev/null",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue partial update", 0, cmd);
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue get --base-dir \"%s\" --id iss1 | grep -q '\"status\":\"in_progress\"'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue partial update keeps status", 0, cmd);
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue update --base-dir \"%s\" --id iss1 --json '{\"id\":\"iss1\",\"description\":\"memo\"}' >/dev/null",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue update description", 0, cmd);
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue unset --base-dir \"%s\" --id iss1 --field description >/dev/null",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue unset description", 0, cmd);
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue get --base-dir \"%s\" --id iss1 | grep -q '\"description\":\"\"'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue unset description resets default", 0, cmd);
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue unset --base-dir \"%s\" --id iss1 --field labelIds >/dev/null 2>&1",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue unset labelIds disallowed", 2, cmd);
 
     snprintf(
         cmd,
