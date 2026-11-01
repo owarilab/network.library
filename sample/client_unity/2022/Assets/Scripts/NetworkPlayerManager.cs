@@ -13,68 +13,84 @@ namespace QS
 {
     public class NetworkPlayerManager : MonoBehaviour
     {
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+        private const CallingConvention NativeCallingConvention = CallingConvention.StdCall;
+#else
+        private const CallingConvention NativeCallingConvention = CallingConvention.Cdecl;
+#endif
+
         private static string serverUrl = "http://localhost:8080";
 
         //typedef void(UNITY_INTERFACE_API *libqs_api_callback_unity_debug_log)(const char* str);
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+#else
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+#endif
         public delegate void libqs_api_callback_unity_debug_log(string str);
 
         //typedef int (UNITY_INTERFACE_API *libqs_api_callback_unity_on_recv_http_request)(void* http_request_parameter);
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+        [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+#else
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+#endif
         public delegate int libqs_api_callback_unity_on_recv_http_request(IntPtr http_request_parameter);
 
         // UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API libqs_api_set_debug_log(libqs_api_callback_unity_debug_log callback);
-        [DllImport("libqs.dll")]
+        [DllImport("libqs.dll", CallingConvention = NativeCallingConvention)]
         public static extern void libqs_api_set_debug_log(libqs_api_callback_unity_debug_log callback);
 
         // UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API libqs_api_set_on_recv_http_request(libqs_api_callback_unity_on_recv_http_request callback);
-        [DllImport("libqs.dll")]
+        [DllImport("libqs.dll", CallingConvention = NativeCallingConvention)]
         public static extern void libqs_api_set_on_recv_http_request(libqs_api_callback_unity_on_recv_http_request callback);
 
         // UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_update();
-        [DllImport("libqs.dll")]
+        [DllImport("libqs.dll", CallingConvention = NativeCallingConvention)]
         public static extern int libqs_api_update();
 
         // UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_free();
-        [DllImport("libqs.dll")]
+        [DllImport("libqs.dll", CallingConvention = NativeCallingConvention)]
         public static extern int libqs_api_free();
 
         // UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_init();
-        [DllImport("libqs.dll")]
+        [DllImport("libqs.dll", CallingConvention = NativeCallingConvention)]
         public static extern int libqs_api_init();
 
         // UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_init_http_server(uint32_t port, uint32_t max_connection);
-        [DllImport("libqs.dll")]
+        [DllImport("libqs.dll", CallingConvention = NativeCallingConvention)]
         public static extern int libqs_api_init_http_server(uint port, uint max_connection);
 
         // UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_send_response(void* http_request_parameter, const char* response);
-        [DllImport("libqs.dll")]
+        [DllImport("libqs.dll", CallingConvention = NativeCallingConvention)]
         public static extern int libqs_api_send_response(IntPtr http_request_parameter, IntPtr response);
 
         // UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_send_http_response_json(void* http_request_parameter,char* json);
-        [DllImport("libqs.dll")]
+        [DllImport("libqs.dll", CallingConvention = NativeCallingConvention)]
         public static extern int libqs_api_send_http_response_json(IntPtr http_request_parameter, IntPtr json);
 
         //UNITY_INTERFACE_EXPORT char* UNITY_INTERFACE_API libqs_api_get_http_method(void* http_request_parameter);
-        [DllImport("libqs.dll")]
+        [DllImport("libqs.dll", CallingConvention = NativeCallingConvention)]
         public static extern IntPtr libqs_api_get_http_method(IntPtr http_request_parameter);
 
         //UNITY_INTERFACE_EXPORT char* UNITY_INTERFACE_API libqs_api_get_http_path(void* http_request_parameter);
-        [DllImport("libqs.dll")]
+        [DllImport("libqs.dll", CallingConvention = NativeCallingConvention)]
         public static extern IntPtr libqs_api_get_http_path(IntPtr http_request_parameter);
 
         //UNITY_INTERFACE_EXPORT char* UNITY_INTERFACE_API libqs_api_get_http_get_parameter(void* http_request_parameter, char* name);
-        [DllImport("libqs.dll")]
+        [DllImport("libqs.dll", CallingConvention = NativeCallingConvention)]
         public static extern IntPtr libqs_api_get_http_get_parameter(IntPtr http_request_parameter, IntPtr name);
         
         //UNITY_INTERFACE_EXPORT char* UNITY_INTERFACE_API libqs_api_get_http_post_parameter(void* http_request_parameter, char* name);
-        [DllImport("libqs.dll")]
+        [DllImport("libqs.dll", CallingConvention = NativeCallingConvention)]
         public static extern IntPtr libqs_api_get_http_post_parameter(IntPtr http_request_parameter, IntPtr name);
 
         //UNITY_INTERFACE_EXPORT char* UNITY_INTERFACE_API libqs_api_get_http_post_body(void* http_request_parameter);
-        [DllImport("libqs.dll")]
+        [DllImport("libqs.dll", CallingConvention = NativeCallingConvention)]
         public static extern IntPtr libqs_api_get_http_post_body(IntPtr http_request_parameter);
 
         // UNITY_INTERFACE_EXPORT uint32_t UNITY_INTERFACE_API libqs_api_rand()
-        [DllImport("libqs.dll")]
+        [DllImport("libqs.dll", CallingConvention = NativeCallingConvention)]
         public static extern uint libqs_api_rand();
 
         static Dictionary<string, PlayerCharacterData> networkPlayerCharacterInfos = new Dictionary<string, PlayerCharacterData>();
