@@ -21,3 +21,5 @@ static_file_test/qs_static_file_test
 string_test/qs_string_test
 websocket_protocol_test/qs_websocket_protocol_test
 ws_binary_test/qs_ws_binary_test
+issue_tracker_cli_test/issue_tracker_cli_test
+issue_tracker_cli_test/tmp_issue_tracker_cli_test_data/

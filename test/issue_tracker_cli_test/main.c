@@ -1,0 +1,177 @@
+/*
+ * Copyright (c) Katsuya Owari
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <limits.h>
+
+static int pass_count = 0;
+static int fail_count = 0;
+
+static int run_cmd(const char* cmd)
+{
+    int rc = system(cmd);
+    if (rc == -1) {
+        return -1;
+    }
+    if (WIFEXITED(rc)) {
+        return WEXITSTATUS(rc);
+    }
+    return -1;
+}
+
+static void check_exit(const char* name, int expected_exit, const char* cmd)
+{
+    int rc = run_cmd(cmd);
+    if (rc == expected_exit) {
+        pass_count++;
+        printf("[PASS] %s\n", name);
+        return;
+    }
+    fail_count++;
+    printf("[FAIL] %s (expected=%d actual=%d)\n", name, expected_exit, rc);
+}
+
+int main(void)
+{
+    char cwd[PATH_MAX];
+    if (getcwd(cwd, sizeof(cwd)) == NULL) {
+        printf("[FAIL] getcwd\n");
+        return 1;
+    }
+
+    char data_dir[PATH_MAX];
+    if (strlen(cwd) + strlen("/tmp_issue_tracker_cli_test_data") + 1 >= sizeof(data_dir)) {
+        printf("[FAIL] data_dir path too long\n");
+        return 1;
+    }
+    strcpy(data_dir, cwd);
+    strcat(data_dir, "/tmp_issue_tracker_cli_test_data");
+
+    const char* cli_bin = "../../sample/issue_tracker_cli/qs_issue_tracker_cli";
+
+    check_exit(
+        "build issue_tracker_cli",
+        0,
+        "cd ../../sample/issue_tracker_cli && make >/dev/null"
+    );
+
+    char cmd[8192];
+    snprintf(cmd, sizeof(cmd), "rm -rf \"%s\"", data_dir);
+    check_exit("cleanup before test", 0, cmd);
+
+    snprintf(cmd, sizeof(cmd), "%s init --base-dir \"%s\" >/dev/null", cli_bin, data_dir);
+    check_exit("init stores", 0, cmd);
+
+    snprintf(cmd, sizeof(cmd), "%s init --base-dir \"%s\" >/dev/null 2>&1", cli_bin, data_dir);
+    check_exit("init without force fails", 4, cmd);
+
+    snprintf(cmd, sizeof(cmd), "%s init --base-dir \"%s\" --force >/dev/null", cli_bin, data_dir);
+    check_exit("init with force", 0, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s user create --base-dir \"%s\" --id u1 --json '{\"id\":\"u1\",\"name\":\"alice\"}' >/dev/null",
+        cli_bin,
+        data_dir
+    );
+    check_exit("user create", 0, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s label create --base-dir \"%s\" --id bug --json '{\"id\":\"bug\",\"name\":\"Bug\"}' >/dev/null",
+        cli_bin,
+        data_dir
+    );
+    check_exit("label create", 0, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s user list --base-dir \"%s\" | grep -q '\"id\":\"u1\"'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("user list", 0, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s label list --base-dir \"%s\" | grep -q '\"id\":\"bug\"'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("label list", 0, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue create --base-dir \"%s\" --id iss1 --json '{\"id\":\"iss1\",\"title\":\"bug\",\"status\":\"open\",\"assigneeIds\":[\"u1\"],\"labelIds\":[\"bug\"]}' >/dev/null",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue create", 0, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --status open | grep -q '\"id\":\"iss1\"'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue list by status(open)", 0, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue update --base-dir \"%s\" --id iss1 --json '{\"id\":\"iss1\",\"title\":\"bug2\",\"status\":\"in_progress\",\"assigneeIds\":[\"u2\"],\"labelIds\":[\"feature\"]}' >/dev/null",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue update", 0, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --status open | grep -q '\"id\":\"iss1\"'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue removed from old status index", 1, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --assignee u2 | grep -q '\"id\":\"iss1\"'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue list by assignee index", 0, cmd);
+
+    snprintf(cmd, sizeof(cmd), "%s compact --base-dir \"%s\" --store all >/dev/null", cli_bin, data_dir);
+    check_exit("compact all stores", 0, cmd);
+
+    snprintf(cmd, sizeof(cmd), "%s issue delete --base-dir \"%s\" --id iss1 >/dev/null", cli_bin, data_dir);
+    check_exit("issue delete", 0, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --status in_progress | grep -q '\"id\":\"iss1\"'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue removed from status index after delete", 1, cmd);
+
+    snprintf(cmd, sizeof(cmd), "rm -rf \"%s\"", data_dir);
+    check_exit("cleanup after test", 0, cmd);
+
+    printf("\nresult: pass=%d fail=%d\n", pass_count, fail_count);
+    return (fail_count == 0) ? 0 : 1;
+}

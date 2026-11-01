@@ -31,3 +31,6 @@ llm_http_stream/embeddings.db-wal
 llm_http_stream/run.sh
 llm_agent/default_workspace/
 llm_agent/run.sh
+issue_tracker_cli/qs_issue_tracker_cli
+issue_tracker_cli/issue_data/
+issue_tracker_cli/tmp_issue_data/

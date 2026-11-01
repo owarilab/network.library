@@ -18,6 +18,7 @@
 
 ### KVS
 - 永続化 KVS: [sample/persistence_cache/main.c](sample/persistence_cache/main.c)
+- Issue Tracker CLI 初期化: [sample/issue_tracker_cli/main.c](sample/issue_tracker_cli/main.c)
 
 ### スクリプト
 - Script 実行: [sample/script/main.c](sample/script/main.c)
@@ -54,3 +55,4 @@
 | [test/base64_test/](test/base64_test/) | `qs_base64` 系 | Base64 エンコード/デコード（Python で検証） |
 | [test/websocket_protocol_test/](test/websocket_protocol_test/) | WebSocket フレーム処理 | フレーム構築・マスク・opcode |
 | [test/memory_allocator_test/](test/memory_allocator_test/) | メモリアロケーター | 確保・解放・クリーン挙動 |
+| [test/issue_tracker_cli_test/](test/issue_tracker_cli_test/) | Issue Tracker CLI (`sample/issue_tracker_cli`) | init/force・CRUD・index検索・compaction |
