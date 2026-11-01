@@ -6,6 +6,7 @@ csv_lowlevel_test/qs_csv_lowlevel_test
 http_param_test/qs_http_param_test
 io_test/qs_io_test
 json_ext_test/qs_json_ext_test
+json_decode_test/qs_json_decode_test
 kvs_create_test/qs_kvs_create_test
 kvs_ext_test/qs_kvs_ext_test
 kvs_stress_test/qs_kvs_stress_test
