@@ -1,7 +1,8 @@
-PROGRAM = qs_queue
+PROGRAM = qs_kvs_stress_test
 CC      = gcc
 DEFINE  = -D_LINUX
 CFLAG   = -pthread -Wall -O
+#CFLAG   = -Wall -O2
 INCDIR  = -I ../../core/header
 LIBA = ../../core/libqs_core.a
 MYSOCKETOBJGROUP = main.o $(LIBA)
@@ -12,13 +13,13 @@ $(LIBA):
 	cd ../../core/src && make
 
 $(PROGRAM): $(MYSOCKETOBJGROUP)
-	$(CC) $(CFLAG) $(INCDIR) -o $(PROGRAM) $(MYSOCKETOBJGROUP)
+	$(CC) $(CFLAG) $(LIBDIR) $(INCDIR) -o $(PROGRAM) $(MYSOCKETOBJGROUP)
 
 main.o: main.c
 	$(CC) $(DEFINE) $(CFLAG) $(INCDIR) -c main.c -o main.o
 
 .PHONY: clean
-clean:
+clean: 
 	cd ../../core/src && make clean
-	rm -f $(PROGRAM)
+	rm -f $(PROGRAM) 
 	rm -f ./*.o

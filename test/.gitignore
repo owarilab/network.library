@@ -2,12 +2,16 @@ base64_test/qs_base64_test
 base64_test/qs_verify_decode
 chain_array_test/qs_chain_array_test
 csv_api_test/qs_csv_api_test
+csv_lowlevel_test/qs_csv_lowlevel_test
 http_param_test/qs_http_param_test
 io_test/qs_io_test
 json_ext_test/qs_json_ext_test
+kvs_create_test/qs_kvs_create_test
 kvs_ext_test/qs_kvs_ext_test
+kvs_stress_test/qs_kvs_stress_test
 memory_allocator_test/qs_memory_allocator_test
 packet_route_test/qs_packet_route_test
+queue_test/qs_queue_test
 random_test/qs_random_test
 ranking_ext_test/qs_ranking_ext_test
 room_test/qs_room_test

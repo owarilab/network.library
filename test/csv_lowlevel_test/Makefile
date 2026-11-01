@@ -1,7 +1,8 @@
-PROGRAM = qs_cache_api
+PROGRAM = qs_csv_lowlevel_test
 CC      = gcc
 DEFINE  = -D_LINUX
 CFLAG   = -pthread -Wall -O
+#CFLAG   = -Wall -O2
 INCDIR  = -I ../../core/header
 LIBA = ../../core/libqs_core.a
 MYSOCKETOBJGROUP = main.o $(LIBA)

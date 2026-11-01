@@ -1,5 +1,18 @@
 /*
  * Copyright (c) Katsuya Owari
+ *
+ * CSV low-level API test (qs_csv.h)
+ *
+ * Verifies the following:
+ *  - qs_csv_file_load / qs_csv_parse
+ *  - qs_csv_get_line_length / qs_csv_get_row_length / qs_csv_get_row
+ *  - qs_csv_build_csv / qs_csv_build_csv_memid
+ *  - qs_csv_init / qs_csv_add_row / qs_csv_add_line
+ *  - Edge cases: empty fields, quoted commas, newlines inside quotes,
+ *    escaped quotes, negative numbers, round-trip
+ *
+ * Build: make
+ * Run:   ./qs_csv_lowlevel_test
  */
 
 #include <stdio.h>
@@ -205,7 +218,58 @@ int main(int argc, char *argv[])
         check_str("blank record: value", qs_csv_get_row(memory, m, 1, 0), "");
     }
 
-    printf("\n=== Result: %d passed, %d failed ===\n", g_pass, g_fail);
+    /* --- 12. qs_csv_init + qs_csv_add_row / qs_csv_add_line ---
+     * 注意: qs_csv_init 直後は内部配列が未初期化（memid_csv_array=-1）のため
+     * qs_csv_get_line_length は -1 を返す。
+     * 最初の qs_csv_add_row(0, ...) では current_length=-1 となり
+     * for(i=-1; i<0; i++) が1回実行されて先頭に空行が1つ挿入される。 */
+    {
+        int32_t m = qs_csv_init(memory);
+        check_int("csv_init: memid valid", (m >= 0) ? 1 : 0, 1);
+        check_int("csv_init: line count (uninit)", qs_csv_get_line_length(memory, m), -1);
+
+        // add_row で行を追加（line_pos 0,1,2）
+        if(QS_SYSTEM_OK != qs_csv_add_row(memory, m, 0, "a")){ g_fail++; }
+        if(QS_SYSTEM_OK != qs_csv_add_row(memory, m, 1, "b")){ g_fail++; }
+        if(QS_SYSTEM_OK != qs_csv_add_row(memory, m, 2, "c")){ g_pass++; }
+        check_int("csv_add_row: line count", qs_csv_get_line_length(memory, m), 3);
+        check_str("csv_add_row: [0][0] (leading empty)", qs_csv_get_row(memory, m, 0, 0), "");
+        check_str("csv_add_row: [1][0]", qs_csv_get_row(memory, m, 1, 0), "a");
+        check_str("csv_add_row: [2][0]", qs_csv_get_row(memory, m, 2, 0), "c");
+
+        // add_row で既存行に列を追加
+        if(QS_SYSTEM_OK != qs_csv_add_row(memory, m, 0, "a2")){ g_fail++; }
+        check_int("csv_add_row: row count [0]", qs_csv_get_row_length(memory, m, 0), 2);
+        check_str("csv_add_row: [0][1]", qs_csv_get_row(memory, m, 0, 1), "a2");
+
+        // add_line で行を追加
+        int32_t arr = -1;
+        if(-1==qs_array_push_string(memory, &arr, "x")){ g_fail++; }
+        if(-1==qs_array_push_string(memory, &arr, "y")){ g_fail++; }
+        if(0 != qs_csv_add_line(memory, m, arr)){ g_fail++; }
+        check_int("csv_add_line: line count", qs_csv_get_line_length(memory, m), 4);
+        check_int("csv_add_line: row count [3]", qs_csv_get_row_length(memory, m, 3), 2);
+        check_str("csv_add_line: [3][1]", qs_csv_get_row(memory, m, 3, 1), "y");
+
+        // build_csv で文字列化
+        char* built = qs_csv_build_csv(memory, m, 1024);
+        check_str("csv_init build_csv", built, "\"\",\"a2\"\n\"a\",\"b\"\n\"c\"\n\"x\",\"y\"");
+    }
+
+    /* --- 13. qs_csv_build_csv_memid --- */
+    {
+        int32_t m = qs_csv_parse(memory, "a,1\nb,2");
+        int32_t memid_str = qs_csv_build_csv_memid(memory, m, 1024);
+        check_int("build_csv_memid: memid valid", (memid_str >= 0) ? 1 : 0, 1);
+        char* str = (char*)QS_GET_POINTER(memory, memid_str);
+        check_str("build_csv_memid: content", str, "\"a\",1\n\"b\",2");
+        // build_csv と同じ内容になること
+        char* built = qs_csv_build_csv(memory, m, 1024);
+        check_str("build_csv_memid: same as build_csv", str, built);
+    }
+
+    printf("\n=== csv_lowlevel_test summary ===\n");
+    printf("pass: %d, fail: %d\n", g_pass, g_fail);
 
     qs_free(memory);
     return (g_fail == 0) ? 0 : 1;

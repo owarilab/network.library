@@ -1,11 +1,8 @@
 array/qs_array
-cache/qs_cache
-cache_api/qs_cache_api
 client/qs_client
 client_plain/qs_client_plane
 client_printer/qs_client
 client_simple/qs_simple_client
-csv/qs_csv
 encode/qs_base64
 hash/qs_hash
 http_client/qs_http_client
@@ -18,7 +15,6 @@ llm_http_stream/qs_llm_http_stream_server
 logger/qs_logger
 persistence_cache/qs_persistence_cache
 qs_tool_server/qs_tool_server
-queue/qs_queue
 ranking/qs_ranking
 script/qs_script
 server/qs_server

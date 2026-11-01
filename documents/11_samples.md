@@ -11,14 +11,12 @@
 
 ### データ処理
 - JSON: [sample/json/main.c](sample/json/main.c)
-- CSV: [sample/csv/main.c](sample/csv/main.c)
 - Base64/SHA1: [sample/encode/main.c](sample/encode/main.c)
 
 ### メモリ
 - メモリアロケーター挙動テスト: [sample/memory_allocator_test/main.c](sample/memory_allocator_test/main.c)
 
 ### KVS
-- メモリ KVS: [sample/cache/main.c](sample/cache/main.c)
 - 永続化 KVS: [sample/persistence_cache/main.c](sample/persistence_cache/main.c)
 
 ### スクリプト
@@ -48,6 +46,10 @@
 | [test/script_argv_test/](test/script_argv_test/) | Script 引数API | スクリプト実行時の引数処理 |
 | [test/ranking_ext_test/](test/ranking_ext_test/) | ランキング拡張API | ランキング登録・取得・更新 |
 | [test/kvs_ext_test/](test/kvs_ext_test/) | KVS 拡張API（`api_qs_kvs_keys` 等） | キー列挙・ソートキー |
+| [test/kvs_create_test/](test/kvs_create_test/) | `api_qs_kvs_create_b*mb`（全9サイズ） | 作成・set/get/delete・key_length・sorted_keys 件数 |
+| [test/kvs_stress_test/](test/kvs_stress_test/) | `api_qs_kvs_create_b1mb`（100万件投入） | LRU 退避後の key_length・sorted_keys 一致・get ラウンドトリップ |
+| [test/csv_lowlevel_test/](test/csv_lowlevel_test/) | `qs_csv_*`（低レベル版） | file_load/parse/build_csv(_memid)/init/add_row/add_line・エッジケース |
+| [test/queue_test/](test/queue_test/) | `qs_create_queue` / `qs_enqueue` / `qs_safe_enqueue` / `qs_dequeue` / `qs_read_queue` | 空キュー・チャンク読み込み・満杯上書き・複数キュー |
 | [test/static_file_test/](test/static_file_test/) | 静的ファイル配信（`http_request_common`） | Content-Type・キャッシュ制御・304 Not Modified |
 | [test/base64_test/](test/base64_test/) | `qs_base64` 系 | Base64 エンコード/デコード（Python で検証） |
 | [test/websocket_protocol_test/](test/websocket_protocol_test/) | WebSocket フレーム処理 | フレーム構築・マスク・opcode |
