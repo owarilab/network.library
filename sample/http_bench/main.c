@@ -45,6 +45,7 @@ typedef struct
 {
     long completed;        /* レスポンスを受信したリクエスト数 */
     long failed;           /* 接続エラー等でレスポンス未取得 */
+    long finished;         /* 完了数（completed + failed） */
     long non_2xx;          /* 2xx 以外のレスポンス */
     long non_404;          /* 404 以外のレスポンス */
     long status_200;
@@ -119,6 +120,7 @@ static void finish_request(WORKER* w, STATS* stats)
 
     if(header != NULL && status_code > 0){
         stats->completed++;
+        stats->finished++;
         if(status_code >= 200 && status_code < 300){
             stats->status_200++;
         }else if(status_code == 404){
@@ -143,10 +145,57 @@ static void finish_request(WORKER* w, STATS* stats)
         }
     }else{
         stats->failed++;
+        stats->finished++;
     }
 
     qs_ssl_module_http_client_free(&w->ctx);
     w->state = WORKER_STATE_IDLE;
+}
+
+/* 進捗表示（1秒ごとに 2 行を上書き更新。バー行＋統計行） */
+#define PROGRESS_BAR_WIDTH 30
+static int progress_initialized = 0;
+
+static void print_progress(long finished, long total, const STATS* stats, double elapsed_sec)
+{
+    long pct = (total > 0) ? (finished * 100) / total : 100;
+    double rps = (elapsed_sec > 0.0) ? (double)stats->completed / elapsed_sec : 0.0;
+    int filled = (int)((double)pct / 100.0 * (double)PROGRESS_BAR_WIDTH);
+    if(filled > PROGRESS_BAR_WIDTH) filled = PROGRESS_BAR_WIDTH;
+    if(filled < 0) filled = 0;
+
+    char line[512];
+    int pos = 0;
+
+    /* 初回は行頭へ、それ以外は 1 行上へカーソル移動 */
+    if(!progress_initialized){
+        pos += snprintf(line + pos, sizeof(line) - (size_t)pos, "\r");
+        progress_initialized = 1;
+    }else{
+        pos += snprintf(line + pos, sizeof(line) - (size_t)pos, "\r\033[1A\r");
+    }
+
+    /* バー行: [████████░░░░░░░░░░░░░░░░░░░░░░░░]  50%  5000/10000 */
+    pos += snprintf(line + pos, sizeof(line) - (size_t)pos, "[\033[32m");
+    for(int i = 0; i < filled; i++){
+        pos += snprintf(line + pos, sizeof(line) - (size_t)pos, "\xe2\x96\x88"); /* █ */
+    }
+    for(int i = filled; i < PROGRESS_BAR_WIDTH; i++){
+        pos += snprintf(line + pos, sizeof(line) - (size_t)pos, "\xe2\x96\x91"); /* ░ */
+    }
+    pos += snprintf(line + pos, sizeof(line) - (size_t)pos,
+        "\033[0m] \033[32m%3ld%%\033[0m %6ld/%-6ld\n",
+        pct, finished, total);
+
+    /* 統計行 */
+    pos += snprintf(line + pos, sizeof(line) - (size_t)pos,
+        "     completed=%-6ld failed=%-4ld elapsed=%8.2fs RPS=%8.2f",
+        stats->completed, stats->failed, elapsed_sec, rps);
+
+    if(pos > 0){
+        fwrite(line, 1, (size_t)pos, stdout);
+    }
+    fflush(stdout);
 }
 
 static void print_result(const CONFIG* cfg, const STATS* stats, double elapsed_sec, int timed_out)
@@ -232,6 +281,7 @@ int main(int argc, char *argv[], char *envp[])
 
     long remaining = cfg.total_requests;  /* 未開始 */
     long in_flight = 0;                   /* 開始済み・未完了 */
+    double last_progress_ms = -1000.0;    /* 前回進捗表示時刻（初回は即表示） */
     int  timed_out = 0;
     double start = now_ms();
 
@@ -253,6 +303,7 @@ int main(int argc, char *argv[], char *envp[])
                     in_flight++;
                 }else{
                     stats.failed++;
+                    stats.finished++;
                     remaining--;
                 }
             }
@@ -266,6 +317,15 @@ int main(int argc, char *argv[], char *envp[])
                     finish_request(&workers[i], &stats);
                     in_flight--;
                 }
+            }
+        }
+
+        /* 進捗表示（1秒ごとにバー行＋統計行を上書き更新） */
+        {
+            double now = now_ms();
+            if(now - last_progress_ms >= 1000.0){
+                print_progress(stats.finished, cfg.total_requests, &stats, (now - start) / 1000.0);
+                last_progress_ms = now;
             }
         }
 
@@ -289,6 +349,10 @@ int main(int argc, char *argv[], char *envp[])
         }
     }
     free(workers);
+
+    if(last_progress_ms >= 0.0){
+        printf("\n");  /* 進捗行の改行 */
+    }
 
     print_result(&cfg, &stats, elapsed_sec, timed_out);
     return 0;
