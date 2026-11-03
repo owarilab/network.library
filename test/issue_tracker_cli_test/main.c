@@ -9,8 +9,25 @@
 #include <unistd.h>
 #include <limits.h>
 
+#include "qs_random.h"
+
 static int pass_count = 0;
 static int fail_count = 0;
+
+/* 断片化テスト用: ランダム文字列のタイトルを生成する */
+static void frag_random_title(char* buf, size_t buf_size)
+{
+    size_t len = 1 + (size_t)(qs_rand_32() % 250);
+    if (len >= buf_size) {
+        len = buf_size - 1;
+    }
+    const char* chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    size_t i;
+    for (i = 0; i < len; i++) {
+        buf[i] = chars[qs_rand_32() % 62];
+    }
+    buf[len] = '\0';
+}
 
 static int run_cmd(const char* cmd)
 {
@@ -470,6 +487,321 @@ int main(void)
 
     snprintf(cmd, sizeof(cmd), "rm -rf \"%s\"", data_dir);
     check_exit("cleanup after test", 0, cmd);
+
+    /* --- stress test: 500 issues --- */
+    char stress_dir[PATH_MAX];
+    if (strlen(cwd) + strlen("/tmp_issue_stress_data") + 1 >= sizeof(stress_dir)) {
+        printf("[FAIL] stress_dir path too long\n");
+        return 1;
+    }
+    strcpy(stress_dir, cwd);
+    strcat(stress_dir, "/tmp_issue_stress_data");
+
+    snprintf(cmd, sizeof(cmd), "rm -rf \"%s\"", stress_dir);
+    check_exit("stress: cleanup before", 0, cmd);
+
+    snprintf(cmd, sizeof(cmd), "%s init --base-dir \"%s\" >/dev/null", cli_bin, stress_dir);
+    check_exit("stress: init", 0, cmd);
+
+    snprintf(cmd, sizeof(cmd),
+        "%s user create --base-dir \"%s\" --id su1 --json '{\"id\":\"su1\",\"name\":\"stress\"}' >/dev/null",
+        cli_bin, stress_dir);
+    check_exit("stress: user create", 0, cmd);
+
+    snprintf(cmd, sizeof(cmd),
+        "%s label create --base-dir \"%s\" --id sl1 --json '{\"id\":\"sl1\",\"name\":\"Stress\"}' >/dev/null",
+        cli_bin, stress_dir);
+    check_exit("stress: label create", 0, cmd);
+
+    /* 500 issues via shell loop */
+    snprintf(cmd, sizeof(cmd),
+        "for i in $(seq 1 500); do "
+        "%s issue create --base-dir \"%s\" "
+        "--json \"{\\\"title\\\":\\\"stress_$i\\\",\\\"status\\\":\\\"open\\\",\\\"assigneeIds\\\":[\\\"su1\\\"],\\\"labelIds\\\":[\\\"sl1\\\"]}\" "
+        ">/dev/null 2>&1 || exit 1; done",
+        cli_bin, stress_dir);
+    check_exit("stress: create 500 issues", 0, cmd);
+
+    snprintf(cmd, sizeof(cmd),
+        "%s verify --base-dir \"%s\" | grep -q 'verify: ok'",
+        cli_bin, stress_dir);
+    check_exit("stress: verify ok after 500 issues", 0, cmd);
+
+    snprintf(cmd, sizeof(cmd),
+        "%s reindex --base-dir \"%s\" | grep -q 'reindex: rebuilt index from 500 issues'",
+        cli_bin, stress_dir);
+    check_exit("stress: reindex 500 issues", 0, cmd);
+
+    snprintf(cmd, sizeof(cmd),
+        "%s verify --base-dir \"%s\" | grep -q 'verify: ok'",
+        cli_bin, stress_dir);
+    check_exit("stress: verify ok after reindex", 0, cmd);
+
+    snprintf(cmd, sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --status open | grep -c '\"id\"' | grep -q '500'",
+        cli_bin, stress_dir);
+    check_exit("stress: list 500 by status", 0, cmd);
+
+    snprintf(cmd, sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --assignee su1 | grep -c '\"id\"' | grep -q '500'",
+        cli_bin, stress_dir);
+    check_exit("stress: list 500 by assignee", 0, cmd);
+
+    snprintf(cmd, sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --label sl1 | grep -c '\"id\"' | grep -q '500'",
+        cli_bin, stress_dir);
+    check_exit("stress: list 500 by label", 0, cmd);
+
+    snprintf(cmd, sizeof(cmd), "rm -rf \"%s\"", stress_dir);
+    check_exit("stress: cleanup after", 0, cmd);
+
+    /* --- fragmentation test: random create/update/delete --- */
+    char frag_dir[PATH_MAX];
+    if (strlen(cwd) + strlen("/tmp_issue_frag_data") + 1 >= sizeof(frag_dir)) {
+        printf("[FAIL] frag_dir path too long\n");
+        return 1;
+    }
+    strcpy(frag_dir, cwd);
+    strcat(frag_dir, "/tmp_issue_frag_data");
+
+    snprintf(cmd, sizeof(cmd), "rm -rf \"%s\"", frag_dir);
+    check_exit("frag: cleanup before", 0, cmd);
+
+    snprintf(cmd, sizeof(cmd), "%s init --base-dir \"%s\" >/dev/null", cli_bin, frag_dir);
+    check_exit("frag: init", 0, cmd);
+
+    snprintf(cmd, sizeof(cmd),
+        "%s user create --base-dir \"%s\" --id fu1 --json '{\"id\":\"fu1\",\"name\":\"frag\"}' >/dev/null",
+        cli_bin, frag_dir);
+    check_exit("frag: user create", 0, cmd);
+
+    snprintf(cmd, sizeof(cmd),
+        "%s label create --base-dir \"%s\" --id fl1 --json '{\"id\":\"fl1\",\"name\":\"Frag\"}' >/dev/null",
+        cli_bin, frag_dir);
+    check_exit("frag: label create", 0, cmd);
+
+    qs_srand_32();
+
+    const char* frag_id_file = "/tmp/frag_random_id.txt";
+    const char* frag_log_file = "/tmp/frag_debug.log";
+    FILE* frag_log = fopen(frag_log_file, "w");
+    if (frag_log) {
+        fprintf(frag_log, "frag debug log: seed=%u\n", qs_xorshift_32_seed);
+    }
+
+    int frag_ops = 2000;
+    int frag_errors = 0;
+    int frag_creates = 0, frag_updates = 0, frag_deletes = 0;
+    int frag_first_fail_iter = -1;
+    int iter;
+    for (iter = 0; iter < frag_ops; iter++) {
+        uint32_t action = qs_rand_32() % 100;
+        char title[256];
+        frag_random_title(title, sizeof(title));
+        int rc = 0;
+        const char* action_name = "create";
+        char target_id[128] = "";
+
+        if (action < 40) {
+            /* create */
+            snprintf(cmd, sizeof(cmd),
+                "%s issue create --base-dir \"%s\" "
+                "--json '{\"title\":\"%s\",\"status\":\"open\",\"assigneeIds\":[\"fu1\"],\"labelIds\":[\"fl1\"]}' "
+                ">/dev/null 2>&1",
+                cli_bin, frag_dir, title);
+            rc = run_cmd(cmd);
+            if (rc != 0) frag_errors++;
+            else frag_creates++;
+        } else if (action < 70) {
+            /* update: pick random existing issue */
+            action_name = "update";
+            snprintf(cmd, sizeof(cmd),
+                "%s issue list --base-dir \"%s\" 2>/dev/null > \"%s\"",
+                cli_bin, frag_dir, frag_id_file);
+            run_cmd(cmd);
+            FILE* f = fopen(frag_id_file, "r");
+            if (f) {
+                char line[2048];
+                char ids[1024][64];
+                int id_count = 0;
+                while (fgets(line, sizeof(line), f) && id_count < 1024) {
+                    char* id_start = strstr(line, "\"id\":\"");
+                    if (id_start) {
+                        id_start += strlen("\"id\":\"");
+                        char* id_end = strchr(id_start, '\"');
+                        if (id_end && (size_t)(id_end - id_start) < sizeof(ids[0])) {
+                            size_t id_size = (size_t)(id_end - id_start);
+                            memcpy(ids[id_count], id_start, id_size);
+                            ids[id_count][id_size] = '\0';
+                            id_count++;
+                        }
+                    }
+                }
+                fclose(f);
+                if (id_count > 0) {
+                    snprintf(target_id, sizeof(target_id), "%s", ids[qs_rand_32() % id_count]);
+                }
+            }
+            if (target_id[0] != '\0') {
+                snprintf(cmd, sizeof(cmd),
+                    "%s issue update --base-dir \"%s\" --id \"%s\" "
+                    "--json '{\"id\":\"%s\",\"title\":\"%s\",\"status\":\"open\",\"assigneeIds\":[\"fu1\"],\"labelIds\":[\"fl1\"]}' >/dev/null 2>&1",
+                    cli_bin, frag_dir, target_id, target_id, title);
+                rc = run_cmd(cmd);
+                if (rc != 0) frag_errors++;
+                else frag_updates++;
+            } else {
+                action_name = "create_fallback";
+                snprintf(cmd, sizeof(cmd),
+                    "%s issue create --base-dir \"%s\" "
+                    "--json '{\"title\":\"%s\",\"status\":\"open\"}' >/dev/null 2>&1",
+                    cli_bin, frag_dir, title);
+                rc = run_cmd(cmd);
+                if (rc != 0) frag_errors++;
+                else frag_creates++;
+            }
+        } else {
+            /* delete: pick random existing issue, delete if exists else create */
+            action_name = "delete";
+            snprintf(cmd, sizeof(cmd),
+                "%s issue list --base-dir \"%s\" 2>/dev/null > \"%s\"",
+                cli_bin, frag_dir, frag_id_file);
+            run_cmd(cmd);
+            FILE* f = fopen(frag_id_file, "r");
+            if (f) {
+                char line[2048];
+                char ids[1024][64];
+                int id_count = 0;
+                while (fgets(line, sizeof(line), f) && id_count < 1024) {
+                    char* id_start = strstr(line, "\"id\":\"");
+                    if (id_start) {
+                        id_start += strlen("\"id\":\"");
+                        char* id_end = strchr(id_start, '\"');
+                        if (id_end && (size_t)(id_end - id_start) < sizeof(ids[0])) {
+                            size_t id_size = (size_t)(id_end - id_start);
+                            memcpy(ids[id_count], id_start, id_size);
+                            ids[id_count][id_size] = '\0';
+                            id_count++;
+                        }
+                    }
+                }
+                fclose(f);
+                if (id_count > 0) {
+                    snprintf(target_id, sizeof(target_id), "%s", ids[qs_rand_32() % id_count]);
+                }
+            }
+            if (target_id[0] != '\0') {
+                snprintf(cmd, sizeof(cmd),
+                    "%s issue delete --base-dir \"%s\" --id \"%s\" >/dev/null 2>&1",
+                    cli_bin, frag_dir, target_id);
+                rc = run_cmd(cmd);
+                if (rc != 0) frag_errors++;
+                else frag_deletes++;
+            } else {
+                action_name = "create_fallback";
+                snprintf(cmd, sizeof(cmd),
+                    "%s issue create --base-dir \"%s\" "
+                    "--json '{\"title\":\"%s\",\"status\":\"open\"}' >/dev/null 2>&1",
+                    cli_bin, frag_dir, title);
+                rc = run_cmd(cmd);
+                if (rc != 0) frag_errors++;
+                else frag_creates++;
+            }
+        }
+
+        /* log failed operations */
+        if (rc != 0 && frag_log) {
+            fprintf(frag_log, "iter=%d action=%s id=%s rc=%d title=%.40s\n",
+                iter, action_name, target_id, rc, title);
+        }
+
+        /* periodic verify every 500 ops to find when inconsistency appears */
+        if ((iter + 1) % 500 == 0) {
+            char vfile[256];
+            snprintf(vfile, sizeof(vfile), "/tmp/frag_verify_%d.txt", iter + 1);
+            snprintf(cmd, sizeof(cmd),
+                "%s verify --base-dir \"%s\" > \"%s\" 2>&1",
+                cli_bin, frag_dir, vfile);
+            run_cmd(cmd);
+            snprintf(cmd, sizeof(cmd), "grep -q 'verify: ok' \"%s\"", vfile);
+            int vrc = run_cmd(cmd);
+            if (frag_log) {
+                fprintf(frag_log, "periodic_verify iter=%d rc=%d\n", iter + 1, vrc);
+            }
+            if (vrc != 0 && frag_first_fail_iter < 0) {
+                frag_first_fail_iter = iter + 1;
+                if (frag_log) {
+                    fprintf(frag_log, "FIRST INCONSISTENCY at iter=%d\n", iter + 1);
+                }
+                /* keep the first failing verify output for inspection */
+                char keep_file[256];
+                snprintf(keep_file, sizeof(keep_file), "/tmp/frag_verify_firstfail.txt");
+                rename(vfile, keep_file);
+                if (frag_log) {
+                    fprintf(frag_log, "kept verify output: %s\n", keep_file);
+                }
+            } else {
+                unlink(vfile);
+            }
+        }
+    }
+
+    if (frag_log) {
+        fclose(frag_log);
+    }
+
+    printf("frag: ops=%d creates=%d updates=%d deletes=%d errors=%d first_inconsistency=%d\n",
+        frag_ops, frag_creates, frag_updates, frag_deletes, frag_errors, frag_first_fail_iter);
+
+    /* save full verify output for inspection */
+    snprintf(cmd, sizeof(cmd),
+        "%s verify --base-dir \"%s\" > /tmp/frag_verify_final.txt 2>&1",
+        cli_bin, frag_dir);
+    run_cmd(cmd);
+    printf("frag: verify output saved to /tmp/frag_verify_final.txt\n");
+
+    snprintf(cmd, sizeof(cmd), "%s compact --base-dir \"%s\" --store all >/dev/null", cli_bin, frag_dir);
+    check_exit("frag: compact all", 0, cmd);
+
+    snprintf(cmd, sizeof(cmd),
+        "%s verify --base-dir \"%s\" > /tmp/frag_verify_postcompact.txt 2>&1",
+        cli_bin, frag_dir);
+    run_cmd(cmd);
+
+    snprintf(cmd, sizeof(cmd),
+        "grep -q 'verify: ok' /tmp/frag_verify_postcompact.txt");
+    check_exit("frag: verify ok after fragmentation", 0, cmd);
+
+    snprintf(cmd, sizeof(cmd),
+        "%s reindex --base-dir \"%s\" | grep -q 'reindex: rebuilt index'",
+        cli_bin, frag_dir);
+    check_exit("frag: reindex after fragmentation", 0, cmd);
+
+    snprintf(cmd, sizeof(cmd),
+        "%s verify --base-dir \"%s\" | grep -q 'verify: ok'",
+        cli_bin, frag_dir);
+    check_exit("frag: verify ok after reindex", 0, cmd);
+
+    snprintf(cmd, sizeof(cmd),
+        "%s issue list --base-dir \"%s\" | grep -c '\"id\"' | grep -q '[0-9]'",
+        cli_bin, frag_dir);
+    check_exit("frag: issue list works", 0, cmd);
+
+    unlink(frag_id_file);
+    if (fail_count > 0) {
+        printf("frag: data dir kept for inspection: %s\n", frag_dir);
+        printf("frag: debug log kept: %s\n", frag_log_file);
+        printf("frag: verify output kept: /tmp/frag_verify_final.txt\n");
+        printf("frag: post-compact verify kept: /tmp/frag_verify_postcompact.txt\n");
+        printf("frag: first-fail verify kept: /tmp/frag_verify_firstfail.txt\n");
+    } else {
+        unlink(frag_log_file);
+        unlink("/tmp/frag_verify_final.txt");
+        unlink("/tmp/frag_verify_postcompact.txt");
+        unlink("/tmp/frag_verify_firstfail.txt");
+        snprintf(cmd, sizeof(cmd), "rm -rf \"%s\"", frag_dir);
+        check_exit("frag: cleanup after", 0, cmd);
+    }
 
     printf("\nresult: pass=%d fail=%d\n", pass_count, fail_count);
     return (fail_count == 0) ? 0 : 1;

@@ -1,15 +1,20 @@
 PROGRAM = issue_tracker_cli_test
 CC      = gcc
-CFLAG   = -Wall -O
+CFLAG   = -pthread -Wall -O
+INCDIR  = -I ../../core/header
+LIBA    = ../../core/libqs_core.a
 OBJS    = main.o
 
 build: $(PROGRAM)
 
-$(PROGRAM): $(OBJS)
-	$(CC) $(CFLAG) -o $(PROGRAM) $(OBJS)
+$(LIBA):
+	cd ../../core/src && make
+
+$(PROGRAM): $(OBJS) $(LIBA)
+	$(CC) $(CFLAG) -o $(PROGRAM) $(OBJS) $(LIBA)
 
 main.o: main.c
-	$(CC) $(CFLAG) -c main.c -o main.o
+	$(CC) $(CFLAG) $(INCDIR) -c main.c -o main.o
 
 .PHONY: clean
 clean:

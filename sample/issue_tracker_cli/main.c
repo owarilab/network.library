@@ -1766,6 +1766,7 @@ static int cb_verify_status(const char* value, void* user_data)
     INDEX_SCAN_DATA* d = (INDEX_SCAN_DATA*)user_data;
     char key[1024];
     if (snprintf(key, sizeof(key), "index:status:%s", value) <= 0) {
+        fprintf(stderr, "verify: error: status key too long: %s\n", value);
         return -1;
     }
     char* ids_json = api_qs_kvs_get(&d->stores->index, key);
@@ -1776,6 +1777,7 @@ static int cb_verify_status(const char* value, void* user_data)
     }
     QS_MEMORY_CONTEXT context;
     if (create_temp_memory(&context, 1024 * 1024) != 0) {
+        fprintf(stderr, "verify: error: temp memory alloc failed for %s\n", key);
         return -1;
     }
     QS_JSON_ELEMENT_ARRAY ids;
@@ -1797,6 +1799,7 @@ static int cb_verify_assignee(const char* value, void* user_data)
     INDEX_SCAN_DATA* d = (INDEX_SCAN_DATA*)user_data;
     char key[1024];
     if (snprintf(key, sizeof(key), "index:assignee:%s", value) <= 0) {
+        fprintf(stderr, "verify: error: assignee key too long: %s\n", value);
         return -1;
     }
     char* ids_json = api_qs_kvs_get(&d->stores->index, key);
@@ -1807,6 +1810,7 @@ static int cb_verify_assignee(const char* value, void* user_data)
     }
     QS_MEMORY_CONTEXT context;
     if (create_temp_memory(&context, 1024 * 1024) != 0) {
+        fprintf(stderr, "verify: error: temp memory alloc failed for %s\n", key);
         return -1;
     }
     QS_JSON_ELEMENT_ARRAY ids;
@@ -1828,6 +1832,7 @@ static int cb_verify_label(const char* value, void* user_data)
     INDEX_SCAN_DATA* d = (INDEX_SCAN_DATA*)user_data;
     char key[1024];
     if (snprintf(key, sizeof(key), "index:label:%s", value) <= 0) {
+        fprintf(stderr, "verify: error: label key too long: %s\n", value);
         return -1;
     }
     char* ids_json = api_qs_kvs_get(&d->stores->index, key);
@@ -1838,6 +1843,7 @@ static int cb_verify_label(const char* value, void* user_data)
     }
     QS_MEMORY_CONTEXT context;
     if (create_temp_memory(&context, 1024 * 1024) != 0) {
+        fprintf(stderr, "verify: error: temp memory alloc failed for %s\n", key);
         return -1;
     }
     QS_JSON_ELEMENT_ARRAY ids;
@@ -1867,6 +1873,7 @@ static int verify_issue_against_index(APP_STORES* stores, const char* issue_id, 
 
     QS_JSON_ELEMENT_OBJECT obj;
     if (-1 == api_qs_json_decode_object(&context, &obj, issue_json)) {
+        fprintf(stderr, "verify: error: failed to decode issue json: %s\n", issue_id);
         api_qs_memory_free(&context);
         return -1;
     }
@@ -1874,6 +1881,7 @@ static int verify_issue_against_index(APP_STORES* stores, const char* issue_id, 
     char* status = api_qs_object_get_string(&obj, "status");
     if (status != NULL) {
         if (cb_verify_status(status, data) != 0) {
+            fprintf(stderr, "verify: error: cb_verify_status failed for issue=%s status=%s\n", issue_id, status);
             api_qs_memory_free(&context);
             return -1;
         }
@@ -1882,6 +1890,7 @@ static int verify_issue_against_index(APP_STORES* stores, const char* issue_id, 
     QS_JSON_ELEMENT_ARRAY assignee_ids;
     if (api_qs_object_get_array(&obj, "assigneeIds", &assignee_ids) == 0) {
         if (for_each_string_in_array(&assignee_ids, cb_verify_assignee, data) != 0) {
+            fprintf(stderr, "verify: error: cb_verify_assignee failed for issue=%s\n", issue_id);
             api_qs_memory_free(&context);
             return -1;
         }
@@ -1890,6 +1899,7 @@ static int verify_issue_against_index(APP_STORES* stores, const char* issue_id, 
     QS_JSON_ELEMENT_ARRAY label_ids;
     if (api_qs_object_get_array(&obj, "labelIds", &label_ids) == 0) {
         if (for_each_string_in_array(&label_ids, cb_verify_label, data) != 0) {
+            fprintf(stderr, "verify: error: cb_verify_label failed for issue=%s\n", issue_id);
             api_qs_memory_free(&context);
             return -1;
         }
@@ -1908,10 +1918,12 @@ static int verify_index_against_issues(APP_STORES* stores, INDEX_SCAN_DATA* data
 
     QS_JSON_ELEMENT_ARRAY keys;
     if (-1 == api_qs_array_create(&temp, &keys)) {
+        fprintf(stderr, "verify: error: failed to create array for index keys\n");
         api_qs_memory_free(&temp);
         return -1;
     }
     if (-1 == api_qs_kvs_sorted_keys(&keys, &stores->index, 1)) {
+        fprintf(stderr, "verify: error: failed to list index keys\n");
         api_qs_memory_free(&temp);
         return -1;
     }
@@ -1953,6 +1965,7 @@ static int verify_index_against_issues(APP_STORES* stores, INDEX_SCAN_DATA* data
             }
             QS_MEMORY_CONTEXT issue_context;
             if (create_temp_memory(&issue_context, 1024 * 1024) != 0) {
+                fprintf(stderr, "verify: error: failed to alloc temp memory for issue=%s in index=%s\n", issue_id, key);
                 api_qs_memory_free(&temp);
                 return -1;
             }
@@ -2038,6 +2051,7 @@ static int command_verify(int argc, char* argv[])
         return EXIT_IO;
     }
     if (-1 == api_qs_kvs_sorted_keys(&keys, &stores.issue, 1)) {
+        fprintf(stderr, "verify: error: failed to list issue keys\n");
         api_qs_memory_free(&temp);
         close_all_stores(&stores);
         return EXIT_KVS;
@@ -2057,6 +2071,7 @@ static int command_verify(int argc, char* argv[])
         }
         data.issue_count++;
         if (verify_issue_against_index(&stores, key + strlen("issue:"), issue_json, &data) != 0) {
+            fprintf(stderr, "verify: error: failed to verify issue: %s\n", key);
             api_qs_memory_free(&temp);
             close_all_stores(&stores);
             return EXIT_KVS;
@@ -2064,6 +2079,7 @@ static int command_verify(int argc, char* argv[])
     }
 
     if (verify_index_against_issues(&stores, &data) != 0) {
+        fprintf(stderr, "verify: error: failed to verify index against issues\n");
         api_qs_memory_free(&temp);
         close_all_stores(&stores);
         return EXIT_KVS;
