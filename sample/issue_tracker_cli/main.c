@@ -88,7 +88,7 @@ static void print_usage(const char* program_name)
     printf("  %s label <create|get|update|delete|unset> --id <id> [--json <json>] [--field <name>] [--base-dir <dir>]\n", program_name);
     printf("  %s label list [--base-dir <dir>]\n", program_name);
     printf("  %s issue <create|get|update|delete|unset> --id <id> [--json <json>] [--field <name>] [--base-dir <dir>]\n", program_name);
-    printf("  %s issue list [--status <status> | --assignee <userId> | --label <label>] [--base-dir <dir>]\n", program_name);
+    printf("  %s issue list [--status <status> | --assignee <userId> | --label <label>] [--scan index|full] [--base-dir <dir>]\n", program_name);
     printf("  %s reindex [--base-dir <dir>]\n", program_name);
     printf("  %s verify  [--base-dir <dir>]\n", program_name);
     printf("  %s schema <list|get> [--entity user|label|issue] [--base-dir <dir>]\n", program_name);
@@ -1633,6 +1633,87 @@ static int issue_list_by_index(APP_STORES* stores, const char* index_key)
     return rc;
 }
 
+static int issue_list_full_scan(APP_STORES* stores, const char* status, const char* assignee, const char* label)
+{
+    QS_MEMORY_CONTEXT temp;
+    if (create_temp_memory(&temp, 4 * 1024 * 1024) != 0) {
+        return EXIT_IO;
+    }
+
+    QS_JSON_ELEMENT_ARRAY keys;
+    if (-1 == api_qs_array_create(&temp, &keys)) {
+        api_qs_memory_free(&temp);
+        return EXIT_IO;
+    }
+    if (-1 == api_qs_kvs_sorted_keys(&keys, &stores->issue, 1)) {
+        api_qs_memory_free(&temp);
+        return EXIT_KVS;
+    }
+
+    int32_t len = api_qs_array_get_length(&keys);
+    int32_t i;
+    int printed = 0;
+    printf("[\n");
+    for (i = 0; i < len; i++) {
+        char* key = api_qs_array_get_string(&keys, i);
+        char* issue_json;
+        if (key == NULL || strncmp(key, "issue:", 6) != 0) {
+            continue;
+        }
+        issue_json = api_qs_kvs_get(&stores->issue, key);
+        if (issue_json == NULL) {
+            continue;
+        }
+
+        if (status != NULL || assignee != NULL || label != NULL) {
+            QS_MEMORY_CONTEXT issue_ctx;
+            if (create_temp_memory(&issue_ctx, 1024 * 1024) != 0) {
+                api_qs_memory_free(&temp);
+                return EXIT_IO;
+            }
+            QS_JSON_ELEMENT_OBJECT obj;
+            if (-1 == api_qs_json_decode_object(&issue_ctx, &obj, issue_json)) {
+                api_qs_memory_free(&issue_ctx);
+                api_qs_memory_free(&temp);
+                return EXIT_KVS;
+            }
+            int match = 1;
+            if (status != NULL) {
+                char* s = api_qs_object_get_string(&obj, "status");
+                match = (s != NULL && strcmp(s, status) == 0);
+            }
+            if (match && assignee != NULL) {
+                QS_JSON_ELEMENT_ARRAY arr;
+                match = 0;
+                if (api_qs_object_get_array(&obj, "assigneeIds", &arr) == 0) {
+                    match = array_has_string(&arr, assignee);
+                }
+            }
+            if (match && label != NULL) {
+                QS_JSON_ELEMENT_ARRAY arr;
+                match = 0;
+                if (api_qs_object_get_array(&obj, "labelIds", &arr) == 0) {
+                    match = array_has_string(&arr, label);
+                }
+            }
+            api_qs_memory_free(&issue_ctx);
+            if (!match) {
+                continue;
+            }
+        }
+
+        if (printed > 0) {
+            printf(",\n");
+        }
+        printf("%s", issue_json);
+        printed++;
+    }
+    printf("\n]\n");
+
+    api_qs_memory_free(&temp);
+    return EXIT_OK;
+}
+
 static int copy_store_data(QS_KVS_CONTEXT* src, QS_KVS_CONTEXT* dst)
 {
     QS_MEMORY_CONTEXT temp;
@@ -2520,8 +2601,17 @@ static int command_issue(int argc, char* argv[], APP_STORES* stores)
         const char* status = get_option_value(argc, argv, "--status");
         const char* assignee = get_option_value(argc, argv, "--assignee");
         const char* label = get_option_value(argc, argv, "--label");
+        const char* scan = get_option_value(argc, argv, "--scan");
         int filters = (status != NULL) + (assignee != NULL) + (label != NULL);
         char index_key[1024];
+
+        if (scan != NULL && strcmp(scan, "full") == 0) {
+            return issue_list_full_scan(stores, status, assignee, label);
+        }
+        if (scan != NULL && strcmp(scan, "index") != 0) {
+            fprintf(stderr, "error: invalid --scan value: %s (use index or full)\n", scan);
+            return EXIT_USAGE;
+        }
 
         if (filters == 0) {
             return issue_list_all(stores);

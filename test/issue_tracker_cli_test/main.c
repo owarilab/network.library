@@ -434,6 +434,64 @@ int main(void)
     );
     check_exit("issue list by assignee index", 0, cmd);
 
+    /* full scan: same results as index scan */
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --status in_progress --scan full | grep -q '\"id\":\"iss1\"'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue list by status full scan", 0, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --assignee u2 --scan full | grep -q '\"id\":\"iss1\"'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue list by assignee full scan", 0, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --label feature --scan full | grep -q '\"id\":\"iss1\"'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue list by label full scan", 0, cmd);
+
+    /* full scan: no filter returns all issues (iss1 + 2 auto-id) */
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --scan full | grep -c '\"id\"' | grep -q '3'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue list full scan no filter", 0, cmd);
+
+    /* full scan: non-matching filter returns no issues */
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --status closed --scan full | grep -q '\"id\"'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue list full scan empty result", 1, cmd);
+
+    /* invalid scan value fails */
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --scan invalid >/dev/null 2>&1",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue list invalid scan fails", 2, cmd);
+
     snprintf(cmd, sizeof(cmd), "%s compact --base-dir \"%s\" --store all >/dev/null", cli_bin, data_dir);
     check_exit("compact all stores", 0, cmd);
 
@@ -551,6 +609,22 @@ int main(void)
         "%s issue list --base-dir \"%s\" --label sl1 | grep -c '\"id\"' | grep -q '500'",
         cli_bin, stress_dir);
     check_exit("stress: list 500 by label", 0, cmd);
+
+    /* full scan: same count as index scan */
+    snprintf(cmd, sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --status open --scan full | grep -c '\"id\"' | grep -q '500'",
+        cli_bin, stress_dir);
+    check_exit("stress: list 500 by status full scan", 0, cmd);
+
+    snprintf(cmd, sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --assignee su1 --scan full | grep -c '\"id\"' | grep -q '500'",
+        cli_bin, stress_dir);
+    check_exit("stress: list 500 by assignee full scan", 0, cmd);
+
+    snprintf(cmd, sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --label sl1 --scan full | grep -c '\"id\"' | grep -q '500'",
+        cli_bin, stress_dir);
+    check_exit("stress: list 500 by label full scan", 0, cmd);
 
     snprintf(cmd, sizeof(cmd), "rm -rf \"%s\"", stress_dir);
     check_exit("stress: cleanup after", 0, cmd);
