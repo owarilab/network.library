@@ -2084,6 +2084,112 @@ static int command_verify(int argc, char* argv[])
     return rc;
 }
 
+/*
+ * reindex 専用の index 追加処理。
+ * 通常の index_add_id は kvs_set_with_compact_retry を通すが、
+ * reindex では書き込み先が一時ストアのため、compact/reopen が
+ * 元の issue_index.db を操作してしまう。
+ * したがって api_qs_kvs_set を直接呼び、compact retry を行わない。
+ */
+static int reindex_add_id(QS_KVS_CONTEXT* index_store, const char* index_key, const char* issue_id)
+{
+    QS_MEMORY_CONTEXT context;
+    if (create_temp_memory(&context, 1024 * 1024) != 0) {
+        return -1;
+    }
+
+    char* old_value = api_qs_kvs_get(index_store, index_key);
+    QS_JSON_ELEMENT_ARRAY ids;
+    if (decode_index_array(&context, old_value, &ids) != 0) {
+        api_qs_memory_free(&context);
+        return -1;
+    }
+    if (-1 == append_unique_string(&ids, issue_id)) {
+        api_qs_memory_free(&context);
+        return -1;
+    }
+
+    char* encoded = api_qs_json_encode_array(&ids, INDEX_JSON_BUFFER_SIZE);
+    if (encoded == NULL) {
+        api_qs_memory_free(&context);
+        return -1;
+    }
+
+    int rc = api_qs_kvs_set(index_store, index_key, encoded, 0);
+    api_qs_memory_free(&context);
+    return (rc == -1) ? -1 : 0;
+}
+
+static int reindex_apply_issue(QS_KVS_CONTEXT* index_store, const char* issue_id, const char* issue_json)
+{
+    QS_MEMORY_CONTEXT context;
+    if (create_temp_memory(&context, 1024 * 1024) != 0) {
+        return -1;
+    }
+
+    QS_JSON_ELEMENT_OBJECT obj;
+    if (-1 == api_qs_json_decode_object(&context, &obj, issue_json)) {
+        fprintf(stderr, "error: invalid issue json\n");
+        api_qs_memory_free(&context);
+        return -1;
+    }
+
+    char* status = api_qs_object_get_string(&obj, "status");
+    if (status != NULL) {
+        char status_key[1024];
+        snprintf(status_key, sizeof(status_key), "index:status:%s", status);
+        if (reindex_add_id(index_store, status_key, issue_id) != 0) {
+            api_qs_memory_free(&context);
+            return -1;
+        }
+    }
+
+    QS_JSON_ELEMENT_ARRAY assignee_ids;
+    if (api_qs_object_get_array(&obj, "assigneeIds", &assignee_ids) == 0) {
+        int32_t len = api_qs_array_get_length(&assignee_ids);
+        int32_t i;
+        for (i = 0; i < len; i++) {
+            char* item = api_qs_array_get_string(&assignee_ids, i);
+            if (item == NULL) {
+                continue;
+            }
+            char key[1024];
+            if (snprintf(key, sizeof(key), "index:assignee:%s", item) <= 0) {
+                api_qs_memory_free(&context);
+                return -1;
+            }
+            if (reindex_add_id(index_store, key, issue_id) != 0) {
+                api_qs_memory_free(&context);
+                return -1;
+            }
+        }
+    }
+
+    QS_JSON_ELEMENT_ARRAY label_ids;
+    if (api_qs_object_get_array(&obj, "labelIds", &label_ids) == 0) {
+        int32_t len = api_qs_array_get_length(&label_ids);
+        int32_t i;
+        for (i = 0; i < len; i++) {
+            char* item = api_qs_array_get_string(&label_ids, i);
+            if (item == NULL) {
+                continue;
+            }
+            char key[1024];
+            if (snprintf(key, sizeof(key), "index:label:%s", item) <= 0) {
+                api_qs_memory_free(&context);
+                return -1;
+            }
+            if (reindex_add_id(index_store, key, issue_id) != 0) {
+                api_qs_memory_free(&context);
+                return -1;
+            }
+        }
+    }
+
+    api_qs_memory_free(&context);
+    return 0;
+}
+
 static int command_reindex(int argc, char* argv[])
 {
     const char* base_dir = DEFAULT_BASE_DIR;
@@ -2101,46 +2207,49 @@ static int command_reindex(int argc, char* argv[])
         return EXIT_IO;
     }
 
-    QS_MEMORY_CONTEXT temp;
-    if (create_temp_memory(&temp, 4 * 1024 * 1024) != 0) {
+    char index_path[4096];
+    char temp_index_path[4096];
+    char backup_path[4096];
+    if (build_store_path(index_path, sizeof(index_path), base_dir, STORE_INDEX.file_name) != 0 ||
+        snprintf(temp_index_path, sizeof(temp_index_path), "%s.reindex", index_path) <= 0 ||
+        snprintf(backup_path, sizeof(backup_path), "%s.bak", index_path) <= 0) {
         close_all_stores(&stores);
         return EXIT_IO;
     }
-    QS_JSON_ELEMENT_ARRAY index_keys;
-    if (-1 == api_qs_array_create(&temp, &index_keys) ||
-        -1 == api_qs_kvs_sorted_keys(&index_keys, &stores.index, 1)) {
-        api_qs_memory_free(&temp);
+
+    /* 元の index ストアを閉じ、一時ファイルに新しい index を構築する */
+    api_qs_persistence_kvs_memory_free(&stores.index);
+    unlink(temp_index_path);
+    if (-1 == STORE_INDEX.create_fn(&stores.index, temp_index_path)) {
+        fprintf(stderr, "error: failed to create temp index store: %s\n", temp_index_path);
+        open_store_checked(&STORE_INDEX, base_dir, &stores.index);
         close_all_stores(&stores);
         return EXIT_KVS;
     }
-    int32_t index_len = api_qs_array_get_length(&index_keys);
-    int32_t index_i;
-    for (index_i = 0; index_i < index_len; index_i++) {
-        char* index_key = api_qs_array_get_string(&index_keys, index_i);
-        if (index_key != NULL && strncmp(index_key, "index:", 6) == 0 &&
-            -1 == api_qs_kvs_delete(&stores.index, index_key)) {
-            api_qs_memory_free(&temp);
-            close_all_stores(&stores);
-            fprintf(stderr, "error: failed to remove index key: %s\n", index_key);
-            return EXIT_KVS;
-        }
-    }
-    api_qs_memory_free(&temp);
 
-    QS_MEMORY_CONTEXT temp2;
-    if (create_temp_memory(&temp2, 4 * 1024 * 1024) != 0) {
+    QS_MEMORY_CONTEXT temp;
+    if (create_temp_memory(&temp, 4 * 1024 * 1024) != 0) {
+        api_qs_persistence_kvs_memory_free(&stores.index);
+        unlink(temp_index_path);
+        open_store_checked(&STORE_INDEX, base_dir, &stores.index);
         close_all_stores(&stores);
         return EXIT_IO;
     }
 
     QS_JSON_ELEMENT_ARRAY issue_keys;
-    if (-1 == api_qs_array_create(&temp2, &issue_keys)) {
-        api_qs_memory_free(&temp2);
+    if (-1 == api_qs_array_create(&temp, &issue_keys)) {
+        api_qs_memory_free(&temp);
+        api_qs_persistence_kvs_memory_free(&stores.index);
+        unlink(temp_index_path);
+        open_store_checked(&STORE_INDEX, base_dir, &stores.index);
         close_all_stores(&stores);
         return EXIT_IO;
     }
     if (-1 == api_qs_kvs_sorted_keys(&issue_keys, &stores.issue, 1)) {
-        api_qs_memory_free(&temp2);
+        api_qs_memory_free(&temp);
+        api_qs_persistence_kvs_memory_free(&stores.index);
+        unlink(temp_index_path);
+        open_store_checked(&STORE_INDEX, base_dir, &stores.index);
         close_all_stores(&stores);
         return EXIT_KVS;
     }
@@ -2157,17 +2266,47 @@ static int command_reindex(int argc, char* argv[])
         if (issue_json == NULL) {
             continue;
         }
-        if (issue_apply_indexes(&stores, key + strlen("issue:"), issue_json, 1) != 0) {
-            api_qs_memory_free(&temp2);
+        if (reindex_apply_issue(&stores.index, key + strlen("issue:"), issue_json) != 0) {
+            api_qs_memory_free(&temp);
+            api_qs_persistence_kvs_memory_free(&stores.index);
+            unlink(temp_index_path);
+            open_store_checked(&STORE_INDEX, base_dir, &stores.index);
             close_all_stores(&stores);
             fprintf(stderr, "error: failed to rebuild index for issue: %s\n", key);
             return EXIT_KVS;
         }
         issue_count++;
     }
-    api_qs_memory_free(&temp2);
+    api_qs_memory_free(&temp);
+
+    /* 一時ストアを閉じ、元のファイルを backup に退避して一時ファイルを切り替える */
+    api_qs_persistence_kvs_memory_free(&stores.index);
+    unlink(backup_path);
+    if (rename(index_path, backup_path) != 0) {
+        fprintf(stderr, "error: failed to backup index store: %s\n", index_path);
+        unlink(temp_index_path);
+        open_store_checked(&STORE_INDEX, base_dir, &stores.index);
+        close_all_stores(&stores);
+        return EXIT_IO;
+    }
+    if (rename(temp_index_path, index_path) != 0) {
+        rename(backup_path, index_path);
+        fprintf(stderr, "error: failed to switch index store: %s\n", index_path);
+        unlink(temp_index_path);
+        open_store_checked(&STORE_INDEX, base_dir, &stores.index);
+        close_all_stores(&stores);
+        return EXIT_IO;
+    }
+    unlink(backup_path);
 
     printf("reindex: rebuilt index from %d issues\n", issue_count);
+    if (open_store_checked(&STORE_INDEX, base_dir, &stores.index) != 0) {
+        api_qs_persistence_kvs_memory_free(&stores.user);
+        api_qs_persistence_kvs_memory_free(&stores.label);
+        api_qs_persistence_kvs_memory_free(&stores.issue);
+        api_qs_persistence_kvs_memory_free(&stores.system);
+        return EXIT_IO;
+    }
     close_all_stores(&stores);
     return EXIT_OK;
 }
