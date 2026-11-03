@@ -977,6 +977,208 @@ int main(void)
         check_exit("frag: cleanup after", 0, cmd);
     }
 
+    /* ==================== comment 統合テスト ==================== */
+    char cmt_dir[PATH_MAX];
+    if (strlen(cwd) + strlen("/tmp_issue_cmt_test_data") + 1 >= sizeof(cmt_dir)) {
+        printf("[FAIL] cmt_dir path too long\n");
+        return 1;
+    }
+    strcpy(cmt_dir, cwd);
+    strcat(cmt_dir, "/tmp_issue_cmt_test_data");
+
+    snprintf(cmd, sizeof(cmd), "rm -rf \"%s\"", cmt_dir);
+    check_exit("cmt: cleanup before", 0, cmd);
+    snprintf(cmd, sizeof(cmd), "%s init --base-dir \"%s\" >/dev/null", cli_bin, cmt_dir);
+    check_exit("cmt: init", 0, cmd);
+    snprintf(cmd, sizeof(cmd), "test -f \"%s/issue_comment.db\"", cmt_dir);
+    check_exit("cmt: comment store created", 0, cmd);
+    snprintf(cmd, sizeof(cmd), "test -f \"%s/schema_comment.json\"", cmt_dir);
+    check_exit("cmt: schema_comment created", 0, cmd);
+    snprintf(
+        cmd, sizeof(cmd),
+        "%s schema get --base-dir \"%s\" --entity comment | grep -q '\"name\":\"body\"'",
+        cli_bin, cmt_dir);
+    check_exit("cmt: schema get comment", 0, cmd);
+
+    /* user / issue 準備 */
+    snprintf(cmd, sizeof(cmd),
+        "%s user create --id u1 --json '{\"name\":\"alice\"}' --base-dir \"%s\" >/dev/null",
+        cli_bin, cmt_dir);
+    check_exit("cmt: user create", 0, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s issue create --id iss1 --json '{\"title\":\"t1\",\"status\":\"open\"}' --base-dir \"%s\" >/dev/null",
+        cli_bin, cmt_dir);
+    check_exit("cmt: issue create", 0, cmd);
+
+    /* comment create */
+    snprintf(cmd, sizeof(cmd),
+        "%s issue comment create --issue iss1 --json '{\"body\":\"first comment\",\"userId\":\"u1\"}' --base-dir \"%s\" | grep -q 'generated id: cmt_000001'",
+        cli_bin, cmt_dir);
+    check_exit("cmt: create auto id", 0, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s issue comment create --issue iss1 --id cmt_x --json '{\"body\":\"second\"}' --base-dir \"%s\" | grep -q 'created: comment:cmt_x'",
+        cli_bin, cmt_dir);
+    check_exit("cmt: create explicit id", 0, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s issue comment create --issue iss1 --id cmt_x --json '{\"body\":\"dup\"}' --base-dir \"%s\" >/dev/null 2>&1",
+        cli_bin, cmt_dir);
+    check_exit("cmt: create duplicate id fails", 4, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s issue comment create --issue iss_missing --json '{\"body\":\"x\"}' --base-dir \"%s\" >/dev/null 2>&1",
+        cli_bin, cmt_dir);
+    check_exit("cmt: create unknown issue fails", 5, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s issue comment create --issue iss1 --json '{\"body\":\"x\",\"userId\":\"u_missing\"}' --base-dir \"%s\" >/dev/null 2>&1",
+        cli_bin, cmt_dir);
+    check_exit("cmt: create unknown user fails", 2, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s issue comment create --issue iss1 --json '{\"body\":\"\"}' --base-dir \"%s\" >/dev/null 2>&1",
+        cli_bin, cmt_dir);
+    check_exit("cmt: create empty body fails", 2, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s issue comment create --json '{\"body\":\"x\"}' --base-dir \"%s\" >/dev/null 2>&1",
+        cli_bin, cmt_dir);
+    check_exit("cmt: create without --issue fails", 2, cmd);
+
+    /* comment get */
+    snprintf(cmd, sizeof(cmd),
+        "%s issue comment get --id cmt_000001 --base-dir \"%s\" | grep -q '\"issueId\":\"iss1\"'",
+        cli_bin, cmt_dir);
+    check_exit("cmt: get issueId", 0, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s issue comment get --id cmt_000001 --base-dir \"%s\" | grep -q '\"createdAtJst\":\"[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9]\"'",
+        cli_bin, cmt_dir);
+    check_exit("cmt: get createdAtJst format", 0, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s issue comment get --id cmt_000001 --base-dir \"%s\" | grep -q '\"user\":{\"id\":\"u1\",\"name\":\"alice\"}'",
+        cli_bin, cmt_dir);
+    check_exit("cmt: get user enrichment", 0, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s issue comment get --id cmt_x --base-dir \"%s\" | grep -q '\"body\":\"second\"'",
+        cli_bin, cmt_dir);
+    check_exit("cmt: get without userId has no user field", 0, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s issue comment get --id cmt_missing --base-dir \"%s\" >/dev/null 2>&1",
+        cli_bin, cmt_dir);
+    check_exit("cmt: get missing fails", 5, cmd);
+
+    /* comment list */
+    snprintf(cmd, sizeof(cmd),
+        "%s issue comment list --issue iss1 --base-dir \"%s\" | grep -c '\"id\"' | grep -q 2",
+        cli_bin, cmt_dir);
+    check_exit("cmt: list count 2", 0, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s issue comment list --issue iss_missing --base-dir \"%s\" >/dev/null 2>&1",
+        cli_bin, cmt_dir);
+    check_exit("cmt: list unknown issue fails", 5, cmd);
+
+    /* comment update */
+    snprintf(cmd, sizeof(cmd),
+        "%s issue comment update --id cmt_x --json '{\"body\":\"updated body\"}' --base-dir \"%s\" | grep -q 'updated: comment:cmt_x'",
+        cli_bin, cmt_dir);
+    check_exit("cmt: update body", 0, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s issue comment get --id cmt_x --base-dir \"%s\" | grep -q '\"body\":\"updated body\"'",
+        cli_bin, cmt_dir);
+    check_exit("cmt: update reflected", 0, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s issue comment update --id cmt_x --json '{\"issueId\":\"iss2\"}' --base-dir \"%s\" >/dev/null 2>&1",
+        cli_bin, cmt_dir);
+    check_exit("cmt: update immutable issueId fails", 2, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s issue comment update --id cmt_x --json '{\"userId\":\"u2\"}' --base-dir \"%s\" >/dev/null 2>&1",
+        cli_bin, cmt_dir);
+    check_exit("cmt: update immutable userId fails", 2, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s issue comment update --id cmt_x --json '{\"createdAt\":123}' --base-dir \"%s\" >/dev/null 2>&1",
+        cli_bin, cmt_dir);
+    check_exit("cmt: update immutable createdAt fails", 2, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s issue comment update --id cmt_x --json '{\"body\":\"\"}' --base-dir \"%s\" >/dev/null 2>&1",
+        cli_bin, cmt_dir);
+    check_exit("cmt: update empty body fails", 2, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s issue comment update --id cmt_missing --json '{\"body\":\"x\"}' --base-dir \"%s\" >/dev/null 2>&1",
+        cli_bin, cmt_dir);
+    check_exit("cmt: update missing fails", 5, cmd);
+
+    /* issue get --with-comments */
+    snprintf(cmd, sizeof(cmd),
+        "%s issue get --id iss1 --base-dir \"%s\" | grep -q '\"title\":\"t1\"'",
+        cli_bin, cmt_dir);
+    check_exit("cmt: issue get without comments (backward compat)", 0, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s issue get --id iss1 --base-dir \"%s\" | grep -q '\"comments\"' >/dev/null",
+        cli_bin, cmt_dir);
+    check_exit("cmt: issue get plain has no comments field", 1, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s issue get --id iss1 --with-comments --base-dir \"%s\" | grep -q '\"comments\"'",
+        cli_bin, cmt_dir);
+    check_exit("cmt: issue get --with-comments has comments", 0, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s issue get --id iss1 --with-comments --base-dir \"%s\" | grep -q '\"createdAtJst\"'",
+        cli_bin, cmt_dir);
+    check_exit("cmt: with-comments has createdAtJst", 0, cmd);
+
+    /* verify / reindex with comments */
+    snprintf(cmd, sizeof(cmd),
+        "%s verify --base-dir \"%s\" | grep -q 'verify: ok'",
+        cli_bin, cmt_dir);
+    check_exit("cmt: verify ok with comments", 0, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s reindex --base-dir \"%s\" | grep -q 'reindex: rebuilt index from 1 issues, 2 comments'",
+        cli_bin, cmt_dir);
+    check_exit("cmt: reindex with comments", 0, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s verify --base-dir \"%s\" | grep -q 'verify: ok'",
+        cli_bin, cmt_dir);
+    check_exit("cmt: verify ok after reindex", 0, cmd);
+
+    /* comment delete */
+    snprintf(cmd, sizeof(cmd),
+        "%s issue comment delete --id cmt_x --base-dir \"%s\" | grep -q 'deleted: comment:cmt_x'",
+        cli_bin, cmt_dir);
+    check_exit("cmt: delete", 0, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s issue comment get --id cmt_x --base-dir \"%s\" >/dev/null 2>&1",
+        cli_bin, cmt_dir);
+    check_exit("cmt: deleted comment gone", 5, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s issue comment list --issue iss1 --base-dir \"%s\" | grep -c '\"id\"' | grep -q 1",
+        cli_bin, cmt_dir);
+    check_exit("cmt: list count 1 after delete", 0, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s issue comment delete --id cmt_x --base-dir \"%s\" >/dev/null 2>&1",
+        cli_bin, cmt_dir);
+    check_exit("cmt: delete missing fails", 5, cmd);
+
+    /* issue delete カスケード削除 */
+    snprintf(cmd, sizeof(cmd),
+        "%s issue delete --id iss1 --base-dir \"%s\" | grep -q 'deleted: issue:iss1'",
+        cli_bin, cmt_dir);
+    check_exit("cmt: issue delete", 0, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s issue comment get --id cmt_000001 --base-dir \"%s\" >/dev/null 2>&1",
+        cli_bin, cmt_dir);
+    check_exit("cmt: cascade delete removed comment", 5, cmd);
+    snprintf(cmd, sizeof(cmd),
+        "%s verify --base-dir \"%s\" | grep -q 'verify: ok'",
+        cli_bin, cmt_dir);
+    check_exit("cmt: verify ok after cascade delete", 0, cmd);
+
+    /* compact comment */
+    snprintf(cmd, sizeof(cmd),
+        "%s compact --store comment --base-dir \"%s\" >/dev/null",
+        cli_bin, cmt_dir);
+    check_exit("cmt: compact comment", 0, cmd);
+
+    if (fail_count > 0) {
+        printf("cmt: data dir kept for inspection: %s\n", cmt_dir);
+    } else {
+        snprintf(cmd, sizeof(cmd), "rm -rf \"%s\"", cmt_dir);
+        check_exit("cmt: cleanup after", 0, cmd);
+    }
+
     printf("\nresult: pass=%d fail=%d\n", pass_count, fail_count);
     return (fail_count == 0) ? 0 : 1;
 }

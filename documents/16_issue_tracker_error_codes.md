@@ -24,7 +24,7 @@
 | `error: --json is required for update` | update に `--json` 未指定 | `--json '{...}'` を追加 |
 | `error: --id is required` | get/update/delete/unset に `--id` 未指定 | `--id <id>` を追加 |
 | `error: --field is required for unset` | unset に `--field` 未指定 | `--field <name>` を追加 |
-| `error: --entity is required for schema get` | `schema get` に `--entity` 未指定 | `--entity user\|label\|issue` を追加 |
+| `error: --entity is required for schema get` | `schema get` に `--entity` 未指定 | `--entity user\|label\|issue\|comment` を追加 |
 | `error: --id and json.id mismatch for create` | `--id` と JSON の `id` が不一致 | 両方を一致させる |
 | `error: --id and json.id mismatch for update` | `--id` と JSON の `id` が不一致 | 両方を一致させる |
 | `error: --id and json.id mismatch for issue create` | `--id` と JSON の `id` が不一致 | 両方を一致させる |
@@ -50,10 +50,23 @@
 | `error: user id not found: <id>` | `assigneeIds` に存在しない user id | 有効な user id を使用 |
 | `error: label id not found: <id>` | `labelIds` に存在しない label id | 有効な label id を使用 |
 | `error: invalid --scan value: <value> (use index or full)` | `--scan` に不正値 | `index` または `full` を使用 |
-| `error: invalid --store value: <value>` | `compact --store` に不正値 | `user\|label\|issue\|index\|system\|all` を使用 |
-| `error: invalid --entity value: <value>` | `schema get --entity` に不正値 | `user\|label\|issue` を使用 |
+| `error: invalid --store value: <value>` | `compact --store` に不正値 | `user\|label\|issue\|index\|system\|comment\|all` を使用 |
+| `error: invalid --entity value: <value>` | `schema get --entity` に不正値 | `user\|label\|issue\|comment` を使用 |
 | `error: unsupported action for <entity>: <action>` | 未対応の action | `create\|get\|update\|delete\|unset\|list` を使用 |
 | `error: unsupported issue action: <action>` | 同上 | 同上 |
+| `error: comment action is required` | `issue comment` にサブコマンド未指定 | `create\|list\|get\|update\|delete` を追加 |
+| `error: --issue is required for comment create` | comment create に `--issue` 未指定 | `--issue <issueId>` を追加 |
+| `error: --issue is required for comment list` | comment list に `--issue` 未指定 | `--issue <issueId>` を追加 |
+| `error: --json is required for comment create` | comment create に `--json` 未指定 | `--json '{"body":"..."}'` を追加 |
+| `error: --json is required for comment update` | comment update に `--json` 未指定 | `--json '{"body":"..."}'` を追加 |
+| `error: invalid json for comment create` | comment create の JSON デコード失敗 | JSON 構文を確認 |
+| `error: invalid json for comment update` | comment update の JSON デコード失敗 | JSON 構文を確認 |
+| `error: schema validation failed for comment create` | comment スキーマ違反（maxLength 超過等） | `schema get --entity comment` と照合 |
+| `error: comment issueId is missing` | comment JSON に `issueId` なし | 通常は CLI が自動付与するため内部エラー | 報告 |
+| `error: comment body is empty` | comment の `body` が空文字列 | 空でない body を指定 |
+| `error: comment field is immutable: <name>` | comment update で不変フィールド（`id`/`issueId`/`userId`/`createdAt`）を指定 | `body` のみで update |
+| `error: comment update requires body field` | comment update の JSON に `body` なし | `--json '{"body":"..."}'` を指定 |
+| `error: unsupported comment action: <action>` | 未対応の comment サブコマンド | `create\|list\|get\|update\|delete` を使用 |
 | `error: unsupported schema action: <action>` | 同上 | `list\|get` を使用 |
 | `error: unknown command: <cmd>` | 未対応のコマンド | `help` で利用可能コマンドを確認 |
 
@@ -97,6 +110,17 @@
 | `error: failed to create issue: <key>` | issue 書き込み失敗 | `compact --store issue` を実行 |
 | `error: failed to update index on issue create` | index 更新失敗（create 後ロールバック） | `compact --store index` を実行し再作成 |
 | `error: issue not found: <key>` | issue update/delete でキー未存在 | 正しい id を確認 |
+| `error: issue not found for comment: <issueId>` | comment create/list で issue 未存在 | 正しい issue id を確認 |
+| `error: comment already exists: <key>` | comment create で既存 id | 別の id を使用、または `update` |
+| `error: failed to create comment: <key>` | comment 書き込み失敗 | `compact --store comment` を実行 |
+| `error: failed to update comment index` | comment index 更新失敗（create 後ロールバック） | `compact --store index` を実行し再作成 |
+| `error: comment not found: <key>` | comment get/update/delete でキー未存在 | 正しい comment id を確認 |
+| `error: failed to update comment: <key>` | comment 書き込み失敗 | `compact --store comment` を実行 |
+| `error: failed to delete comment: <key>` | comment 削除失敗 | 再実行 |
+| `error: failed to cascade delete comments for issue: <id>` | issue 削除時のコメントカスケード削除失敗 | 再実行（残ったコメントは再実行で削除される） |
+| `error: failed to generate comment id` | comment カウンター書き込み失敗 | `compact --store system` を実行 |
+| `error: failed to rebuild comment index for: <key>` | reindex 時 comment JSON 不正 | `verify` で破損 comment を特定 |
+| `verify: error: failed to verify comments` | verify 時 comment 検証失敗 | `reindex` を実行 |
 | `error: failed to remove old index on issue update` | 旧 index 削除失敗 | `reindex` を実行 |
 | `error: failed to update issue: <key>` | issue 書き込み失敗（旧 index にロールバック） | `compact --store issue` を実行 |
 | `error: failed to add new index on issue update` | 新 index 追加失敗（旧値にロールバック） | `compact --store index` を実行 |
@@ -153,7 +177,7 @@
 
 | コマンド | 用途 |
 |---|---|
-| `verify` | index と issue の整合性を検査。破損・欠落・stale を検出 |
-| `reindex` | issue 本体から index を再構築（一時ストア切替方式、失敗時は元 index 保持） |
+| `verify` | index と issue / comment の整合性を検査。破損・欠落・stale を検出 |
+| `reindex` | issue・comment 本体から index を再構築（一時ストア切替方式、失敗時は元 index 保持） |
 | `compact --store <name>` | ストアの compaction（新ファイル再構築→切替） |
 | `init --force` | ストア・スキーマ・設定を再生成（既存データは上書き） |

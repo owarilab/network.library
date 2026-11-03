@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <time.h>
 
 #include "qs_api.h"
 
@@ -42,6 +43,7 @@ typedef struct APP_STORES {
     QS_KVS_CONTEXT issue;
     QS_KVS_CONTEXT index;
     QS_KVS_CONTEXT system;
+    QS_KVS_CONTEXT comment;
     int issue_status_count;
     char issue_statuses[MAX_ISSUE_STATUS_VALUES][64];
     char base_dir[4096];
@@ -70,8 +72,11 @@ static const STORE_CONFIG STORE_LABEL = {"label", "label.db", api_qs_kvs_create_
 static const STORE_CONFIG STORE_ISSUE = {"issue", "issue.db", api_qs_kvs_create_b8mb_persistence};
 static const STORE_CONFIG STORE_INDEX = {"index", "issue_index.db", api_qs_kvs_create_b1mb_persistence};
 static const STORE_CONFIG STORE_SYSTEM = {"system", "system.db", api_qs_kvs_create_b1mb_persistence};
+static const STORE_CONFIG STORE_COMMENT = {"comment", "issue_comment.db", api_qs_kvs_create_b8mb_persistence};
 
 static int compact_store(const STORE_CONFIG* cfg, const char* base_dir);
+static int command_issue_comment(int argc, char* argv[], APP_STORES* stores);
+static int comment_cascade_delete(APP_STORES* stores, const char* issue_id);
 static SCHEMA_FIELD_DEF* schema_find_field(SCHEMA_DEF* schema, const char* name);
 static int load_schema(const char* base_dir, const char* schema_file_name, SCHEMA_DEF* out_schema);
 static int is_allowed_extra_field(const char* entity_name, const char* key);
@@ -90,10 +95,16 @@ static void print_usage(const char* program_name)
     printf("  %s issue <create|get|update|delete|unset> --id <id> [--json <json>] [--field <name>] [--base-dir <dir>]\n", program_name);
     printf("  %s issue list [--status <status>] [--assignee <userId>] [--label <label>] [--scan index|full] [--base-dir <dir>]\n", program_name);
     printf("      (multiple filters are combined with AND)\n");
+    printf("  %s issue get --id <issueId> [--with-comments] [--base-dir <dir>]\n", program_name);
+    printf("  %s issue comment create --issue <issueId> [--id <commentId>] [--json <json>] [--base-dir <dir>]\n", program_name);
+    printf("  %s issue comment list --issue <issueId> [--base-dir <dir>]\n", program_name);
+    printf("  %s issue comment get --id <commentId> [--base-dir <dir>]\n", program_name);
+    printf("  %s issue comment update --id <commentId> --json <json> [--base-dir <dir>]\n", program_name);
+    printf("  %s issue comment delete --id <commentId> [--base-dir <dir>]\n", program_name);
     printf("  %s reindex [--base-dir <dir>]\n", program_name);
     printf("  %s verify  [--base-dir <dir>]\n", program_name);
-    printf("  %s schema <list|get> [--entity user|label|issue] [--base-dir <dir>]\n", program_name);
-    printf("  %s compact [--store user|label|issue|index|system|all] [--base-dir <dir>]\n", program_name);
+    printf("  %s schema <list|get> [--entity user|label|issue|comment] [--base-dir <dir>]\n", program_name);
+    printf("  %s compact [--store user|label|issue|index|system|comment|all] [--base-dir <dir>]\n", program_name);
     printf("\n");
     printf("Examples:\n");
     printf("  %s init --base-dir ./issue_data\n", program_name);
@@ -293,6 +304,16 @@ static int init_schema_files(const char* base_dir, int force)
         "    {\"name\":\"updatedAt\",\"type\":\"int64\",\"default\":0,\"required\":0,\"unsettable\":1}\n"
         "  ]\n"
         "}\n";
+    static const char* COMMENT_SCHEMA =
+        "{\n"
+        "  \"fields\": [\n"
+        "    {\"name\":\"id\",\"type\":\"string\",\"maxLength\":64,\"required\":0,\"unsettable\":0},\n"
+        "    {\"name\":\"issueId\",\"type\":\"string\",\"maxLength\":64,\"required\":1,\"unsettable\":0},\n"
+        "    {\"name\":\"body\",\"type\":\"string\",\"maxLength\":1024,\"required\":1,\"unsettable\":1},\n"
+        "    {\"name\":\"userId\",\"type\":\"string\",\"maxLength\":64,\"required\":0,\"unsettable\":0},\n"
+        "    {\"name\":\"createdAt\",\"type\":\"int64\",\"required\":1,\"unsettable\":0}\n"
+        "  ]\n"
+        "}\n";
 
     if (write_schema_file(base_dir, "schema_user.json", USER_SCHEMA, force) != 0) {
         return -1;
@@ -301,6 +322,9 @@ static int init_schema_files(const char* base_dir, int force)
         return -1;
     }
     if (write_schema_file(base_dir, "schema_issue.json", ISSUE_SCHEMA, force) != 0) {
+        return -1;
+    }
+    if (write_schema_file(base_dir, "schema_comment.json", COMMENT_SCHEMA, force) != 0) {
         return -1;
     }
     return 0;
@@ -316,6 +340,9 @@ static const char* schema_file_name_from_entity(const char* entity_name)
     }
     if (strcmp(entity_name, "issue") == 0) {
         return "schema_issue.json";
+    }
+    if (strcmp(entity_name, "comment") == 0) {
+        return "schema_comment.json";
     }
     return NULL;
 }
@@ -365,6 +392,14 @@ static int open_all_stores(const char* base_dir, APP_STORES* stores)
         api_qs_persistence_kvs_memory_free(&stores->index);
         return -1;
     }
+    if (open_store_checked(&STORE_COMMENT, base_dir, &stores->comment) != 0) {
+        api_qs_persistence_kvs_memory_free(&stores->user);
+        api_qs_persistence_kvs_memory_free(&stores->label);
+        api_qs_persistence_kvs_memory_free(&stores->issue);
+        api_qs_persistence_kvs_memory_free(&stores->index);
+        api_qs_persistence_kvs_memory_free(&stores->system);
+        return -1;
+    }
     return 0;
 }
 
@@ -375,6 +410,7 @@ static void close_all_stores(APP_STORES* stores)
     api_qs_persistence_kvs_memory_free(&stores->issue);
     api_qs_persistence_kvs_memory_free(&stores->index);
     api_qs_persistence_kvs_memory_free(&stores->system);
+    api_qs_persistence_kvs_memory_free(&stores->comment);
 }
 
 static int create_temp_memory(QS_MEMORY_CONTEXT* context, size_t size)
@@ -1526,6 +1562,12 @@ static int issue_delete(APP_STORES* stores, const char* id)
         fprintf(stderr, "error: failed to remove issue index\n");
         return EXIT_KVS;
     }
+    if (comment_cascade_delete(stores, id) != 0) {
+        issue_apply_indexes(stores, id, old_copy, 1);
+        free(old_copy);
+        fprintf(stderr, "error: failed to cascade delete comments for issue: %s\n", id);
+        return EXIT_KVS;
+    }
     if (-1 == api_qs_kvs_delete(&stores->issue, key)) {
         issue_apply_indexes(stores, id, old_copy, 1);
         free(old_copy);
@@ -1535,6 +1577,768 @@ static int issue_delete(APP_STORES* stores, const char* id)
     free(old_copy);
     printf("deleted: %s\n", key);
     return EXIT_OK;
+}
+
+/* ==================== comment 関連 ==================== */
+
+/* createdAt を int32 / int64 のいずれかで読み取る。
+ * JSON デコーダは int32 範囲の値を int32 として保存するため両方確認する。 */
+static int get_created_at_value(QS_JSON_ELEMENT_OBJECT* obj, int64_t* out)
+{
+    int64_t* i64 = api_qs_object_get_big_integer(obj, "createdAt");
+    if (i64 != NULL) {
+        *out = *i64;
+        return 0;
+    }
+    int32_t* i32 = api_qs_object_get_integer(obj, "createdAt");
+    if (i32 != NULL) {
+        *out = (int64_t)*i32;
+        return 0;
+    }
+    return -1;
+}
+
+/* epoch 秒を JST(UTC+9) の "YYYY-MM-DD HH:MM:SS" 形式に変換する。
+ * gmtime を使うためサーバーのローカルタイムゾーンに依存しない。 */
+static int format_jst(int64_t epoch_sec, char* out, size_t out_size)
+{
+    time_t t = (time_t)(epoch_sec + 9 * 3600);
+    struct tm tm_utc;
+    if (gmtime_r(&t, &tm_utc) == NULL) {
+        return -1;
+    }
+    if (snprintf(out, out_size, "%04d-%02d-%02d %02d:%02d:%02d",
+        tm_utc.tm_year + 1900, tm_utc.tm_mon + 1, tm_utc.tm_mday,
+        tm_utc.tm_hour, tm_utc.tm_min, tm_utc.tm_sec) <= 0) {
+        return -1;
+    }
+    return 0;
+}
+
+/* comment JSON を取得時出力形式に変換する。
+ * - userId が存在し対応する user も存在する場合のみ user 字段を付与
+ * - createdAtJst を付与（保存値は変更しない）
+ * 成功時 *out_json に strdup された文字列を返す。 */
+static int build_comment_output_json(APP_STORES* stores, const char* comment_json, char** out_json)
+{
+    QS_MEMORY_CONTEXT context;
+    if (create_temp_memory(&context, 1024 * 1024) != 0) {
+        return -1;
+    }
+
+    QS_JSON_ELEMENT_OBJECT obj;
+    if (-1 == api_qs_json_decode_object(&context, &obj, comment_json)) {
+        api_qs_memory_free(&context);
+        return -1;
+    }
+
+    /* user 情報付与: {"id":..., "name":...} の object 形式 */
+    char* user_id = api_qs_object_get_string(&obj, "userId");
+    if (user_id != NULL) {
+        char user_key[1024];
+        if (snprintf(user_key, sizeof(user_key), "user:%s", user_id) > 0) {
+            char* user_json = api_qs_kvs_get(&stores->user, user_key);
+            if (user_json != NULL) {
+                QS_JSON_ELEMENT_OBJECT user_obj;
+                if (api_qs_json_decode_object(&context, &user_obj, user_json) == 0) {
+                    QS_JSON_ELEMENT_OBJECT user_out;
+                    if (api_qs_object_create(&context, &user_out) == 0) {
+                        if (api_qs_object_push_string(&user_out, "id", user_id) == 0) {
+                            char* user_name = api_qs_object_get_string(&user_obj, "name");
+                            if (api_qs_object_push_string(&user_out, "name", user_name != NULL ? user_name : "") == 0) {
+                                if (api_qs_object_push_object(&obj, "user", &user_out) == -1) {
+                                    api_qs_memory_free(&context);
+                                    return -1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /* createdAtJst 付与 */
+    int64_t created_at;
+    if (get_created_at_value(&obj, &created_at) == 0) {
+        char jst[64];
+        if (format_jst(created_at, jst, sizeof(jst)) == 0) {
+            if (api_qs_object_push_string(&obj, "createdAtJst", jst) == -1) {
+                api_qs_memory_free(&context);
+                return -1;
+            }
+        }
+    }
+
+    char* encoded = api_qs_json_encode_object(&obj, 8192);
+    if (encoded == NULL) {
+        api_qs_memory_free(&context);
+        return -1;
+    }
+    *out_json = strdup(encoded);
+    api_qs_memory_free(&context);
+    return (*out_json == NULL) ? -1 : 0;
+}
+
+/* comment の参照整合性を検証する */
+static int validate_comment_references(APP_STORES* stores, const char* comment_json)
+{
+    QS_MEMORY_CONTEXT context;
+    if (create_temp_memory(&context, 1024 * 1024) != 0) {
+        return -1;
+    }
+    QS_JSON_ELEMENT_OBJECT obj;
+    if (-1 == api_qs_json_decode_object(&context, &obj, comment_json)) {
+        fprintf(stderr, "error: invalid comment json\n");
+        api_qs_memory_free(&context);
+        return -1;
+    }
+
+    char* issue_id = api_qs_object_get_string(&obj, "issueId");
+    if (issue_id == NULL) {
+        fprintf(stderr, "error: comment issueId is missing\n");
+        api_qs_memory_free(&context);
+        return -1;
+    }
+    char issue_key[1024];
+    if (snprintf(issue_key, sizeof(issue_key), "issue:%s", issue_id) <= 0) {
+        api_qs_memory_free(&context);
+        return -1;
+    }
+    if (api_qs_kvs_get(&stores->issue, issue_key) == NULL) {
+        fprintf(stderr, "error: issue not found for comment: %s\n", issue_id);
+        api_qs_memory_free(&context);
+        return -1;
+    }
+
+    char* user_id = api_qs_object_get_string(&obj, "userId");
+    if (user_id != NULL) {
+        char user_key[1024];
+        if (snprintf(user_key, sizeof(user_key), "user:%s", user_id) <= 0) {
+            api_qs_memory_free(&context);
+            return -1;
+        }
+        if (api_qs_kvs_get(&stores->user, user_key) == NULL) {
+            fprintf(stderr, "error: user id not found: %s\n", user_id);
+            api_qs_memory_free(&context);
+            return -1;
+        }
+    }
+
+    char* body = api_qs_object_get_string(&obj, "body");
+    if (body == NULL || body[0] == '\0') {
+        fprintf(stderr, "error: comment body is empty\n");
+        api_qs_memory_free(&context);
+        return -1;
+    }
+
+    api_qs_memory_free(&context);
+    return 0;
+}
+
+/* comment index キーを構築する */
+static int build_comment_index_key(char* out_key, size_t out_size, const char* issue_id)
+{
+    int written = snprintf(out_key, out_size, "index:comment:issue:%s", issue_id);
+    if (written <= 0 || (size_t)written >= out_size) {
+        return -1;
+    }
+    return 0;
+}
+
+/* comment create */
+static int comment_create(APP_STORES* stores, const char* comment_id, const char* issue_id, const char* comment_json)
+{
+    char key[1024];
+    if (build_entity_key(key, sizeof(key), "comment", comment_id) != 0) {
+        return EXIT_IO;
+    }
+    if (api_qs_kvs_get(&stores->comment, key) != NULL) {
+        fprintf(stderr, "error: comment already exists: %s\n", key);
+        return EXIT_KVS;
+    }
+    if (validate_comment_references(stores, comment_json) != 0) {
+        return EXIT_USAGE;
+    }
+    if (kvs_set_with_compact_retry(stores, &stores->comment, &STORE_COMMENT, key, comment_json) != 0) {
+        fprintf(stderr, "error: failed to create comment: %s\n", key);
+        return EXIT_KVS;
+    }
+    char index_key[1024];
+    if (build_comment_index_key(index_key, sizeof(index_key), issue_id) != 0) {
+        api_qs_kvs_delete(&stores->comment, key);
+        return EXIT_IO;
+    }
+    if (index_add_id(stores, index_key, comment_id) != 0) {
+        api_qs_kvs_delete(&stores->comment, key);
+        fprintf(stderr, "error: failed to update comment index\n");
+        return EXIT_KVS;
+    }
+    printf("created: %s\n", key);
+    return EXIT_OK;
+}
+
+/* comment get（取得時出力形式） */
+static int comment_get(APP_STORES* stores, const char* comment_id)
+{
+    char key[1024];
+    if (build_entity_key(key, sizeof(key), "comment", comment_id) != 0) {
+        return EXIT_IO;
+    }
+    char* value = api_qs_kvs_get(&stores->comment, key);
+    if (value == NULL) {
+        fprintf(stderr, "error: comment not found: %s\n", key);
+        return EXIT_NOT_FOUND;
+    }
+    char* output_json = NULL;
+    if (build_comment_output_json(stores, value, &output_json) != 0) {
+        fprintf(stderr, "error: failed to build comment output\n");
+        return EXIT_IO;
+    }
+    printf("%s\n", output_json);
+    free(output_json);
+    return EXIT_OK;
+}
+
+/* comment list（createdAt 昇順） */
+static int comment_list(APP_STORES* stores, const char* issue_id)
+{
+    /* issue の存在確認 */
+    char issue_key[1024];
+    if (snprintf(issue_key, sizeof(issue_key), "issue:%s", issue_id) <= 0) {
+        return EXIT_IO;
+    }
+    if (api_qs_kvs_get(&stores->issue, issue_key) == NULL) {
+        fprintf(stderr, "error: issue not found: %s\n", issue_key);
+        return EXIT_NOT_FOUND;
+    }
+
+    char index_key[1024];
+    if (build_comment_index_key(index_key, sizeof(index_key), issue_id) != 0) {
+        return EXIT_IO;
+    }
+    char* index_value = api_qs_kvs_get(&stores->index, index_key);
+    if (index_value == NULL) {
+        printf("[\n]\n");
+        return EXIT_OK;
+    }
+
+    QS_MEMORY_CONTEXT context;
+    if (create_temp_memory(&context, 4 * 1024 * 1024) != 0) {
+        return EXIT_IO;
+    }
+
+    QS_JSON_ELEMENT_ARRAY ids;
+    if (decode_index_array(&context, index_value, &ids) != 0) {
+        api_qs_memory_free(&context);
+        return EXIT_IO;
+    }
+
+    int32_t len = api_qs_array_get_length(&ids);
+    if (len == 0) {
+        printf("[\n]\n");
+        api_qs_memory_free(&context);
+        return EXIT_OK;
+    }
+
+    /* コメントを createdAt 昇順にソート（id 昇順で安定ソート） */
+    typedef struct COMMENT_SORT_ENTRY {
+        char id[128];
+        int64_t created_at;
+    } COMMENT_SORT_ENTRY;
+    COMMENT_SORT_ENTRY* entries = (COMMENT_SORT_ENTRY*)malloc(sizeof(COMMENT_SORT_ENTRY) * (size_t)len);
+    if (entries == NULL) {
+        api_qs_memory_free(&context);
+        return EXIT_IO;
+    }
+    int valid_count = 0;
+    int32_t i;
+    for (i = 0; i < len; i++) {
+        char* id = api_qs_array_get_string(&ids, i);
+        if (id == NULL) {
+            continue;
+        }
+        char key[1024];
+        if (build_entity_key(key, sizeof(key), "comment", id) != 0) {
+            continue;
+        }
+        char* cjson = api_qs_kvs_get(&stores->comment, key);
+        if (cjson == NULL) {
+            continue;
+        }
+        snprintf(entries[valid_count].id, sizeof(entries[valid_count].id), "%s", id);
+        entries[valid_count].created_at = 0;
+        QS_MEMORY_CONTEXT cctx;
+        if (api_qs_memory_alloc(&cctx, 256 * 1024) == 0) {
+            QS_JSON_ELEMENT_OBJECT cobj;
+            if (api_qs_json_decode_object(&cctx, &cobj, cjson) == 0) {
+                int64_t ca_val;
+                if (get_created_at_value(&cobj, &ca_val) == 0) {
+                    entries[valid_count].created_at = ca_val;
+                }
+            }
+            api_qs_memory_free(&cctx);
+        }
+        valid_count++;
+    }
+
+    /* 単純な挿入ソート（createdAt 昇順、同値は id 昇順） */
+    for (i = 1; i < valid_count; i++) {
+        COMMENT_SORT_ENTRY tmp = entries[i];
+        int j = (int)i - 1;
+        while (j >= 0 && (entries[j].created_at > tmp.created_at ||
+               (entries[j].created_at == tmp.created_at && strcmp(entries[j].id, tmp.id) > 0))) {
+            entries[j + 1] = entries[j];
+            j--;
+        }
+        entries[j + 1] = tmp;
+    }
+
+    printf("[\n");
+    int printed = 0;
+    for (i = 0; i < valid_count; i++) {
+        char key[1024];
+        if (build_entity_key(key, sizeof(key), "comment", entries[i].id) != 0) {
+            continue;
+        }
+        char* cjson = api_qs_kvs_get(&stores->comment, key);
+        if (cjson == NULL) {
+            continue;
+        }
+        char* output_json = NULL;
+        if (build_comment_output_json(stores, cjson, &output_json) != 0) {
+            continue;
+        }
+        if (printed > 0) {
+            printf(",\n");
+        }
+        printf("%s", output_json);
+        free(output_json);
+        printed++;
+    }
+    printf("\n]\n");
+
+    free(entries);
+    api_qs_memory_free(&context);
+    return EXIT_OK;
+}
+
+/* comment update（body のみ編集可） */
+static int comment_update(APP_STORES* stores, const char* comment_id, const char* patch_json)
+{
+    char key[1024];
+    if (build_entity_key(key, sizeof(key), "comment", comment_id) != 0) {
+        return EXIT_IO;
+    }
+    char* old_json = api_qs_kvs_get(&stores->comment, key);
+    if (old_json == NULL) {
+        fprintf(stderr, "error: comment not found: %s\n", key);
+        return EXIT_NOT_FOUND;
+    }
+
+    /* 不変フィールドのチェック */
+    QS_MEMORY_CONTEXT context;
+    if (create_temp_memory(&context, 1024 * 1024) != 0) {
+        return EXIT_IO;
+    }
+    QS_JSON_ELEMENT_OBJECT patch_obj;
+    if (-1 == api_qs_json_decode_object(&context, &patch_obj, patch_json)) {
+        fprintf(stderr, "error: invalid json for comment update\n");
+        api_qs_memory_free(&context);
+        return EXIT_USAGE;
+    }
+    static const char* immutable_fields[] = {"id", "issueId", "userId", "createdAt"};
+    int fi;
+    for (fi = 0; fi < 4; fi++) {
+        if (api_qs_object_exist(&patch_obj, immutable_fields[fi])) {
+            fprintf(stderr, "error: comment field is immutable: %s\n", immutable_fields[fi]);
+            api_qs_memory_free(&context);
+            return EXIT_USAGE;
+        }
+    }
+
+    /* body のみ適用 */
+    char* body = api_qs_object_get_string(&patch_obj, "body");
+    if (body == NULL) {
+        fprintf(stderr, "error: comment update requires body field\n");
+        api_qs_memory_free(&context);
+        return EXIT_USAGE;
+    }
+    if (body[0] == '\0') {
+        fprintf(stderr, "error: comment body is empty\n");
+        api_qs_memory_free(&context);
+        return EXIT_USAGE;
+    }
+
+    /* 旧 JSON に body を反映して新 JSON を構築 */
+    QS_JSON_ELEMENT_OBJECT old_obj;
+    if (-1 == api_qs_json_decode_object(&context, &old_obj, old_json)) {
+        api_qs_memory_free(&context);
+        return EXIT_IO;
+    }
+    /* body を上書き */
+    if (api_qs_object_push_string(&old_obj, "body", body) == -1) {
+        api_qs_memory_free(&context);
+        return EXIT_IO;
+    }
+    char* new_json = api_qs_json_encode_object(&old_obj, 8192);
+    if (new_json == NULL) {
+        api_qs_memory_free(&context);
+        return EXIT_IO;
+    }
+    char* new_copy = strdup(new_json);
+    api_qs_memory_free(&context);
+    if (new_copy == NULL) {
+        return EXIT_IO;
+    }
+
+    if (kvs_set_with_compact_retry(stores, &stores->comment, &STORE_COMMENT, key, new_copy) != 0) {
+        free(new_copy);
+        fprintf(stderr, "error: failed to update comment: %s\n", key);
+        return EXIT_KVS;
+    }
+    free(new_copy);
+    printf("updated: %s\n", key);
+    return EXIT_OK;
+}
+
+/* comment delete */
+static int comment_delete(APP_STORES* stores, const char* comment_id)
+{
+    char key[1024];
+    if (build_entity_key(key, sizeof(key), "comment", comment_id) != 0) {
+        return EXIT_IO;
+    }
+    char* old_json = api_qs_kvs_get(&stores->comment, key);
+    if (old_json == NULL) {
+        fprintf(stderr, "error: comment not found: %s\n", key);
+        return EXIT_NOT_FOUND;
+    }
+
+    /* issueId を取得して index から除去 */
+    QS_MEMORY_CONTEXT context;
+    if (create_temp_memory(&context, 256 * 1024) != 0) {
+        return EXIT_IO;
+    }
+    QS_JSON_ELEMENT_OBJECT obj;
+    char* issue_id = NULL;
+    if (api_qs_json_decode_object(&context, &obj, old_json) == 0) {
+        issue_id = api_qs_object_get_string(&obj, "issueId");
+    }
+    api_qs_memory_free(&context);
+
+    if (-1 == api_qs_kvs_delete(&stores->comment, key)) {
+        fprintf(stderr, "error: failed to delete comment: %s\n", key);
+        return EXIT_KVS;
+    }
+    if (issue_id != NULL) {
+        char index_key[1024];
+        if (build_comment_index_key(index_key, sizeof(index_key), issue_id) == 0) {
+            if (index_remove_id(stores, index_key, comment_id) != 0) {
+                fprintf(stderr, "error: failed to update comment index\n");
+                return EXIT_KVS;
+            }
+        }
+    }
+    printf("deleted: %s\n", key);
+    return EXIT_OK;
+}
+
+/* issue の全コメントをカスケード削除する */
+static int comment_cascade_delete(APP_STORES* stores, const char* issue_id)
+{
+    char index_key[1024];
+    if (build_comment_index_key(index_key, sizeof(index_key), issue_id) != 0) {
+        return -1;
+    }
+    char* index_value = api_qs_kvs_get(&stores->index, index_key);
+    if (index_value == NULL) {
+        return 0;
+    }
+
+    QS_MEMORY_CONTEXT context;
+    if (create_temp_memory(&context, 1024 * 1024) != 0) {
+        return -1;
+    }
+    QS_JSON_ELEMENT_ARRAY ids;
+    if (decode_index_array(&context, index_value, &ids) != 0) {
+        api_qs_memory_free(&context);
+        return -1;
+    }
+    int32_t len = api_qs_array_get_length(&ids);
+    int32_t i;
+    for (i = 0; i < len; i++) {
+        char* id = api_qs_array_get_string(&ids, i);
+        if (id == NULL) {
+            continue;
+        }
+        char key[1024];
+        if (build_entity_key(key, sizeof(key), "comment", id) != 0) {
+            continue;
+        }
+        if (api_qs_kvs_get(&stores->comment, key) != NULL) {
+            if (-1 == api_qs_kvs_delete(&stores->comment, key)) {
+                api_qs_memory_free(&context);
+                return -1;
+            }
+        }
+    }
+    api_qs_memory_free(&context);
+
+    if (-1 == api_qs_kvs_delete(&stores->index, index_key)) {
+        return -1;
+    }
+    return 0;
+}
+
+/* issue get --with-comments: issue JSON に comments 配列を追加して出力 */
+static int issue_get_with_comments(APP_STORES* stores, const char* issue_id, const char* issue_key)
+{
+    char* issue_json = api_qs_kvs_get(&stores->issue, issue_key);
+    if (issue_json == NULL) {
+        fprintf(stderr, "error: issue not found: %s\n", issue_key);
+        return EXIT_NOT_FOUND;
+    }
+
+    QS_MEMORY_CONTEXT context;
+    if (create_temp_memory(&context, 4 * 1024 * 1024) != 0) {
+        return EXIT_IO;
+    }
+
+    QS_JSON_ELEMENT_OBJECT issue_obj;
+    if (-1 == api_qs_json_decode_object(&context, &issue_obj, issue_json)) {
+        api_qs_memory_free(&context);
+        return EXIT_IO;
+    }
+
+    /* comments 配列を構築（createdAt 昇順） */
+    char index_key[1024];
+    if (build_comment_index_key(index_key, sizeof(index_key), issue_id) != 0) {
+        api_qs_memory_free(&context);
+        return EXIT_IO;
+    }
+    char* index_value = api_qs_kvs_get(&stores->index, index_key);
+
+    QS_JSON_ELEMENT_ARRAY comments_arr;
+    if (-1 == api_qs_array_create(&context, &comments_arr)) {
+        api_qs_memory_free(&context);
+        return EXIT_IO;
+    }
+
+    if (index_value != NULL) {
+        QS_JSON_ELEMENT_ARRAY ids;
+        if (decode_index_array(&context, index_value, &ids) == 0) {
+            int32_t len = api_qs_array_get_length(&ids);
+            int32_t i;
+            /* 簡易ソート: createdAt 昇順 */
+            typedef struct CS_ENTRY { char id[128]; int64_t ca; } CS_ENTRY;
+            CS_ENTRY* entries = (CS_ENTRY*)malloc(sizeof(CS_ENTRY) * (size_t)(len > 0 ? len : 1));
+            if (entries != NULL) {
+                int vc = 0;
+                for (i = 0; i < len; i++) {
+                    char* cid = api_qs_array_get_string(&ids, i);
+                    if (cid == NULL) continue;
+                    char ckey[1024];
+                    if (build_entity_key(ckey, sizeof(ckey), "comment", cid) != 0) continue;
+                    char* cjson = api_qs_kvs_get(&stores->comment, ckey);
+                    if (cjson == NULL) continue;
+                    snprintf(entries[vc].id, sizeof(entries[vc].id), "%s", cid);
+                    entries[vc].ca = 0;
+                    QS_JSON_ELEMENT_OBJECT cobj;
+                    if (api_qs_json_decode_object(&context, &cobj, cjson) == 0) {
+                        int64_t ca_val;
+                        if (get_created_at_value(&cobj, &ca_val) == 0) entries[vc].ca = ca_val;
+                    }
+                    vc++;
+                }
+                for (i = 1; i < vc; i++) {
+                    CS_ENTRY tmp = entries[i];
+                    int j = (int)i - 1;
+                    while (j >= 0 && (entries[j].ca > tmp.ca ||
+                           (entries[j].ca == tmp.ca && strcmp(entries[j].id, tmp.id) > 0))) {
+                        entries[j + 1] = entries[j];
+                        j--;
+                    }
+                    entries[j + 1] = tmp;
+                }
+                for (i = 0; i < vc; i++) {
+                    char ckey[1024];
+                    if (build_entity_key(ckey, sizeof(ckey), "comment", entries[i].id) != 0) continue;
+                    char* cjson = api_qs_kvs_get(&stores->comment, ckey);
+                    if (cjson == NULL) continue;
+                    /* 取得時出力形式で付与 */
+                    QS_JSON_ELEMENT_OBJECT cobj;
+                    if (api_qs_json_decode_object(&context, &cobj, cjson) != 0) continue;
+                    char* uid = api_qs_object_get_string(&cobj, "userId");
+                    if (uid != NULL) {
+                        char ukey[1024];
+                        if (snprintf(ukey, sizeof(ukey), "user:%s", uid) > 0) {
+                            char* ujson = api_qs_kvs_get(&stores->user, ukey);
+                            if (ujson != NULL) {
+                                QS_JSON_ELEMENT_OBJECT uobj;
+                                if (api_qs_json_decode_object(&context, &uobj, ujson) == 0) {
+                                    QS_JSON_ELEMENT_OBJECT uout;
+                                    if (api_qs_object_create(&context, &uout) == 0) {
+                                        if (api_qs_object_push_string(&uout, "id", uid) == 0) {
+                                            char* un = api_qs_object_get_string(&uobj, "name");
+                                            if (api_qs_object_push_string(&uout, "name", un != NULL ? un : "") == 0) {
+                                                api_qs_object_push_object(&cobj, "user", &uout);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    int64_t ca_val;
+                    if (get_created_at_value(&cobj, &ca_val) == 0) {
+                        char jst[64];
+                        if (format_jst(ca_val, jst, sizeof(jst)) == 0) {
+                            api_qs_object_push_string(&cobj, "createdAtJst", jst);
+                        }
+                    }
+                    api_qs_array_push_object(&comments_arr, &cobj);
+                }
+                free(entries);
+            }
+        }
+    }
+
+    if (api_qs_object_push_array(&issue_obj, "comments", &comments_arr) == -1) {
+        api_qs_memory_free(&context);
+        return EXIT_IO;
+    }
+
+    char* encoded = api_qs_json_encode_object(&issue_obj, 65536);
+    if (encoded == NULL) {
+        api_qs_memory_free(&context);
+        return EXIT_IO;
+    }
+    printf("%s\n", encoded);
+    api_qs_memory_free(&context);
+    return EXIT_OK;
+}
+
+/* issue comment サブコマンド */
+static int command_issue_comment(int argc, char* argv[], APP_STORES* stores)
+{
+    if (argc < 4) {
+        fprintf(stderr, "error: comment action is required\n");
+        return EXIT_USAGE;
+    }
+    const char* action = argv[3];
+    const char* id = get_option_value(argc, argv, "--id");
+    const char* issue_id = get_option_value(argc, argv, "--issue");
+    const char* json = get_option_value(argc, argv, "--json");
+
+    if (strcmp(action, "create") == 0) {
+        if (issue_id == NULL) {
+            fprintf(stderr, "error: --issue is required for comment create\n");
+            return EXIT_USAGE;
+        }
+        if (json == NULL) {
+            fprintf(stderr, "error: --json is required for comment create\n");
+            return EXIT_USAGE;
+        }
+        /* issue の存在確認 */
+        char issue_key[1024];
+        if (snprintf(issue_key, sizeof(issue_key), "issue:%s", issue_id) <= 0) {
+            return EXIT_IO;
+        }
+        if (api_qs_kvs_get(&stores->issue, issue_key) == NULL) {
+            fprintf(stderr, "error: issue not found for comment: %s\n", issue_id);
+            return EXIT_NOT_FOUND;
+        }
+
+        char generated_id[128];
+        const char* final_id = id;
+        if (final_id == NULL) {
+            if (next_counter_id(stores, "counter:comment", "cmt_", generated_id, sizeof(generated_id)) != 0) {
+                fprintf(stderr, "error: failed to generate comment id\n");
+                return EXIT_KVS;
+            }
+            final_id = generated_id;
+            printf("generated id: %s\n", final_id);
+        }
+
+        /* JSON に id / issueId / createdAt を注入して最終 JSON を構築 */
+        QS_MEMORY_CONTEXT context;
+        if (create_temp_memory(&context, 1024 * 1024) != 0) {
+            return EXIT_IO;
+        }
+        QS_JSON_ELEMENT_OBJECT obj;
+        if (-1 == api_qs_json_decode_object(&context, &obj, json)) {
+            fprintf(stderr, "error: invalid json for comment create\n");
+            api_qs_memory_free(&context);
+            return EXIT_USAGE;
+        }
+        if (api_qs_object_push_string(&obj, "id", final_id) == -1 ||
+            api_qs_object_push_string(&obj, "issueId", issue_id) == -1) {
+            fprintf(stderr, "error: failed to build comment json\n");
+            api_qs_memory_free(&context);
+            return EXIT_IO;
+        }
+        time_t now = time(NULL);
+        if (api_qs_object_push_big_integer(&obj, "createdAt", (int64_t)now) == -1) {
+            fprintf(stderr, "error: failed to build comment json\n");
+            api_qs_memory_free(&context);
+            return EXIT_IO;
+        }
+        /* スキーマ検証 */
+        SCHEMA_DEF schema;
+        if (load_schema(stores->base_dir, "schema_comment.json", &schema) != 0) {
+            api_qs_memory_free(&context);
+            return EXIT_IO;
+        }
+        if (validate_and_fill_schema_object("comment", &schema, &obj, &context) != 0) {
+            fprintf(stderr, "error: schema validation failed for comment create\n");
+            api_qs_memory_free(&context);
+            return EXIT_USAGE;
+        }
+        char* final_json = api_qs_json_encode_object(&obj, 8192);
+        if (final_json == NULL) {
+            api_qs_memory_free(&context);
+            return EXIT_IO;
+        }
+        char* final_copy = strdup(final_json);
+        api_qs_memory_free(&context);
+        if (final_copy == NULL) {
+            return EXIT_IO;
+        }
+        int rc = comment_create(stores, final_id, issue_id, final_copy);
+        free(final_copy);
+        return rc;
+    }
+
+    if (strcmp(action, "list") == 0) {
+        if (issue_id == NULL) {
+            fprintf(stderr, "error: --issue is required for comment list\n");
+            return EXIT_USAGE;
+        }
+        return comment_list(stores, issue_id);
+    }
+
+    if (id == NULL) {
+        fprintf(stderr, "error: --id is required\n");
+        return EXIT_USAGE;
+    }
+
+    if (strcmp(action, "get") == 0) {
+        return comment_get(stores, id);
+    }
+    if (strcmp(action, "update") == 0) {
+        if (json == NULL) {
+            fprintf(stderr, "error: --json is required for comment update\n");
+            return EXIT_USAGE;
+        }
+        return comment_update(stores, id, json);
+    }
+    if (strcmp(action, "delete") == 0) {
+        return comment_delete(stores, id);
+    }
+
+    fprintf(stderr, "error: unsupported comment action: %s\n", action);
+    return EXIT_USAGE;
 }
 
 static int print_issue_list_from_ids(APP_STORES* stores, QS_JSON_ELEMENT_ARRAY* ids)
@@ -2135,17 +2939,21 @@ static int verify_index_against_issues(APP_STORES* stores, INDEX_SCAN_DATA* data
         api_qs_memory_free(&temp);
         return -1;
     }
+    /* 空の index ストアは api_qs_kvs_sorted_keys が -1 を返すためスキップ */
+    int index_store_empty = 0;
     if (-1 == api_qs_kvs_sorted_keys(&keys, &stores->index, 1)) {
-        fprintf(stderr, "verify: error: failed to list index keys\n");
-        api_qs_memory_free(&temp);
-        return -1;
+        index_store_empty = 1;
     }
 
-    int32_t len = api_qs_array_get_length(&keys);
+    int32_t len = index_store_empty ? 0 : api_qs_array_get_length(&keys);
     int32_t i;
     for (i = 0; i < len; i++) {
         char* key = api_qs_array_get_string(&keys, i);
         if (key == NULL || strncmp(key, "index:", 6) != 0) {
+            continue;
+        }
+        /* comment index は verify_comments で検証するためここでスキップ */
+        if (strncmp(key, "index:comment:issue:", 20) == 0) {
             continue;
         }
         data->index_entry_count++;
@@ -2230,6 +3038,155 @@ static int verify_index_against_issues(APP_STORES* stores, INDEX_SCAN_DATA* data
     return 0;
 }
 
+/* comment 本体 → index 方向 + index → comment 本体方向 の検証 */
+static int verify_comments(APP_STORES* stores, INDEX_SCAN_DATA* data)
+{
+    QS_MEMORY_CONTEXT temp;
+    if (create_temp_memory(&temp, 4 * 1024 * 1024) != 0) {
+        return -1;
+    }
+
+    /* 1. comment 本体 → index 方向 */
+    QS_JSON_ELEMENT_ARRAY comment_keys;
+    if (-1 == api_qs_array_create(&temp, &comment_keys)) {
+        api_qs_memory_free(&temp);
+        return -1;
+    }
+    /* 空の comment ストアは api_qs_kvs_sorted_keys が -1 を返すためスキップ */
+    if (-1 == api_qs_kvs_sorted_keys(&comment_keys, &stores->comment, 1)) {
+        api_qs_memory_free(&temp);
+        return 0;
+    }
+    int32_t clen = api_qs_array_get_length(&comment_keys);
+    int32_t i;
+    for (i = 0; i < clen; i++) {
+        char* key = api_qs_array_get_string(&comment_keys, i);
+        if (key == NULL || strncmp(key, "comment:", 8) != 0) {
+            continue;
+        }
+        char* cjson = api_qs_kvs_get(&stores->comment, key);
+        if (cjson == NULL) {
+            continue;
+        }
+        /* 各コメントごとに新しいコンテキストでデコード */
+        QS_MEMORY_CONTEXT cctx;
+        if (create_temp_memory(&cctx, 1024 * 1024) != 0) {
+            api_qs_memory_free(&temp);
+            return -1;
+        }
+        QS_JSON_ELEMENT_OBJECT cobj;
+        if (-1 == api_qs_json_decode_object(&cctx, &cobj, cjson)) {
+            api_qs_memory_free(&cctx);
+            report_corrupt_key(data, key);
+            continue;
+        }
+        char* issue_id = api_qs_object_get_string(&cobj, "issueId");
+        if (issue_id == NULL) {
+            api_qs_memory_free(&cctx);
+            report_corrupt_key(data, key);
+            continue;
+        }
+        char index_key[1024];
+        if (build_comment_index_key(index_key, sizeof(index_key), issue_id) != 0) {
+            api_qs_memory_free(&cctx);
+            continue;
+        }
+        char* ids_json = api_qs_kvs_get(&stores->index, index_key);
+        if (ids_json == NULL) {
+            api_qs_memory_free(&cctx);
+            data->missing_count++;
+            printf("missing: %s (comment=%s)\n", index_key, key + 8);
+            continue;
+        }
+        QS_JSON_ELEMENT_ARRAY ids;
+        if (decode_index_array(&cctx, ids_json, &ids) != 0) {
+            api_qs_memory_free(&cctx);
+            report_corrupt_key(data, index_key);
+            continue;
+        }
+        if (!array_has_string(&ids, key + 8)) {
+            data->missing_count++;
+            printf("missing: %s (comment=%s)\n", index_key, key + 8);
+        }
+        api_qs_memory_free(&cctx);
+    }
+
+    /* 2. index → comment 本体方向 */
+    QS_JSON_ELEMENT_ARRAY index_keys;
+    if (-1 == api_qs_array_create(&temp, &index_keys)) {
+        api_qs_memory_free(&temp);
+        return -1;
+    }
+    if (-1 == api_qs_kvs_sorted_keys(&index_keys, &stores->index, 1)) {
+        api_qs_memory_free(&temp);
+        return -1;
+    }
+    int32_t ilen = api_qs_array_get_length(&index_keys);
+    for (i = 0; i < ilen; i++) {
+        char* key = api_qs_array_get_string(&index_keys, i);
+        if (key == NULL || strncmp(key, "index:comment:issue:", 20) != 0) {
+            continue;
+        }
+        data->index_entry_count++;
+        char* expected_issue_id = key + 20;
+        char* ids_json = api_qs_kvs_get(&stores->index, key);
+        if (ids_json == NULL) {
+            continue;
+        }
+        QS_MEMORY_CONTEXT icctx;
+        if (create_temp_memory(&icctx, 1024 * 1024) != 0) {
+            api_qs_memory_free(&temp);
+            return -1;
+        }
+        QS_JSON_ELEMENT_ARRAY ids;
+        if (decode_index_array(&icctx, ids_json, &ids) != 0) {
+            api_qs_memory_free(&icctx);
+            report_corrupt_key(data, key);
+            continue;
+        }
+        int32_t id_len = api_qs_array_get_length(&ids);
+        int32_t j;
+        for (j = 0; j < id_len; j++) {
+            char* comment_id = api_qs_array_get_string(&ids, j);
+            if (comment_id == NULL) {
+                continue;
+            }
+            char comment_key[1024];
+            if (build_entity_key(comment_key, sizeof(comment_key), "comment", comment_id) != 0) {
+                continue;
+            }
+            char* cjson = api_qs_kvs_get(&stores->comment, comment_key);
+            if (cjson == NULL) {
+                data->stale_count++;
+                printf("stale: %s (comment=%s not found)\n", key, comment_id);
+                continue;
+            }
+            QS_MEMORY_CONTEXT cctx;
+            if (create_temp_memory(&cctx, 256 * 1024) != 0) {
+                api_qs_memory_free(&icctx);
+                api_qs_memory_free(&temp);
+                return -1;
+            }
+            QS_JSON_ELEMENT_OBJECT cobj;
+            if (api_qs_json_decode_object(&cctx, &cobj, cjson) != 0) {
+                api_qs_memory_free(&cctx);
+                report_corrupt_key(data, comment_key);
+                continue;
+            }
+            char* actual_issue_id = api_qs_object_get_string(&cobj, "issueId");
+            if (actual_issue_id == NULL || strcmp(actual_issue_id, expected_issue_id) != 0) {
+                data->stale_count++;
+                printf("stale: %s (comment=%s issueId mismatch)\n", key, comment_id);
+            }
+            api_qs_memory_free(&cctx);
+        }
+        api_qs_memory_free(&icctx);
+    }
+
+    api_qs_memory_free(&temp);
+    return 0;
+}
+
 static int command_verify(int argc, char* argv[])
 {
     const char* base_dir = DEFAULT_BASE_DIR;
@@ -2263,15 +3220,14 @@ static int command_verify(int argc, char* argv[])
         close_all_stores(&stores);
         return EXIT_IO;
     }
+    /* 空の issue ストアは api_qs_kvs_sorted_keys が -1 を返すためスキップ */
+    int issue_store_empty = 0;
     if (-1 == api_qs_kvs_sorted_keys(&keys, &stores.issue, 1)) {
-        fprintf(stderr, "verify: error: failed to list issue keys\n");
-        api_qs_memory_free(&temp);
-        close_all_stores(&stores);
-        return EXIT_KVS;
+        issue_store_empty = 1;
     }
 
     int rc = EXIT_OK;
-    int32_t len = api_qs_array_get_length(&keys);
+    int32_t len = issue_store_empty ? 0 : api_qs_array_get_length(&keys);
     int32_t i;
     for (i = 0; i < len; i++) {
         char* key = api_qs_array_get_string(&keys, i);
@@ -2293,6 +3249,12 @@ static int command_verify(int argc, char* argv[])
 
     if (verify_index_against_issues(&stores, &data) != 0) {
         fprintf(stderr, "verify: error: failed to verify index against issues\n");
+        api_qs_memory_free(&temp);
+        close_all_stores(&stores);
+        return EXIT_KVS;
+    }
+    if (verify_comments(&stores, &data) != 0) {
+        fprintf(stderr, "verify: error: failed to verify comments\n");
         api_qs_memory_free(&temp);
         close_all_stores(&stores);
         return EXIT_KVS;
@@ -2474,17 +3436,14 @@ static int command_reindex(int argc, char* argv[])
         close_all_stores(&stores);
         return EXIT_IO;
     }
+    /* 空の issue ストアは api_qs_kvs_sorted_keys が -1 を返すためスキップ */
+    int issue_store_empty = 0;
     if (-1 == api_qs_kvs_sorted_keys(&issue_keys, &stores.issue, 1)) {
-        api_qs_memory_free(&temp);
-        api_qs_persistence_kvs_memory_free(&stores.index);
-        unlink(temp_index_path);
-        open_store_checked(&STORE_INDEX, base_dir, &stores.index);
-        close_all_stores(&stores);
-        return EXIT_KVS;
+        issue_store_empty = 1;
     }
 
     int issue_count = 0;
-    int32_t issue_len = api_qs_array_get_length(&issue_keys);
+    int32_t issue_len = issue_store_empty ? 0 : api_qs_array_get_length(&issue_keys);
     int32_t i;
     for (i = 0; i < issue_len; i++) {
         char* key = api_qs_array_get_string(&issue_keys, i);
@@ -2506,8 +3465,69 @@ static int command_reindex(int argc, char* argv[])
         }
         issue_count++;
     }
+
+    /* comment index の再構築 */
+    int comment_count = 0;
+    QS_JSON_ELEMENT_ARRAY comment_keys;
+    if (-1 == api_qs_array_create(&temp, &comment_keys)) {
+        api_qs_memory_free(&temp);
+        api_qs_persistence_kvs_memory_free(&stores.index);
+        unlink(temp_index_path);
+        open_store_checked(&STORE_INDEX, base_dir, &stores.index);
+        close_all_stores(&stores);
+        return EXIT_IO;
+    }
+    /* 空の comment ストアは api_qs_kvs_sorted_keys が -1 を返すためスキップ */
+    if (-1 == api_qs_kvs_sorted_keys(&comment_keys, &stores.comment, 1)) {
+        api_qs_memory_free(&temp);
+        goto reindex_switch;
+    }
+    int32_t ckey_len = api_qs_array_get_length(&comment_keys);
+    for (i = 0; i < ckey_len; i++) {
+        char* key = api_qs_array_get_string(&comment_keys, i);
+        if (key == NULL || strncmp(key, "comment:", 8) != 0) {
+            continue;
+        }
+        char* cjson = api_qs_kvs_get(&stores.comment, key);
+        if (cjson == NULL) {
+            continue;
+        }
+        QS_MEMORY_CONTEXT cctx;
+        if (create_temp_memory(&cctx, 256 * 1024) != 0) {
+            api_qs_memory_free(&temp);
+            api_qs_persistence_kvs_memory_free(&stores.index);
+            unlink(temp_index_path);
+            open_store_checked(&STORE_INDEX, base_dir, &stores.index);
+            close_all_stores(&stores);
+            return EXIT_IO;
+        }
+        QS_JSON_ELEMENT_OBJECT cobj;
+        if (api_qs_json_decode_object(&cctx, &cobj, cjson) != 0) {
+            api_qs_memory_free(&cctx);
+            continue;
+        }
+        char* issue_id = api_qs_object_get_string(&cobj, "issueId");
+        if (issue_id != NULL) {
+            char index_key[1024];
+            if (build_comment_index_key(index_key, sizeof(index_key), issue_id) == 0) {
+                if (reindex_add_id(&stores.index, index_key, key + 8) != 0) {
+                    api_qs_memory_free(&cctx);
+                    api_qs_memory_free(&temp);
+                    api_qs_persistence_kvs_memory_free(&stores.index);
+                    unlink(temp_index_path);
+                    open_store_checked(&STORE_INDEX, base_dir, &stores.index);
+                    close_all_stores(&stores);
+                    fprintf(stderr, "error: failed to rebuild comment index for: %s\n", key);
+                    return EXIT_KVS;
+                }
+            }
+        }
+        api_qs_memory_free(&cctx);
+        comment_count++;
+    }
     api_qs_memory_free(&temp);
 
+reindex_switch:
     /* 一時ストアを閉じ、元のファイルを backup に退避して一時ファイルを切り替える */
     api_qs_persistence_kvs_memory_free(&stores.index);
     unlink(backup_path);
@@ -2528,12 +3548,13 @@ static int command_reindex(int argc, char* argv[])
     }
     unlink(backup_path);
 
-    printf("reindex: rebuilt index from %d issues\n", issue_count);
+    printf("reindex: rebuilt index from %d issues, %d comments\n", issue_count, comment_count);
     if (open_store_checked(&STORE_INDEX, base_dir, &stores.index) != 0) {
         api_qs_persistence_kvs_memory_free(&stores.user);
         api_qs_persistence_kvs_memory_free(&stores.label);
         api_qs_persistence_kvs_memory_free(&stores.issue);
         api_qs_persistence_kvs_memory_free(&stores.system);
+        api_qs_persistence_kvs_memory_free(&stores.comment);
         return EXIT_IO;
     }
     close_all_stores(&stores);
@@ -2553,7 +3574,7 @@ static int command_init(int argc, char* argv[])
         return EXIT_IO;
     }
 
-    const STORE_CONFIG* stores[] = {&STORE_USER, &STORE_LABEL, &STORE_ISSUE, &STORE_INDEX, &STORE_SYSTEM};
+    const STORE_CONFIG* stores[] = {&STORE_USER, &STORE_LABEL, &STORE_ISSUE, &STORE_INDEX, &STORE_SYSTEM, &STORE_COMMENT};
     size_t store_len = sizeof(stores) / sizeof(stores[0]);
     size_t i;
     for (i = 0; i < store_len; i++) {
@@ -2729,6 +3750,10 @@ static int command_issue(int argc, char* argv[], APP_STORES* stores)
     const char* json = get_option_value(argc, argv, "--json");
     const char* field = get_option_value(argc, argv, "--field");
 
+    if (strcmp(action, "comment") == 0) {
+        return command_issue_comment(argc, argv, stores);
+    }
+
     if (strcmp(action, "list") == 0) {
         const char* status = get_option_value(argc, argv, "--status");
         const char* assignee = get_option_value(argc, argv, "--assignee");
@@ -2833,6 +3858,9 @@ static int command_issue(int argc, char* argv[], APP_STORES* stores)
         if (build_entity_key(key, sizeof(key), "issue", id) != 0) {
             return EXIT_IO;
         }
+        if (has_option(argc, argv, "--with-comments")) {
+            return issue_get_with_comments(stores, id, key);
+        }
         return entity_get(&stores->issue, key);
     }
     if (strcmp(action, "update") == 0) {
@@ -2931,7 +3959,7 @@ static int command_compact(int argc, char* argv[])
     }
 
     if (strcmp(store_arg, "all") == 0) {
-        const STORE_CONFIG* stores[] = {&STORE_USER, &STORE_LABEL, &STORE_ISSUE, &STORE_INDEX, &STORE_SYSTEM};
+        const STORE_CONFIG* stores[] = {&STORE_USER, &STORE_LABEL, &STORE_ISSUE, &STORE_INDEX, &STORE_SYSTEM, &STORE_COMMENT};
         size_t i;
         for (i = 0; i < sizeof(stores) / sizeof(stores[0]); i++) {
             if (compact_store(stores[i], base_dir) != 0) {
@@ -2955,6 +3983,9 @@ static int command_compact(int argc, char* argv[])
     if (strcmp(store_arg, "system") == 0) {
         return (compact_store(&STORE_SYSTEM, base_dir) == 0) ? EXIT_OK : EXIT_KVS;
     }
+    if (strcmp(store_arg, "comment") == 0) {
+        return (compact_store(&STORE_COMMENT, base_dir) == 0) ? EXIT_OK : EXIT_KVS;
+    }
     fprintf(stderr, "error: invalid --store value: %s\n", store_arg);
     return EXIT_USAGE;
 }
@@ -2976,7 +4007,8 @@ static int command_schema(int argc, char* argv[])
         printf("{\"schemas\":[");
         printf("{\"entity\":\"user\",\"file\":\"schema_user.json\"},");
         printf("{\"entity\":\"label\",\"file\":\"schema_label.json\"},");
-        printf("{\"entity\":\"issue\",\"file\":\"schema_issue.json\"}");
+        printf("{\"entity\":\"issue\",\"file\":\"schema_issue.json\"},");
+        printf("{\"entity\":\"comment\",\"file\":\"schema_comment.json\"}");
         printf("]}\n");
         return EXIT_OK;
     }
