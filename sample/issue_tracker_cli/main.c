@@ -89,6 +89,8 @@ static void print_usage(const char* program_name)
     printf("  %s label list [--base-dir <dir>]\n", program_name);
     printf("  %s issue <create|get|update|delete|unset> --id <id> [--json <json>] [--field <name>] [--base-dir <dir>]\n", program_name);
     printf("  %s issue list [--status <status> | --assignee <userId> | --label <label>] [--base-dir <dir>]\n", program_name);
+    printf("  %s reindex [--base-dir <dir>]\n", program_name);
+    printf("  %s verify  [--base-dir <dir>]\n", program_name);
     printf("  %s schema <list|get> [--entity user|label|issue] [--base-dir <dir>]\n", program_name);
     printf("  %s compact [--store user|label|issue|index|system|all] [--base-dir <dir>]\n", program_name);
     printf("\n");
@@ -1729,6 +1731,447 @@ static int compact_store(const STORE_CONFIG* cfg, const char* base_dir)
     return 0;
 }
 
+typedef struct INDEX_SCAN_DATA {
+    APP_STORES* stores;
+    char issue_id[1024];
+    char corrupt_keys[256][1024];
+    int corrupt_key_count;
+    int issue_count;
+    int index_entry_count;
+    int missing_count;
+    int stale_count;
+    int corrupt_count;
+} INDEX_SCAN_DATA;
+
+static int report_corrupt_key(INDEX_SCAN_DATA* data, const char* key)
+{
+    int i;
+    for (i = 0; i < data->corrupt_key_count; i++) {
+        if (strcmp(data->corrupt_keys[i], key) == 0) {
+            return 0;
+        }
+    }
+    if (data->corrupt_key_count >= 256) {
+        return 0;
+    }
+    snprintf(data->corrupt_keys[data->corrupt_key_count], 1024, "%s", key);
+    data->corrupt_key_count++;
+    data->corrupt_count++;
+    printf("corrupt: %s (invalid json)\n", key);
+    return 0;
+}
+
+static int cb_verify_status(const char* value, void* user_data)
+{
+    INDEX_SCAN_DATA* d = (INDEX_SCAN_DATA*)user_data;
+    char key[1024];
+    if (snprintf(key, sizeof(key), "index:status:%s", value) <= 0) {
+        return -1;
+    }
+    char* ids_json = api_qs_kvs_get(&d->stores->index, key);
+    if (ids_json == NULL) {
+        d->missing_count++;
+        printf("missing: %s (issue=%s)\n", key, d->issue_id);
+        return 0;
+    }
+    QS_MEMORY_CONTEXT context;
+    if (create_temp_memory(&context, 1024 * 1024) != 0) {
+        return -1;
+    }
+    QS_JSON_ELEMENT_ARRAY ids;
+    if (decode_index_array(&context, ids_json, &ids) != 0) {
+        api_qs_memory_free(&context);
+        report_corrupt_key(d, key);
+        return 0;
+    }
+    if (!array_has_string(&ids, d->issue_id)) {
+        d->missing_count++;
+        printf("missing: %s (issue=%s)\n", key, d->issue_id);
+    }
+    api_qs_memory_free(&context);
+    return 0;
+}
+
+static int cb_verify_assignee(const char* value, void* user_data)
+{
+    INDEX_SCAN_DATA* d = (INDEX_SCAN_DATA*)user_data;
+    char key[1024];
+    if (snprintf(key, sizeof(key), "index:assignee:%s", value) <= 0) {
+        return -1;
+    }
+    char* ids_json = api_qs_kvs_get(&d->stores->index, key);
+    if (ids_json == NULL) {
+        d->missing_count++;
+        printf("missing: %s (issue=%s)\n", key, d->issue_id);
+        return 0;
+    }
+    QS_MEMORY_CONTEXT context;
+    if (create_temp_memory(&context, 1024 * 1024) != 0) {
+        return -1;
+    }
+    QS_JSON_ELEMENT_ARRAY ids;
+    if (decode_index_array(&context, ids_json, &ids) != 0) {
+        api_qs_memory_free(&context);
+        report_corrupt_key(d, key);
+        return 0;
+    }
+    if (!array_has_string(&ids, d->issue_id)) {
+        d->missing_count++;
+        printf("missing: %s (issue=%s)\n", key, d->issue_id);
+    }
+    api_qs_memory_free(&context);
+    return 0;
+}
+
+static int cb_verify_label(const char* value, void* user_data)
+{
+    INDEX_SCAN_DATA* d = (INDEX_SCAN_DATA*)user_data;
+    char key[1024];
+    if (snprintf(key, sizeof(key), "index:label:%s", value) <= 0) {
+        return -1;
+    }
+    char* ids_json = api_qs_kvs_get(&d->stores->index, key);
+    if (ids_json == NULL) {
+        d->missing_count++;
+        printf("missing: %s (issue=%s)\n", key, d->issue_id);
+        return 0;
+    }
+    QS_MEMORY_CONTEXT context;
+    if (create_temp_memory(&context, 1024 * 1024) != 0) {
+        return -1;
+    }
+    QS_JSON_ELEMENT_ARRAY ids;
+    if (decode_index_array(&context, ids_json, &ids) != 0) {
+        api_qs_memory_free(&context);
+        report_corrupt_key(d, key);
+        return 0;
+    }
+    if (!array_has_string(&ids, d->issue_id)) {
+        d->missing_count++;
+        printf("missing: %s (issue=%s)\n", key, d->issue_id);
+    }
+    api_qs_memory_free(&context);
+    return 0;
+}
+
+static int verify_issue_against_index(APP_STORES* stores, const char* issue_id, const char* issue_json, INDEX_SCAN_DATA* data)
+{
+    if (snprintf(data->issue_id, sizeof(data->issue_id), "%s", issue_id) <= 0) {
+        return -1;
+    }
+
+    QS_MEMORY_CONTEXT context;
+    if (create_temp_memory(&context, 1024 * 1024) != 0) {
+        return -1;
+    }
+
+    QS_JSON_ELEMENT_OBJECT obj;
+    if (-1 == api_qs_json_decode_object(&context, &obj, issue_json)) {
+        api_qs_memory_free(&context);
+        return -1;
+    }
+
+    char* status = api_qs_object_get_string(&obj, "status");
+    if (status != NULL) {
+        if (cb_verify_status(status, data) != 0) {
+            api_qs_memory_free(&context);
+            return -1;
+        }
+    }
+
+    QS_JSON_ELEMENT_ARRAY assignee_ids;
+    if (api_qs_object_get_array(&obj, "assigneeIds", &assignee_ids) == 0) {
+        if (for_each_string_in_array(&assignee_ids, cb_verify_assignee, data) != 0) {
+            api_qs_memory_free(&context);
+            return -1;
+        }
+    }
+
+    QS_JSON_ELEMENT_ARRAY label_ids;
+    if (api_qs_object_get_array(&obj, "labelIds", &label_ids) == 0) {
+        if (for_each_string_in_array(&label_ids, cb_verify_label, data) != 0) {
+            api_qs_memory_free(&context);
+            return -1;
+        }
+    }
+
+    api_qs_memory_free(&context);
+    return 0;
+}
+
+static int verify_index_against_issues(APP_STORES* stores, INDEX_SCAN_DATA* data)
+{
+    QS_MEMORY_CONTEXT temp;
+    if (create_temp_memory(&temp, 4 * 1024 * 1024) != 0) {
+        return -1;
+    }
+
+    QS_JSON_ELEMENT_ARRAY keys;
+    if (-1 == api_qs_array_create(&temp, &keys)) {
+        api_qs_memory_free(&temp);
+        return -1;
+    }
+    if (-1 == api_qs_kvs_sorted_keys(&keys, &stores->index, 1)) {
+        api_qs_memory_free(&temp);
+        return -1;
+    }
+
+    int32_t len = api_qs_array_get_length(&keys);
+    int32_t i;
+    for (i = 0; i < len; i++) {
+        char* key = api_qs_array_get_string(&keys, i);
+        if (key == NULL || strncmp(key, "index:", 6) != 0) {
+            continue;
+        }
+        data->index_entry_count++;
+
+        char* ids_json = api_qs_kvs_get(&stores->index, key);
+        if (ids_json == NULL) {
+            continue;
+        }
+        QS_JSON_ELEMENT_ARRAY ids;
+        if (decode_index_array(&temp, ids_json, &ids) != 0) {
+            report_corrupt_key(data, key);
+            continue;
+        }
+
+        int32_t id_len = api_qs_array_get_length(&ids);
+        int32_t j;
+        for (j = 0; j < id_len; j++) {
+            char* issue_id = api_qs_array_get_string(&ids, j);
+            if (issue_id == NULL) {
+                continue;
+            }
+            char issue_key[1024];
+            if (build_entity_key(issue_key, sizeof(issue_key), "issue", issue_id) != 0) {
+                continue;
+            }
+            if (api_qs_kvs_get(&stores->issue, issue_key) == NULL) {
+                data->stale_count++;
+                printf("stale: %s (issue=%s not found)\n", key, issue_id);
+                continue;
+            }
+            QS_MEMORY_CONTEXT issue_context;
+            if (create_temp_memory(&issue_context, 1024 * 1024) != 0) {
+                api_qs_memory_free(&temp);
+                return -1;
+            }
+            char* issue_json = api_qs_kvs_get(&stores->issue, issue_key);
+            QS_JSON_ELEMENT_OBJECT issue_obj;
+            int matches = 0;
+            if (issue_json != NULL && api_qs_json_decode_object(&issue_context, &issue_obj, issue_json) == 0) {
+                const char* prefix = "index:status:";
+                if (strncmp(key, prefix, strlen(prefix)) == 0) {
+                    char* value = api_qs_object_get_string(&issue_obj, "status");
+                    matches = value != NULL && strcmp(key + strlen(prefix), value) == 0;
+                } else if (strncmp(key, "index:assignee:", 15) == 0) {
+                    QS_JSON_ELEMENT_ARRAY values;
+                    char* expected = key + 15;
+                    if (api_qs_object_get_array(&issue_obj, "assigneeIds", &values) == 0) {
+                        int32_t k;
+                        for (k = 0; k < api_qs_array_get_length(&values); k++) {
+                            char* value = api_qs_array_get_string(&values, k);
+                            if (value != NULL && strcmp(value, expected) == 0) {
+                                matches = 1;
+                                break;
+                            }
+                        }
+                    }
+                } else if (strncmp(key, "index:label:", 12) == 0) {
+                    QS_JSON_ELEMENT_ARRAY values;
+                    char* expected = key + 12;
+                    if (api_qs_object_get_array(&issue_obj, "labelIds", &values) == 0) {
+                        int32_t k;
+                        for (k = 0; k < api_qs_array_get_length(&values); k++) {
+                            char* value = api_qs_array_get_string(&values, k);
+                            if (value != NULL && strcmp(value, expected) == 0) {
+                                matches = 1;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            api_qs_memory_free(&issue_context);
+            if (!matches) {
+                data->stale_count++;
+                printf("stale: %s (issue=%s does not match index)\n", key, issue_id);
+            }
+        }
+    }
+
+    api_qs_memory_free(&temp);
+    return 0;
+}
+
+static int command_verify(int argc, char* argv[])
+{
+    const char* base_dir = DEFAULT_BASE_DIR;
+    const char* base_dir_arg = get_option_value(argc, argv, "--base-dir");
+    if (base_dir_arg != NULL) {
+        base_dir = base_dir_arg;
+    }
+
+    APP_STORES stores;
+    if (open_all_stores(base_dir, &stores) != 0) {
+        return EXIT_IO;
+    }
+    if (load_system_settings(base_dir, &stores) != 0) {
+        close_all_stores(&stores);
+        return EXIT_IO;
+    }
+
+    INDEX_SCAN_DATA data;
+    memset(&data, 0, sizeof(data));
+    data.stores = &stores;
+
+    QS_MEMORY_CONTEXT temp;
+    if (create_temp_memory(&temp, 4 * 1024 * 1024) != 0) {
+        close_all_stores(&stores);
+        return EXIT_IO;
+    }
+
+    QS_JSON_ELEMENT_ARRAY keys;
+    if (-1 == api_qs_array_create(&temp, &keys)) {
+        api_qs_memory_free(&temp);
+        close_all_stores(&stores);
+        return EXIT_IO;
+    }
+    if (-1 == api_qs_kvs_sorted_keys(&keys, &stores.issue, 1)) {
+        api_qs_memory_free(&temp);
+        close_all_stores(&stores);
+        return EXIT_KVS;
+    }
+
+    int rc = EXIT_OK;
+    int32_t len = api_qs_array_get_length(&keys);
+    int32_t i;
+    for (i = 0; i < len; i++) {
+        char* key = api_qs_array_get_string(&keys, i);
+        if (key == NULL || strncmp(key, "issue:", 6) != 0) {
+            continue;
+        }
+        char* issue_json = api_qs_kvs_get(&stores.issue, key);
+        if (issue_json == NULL) {
+            continue;
+        }
+        data.issue_count++;
+        if (verify_issue_against_index(&stores, key + strlen("issue:"), issue_json, &data) != 0) {
+            api_qs_memory_free(&temp);
+            close_all_stores(&stores);
+            return EXIT_KVS;
+        }
+    }
+
+    if (verify_index_against_issues(&stores, &data) != 0) {
+        api_qs_memory_free(&temp);
+        close_all_stores(&stores);
+        return EXIT_KVS;
+    }
+    api_qs_memory_free(&temp);
+
+    int problem_count = data.missing_count + data.stale_count + data.corrupt_count;
+    printf("verify: issues=%d index_entries=%d missing=%d stale=%d corrupt=%d\n",
+        data.issue_count, data.index_entry_count, data.missing_count, data.stale_count, data.corrupt_count);
+    if (problem_count > 0) {
+        printf("verify: index is inconsistent, run 'reindex' to rebuild\n");
+        rc = EXIT_KVS;
+    } else {
+        printf("verify: ok\n");
+    }
+
+    close_all_stores(&stores);
+    return rc;
+}
+
+static int command_reindex(int argc, char* argv[])
+{
+    const char* base_dir = DEFAULT_BASE_DIR;
+    const char* base_dir_arg = get_option_value(argc, argv, "--base-dir");
+    if (base_dir_arg != NULL) {
+        base_dir = base_dir_arg;
+    }
+
+    APP_STORES stores;
+    if (open_all_stores(base_dir, &stores) != 0) {
+        return EXIT_IO;
+    }
+    if (load_system_settings(base_dir, &stores) != 0) {
+        close_all_stores(&stores);
+        return EXIT_IO;
+    }
+
+    QS_MEMORY_CONTEXT temp;
+    if (create_temp_memory(&temp, 4 * 1024 * 1024) != 0) {
+        close_all_stores(&stores);
+        return EXIT_IO;
+    }
+    QS_JSON_ELEMENT_ARRAY index_keys;
+    if (-1 == api_qs_array_create(&temp, &index_keys) ||
+        -1 == api_qs_kvs_sorted_keys(&index_keys, &stores.index, 1)) {
+        api_qs_memory_free(&temp);
+        close_all_stores(&stores);
+        return EXIT_KVS;
+    }
+    int32_t index_len = api_qs_array_get_length(&index_keys);
+    int32_t index_i;
+    for (index_i = 0; index_i < index_len; index_i++) {
+        char* index_key = api_qs_array_get_string(&index_keys, index_i);
+        if (index_key != NULL && strncmp(index_key, "index:", 6) == 0 &&
+            -1 == api_qs_kvs_delete(&stores.index, index_key)) {
+            api_qs_memory_free(&temp);
+            close_all_stores(&stores);
+            fprintf(stderr, "error: failed to remove index key: %s\n", index_key);
+            return EXIT_KVS;
+        }
+    }
+    api_qs_memory_free(&temp);
+
+    QS_MEMORY_CONTEXT temp2;
+    if (create_temp_memory(&temp2, 4 * 1024 * 1024) != 0) {
+        close_all_stores(&stores);
+        return EXIT_IO;
+    }
+
+    QS_JSON_ELEMENT_ARRAY issue_keys;
+    if (-1 == api_qs_array_create(&temp2, &issue_keys)) {
+        api_qs_memory_free(&temp2);
+        close_all_stores(&stores);
+        return EXIT_IO;
+    }
+    if (-1 == api_qs_kvs_sorted_keys(&issue_keys, &stores.issue, 1)) {
+        api_qs_memory_free(&temp2);
+        close_all_stores(&stores);
+        return EXIT_KVS;
+    }
+
+    int issue_count = 0;
+    int32_t issue_len = api_qs_array_get_length(&issue_keys);
+    int32_t i;
+    for (i = 0; i < issue_len; i++) {
+        char* key = api_qs_array_get_string(&issue_keys, i);
+        if (key == NULL || strncmp(key, "issue:", 6) != 0) {
+            continue;
+        }
+        char* issue_json = api_qs_kvs_get(&stores.issue, key);
+        if (issue_json == NULL) {
+            continue;
+        }
+        if (issue_apply_indexes(&stores, key + strlen("issue:"), issue_json, 1) != 0) {
+            api_qs_memory_free(&temp2);
+            close_all_stores(&stores);
+            fprintf(stderr, "error: failed to rebuild index for issue: %s\n", key);
+            return EXIT_KVS;
+        }
+        issue_count++;
+    }
+    api_qs_memory_free(&temp2);
+
+    printf("reindex: rebuilt index from %d issues\n", issue_count);
+    close_all_stores(&stores);
+    return EXIT_OK;
+}
+
 static int command_init(int argc, char* argv[])
 {
     const char* base_dir = DEFAULT_BASE_DIR;
@@ -2191,6 +2634,12 @@ int main(int argc, char* argv[])
     }
     if (strcmp(argv[1], "compact") == 0) {
         return command_compact(argc, argv);
+    }
+    if (strcmp(argv[1], "reindex") == 0) {
+        return command_reindex(argc, argv);
+    }
+    if (strcmp(argv[1], "verify") == 0) {
+        return command_verify(argc, argv);
     }
     if (strcmp(argv[1], "schema") == 0) {
         return command_schema(argc, argv);

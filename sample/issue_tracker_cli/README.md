@@ -6,6 +6,7 @@ Issue Tracker 向け CLI サンプルです。
 - user / label / issue / index をストア分割して運用
 - issue の status / assignee / label インデックスを自動更新
 - ストア再構築（compaction）コマンドを提供
+- index の再構築（reindex）と整合性検証（verify）に対応
 
 ---
 
@@ -238,7 +239,25 @@ make
 
 ---
 
-## 7. schema 取得
+## 7. index の再構築・検証
+
+issue 本体を正として index を再生成します（既存の`index:`キーを削除してから作り直します）。
+
+```bash
+./qs_issue_tracker_cli reindex
+```
+
+index の欠落・余分な参照・不正な値を検査:
+
+```bash
+./qs_issue_tracker_cli verify
+```
+
+どちらのコマンドも `--base-dir` を指定できます。問題がある場合、`verify` は詳細と集計を出力し、終了コード `4` を返します。`reindex` は issue 本体を走査して index を作り直すため、実行中に他のプロセスから同じストアを書き換えないでください。処理途中で失敗すると index が部分的な状態になる可能性があります。その場合は、issue ストアを保全したうえで再度実行してください。
+
+---
+
+## 8. schema 取得
 
 利用可能なスキーマ一覧:
 

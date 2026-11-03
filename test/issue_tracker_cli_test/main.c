@@ -432,6 +432,42 @@ int main(void)
     );
     check_exit("issue removed from status index after delete", 1, cmd);
 
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s verify --base-dir \"%s\" | grep -q 'verify: ok'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("verify ok on consistent index", 0, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s reindex --base-dir \"%s\"",
+        cli_bin,
+        data_dir
+    );
+    check_exit("reindex rebuilds index", 0, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s verify --base-dir \"%s\" | grep -q 'verify: ok'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("verify ok after reindex", 0, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --status open | grep -q '\"id\":\"iss_000001\"'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("issue list works after reindex", 0, cmd);
+
     snprintf(cmd, sizeof(cmd), "rm -rf \"%s\"", data_dir);
     check_exit("cleanup after test", 0, cmd);
 
