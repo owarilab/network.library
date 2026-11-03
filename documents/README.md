@@ -17,6 +17,7 @@
 - [documents/13_router_room_server.md](documents/13_router_room_server.md)
 - [documents/14_future_roadmap.md](documents/14_future_roadmap.md)
 - [documents/15_websocket_client_roadmap.md](documents/15_websocket_client_roadmap.md)
+- [documents/16_issue_tracker_error_codes.md](documents/16_issue_tracker_error_codes.md)
 
 ## ワークフロー
 

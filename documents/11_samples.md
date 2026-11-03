@@ -19,6 +19,7 @@
 ### KVS
 - 永続化 KVS: [sample/persistence_cache/main.c](sample/persistence_cache/main.c)
 - Issue Tracker CLI 初期化: [sample/issue_tracker_cli/main.c](sample/issue_tracker_cli/main.c)
+  - 運用向けエラーコード表: [documents/16_issue_tracker_error_codes.md](documents/16_issue_tracker_error_codes.md)
 
 ### スクリプト
 - Script 実行: [sample/script/main.c](sample/script/main.c)

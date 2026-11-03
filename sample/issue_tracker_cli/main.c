@@ -88,7 +88,8 @@ static void print_usage(const char* program_name)
     printf("  %s label <create|get|update|delete|unset> --id <id> [--json <json>] [--field <name>] [--base-dir <dir>]\n", program_name);
     printf("  %s label list [--base-dir <dir>]\n", program_name);
     printf("  %s issue <create|get|update|delete|unset> --id <id> [--json <json>] [--field <name>] [--base-dir <dir>]\n", program_name);
-    printf("  %s issue list [--status <status> | --assignee <userId> | --label <label>] [--scan index|full] [--base-dir <dir>]\n", program_name);
+    printf("  %s issue list [--status <status>] [--assignee <userId>] [--label <label>] [--scan index|full] [--base-dir <dir>]\n", program_name);
+    printf("      (multiple filters are combined with AND)\n");
     printf("  %s reindex [--base-dir <dir>]\n", program_name);
     printf("  %s verify  [--base-dir <dir>]\n", program_name);
     printf("  %s schema <list|get> [--entity user|label|issue] [--base-dir <dir>]\n", program_name);
@@ -1714,6 +1715,137 @@ static int issue_list_full_scan(APP_STORES* stores, const char* status, const ch
     return EXIT_OK;
 }
 
+typedef struct ISSUE_FILTER {
+    int type; /* 0=status 1=assignee 2=label */
+    const char* value;
+} ISSUE_FILTER;
+
+static int issue_object_match_filter(QS_JSON_ELEMENT_OBJECT* obj, const ISSUE_FILTER* f)
+{
+    if (f->type == 0) {
+        char* s = api_qs_object_get_string(obj, "status");
+        return (s != NULL && strcmp(s, f->value) == 0);
+    }
+    if (f->type == 1) {
+        QS_JSON_ELEMENT_ARRAY arr;
+        if (api_qs_object_get_array(obj, "assigneeIds", &arr) != 0) {
+            return 0;
+        }
+        return array_has_string(&arr, f->value);
+    }
+    QS_JSON_ELEMENT_ARRAY arr;
+    if (api_qs_object_get_array(obj, "labelIds", &arr) != 0) {
+        return 0;
+    }
+    return array_has_string(&arr, f->value);
+}
+
+/*
+ * 複数フィルタの AND 複合条件検索（index 方式）。
+ * 各フィルタの index リストを取得し、最小のリストを候補起点にする。
+ * 残りの条件は issue 本体（JSON）の読み出しで照合する。
+ * 候補 index が存在しない場合は空結果を返す。
+ */
+static int issue_list_by_index_multi(APP_STORES* stores, const ISSUE_FILTER* filters, int filter_count)
+{
+    QS_MEMORY_CONTEXT temp;
+    if (create_temp_memory(&temp, 2 * 1024 * 1024) != 0) {
+        return EXIT_IO;
+    }
+
+    QS_JSON_ELEMENT_ARRAY* lists = (QS_JSON_ELEMENT_ARRAY*)calloc((size_t)filter_count, sizeof(QS_JSON_ELEMENT_ARRAY));
+    if (lists == NULL) {
+        api_qs_memory_free(&temp);
+        return EXIT_IO;
+    }
+
+    int i;
+    int32_t min_idx = -1;
+    int32_t min_len = 0;
+    for (i = 0; i < filter_count; i++) {
+        char index_key[1024];
+        const char* prefix = (filters[i].type == 0) ? "index:status:" :
+                             (filters[i].type == 1) ? "index:assignee:" : "index:label:";
+        if (snprintf(index_key, sizeof(index_key), "%s%s", prefix, filters[i].value) <= 0) {
+            free(lists);
+            api_qs_memory_free(&temp);
+            return EXIT_IO;
+        }
+        char* ids_json = api_qs_kvs_get(&stores->index, index_key);
+        if (ids_json == NULL) {
+            free(lists);
+            api_qs_memory_free(&temp);
+            printf("[]\n");
+            return EXIT_OK;
+        }
+        if (decode_index_array(&temp, ids_json, &lists[i]) != 0) {
+            free(lists);
+            api_qs_memory_free(&temp);
+            fprintf(stderr, "error: invalid index data for key: %s\n", index_key);
+            return EXIT_KVS;
+        }
+        int32_t l = api_qs_array_get_length(&lists[i]);
+        if (min_idx == -1 || l < min_len) {
+            min_idx = i;
+            min_len = l;
+        }
+    }
+
+    int32_t cand_len = api_qs_array_get_length(&lists[min_idx]);
+    int32_t j;
+    int printed = 0;
+    printf("[\n");
+    for (j = 0; j < cand_len; j++) {
+        char* id = api_qs_array_get_string(&lists[min_idx], j);
+        char key[1024];
+        char* issue_json;
+        if (id == NULL) {
+            continue;
+        }
+        if (build_entity_key(key, sizeof(key), "issue", id) != 0) {
+            continue;
+        }
+        issue_json = api_qs_kvs_get(&stores->issue, key);
+        if (issue_json == NULL) {
+            continue;
+        }
+
+        QS_MEMORY_CONTEXT issue_ctx;
+        if (create_temp_memory(&issue_ctx, 1024 * 1024) != 0) {
+            free(lists);
+            api_qs_memory_free(&temp);
+            return EXIT_IO;
+        }
+        QS_JSON_ELEMENT_OBJECT obj;
+        int match = 1;
+        if (-1 == api_qs_json_decode_object(&issue_ctx, &obj, issue_json)) {
+            match = 0;
+        } else {
+            for (i = 0; i < filter_count && match; i++) {
+                if (i == min_idx) {
+                    continue;
+                }
+                match = issue_object_match_filter(&obj, &filters[i]);
+            }
+        }
+        api_qs_memory_free(&issue_ctx);
+        if (!match) {
+            continue;
+        }
+
+        if (printed > 0) {
+            printf(",\n");
+        }
+        printf("%s", issue_json);
+        printed++;
+    }
+    printf("\n]\n");
+
+    free(lists);
+    api_qs_memory_free(&temp);
+    return EXIT_OK;
+}
+
 static int copy_store_data(QS_KVS_CONTEXT* src, QS_KVS_CONTEXT* dst)
 {
     QS_MEMORY_CONTEXT temp;
@@ -2616,20 +2748,38 @@ static int command_issue(int argc, char* argv[], APP_STORES* stores)
         if (filters == 0) {
             return issue_list_all(stores);
         }
-        if (filters > 1) {
-            fprintf(stderr, "error: list supports only one filter at once\n");
-            return EXIT_USAGE;
-        }
-        if (status != NULL) {
-            snprintf(index_key, sizeof(index_key), "index:status:%s", status);
+        if (filters == 1) {
+            if (status != NULL) {
+                snprintf(index_key, sizeof(index_key), "index:status:%s", status);
+                return issue_list_by_index(stores, index_key);
+            }
+            if (assignee != NULL) {
+                snprintf(index_key, sizeof(index_key), "index:assignee:%s", assignee);
+                return issue_list_by_index(stores, index_key);
+            }
+            snprintf(index_key, sizeof(index_key), "index:label:%s", label);
             return issue_list_by_index(stores, index_key);
+        }
+
+        /* 複数フィルタ: AND 複合条件検索（index 方式） */
+        ISSUE_FILTER flt[3];
+        int flt_count = 0;
+        if (status != NULL) {
+            flt[flt_count].type = 0;
+            flt[flt_count].value = status;
+            flt_count++;
         }
         if (assignee != NULL) {
-            snprintf(index_key, sizeof(index_key), "index:assignee:%s", assignee);
-            return issue_list_by_index(stores, index_key);
+            flt[flt_count].type = 1;
+            flt[flt_count].value = assignee;
+            flt_count++;
         }
-        snprintf(index_key, sizeof(index_key), "index:label:%s", label);
-        return issue_list_by_index(stores, index_key);
+        if (label != NULL) {
+            flt[flt_count].type = 2;
+            flt[flt_count].value = label;
+            flt_count++;
+        }
+        return issue_list_by_index_multi(stores, flt, flt_count);
     }
 
     if (strcmp(action, "create") == 0) {

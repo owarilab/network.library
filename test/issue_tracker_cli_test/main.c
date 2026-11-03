@@ -482,6 +482,84 @@ int main(void)
     );
     check_exit("issue list full scan empty result", 1, cmd);
 
+    /* composite AND: index scan (iss1 = in_progress/u2/feature) */
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --status in_progress --assignee u2 | grep -q '\"id\":\"iss1\"'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("composite index: status+assignee", 0, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --status in_progress --label feature | grep -q '\"id\":\"iss1\"'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("composite index: status+label", 0, cmd);
+
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --assignee u2 --label feature | grep -q '\"id\":\"iss1\"'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("composite index: assignee+label", 0, cmd);
+
+    /* composite AND: all three filters */
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --status in_progress --assignee u2 --label feature | grep -q '\"id\":\"iss1\"'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("composite index: all three", 0, cmd);
+
+    /* composite AND: order independence */
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --assignee u2 --status in_progress | grep -q '\"id\":\"iss1\"'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("composite index: order independent", 0, cmd);
+
+    /* composite AND: full scan matches index scan */
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --status in_progress --assignee u2 --scan full | grep -q '\"id\":\"iss1\"'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("composite full: status+assignee", 0, cmd);
+
+    /* composite AND: non-matching combination returns empty */
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --status in_progress --assignee u1 | grep -q '\"id\"'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("composite index: non-matching empty", 1, cmd);
+
+    /* composite AND: open+u1 matches only iss_000001 (iss1 is in_progress, iss_000002 has no assignee) */
+    snprintf(
+        cmd,
+        sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --status open --assignee u1 | grep -c '\"id\"' | grep -q '1'",
+        cli_bin,
+        data_dir
+    );
+    check_exit("composite index: open+u1 count 1", 0, cmd);
+
     /* invalid scan value fails */
     snprintf(
         cmd,
@@ -625,6 +703,28 @@ int main(void)
         "%s issue list --base-dir \"%s\" --label sl1 --scan full | grep -c '\"id\"' | grep -q '500'",
         cli_bin, stress_dir);
     check_exit("stress: list 500 by label full scan", 0, cmd);
+
+    /* composite AND: all 500 issues are open/su1/sl1 */
+    snprintf(cmd, sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --status open --assignee su1 | grep -c '\"id\"' | grep -q '500'",
+        cli_bin, stress_dir);
+    check_exit("stress: composite index status+assignee 500", 0, cmd);
+
+    snprintf(cmd, sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --status open --assignee su1 --label sl1 | grep -c '\"id\"' | grep -q '500'",
+        cli_bin, stress_dir);
+    check_exit("stress: composite index all three 500", 0, cmd);
+
+    snprintf(cmd, sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --status open --assignee su1 --scan full | grep -c '\"id\"' | grep -q '500'",
+        cli_bin, stress_dir);
+    check_exit("stress: composite full status+assignee 500", 0, cmd);
+
+    /* composite AND: non-matching assignee returns empty */
+    snprintf(cmd, sizeof(cmd),
+        "%s issue list --base-dir \"%s\" --status open --assignee nobody | grep -q '\"id\"'",
+        cli_bin, stress_dir);
+    check_exit("stress: composite index non-matching empty", 1, cmd);
 
     snprintf(cmd, sizeof(cmd), "rm -rf \"%s\"", stress_dir);
     check_exit("stress: cleanup after", 0, cmd);
