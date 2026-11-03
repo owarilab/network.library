@@ -113,7 +113,7 @@ cmake -S . -B build \
 	-DLLAMA_BUILD_UI=OFF \
 	-DLLAMA_OPENSSL=OFF \
 	-DGGML_METAL=ON
-cmake --build build -j"$(sysctl -n hw.ncpu)"
+cmake --build build --config Release -j"$(sysctl -n hw.ncpu)"
 
 cd ../../../llm/src
 make clean
@@ -137,7 +137,7 @@ cmake -S . -B build \
 	-DLLAMA_BUILD_APP=OFF \
 	-DLLAMA_BUILD_UI=OFF \
 	-DLLAMA_OPENSSL=OFF
-cmake --build build -j"$(nproc)"
+cmake --build build --config Release -j"$(nproc)"
 ```
 
 CUDA ビルド:
@@ -156,7 +156,7 @@ cmake -S . -B build \
 	-DLLAMA_BUILD_UI=OFF \
 	-DLLAMA_OPENSSL=OFF \
 	-DGGML_CUDA=ON
-cmake --build build -j"$(nproc)"
+cmake --build build --config Release -j"$(nproc)"
 ```
 
 network.library 側の再ビルド:
@@ -200,7 +200,7 @@ cmake -S . -B build \
 	-DGGML_CUDA=ON \
 	-DGGML_CUDA_NCCL=ON \
 	-DGGML_NATIVE=ON
-cmake --build build -j"$(nproc)"
+cmake --build build --config Release -j"$(nproc)"
 ```
 
 生成物の確認:
