@@ -403,7 +403,7 @@ QS_HASH_ELEMENT* qs_add_hash_string( QS_MEMORY_POOL* memory, int32_t memid_hash,
 		data_size = qs_usize( memory, memid_data );
 	}
 	pbuf = (char*)QS_GET_POINTER( memory, memid_data );
-	memcpy( pbuf, value, data_size );
+	memcpy( pbuf, value, size );
 	QS_HASH_ELEMENT* is_push = qs_add_hash( memory, memid_hash, memid_name, memid_data, ELEMENT_LITERAL_STR );
 	if( NULL==is_push){
 		//printf("[qs_add_hash_string] is_push is NULL\n");
@@ -497,11 +497,32 @@ int32_t qs_remove_hash( QS_MEMORY_POOL* memory, int32_t memid_hash, const char* 
 		{
 			if( !strcmp( (char*)QS_GET_POINTER( memory, hashelement[i].memid_hash_name ), hash_name ) )
 			{
+				uint32_t j = i + 1;
 				hashelement[i].id = -1;
 				hashelement[i].memid_hash_name = -1;
 				hashelement[i].memid_hash_element_data = -1;
 				hashelement[i].create_time = 0;
 				hashelement[i].life_time = 0;
+				while( j < hashchild[hashkey].hash_size && hashelement[j].memid_hash_name >= 0 ){
+					QS_HASH_ELEMENT element = hashelement[j];
+					uint32_t element_hashkey = qs_ihash(
+						(char*)QS_GET_POINTER( memory, element.memid_hash_name ), hash->hash_size );
+					if( element_hashkey == hashkey ){
+						hashelement[j].id = -1;
+						hashelement[j].memid_hash_name = -1;
+						hashelement[j].memid_hash_element_data = -1;
+						hashelement[j].create_time = 0;
+						hashelement[j].life_time = 0;
+						QS_HASH_ELEMENT* moved = qs_add_hash(
+							memory, memid_hash, element.memid_hash_name,
+							element.memid_hash_element_data, element.id );
+						if( moved != NULL ){
+							moved->create_time = element.create_time;
+							moved->life_time = element.life_time;
+						}
+					}
+				++j;
+				}
 				break;
 			}
 		}

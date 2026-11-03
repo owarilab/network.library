@@ -910,14 +910,19 @@ QS_MEMORY_UNIT* qs_find_free_memory_block( QS_MEMORY_POOL* memory, size_t size )
 					}
 				}
 				if( garbageunit != NULL){
-					qs_resize_garbage(memory,garbageunit,freeunit,size);
-					unit = garbageunit;
-					unit->status = MEMORY_STATUS_USE;
+					int resize_result = qs_resize_garbage(memory,garbageunit,freeunit,size);
+					if( QS_SYSTEM_OK == resize_result ){
+						unit = garbageunit;
+						unit->top = unit->p;
+						unit->status = MEMORY_STATUS_USE;
+					} else {
+						memory->error_code = resize_result;
+					}
 				}
-				else if( freeunit != NULL ){
+				if( unit == NULL && freeunit != NULL ){
 					unit = freeunit;
 				}
-				else{
+				else if( unit == NULL ){
 					size_t over_size = ( memory->bottom - memory_block_one_size ) - memory->top;
 					if(memory->debug){
 						printf( "[qs_find_freemunit] QS_MEMORY_UNIT allocate size over %zd Byte\n", over_size );
