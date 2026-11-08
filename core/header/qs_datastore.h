@@ -131,13 +131,15 @@ void qs_db_close_table(QS_DB_STORE* store);
 
 /*
  * Schema
- *   スキーマ JSON は issue tracker と同じ fields 形式を再利用する。
+ *   schema_define は JSON を解釈せず、そのまま保存する。形式・fields 配列の確認は schema_validate 時に行う。
+ *   schema_validate が保証する field type は int32/int64/string、required と string maxLength。
+ *   未知の field、重複 field、default、配列などは検証/適用しない。
  *   例: {"fields":[{"name":"id","type":"string","maxLength":64,"required":0,"unsettable":0}, ...]}
  */
 int qs_db_schema_define(QS_DB_CONTEXT* ctx, const char* table, const char* schema_json);
 /* スキーマ JSON を out_buf にコピーして返す。0=成功, -1=未定義/バッファ不足。 */
 int qs_db_schema_get(QS_DB_CONTEXT* ctx, const char* table, char* out_buf, size_t out_size);
-/* レコード JSON がスキーマ（型・required・maxLength）に適合するか検証する。0=適合, -1=違反。 */
+/* レコード JSON を明示的に検証する。CRUD はこの関数を自動呼び出ししない。0=適合, -1=違反。 */
 int qs_db_schema_validate(QS_MEMORY_POOL* _ppool, QS_DB_CONTEXT* ctx, const char* table, const char* record_json);
 
 /*

@@ -49,6 +49,8 @@ core（`core/libqs_core.a`）が古い場合は `core/src` で `make` してか�
 | `help` | コマンド一覧 | - |
 | `exit` / `quit` | 終了 | - |
 
+`schema define` は渡された文字列を JSON/schema 形式の検証なしで保存する。検証が必要な場合は `insert` / `update` の前に `schema validate` を明示的に実行すること。CRUD は schema 検証も index 更新も自動では行わない。現状の検証対象は `int32` / `int64` / `string` の型、`required`、string の `maxLength`。default の適用、未知・重複 field、配列の検証は行わない。
+
 ## 例
 
 ```sh
