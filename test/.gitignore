@@ -3,6 +3,9 @@ base64_test/qs_verify_decode
 chain_array_test/qs_chain_array_test
 csv_api_test/qs_csv_api_test
 csv_lowlevel_test/qs_csv_lowlevel_test
+datastore_api_test/qs_datastore_api_test
+datastore_test/qs_datastore_test
+hash_collision_delete_test/qs_hash_collision_delete_test
 http_param_test/qs_http_param_test
 io_test/qs_io_test
 json_ext_test/qs_json_ext_test

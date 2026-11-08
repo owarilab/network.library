@@ -3,6 +3,7 @@ client/qs_client
 client_plain/qs_client_plane
 client_printer/qs_client
 client_simple/qs_simple_client
+db_cli/qs_db_cli
 encode/qs_base64
 hash/qs_hash
 http_client/qs_http_client
