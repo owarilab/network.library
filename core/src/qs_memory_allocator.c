@@ -291,6 +291,8 @@ size_t qs_initialize_mmapmemory_f( const char* file_name, QS_MEMORY_POOL** memor
 	int fd = open(file_name, O_CREAT | O_RDWR, 0755);
 	if (fd < 0) {
 		printf("open error\n");
+		free(*memory);
+		*memory = NULL;
 		return 0;
 	}
 
@@ -301,16 +303,22 @@ size_t qs_initialize_mmapmemory_f( const char* file_name, QS_MEMORY_POOL** memor
 		if (0 > (error = _lseeki64(fd, byte_size, SEEK_SET))) {
 			close(fd);
 			printf("lseek error\n");
+			free(*memory);
+			*memory = NULL;
 			return 0;
 		}
 		if (-1 == write(fd, &c, sizeof(char))) {
 			close(fd);
 			printf("write error\n");
+			free(*memory);
+			*memory = NULL;
 			return 0;
 		}
 		if (0 > (error = lseek(fd, 0, SEEK_SET))) {
 			close(fd);
 			printf("lseek2 error\n");
+			free(*memory);
+			*memory = NULL;
 			return 0;
 		}
 	}
@@ -320,12 +328,15 @@ size_t qs_initialize_mmapmemory_f( const char* file_name, QS_MEMORY_POOL** memor
 	DWORD open = OPEN_EXISTING;
 	if (INVALID_HANDLE_VALUE == ((*memory)->h_file = CreateFile(file_name, access, 0, 0, open, 0, 0))) {
 		printf("CreateFile error : %ld\n",GetLastError());
+		free(*memory);
+		*memory = NULL;
 		return 0;
 	}
 	DWORD map_flag = PAGE_READWRITE;
-	if (0 > ((*memory)->h_map = CreateFileMapping((*memory)->h_file, 0, map_flag, 0, 0, file_name))) {
+	if (NULL == ((*memory)->h_map = CreateFileMapping((*memory)->h_file, 0, map_flag, 0, 0, NULL))) {
 		CloseHandle((*memory)->h_file);
-		(*memory)->h_file = INVALID_HANDLE_VALUE;
+		free(*memory);
+		*memory = NULL;
 		printf("CreateFileMapping error\n");
 		return 0;
 	}
@@ -334,7 +345,8 @@ size_t qs_initialize_mmapmemory_f( const char* file_name, QS_MEMORY_POOL** memor
 		CloseHandle((*memory)->h_file);
 		(*memory)->h_file = INVALID_HANDLE_VALUE;
 		CloseHandle((*memory)->h_map);
-		(*memory)->h_map = 0;
+		free(*memory);
+		*memory = NULL;
 		printf("MapViewOfFile error\n");
 		return 0;
 	}
@@ -1282,6 +1294,7 @@ size_t qs_free( QS_MEMORY_POOL* memory )
 				munmap( memory->memory, memory_size );
 #endif
 #ifdef __WINDOWS__
+				UnmapViewOfFile(memory->memory);
 				CloseHandle(memory->h_file);
 				memory->h_file = INVALID_HANDLE_VALUE;
 				CloseHandle(memory->h_map);

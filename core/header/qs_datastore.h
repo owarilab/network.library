@@ -76,7 +76,8 @@ typedef struct QS_DB_STORE
  *   database をオープンした状態を保持する。
  *   system.db / schema.db / index.db を保持する。
  *   同一 directory の open/drop は、対応する datastore 間で排他する。
- *   排他は directory の advisory flock を使用し、対応するファイルシステムが必要。
+ *   POSIX では directory の advisory flock、Windows では directory handle の共有制御を使用する。
+ *   対応するファイルシステムが必要。
  *   同じ context の操作（open/close と table handle 使用期間を含む）は呼び出し側で直列化する。
  *   ロックを使わない外部アクセスや別 directory 内のハードリンクは保護されない。
  *   database 作成中の競合や directory の移動・差し替えは呼び出し側で防ぐこと。

@@ -17,7 +17,12 @@
 #include <limits.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#ifdef __WINDOWS__
+#include <direct.h>
+#include <io.h>
+#else
 #include <pthread.h>
+#endif
 #if defined(__LINUX__) || defined(__BSD_UNIX__) || defined(__ANDROID__) || defined(__IOS__)
 #include <dirent.h>
 #include <sys/file.h>
@@ -34,9 +39,149 @@
 #define QS_DB_CAPACITY_KEY_PREFIX "table:"
 #define QS_DB_MAX_NAME 45
 
+#ifdef __WINDOWS__
+static SRWLOCK db_open_registry_lock = SRWLOCK_INIT;
+#define db_registry_lock() AcquireSRWLockExclusive(&db_open_registry_lock)
+#define db_registry_unlock() ReleaseSRWLockExclusive(&db_open_registry_lock)
+#else
 static pthread_mutex_t db_open_registry_lock = PTHREAD_MUTEX_INITIALIZER;
+#define db_registry_lock() pthread_mutex_lock(&db_open_registry_lock)
+#define db_registry_unlock() pthread_mutex_unlock(&db_open_registry_lock)
+#endif
 static char db_open_registry[QS_DB_OPEN_REGISTRY_SIZE][4352];
 static QS_DB_CONTEXT* db_open_registry_owner[QS_DB_OPEN_REGISTRY_SIZE];
+
+#ifdef __WINDOWS__
+typedef struct db_directory {
+    HANDLE search;
+    WIN32_FIND_DATAA entry;
+    char pattern[4352];
+    int first;
+} DB_DIRECTORY;
+
+static DB_DIRECTORY* db_directory_open(const char* path)
+{
+    DB_DIRECTORY* dir = malloc(sizeof(*dir));
+    if (dir == NULL) return NULL;
+    if (snprintf(dir->pattern, sizeof(dir->pattern), "%s/*", path) < 0) {
+        free(dir);
+        return NULL;
+    }
+    dir->search = FindFirstFileA(dir->pattern, &dir->entry);
+    if (dir->search == INVALID_HANDLE_VALUE) {
+        free(dir);
+        return NULL;
+    }
+    dir->first = 1;
+    return dir;
+}
+
+static const char* db_directory_read(DB_DIRECTORY* dir)
+{
+    if (dir->first) {
+        dir->first = 0;
+        return dir->entry.cFileName;
+    }
+    if (FindNextFileA(dir->search, &dir->entry)) return dir->entry.cFileName;
+    if (GetLastError() != ERROR_NO_MORE_FILES) errno = EIO;
+    return NULL;
+}
+
+static int db_directory_rewind(DB_DIRECTORY* dir)
+{
+    FindClose(dir->search);
+    dir->search = FindFirstFileA(dir->pattern, &dir->entry);
+    dir->first = 1;
+    return dir->search == INVALID_HANDLE_VALUE ? -1 : 0;
+}
+
+static void db_directory_close(DB_DIRECTORY* dir)
+{
+    if (dir->search != INVALID_HANDLE_VALUE) FindClose(dir->search);
+    free(dir);
+}
+
+static int db_path_type(const char* path)
+{
+    DWORD attributes = GetFileAttributesA(path);
+    if (attributes == INVALID_FILE_ATTRIBUTES) {
+        DWORD error = GetLastError();
+        errno = (error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND) ? ENOENT : EIO;
+        return -1;
+    }
+    if (attributes & FILE_ATTRIBUTE_REPARSE_POINT) return 0;
+    return (attributes & FILE_ATTRIBUTE_DIRECTORY) ? 2 : 1;
+}
+#else
+typedef DIR DB_DIRECTORY;
+
+static DB_DIRECTORY* db_directory_open(const char* path) { return opendir(path); }
+static const char* db_directory_read(DB_DIRECTORY* dir)
+{
+    struct dirent* entry = readdir(dir);
+    return entry == NULL ? NULL : entry->d_name;
+}
+static int db_directory_rewind(DB_DIRECTORY* dir) { rewinddir(dir); return 0; }
+static void db_directory_close(DB_DIRECTORY* dir) { closedir(dir); }
+static int db_path_type(const char* path)
+{
+    struct stat st;
+    if (lstat(path, &st) != 0) return -1;
+    if (S_ISREG(st.st_mode)) return 1;
+    if (S_ISDIR(st.st_mode)) return 2;
+    return 0;
+}
+#endif
+
+static int db_resolve_path(const char* path, char* resolved, size_t size)
+{
+#ifdef __WINDOWS__
+    HANDLE dir = CreateFileA(path, FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                             NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+    if (dir == INVALID_HANDLE_VALUE) return -1;
+    DWORD length = GetFinalPathNameByHandleA(dir, resolved, (DWORD)size, FILE_NAME_NORMALIZED);
+    CloseHandle(dir);
+    return length == 0 || length >= size ? -1 : 0;
+#else
+    (void)size;
+    return realpath(path, resolved) == NULL ? -1 : 0;
+#endif
+}
+
+static int db_paths_equal(const char* first, const char* second)
+{
+#ifdef __WINDOWS__
+    return _stricmp(first, second) == 0;
+#else
+    return strcmp(first, second) == 0;
+#endif
+}
+
+static void* db_lock_directory(const char* path)
+{
+#ifdef __WINDOWS__
+    HANDLE dir = CreateFileA(path, FILE_READ_ATTRIBUTES, FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                             NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+    return dir == INVALID_HANDLE_VALUE ? NULL : dir;
+#else
+    DIR* dir = opendir(path);
+    if (dir == NULL) return NULL;
+    if (flock(dirfd(dir), LOCK_EX | LOCK_NB) != 0) {
+        closedir(dir);
+        return NULL;
+    }
+    return dir;
+#endif
+}
+
+static void db_unlock_directory(void* lock)
+{
+#ifdef __WINDOWS__
+    CloseHandle((HANDLE)lock);
+#else
+    closedir((DIR*)lock);
+#endif
+}
 
 /* ------------------------------------------------------------------ */
 /* 内部ヘルパー                                                         */
@@ -102,7 +247,7 @@ static int db_open_registry_contains_locked(const char* resolved)
 {
     int i;
     for (i = 0; i < QS_DB_OPEN_REGISTRY_SIZE; i++) {
-        if (db_open_registry[i][0] != '\0' && strcmp(db_open_registry[i], resolved) == 0) {
+        if (db_open_registry[i][0] != '\0' && db_paths_equal(db_open_registry[i], resolved)) {
             return 1;
         }
     }
@@ -114,33 +259,33 @@ static int db_open_registry_add(const char* path, QS_DB_CONTEXT* owner)
     char resolved[4352];
     int free_slot = -1;
     int i;
-    if (realpath(path, resolved) == NULL) {
+    if (db_resolve_path(path, resolved, sizeof(resolved)) != 0) {
         return -1;
     }
-    pthread_mutex_lock(&db_open_registry_lock);
+    db_registry_lock();
     for (i = 0; i < QS_DB_OPEN_REGISTRY_SIZE; i++) {
         if (db_open_registry[i][0] == '\0') {
             if (free_slot == -1) {
                 free_slot = i;
             }
-        } else if (db_open_registry_owner[i] == owner || strcmp(db_open_registry[i], resolved) == 0) {
-            pthread_mutex_unlock(&db_open_registry_lock);
+        } else if (db_open_registry_owner[i] == owner || db_paths_equal(db_open_registry[i], resolved)) {
+            db_registry_unlock();
             return -1;
         }
     }
     if (free_slot == -1) {
-        pthread_mutex_unlock(&db_open_registry_lock);
+        db_registry_unlock();
         return -1;
     }
     snprintf(db_open_registry[free_slot], sizeof(db_open_registry[free_slot]), "%s", resolved);
     db_open_registry_owner[free_slot] = owner;
-    pthread_mutex_unlock(&db_open_registry_lock);
+    db_registry_unlock();
     return 0;
 }
 
 static void db_open_registry_remove(QS_DB_CONTEXT* owner)
 {
-    pthread_mutex_lock(&db_open_registry_lock);
+    db_registry_lock();
     int i;
     for (i = 0; i < QS_DB_OPEN_REGISTRY_SIZE; i++) {
         if (db_open_registry_owner[i] == owner) {
@@ -149,7 +294,7 @@ static void db_open_registry_remove(QS_DB_CONTEXT* owner)
             break;
         }
     }
-    pthread_mutex_unlock(&db_open_registry_lock);
+    db_registry_unlock();
 }
 
 static int db_capacity_key(char* out, size_t out_size, const char* table)
@@ -237,9 +382,15 @@ static int db_store_create(QS_DB_STORE* store, const char* path, int capacity_mb
 static int db_store_open(QS_DB_STORE* store, const char* path, int capacity_mb)
 {
     size_t cache, page, hash, key;
+#ifdef __WINDOWS__
+    struct __stat64 st;
+    if (db_capacity_params(capacity_mb, &cache, &page, &hash, &key) != 0 ||
+        _stat64(path, &st) != 0 || !S_ISREG(st.st_mode)) {
+#else
     struct stat st;
     if (db_capacity_params(capacity_mb, &cache, &page, &hash, &key) != 0 ||
         stat(path, &st) != 0 || !S_ISREG(st.st_mode)) {
+#endif
         return -1;
     }
     size_t allocate_size = QS_ALIGNUP((cache * (key + 8)) + SIZE_KBYTE + page + SIZE_KBYTE * 4,
@@ -545,7 +696,11 @@ int qs_db_create_database(const char* base_dir, const char* database)
     if (db_path_join(db_path, sizeof(db_path), base_dir, database) != 0) {
         return -1;
     }
+#ifdef __WINDOWS__
+    if (_mkdir(db_path) != 0) {
+#else
     if (mkdir(db_path, 0755) != 0) {
+#endif
         return -1;
     }
     QS_DB_STORE store;
@@ -586,44 +741,44 @@ int qs_db_drop_database(const char* base_dir, const char* database)
     if (db_path_join(db_path, sizeof(db_path), base_dir, database) != 0) {
         return -1;
     }
-    if (!db_is_dir(db_path) || realpath(db_path, resolved) == NULL) {
+    if (!db_is_dir(db_path) || db_resolve_path(db_path, resolved, sizeof(resolved)) != 0) {
         return -1;
     }
-    pthread_mutex_lock(&db_open_registry_lock);
+    db_registry_lock();
     if (db_open_registry_contains_locked(resolved)) {
-        pthread_mutex_unlock(&db_open_registry_lock);
+        db_registry_unlock();
         return -1;
     }
-    DIR* dir = opendir(db_path);
+    void* lock_dir = db_lock_directory(db_path);
+    if (lock_dir == NULL) {
+        db_registry_unlock();
+        return -1;
+    }
+    DB_DIRECTORY* dir = db_directory_open(db_path);
     if (dir == NULL) {
-        pthread_mutex_unlock(&db_open_registry_lock);
-        return -1;
-    }
-    if (flock(dirfd(dir), LOCK_EX | LOCK_NB) != 0) {
-        closedir(dir);
-        pthread_mutex_unlock(&db_open_registry_lock);
+        db_unlock_directory(lock_dir);
+        db_registry_unlock();
         return -1;
     }
     int rc = 0;
-    struct dirent* dent;
+    const char* name;
     errno = 0;
-    while ((dent = readdir(dir)) != NULL) {
-        if (strcmp(dent->d_name, ".") == 0 || strcmp(dent->d_name, "..") == 0) {
+    while ((name = db_directory_read(dir)) != NULL) {
+        if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
             continue;
         }
         char path[4352];
         char table[256];
-        struct stat st;
-        size_t name_len = strlen(dent->d_name);
+        size_t name_len = strlen(name);
         if (name_len <= 3 || name_len - 3 >= sizeof(table) ||
-            strcmp(dent->d_name + name_len - 3, ".db") != 0) {
+            strcmp(name + name_len - 3, ".db") != 0) {
             rc = -1;
             break;
         }
-        memcpy(table, dent->d_name, name_len - 3);
+        memcpy(table, name, name_len - 3);
         table[name_len - 3] = '\0';
-        if (!db_valid_name(table) || db_path_join(path, sizeof(path), db_path, dent->d_name) != 0 ||
-            lstat(path, &st) != 0 || !S_ISREG(st.st_mode)) {
+        if (!db_valid_name(table) || db_path_join(path, sizeof(path), db_path, name) != 0 ||
+            db_path_type(path) != 1) {
             rc = -1;
             break;
         }
@@ -633,25 +788,24 @@ int qs_db_drop_database(const char* base_dir, const char* database)
         rc = -1;
     }
     if (rc == 0) {
-        rewinddir(dir);
+        if (db_directory_rewind(dir) != 0) rc = -1;
         errno = 0;
-        while ((dent = readdir(dir)) != NULL) {
-            if (strcmp(dent->d_name, ".") == 0 || strcmp(dent->d_name, "..") == 0) {
+        while (rc == 0 && (name = db_directory_read(dir)) != NULL) {
+            if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
                 continue;
             }
             char path[4352];
             char table[256];
-            struct stat st;
-            size_t name_len = strlen(dent->d_name);
+            size_t name_len = strlen(name);
             if (name_len <= 3 || name_len - 3 >= sizeof(table) ||
-                strcmp(dent->d_name + name_len - 3, ".db") != 0) {
+                strcmp(name + name_len - 3, ".db") != 0) {
                 rc = -1;
                 break;
             }
-            memcpy(table, dent->d_name, name_len - 3);
+            memcpy(table, name, name_len - 3);
             table[name_len - 3] = '\0';
-            if (!db_valid_name(table) || db_path_join(path, sizeof(path), db_path, dent->d_name) != 0 ||
-                lstat(path, &st) != 0 || !S_ISREG(st.st_mode) || unlink(path) != 0) {
+            if (!db_valid_name(table) || db_path_join(path, sizeof(path), db_path, name) != 0 ||
+                db_path_type(path) != 1 || unlink(path) != 0) {
                 rc = -1;
                 break;
             }
@@ -664,8 +818,9 @@ int qs_db_drop_database(const char* base_dir, const char* database)
     if (rc == 0 && rmdir(db_path) != 0) {
         rc = -1;
     }
-    closedir(dir);
-    pthread_mutex_unlock(&db_open_registry_lock);
+    db_directory_close(dir);
+    db_unlock_directory(lock_dir);
+    db_registry_unlock();
     return rc;
 }
 
@@ -684,56 +839,57 @@ int32_t qs_db_show_database(QS_MEMORY_POOL* _ppool, const char* base_dir)
     }
     memcpy(normalized, base_dir, base_len);
     normalized[base_len] = '\0';
-    DIR* dir = opendir(normalized);
+    DB_DIRECTORY* dir = db_directory_open(normalized);
     if (dir == NULL) {
         return -1;
     }
     int32_t result = qs_create_array(_ppool, 16);
     if (-1 == result) {
-        closedir(dir);
+        db_directory_close(dir);
         return -1;
     }
     int rc = 0;
-    struct dirent* entry;
+    const char* name;
     errno = 0;
-    while ((entry = readdir(dir)) != NULL) {
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+    while ((name = db_directory_read(dir)) != NULL) {
+        if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
             continue;
         }
-        if (!db_valid_name(entry->d_name)) {
+        if (!db_valid_name(name)) {
             continue;
         }
         char path[4352];
         char system_path[4352];
-        struct stat st;
-        if (db_path_join(path, sizeof(path), normalized, entry->d_name) != 0) {
+        if (db_path_join(path, sizeof(path), normalized, name) != 0) {
             rc = -1;
             break;
         }
-        if (lstat(path, &st) != 0) {
+        int path_type = db_path_type(path);
+        if (path_type < 0) {
             rc = -1;
             break;
         }
-        if (!S_ISDIR(st.st_mode)) {
+        if (path_type != 2) {
             continue;
         }
         if (db_path_join(system_path, sizeof(system_path), path, QS_DB_SYSTEM_FILE) != 0) {
             rc = -1;
             break;
         }
-        if (lstat(system_path, &st) == 0 && S_ISREG(st.st_mode)) {
-            if (-1 == qs_array_push_string(_ppool, &result, entry->d_name)) {
+        path_type = db_path_type(system_path);
+        if (path_type == 1) {
+            if (-1 == qs_array_push_string(_ppool, &result, name)) {
                 rc = -1;
                 break;
             }
-        } else if (errno != ENOENT) {
+        } else if (path_type < 0 && errno != ENOENT) {
             rc = -1;
             break;
         }
         errno = 0;
     }
     if (rc == 0 && errno != 0) rc = -1;
-    closedir(dir);
+    db_directory_close(dir);
     if (rc != 0) return -1;
     return result;
 }
@@ -753,13 +909,8 @@ int qs_db_open_database(QS_DB_CONTEXT* ctx, const char* base_dir, const char* da
     if (db_open_registry_add(db_path, ctx) != 0) {
         return -1;
     }
-    DIR* lock_dir = opendir(db_path);
+    void* lock_dir = db_lock_directory(db_path);
     if (lock_dir == NULL) {
-        db_open_registry_remove(ctx);
-        return -1;
-    }
-    if (flock(dirfd(lock_dir), LOCK_EX | LOCK_NB) != 0) {
-        closedir(lock_dir);
         db_open_registry_remove(ctx);
         return -1;
     }
@@ -772,7 +923,7 @@ int qs_db_open_database(QS_DB_CONTEXT* ctx, const char* base_dir, const char* da
     char path[4352];
     if (db_path_join(path, sizeof(path), ctx->db_path, QS_DB_SYSTEM_FILE) != 0 ||
         db_store_open(&ctx->system, path, QS_DB_CAPACITY_B1MB) != 0) {
-        closedir(ctx->lock_dir);
+        db_unlock_directory(ctx->lock_dir);
         ctx->lock_dir = NULL;
         db_open_registry_remove(ctx);
         return -1;
@@ -780,7 +931,7 @@ int qs_db_open_database(QS_DB_CONTEXT* ctx, const char* base_dir, const char* da
     if (db_path_join(path, sizeof(path), ctx->db_path, QS_DB_SCHEMA_FILE) != 0 ||
         db_store_open(&ctx->schema, path, QS_DB_CAPACITY_B1MB) != 0) {
         db_store_close(&ctx->system);
-        closedir(ctx->lock_dir);
+        db_unlock_directory(ctx->lock_dir);
         ctx->lock_dir = NULL;
         db_open_registry_remove(ctx);
         return -1;
@@ -789,7 +940,7 @@ int qs_db_open_database(QS_DB_CONTEXT* ctx, const char* base_dir, const char* da
         db_store_open(&ctx->index, path, QS_DB_CAPACITY_B1MB) != 0) {
         db_store_close(&ctx->system);
         db_store_close(&ctx->schema);
-        closedir(ctx->lock_dir);
+        db_unlock_directory(ctx->lock_dir);
         ctx->lock_dir = NULL;
         db_open_registry_remove(ctx);
         return -1;
@@ -813,7 +964,7 @@ int qs_db_close_database(QS_DB_CONTEXT* ctx)
     db_store_close(&ctx->schema);
     db_store_close(&ctx->index);
     ctx->is_open = 0;
-    closedir(ctx->lock_dir);
+    db_unlock_directory(ctx->lock_dir);
     ctx->lock_dir = NULL;
     db_open_registry_remove(ctx);
     return 0;
@@ -872,8 +1023,7 @@ int qs_db_drop_table(QS_DB_CONTEXT* ctx, const char* table)
     if (db_capacity_key(capacity_key, sizeof(capacity_key), table) != 0) {
         return -1;
     }
-    struct stat st;
-    if (lstat(path, &st) != 0 || !S_ISREG(st.st_mode)) {
+    if (db_path_type(path) != 1) {
         return -1;
     }
     char prefix[256];
@@ -918,26 +1068,26 @@ int32_t qs_db_show_table(QS_MEMORY_POOL* _ppool, QS_DB_CONTEXT* ctx)
     if (-1 == result) {
         return -1;
     }
-    DIR* dir = opendir(ctx->db_path);
+    DB_DIRECTORY* dir = db_directory_open(ctx->db_path);
     if (dir == NULL) {
         return -1;
     }
-    struct dirent* dent;
-    while ((dent = readdir(dir)) != NULL) {
-        size_t n = strlen(dent->d_name);
-        if (n < 4 || strcmp(dent->d_name + n - 3, ".db") != 0) {
+    const char* name;
+    while ((name = db_directory_read(dir)) != NULL) {
+        size_t n = strlen(name);
+        if (n < 4 || strcmp(name + n - 3, ".db") != 0) {
             continue;
         }
-        if (strcmp(dent->d_name, QS_DB_SYSTEM_FILE) == 0 ||
-            strcmp(dent->d_name, QS_DB_SCHEMA_FILE) == 0 ||
-            strcmp(dent->d_name, QS_DB_INDEX_FILE) == 0) {
+        if (strcmp(name, QS_DB_SYSTEM_FILE) == 0 ||
+            strcmp(name, QS_DB_SCHEMA_FILE) == 0 ||
+            strcmp(name, QS_DB_INDEX_FILE) == 0) {
             continue;
         }
         char table_name[256];
-        snprintf(table_name, sizeof(table_name), "%.*s", (int)(n - 3), dent->d_name);
+        snprintf(table_name, sizeof(table_name), "%.*s", (int)(n - 3), name);
         qs_array_push_string(_ppool, &result, table_name);
     }
-    closedir(dir);
+    db_directory_close(dir);
     return result;
 }
 
