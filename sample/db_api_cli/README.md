@@ -51,7 +51,7 @@ core（`core/libqs_core.a`）が古い場合は `core/src` で `make` してか�
 | `help` | コマンド一覧 | - |
 | `exit` / `quit` | 終了 | - |
 
-`schema define` は渡された文字列を JSON/schema 形式の検証なしで保存する。検証が必要な場合は `insert` / `update` の前に `schema validate` を明示的に実行すること。CRUD は schema 検証も index 更新も自動では行わない。
+`schema define` は渡された文字列を JSON/schema 形式の検証なしで保存する。高レベル API 版では schema が定義されている場合、`insert` / `update` 時に対応する型・`required`・string `maxLength` を自動検証し、省略された field に `default` が定義されていれば値を補完して保存する。入力に明示された値は default で上書きしない。default は field の型に合う `int32` / `int64` 数値または string にすること。schema 未定義の table は従来どおり検証せずに保存する。`schema validate` は明示的な事前確認にも引き続き使える。index 更新は自動では行わない。
 
 ## 低レベル版 `qs_db_cli` との差分
 
@@ -60,6 +60,7 @@ core（`core/libqs_core.a`）が古い場合は `core/src` で `make` してか�
 | 項目 | 低レベル版 `qs_db_cli` | 高レベル版 `qs_db_api_cli` |
 |---|---|---|
 | 使う API | `qs_db_*`（`qs_datastore.h`） | `api_qs_db_*`（`qs_api.h`） |
+| insert/update | schema 検証・default 補完なし | schema があれば検証し、欠落 default を補完 |
 | context | `QS_DB_CONTEXT`（自前保持） | `QS_DB_API_CONTEXT`（`api_qs_db_init`/`free`） |
 | スクラッチメモリ | `QS_MEMORY_POOL*`（`qs_initialize_memory_f64`） | `QS_MEMORY_CONTEXT`（`api_qs_memory_alloc`/`clean`/`free`） |
 | 起動処理 | なし | `api_qs_db_init` |

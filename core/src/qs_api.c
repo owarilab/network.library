@@ -2834,6 +2834,252 @@ static QS_DB_STORE* api_qs_db_find_open_table(API_QS_DB_INTERNAL* internal, cons
 	return NULL;
 }
 
+static int api_qs_db_append_text(char** buffer, size_t* length, size_t* capacity, const char* text, size_t text_length)
+{
+	if(text_length > SIZE_MAX - *length - 1){
+		return -1;
+	}
+	size_t required = *length + text_length + 1;
+	if(required > *capacity){
+		size_t new_capacity = (*capacity == 0) ? 128 : *capacity;
+		while(new_capacity < required){
+			if(new_capacity > SIZE_MAX / 2){
+				new_capacity = required;
+				break;
+			}
+			new_capacity *= 2;
+		}
+		char* resized = (char*)realloc(*buffer, new_capacity);
+		if(resized == NULL){
+			return -1;
+		}
+		*buffer = resized;
+		*capacity = new_capacity;
+	}
+	memcpy(*buffer + *length, text, text_length);
+	*length += text_length;
+	(*buffer)[*length] = '\0';
+	return 0;
+}
+
+static int api_qs_db_append_json_string(char** buffer, size_t* length, size_t* capacity, const char* value)
+{
+	if(api_qs_db_append_text(buffer, length, capacity, "\"", 1) != 0){
+		return -1;
+	}
+	const unsigned char* p = (const unsigned char*)value;
+	while(*p != '\0'){
+		char escaped[7];
+		const char* text = (const char*)p;
+		size_t text_length = 1;
+		switch(*p){
+			case '"': text = "\\\""; text_length = 2; break;
+			case '\\': text = "\\\\"; text_length = 2; break;
+			case '\b': text = "\\b"; text_length = 2; break;
+			case '\f': text = "\\f"; text_length = 2; break;
+			case '\n': text = "\\n"; text_length = 2; break;
+			case '\r': text = "\\r"; text_length = 2; break;
+			case '\t': text = "\\t"; text_length = 2; break;
+			default:
+				if(*p < 0x20){
+					snprintf(escaped, sizeof(escaped), "\\u%04x", *p);
+					text = escaped;
+					text_length = 6;
+				}
+				break;
+		}
+		if(api_qs_db_append_text(buffer, length, capacity, text, text_length) != 0){
+			return -1;
+		}
+		p++;
+	}
+	return api_qs_db_append_text(buffer, length, capacity, "\"", 1);
+}
+
+static int api_qs_db_append_json_value(char** buffer, size_t* length, size_t* capacity, const char* type, QS_MEMORY_POOL* memory, int32_t field)
+{
+	int32_t value_id = qs_get_hash_id(memory, field, "default");
+	if(strcmp(type, "string") == 0){
+		char* value = qs_get_hash_string(memory, field, "default");
+		return (value_id == ELEMENT_LITERAL_STR && value != NULL) ?
+			api_qs_db_append_json_string(buffer, length, capacity, value) : -1;
+	}
+	if(strcmp(type, "int32") == 0){
+		int32_t* value = qs_get_hash_integer(memory, field, "default");
+		if(value == NULL){
+			return -1;
+		}
+		char number[32];
+		int number_length = snprintf(number, sizeof(number), "%" PRId32, *value);
+		return (number_length > 0 && (size_t)number_length < sizeof(number)) ?
+			api_qs_db_append_text(buffer, length, capacity, number, (size_t)number_length) : -1;
+	}
+	if(strcmp(type, "int64") == 0){
+		char number[32];
+		int number_length;
+		if(value_id == ELEMENT_LITERAL_NUM_U64){
+			uint64_t* value = qs_get_hash_unsigned_big_integer(memory, field, "default");
+			if(value == NULL){
+				return -1;
+			}
+			number_length = snprintf(number, sizeof(number), "%" PRIu64, *value);
+		}else if(value_id == ELEMENT_LITERAL_NUM_64){
+			int64_t* value = qs_get_hash_big_integer(memory, field, "default");
+			if(value == NULL){
+				return -1;
+			}
+			number_length = snprintf(number, sizeof(number), "%" PRId64, *value);
+		}else if(value_id == ELEMENT_LITERAL_NUM){
+			int32_t* value = qs_get_hash_integer(memory, field, "default");
+			if(value == NULL){
+				return -1;
+			}
+			number_length = snprintf(number, sizeof(number), "%" PRId32, *value);
+		}else{
+			return -1;
+		}
+		return (number_length > 0 && (size_t)number_length < sizeof(number)) ?
+			api_qs_db_append_text(buffer, length, capacity, number, (size_t)number_length) : -1;
+	}
+	return -1;
+}
+
+/* Apply defaults to absent fields, then validate the normalized record. */
+static int api_qs_db_prepare_record(QS_DB_CONTEXT* db_context, const char* table, const char* record_json, char** prepared_json)
+{
+	char* schema_json = NULL;
+	QS_MEMORY_POOL* work_memory = NULL;
+	char* merged_json = NULL;
+	char** defaulted_names = NULL;
+	size_t merged_length = 0;
+	size_t merged_capacity = 0;
+	int result = -1;
+	int defaults_added = 0;
+
+	if(db_context == NULL || !db_context->is_open || table == NULL || record_json == NULL || prepared_json == NULL){
+		return -1;
+	}
+	QS_CACHE* schema_cache = (QS_CACHE*)QS_GET_POINTER(db_context->schema.memory, db_context->schema.cache_id);
+	QS_CACHE_PAGE schema_page;
+	qs_get_cache_page(schema_cache, &schema_page);
+	char* stored_schema = NULL;
+	if(schema_page.memory != NULL && schema_page.hash_id >= 0){
+		int32_t schema_memid = qs_get_hash(schema_page.memory, schema_page.hash_id, table);
+		if(schema_memid >= 0){
+			schema_json = (char*)malloc(qs_usize(schema_page.memory, schema_memid));
+			if(schema_json == NULL){
+				return -1;
+			}
+			stored_schema = (char*)QS_GET_POINTER(schema_page.memory, schema_memid);
+			strcpy(schema_json, stored_schema);
+		}
+	}
+	if(stored_schema == NULL){
+		*prepared_json = (char*)record_json;
+		return 0;
+	}
+	if(qs_initialize_memory_f64(&work_memory, SIZE_MBYTE * 16) == 0){
+		goto cleanup;
+	}
+	int32_t schema_root = qs_json_decode_h(work_memory, schema_json, 8, 128);
+	int32_t record_root = qs_json_decode_h(work_memory, record_json, 8, 128);
+	if(schema_root < 0 || record_root < 0){
+		goto cleanup;
+	}
+	QS_NODE* schema_node = qs_get_json_root(work_memory, schema_root);
+	QS_NODE* record_node = qs_get_json_root(work_memory, record_root);
+	if(schema_node == NULL || schema_node->id != ELEMENT_HASH || record_node == NULL || record_node->id != ELEMENT_HASH){
+		goto cleanup;
+	}
+	int32_t schema_hash = schema_node->element_munit;
+	int32_t record_hash = record_node->element_munit;
+	int32_t fields = qs_get_hash(work_memory, schema_hash, "fields");
+	if(fields < 0 || qs_get_hash_id(work_memory, schema_hash, "fields") != ELEMENT_ARRAY){
+		goto cleanup;
+	}
+	int32_t field_count = qs_array_length(work_memory, fields);
+	if(field_count < 0){
+		goto cleanup;
+	}
+	defaulted_names = (char**)calloc((size_t)field_count, sizeof(*defaulted_names));
+	if(defaulted_names == NULL && field_count != 0){
+		goto cleanup;
+	}
+	int32_t record_length = qs_hash_length(work_memory, record_hash);
+	int32_t field_index;
+	for(field_index = 0; field_index < field_count; field_index++){
+		QS_ARRAY_ELEMENT* element = qs_array_get(work_memory, fields, field_index);
+		if(element == NULL || element->id != ELEMENT_HASH){
+			goto cleanup;
+		}
+		int32_t field = element->memid_array_element_data;
+		char* name = qs_get_hash_string(work_memory, field, "name");
+		char* type = qs_get_hash_string(work_memory, field, "type");
+		if(name == NULL || type == NULL){
+			goto cleanup;
+		}
+		if(qs_get_hash(work_memory, field, "default") < 0 || qs_get_hash(work_memory, record_hash, name) >= 0){
+			continue;
+		}
+		int32_t previous;
+		for(previous = 0; previous < defaults_added; previous++){
+			if(strcmp(defaulted_names[previous], name) == 0){
+				break;
+			}
+		}
+		if(previous != defaults_added){
+			continue;
+		}
+		if(merged_json == NULL){
+			const char* end = record_json + strlen(record_json);
+			while(end > record_json && isspace((unsigned char)end[-1])) end--;
+			if(end == record_json || end[-1] != '}'){
+				goto cleanup;
+			}
+			if(api_qs_db_append_text(&merged_json, &merged_length, &merged_capacity, record_json, (size_t)(end - record_json - 1)) != 0){
+				goto cleanup;
+			}
+			if(record_length > 0 && api_qs_db_append_text(&merged_json, &merged_length, &merged_capacity, ",", 1) != 0){
+				goto cleanup;
+			}
+		}
+		if(defaults_added > 0 && api_qs_db_append_text(&merged_json, &merged_length, &merged_capacity, ",", 1) != 0){
+			goto cleanup;
+		}
+		if(api_qs_db_append_json_string(&merged_json, &merged_length, &merged_capacity, name) != 0 ||
+			api_qs_db_append_text(&merged_json, &merged_length, &merged_capacity, ":", 1) != 0 ||
+			api_qs_db_append_json_value(&merged_json, &merged_length, &merged_capacity, type, work_memory, field) != 0){
+			goto cleanup;
+		}
+		defaulted_names[defaults_added++] = name;
+	}
+	if(merged_json != NULL){
+		const char* end = record_json + strlen(record_json);
+		while(end > record_json && isspace((unsigned char)end[-1])) end--;
+		if(api_qs_db_append_text(&merged_json, &merged_length, &merged_capacity, end - 1, strlen(end - 1)) != 0){
+			goto cleanup;
+		}
+		if(qs_db_schema_validate(work_memory, db_context, table, merged_json) != 0){
+			goto cleanup;
+		}
+		*prepared_json = merged_json;
+		merged_json = NULL;
+	}else{
+		if(qs_db_schema_validate(work_memory, db_context, table, record_json) != 0){
+			goto cleanup;
+		}
+		*prepared_json = (char*)record_json;
+	}
+	result = 0;
+
+cleanup:
+	free(merged_json);
+	free(defaulted_names);
+	if(work_memory != NULL) qs_free(work_memory);
+	free(schema_json);
+	return result;
+}
+
 int api_qs_db_init(QS_DB_API_CONTEXT* context)
 {
 	if(NULL == context){
@@ -3019,13 +3265,35 @@ int api_qs_db_schema_validate(QS_MEMORY_CONTEXT* memory_context, QS_DB_API_CONTE
 int api_qs_db_record_insert(QS_DB_API_CONTEXT* context, const char* table, const char* id, const char* record_json)
 {
 	QS_DB_CONTEXT* db_context = api_qs_db_get_context(context);
-	return (db_context == NULL) ? -1 : qs_db_record_insert(db_context, table, id, record_json);
+	if(db_context == NULL || table == NULL || record_json == NULL){
+		return -1;
+	}
+	char* prepared_json = NULL;
+	if(api_qs_db_prepare_record(db_context, table, record_json, &prepared_json) != 0){
+		return -1;
+	}
+	int result = qs_db_record_insert(db_context, table, id, prepared_json);
+	if(prepared_json != record_json){
+		free(prepared_json);
+	}
+	return result;
 }
 
 int api_qs_db_record_update(QS_DB_API_CONTEXT* context, const char* table, const char* id, const char* record_json)
 {
 	QS_DB_CONTEXT* db_context = api_qs_db_get_context(context);
-	return (db_context == NULL) ? -1 : qs_db_record_update(db_context, table, id, record_json);
+	if(db_context == NULL || table == NULL || record_json == NULL){
+		return -1;
+	}
+	char* prepared_json = NULL;
+	if(api_qs_db_prepare_record(db_context, table, record_json, &prepared_json) != 0){
+		return -1;
+	}
+	int result = qs_db_record_update(db_context, table, id, prepared_json);
+	if(prepared_json != record_json){
+		free(prepared_json);
+	}
+	return result;
 }
 
 int api_qs_db_record_delete(QS_DB_API_CONTEXT* context, const char* table, const char* id)

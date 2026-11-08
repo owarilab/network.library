@@ -424,6 +424,7 @@ int api_qs_db_table_close(QS_DB_API_CONTEXT* context, const char* table);
 int api_qs_db_schema_define(QS_DB_API_CONTEXT* context, const char* table, const char* schema_json);
 int api_qs_db_schema_get(QS_DB_API_CONTEXT* context, const char* table, char* out_buf, size_t out_size);
 int api_qs_db_schema_validate(QS_MEMORY_CONTEXT* memory_context, QS_DB_API_CONTEXT* context, const char* table, const char* record_json);
+/* Insert/update validate records when a schema exists and apply defaults to absent fields. */
 int api_qs_db_record_insert(QS_DB_API_CONTEXT* context, const char* table, const char* id, const char* record_json);
 int api_qs_db_record_update(QS_DB_API_CONTEXT* context, const char* table, const char* id, const char* record_json);
 int api_qs_db_record_delete(QS_DB_API_CONTEXT* context, const char* table, const char* id);
