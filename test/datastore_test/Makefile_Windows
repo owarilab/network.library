@@ -1,0 +1,16 @@
+CC = x86_64-w64-mingw32-gcc
+CFLAGS = -D_WINDOWS -I ../../core/header -Wall -O -Wno-unknown-pragmas
+LIBA = ../../core/libqs_core_win.a
+
+build: qs_datastore_windows_test.exe
+
+qs_datastore_windows_test.exe: windows.c $(LIBA)
+	$(CC) $(CFLAGS) -o $@ windows.c $(LIBA) -lws2_32
+
+run: qs_datastore_windows_test.exe
+	./qs_datastore_windows_test.exe
+
+clean:
+	rm -f qs_datastore_windows_test.exe
+
+.PHONY: build run clean
