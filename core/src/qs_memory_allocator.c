@@ -149,7 +149,8 @@ size_t qs_initialize_mmapmemory_f( const char* file_name, QS_MEMORY_POOL** memor
 	size_t fix_memory_unit = FIX_MUNIT_SIZE;
 	size_t min_realloc = 0;
 	allocate_size = QS_ALIGNUP( allocate_size, MEMORY_ALIGNMENT_SIZE_BIT_64 );
-	if( ( (*memory) = ( QS_MEMORY_POOL * )mmap( 0, sizeof( QS_MEMORY_POOL ), PROT_READ | PROT_WRITE, MAP_ANON | MAP_SHARED, -1, 0 ) ) == NULL ){
+	if( ( (*memory) = ( QS_MEMORY_POOL * )mmap( 0, sizeof( QS_MEMORY_POOL ), PROT_READ | PROT_WRITE, MAP_ANON | MAP_SHARED, -1, 0 ) ) == MAP_FAILED ){
+		*memory = NULL;
 		return 0;
 	}
 	memset( (*memory), 0, sizeof( QS_MEMORY_POOL ) );
@@ -165,6 +166,8 @@ size_t qs_initialize_mmapmemory_f( const char* file_name, QS_MEMORY_POOL** memor
 	}
 	int fd = open(file_name, O_CREAT | O_RDWR, 0755);
 	if( fd < 0 ){
+		munmap(*memory, sizeof(QS_MEMORY_POOL));
+		*memory = NULL;
 		return 0;
 	}
 	
@@ -174,18 +177,27 @@ size_t qs_initialize_mmapmemory_f( const char* file_name, QS_MEMORY_POOL** memor
 		char c = 0;
 		if(0>(error = lseek(fd, byte_size, SEEK_SET))){
 			close(fd);
+			munmap(*memory, sizeof(QS_MEMORY_POOL));
+			*memory = NULL;
 			return 0;
 		}
 		if(-1==write(fd, &c, sizeof(char))){
 			close(fd);
+			munmap(*memory, sizeof(QS_MEMORY_POOL));
+			*memory = NULL;
 			return 0;
 		}
 		if(0>(error = lseek(fd, 0, SEEK_SET))){
 			close(fd);
+			munmap(*memory, sizeof(QS_MEMORY_POOL));
+			*memory = NULL;
 			return 0;
 		}
 	}
-	if( ( (*memory)->memory = ( void* )mmap( 0, byte_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 ) ) == NULL ){
+	if( ( (*memory)->memory = ( void* )mmap( 0, byte_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 ) ) == MAP_FAILED ){
+		close(fd);
+		munmap(*memory, sizeof(QS_MEMORY_POOL));
+		*memory = NULL;
 		return 0;
 	}
 	if(not_exist==1){

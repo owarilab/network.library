@@ -18,6 +18,7 @@ extern "C"{
 #include <stdio.h>
 #include <string.h>
 
+/* buffer_size includes the terminating NUL; encoding returns -1 on insufficient space. */
 int32_t qs_json_encode( QS_MEMORY_POOL* _ppool, QS_NODE* node, size_t buf_size );
 int32_t qs_json_encode_b( QS_MEMORY_POOL* _ppool, QS_NODE* node, int32_t buf_munit );
 int32_t qs_json_encode_hash( QS_MEMORY_POOL* _ppool, int32_t memid_hash, size_t buffer_size );
