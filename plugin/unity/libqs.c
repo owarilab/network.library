@@ -1067,6 +1067,126 @@ UNITY_INTERFACE_EXPORT char* UNITY_INTERFACE_API libqs_api_ranking_get(QS_RANKIN
 	return api_qs_ranking_get(ranking_context, offset, length, dest_memory);
 }
 
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_init(QS_DB_API_CONTEXT* context)
+{
+	return api_qs_db_init(context);
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_free(QS_DB_API_CONTEXT* context)
+{
+	return api_qs_db_free(context);
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_create_database(const char* base_dir, const char* database)
+{
+	return api_qs_db_create_database(base_dir, database);
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_drop_database(const char* base_dir, const char* database)
+{
+	return api_qs_db_drop_database(base_dir, database);
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_show_database(QS_MEMORY_CONTEXT* memory_context, QS_JSON_ELEMENT_ARRAY* array, const char* base_dir)
+{
+	return api_qs_db_show_database(memory_context, array, base_dir);
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_open_database(QS_DB_API_CONTEXT* context, const char* base_dir, const char* database)
+{
+	return api_qs_db_open_database(context, base_dir, database);
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_close_database(QS_DB_API_CONTEXT* context)
+{
+	return api_qs_db_close_database(context);
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_create_table(QS_DB_API_CONTEXT* context, const char* table, int capacity_mb)
+{
+	return api_qs_db_create_table(context, table, capacity_mb);
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_drop_table(QS_DB_API_CONTEXT* context, const char* table)
+{
+	return api_qs_db_drop_table(context, table);
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_show_table(QS_MEMORY_CONTEXT* memory_context, QS_DB_API_CONTEXT* context, QS_JSON_ELEMENT_ARRAY* array)
+{
+	return api_qs_db_show_table(memory_context, context, array);
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_table_open(QS_DB_API_CONTEXT* context, const char* table)
+{
+	return api_qs_db_table_open(context, table);
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_table_close(QS_DB_API_CONTEXT* context, const char* table)
+{
+	return api_qs_db_table_close(context, table);
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_schema_define(QS_DB_API_CONTEXT* context, const char* table, const char* schema_json)
+{
+	return api_qs_db_schema_define(context, table, schema_json);
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_schema_get(QS_DB_API_CONTEXT* context, const char* table, char* out_buf, size_t out_size)
+{
+	return api_qs_db_schema_get(context, table, out_buf, out_size);
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_schema_validate(QS_MEMORY_CONTEXT* memory_context, QS_DB_API_CONTEXT* context, const char* table, const char* record_json)
+{
+	return api_qs_db_schema_validate(memory_context, context, table, record_json);
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_record_insert(QS_DB_API_CONTEXT* context, const char* table, const char* id, const char* record_json)
+{
+	return api_qs_db_record_insert(context, table, id, record_json);
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_record_update(QS_DB_API_CONTEXT* context, const char* table, const char* id, const char* record_json)
+{
+	return api_qs_db_record_update(context, table, id, record_json);
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_record_delete(QS_DB_API_CONTEXT* context, const char* table, const char* id)
+{
+	return api_qs_db_record_delete(context, table, id);
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_record_get(QS_DB_API_CONTEXT* context, const char* table, const char* id, char* out_buf, size_t out_size)
+{
+	return api_qs_db_record_get(context, table, id, out_buf, out_size);
+}
+
+UNITY_INTERFACE_EXPORT char* UNITY_INTERFACE_API libqs_api_db_record_list(QS_MEMORY_CONTEXT* memory_context, QS_DB_API_CONTEXT* context, const char* table, const char* filter_json, int scan_mode)
+{
+	return api_qs_db_record_list(memory_context, context, table, filter_json, scan_mode);
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_index_add(QS_DB_API_CONTEXT* context, const char* table, const char* field, const char* value, const char* record_id)
+{
+	return api_qs_db_index_add(context, table, field, value, record_id);
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_index_remove(QS_DB_API_CONTEXT* context, const char* table, const char* field, const char* value, const char* record_id)
+{
+	return api_qs_db_index_remove(context, table, field, value, record_id);
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_index_rebuild(QS_MEMORY_CONTEXT* memory_context, QS_DB_API_CONTEXT* context, const char* table, const char* indexed_fields_json)
+{
+	return api_qs_db_index_rebuild(memory_context, context, table, indexed_fields_json);
+}
+
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_next_id(QS_DB_API_CONTEXT* context, const char* table, const char* prefix, char* out_id, size_t out_size)
+{
+	return api_qs_db_next_id(context, table, prefix, out_id, out_size);
+}
+
 UNITY_INTERFACE_EXPORT void UNITY_INTERFACE_API libqs_api_memory_info(QS_MEMORY_CONTEXT* context)
 {
 	api_qs_memory_info(context);

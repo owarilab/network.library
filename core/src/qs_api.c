@@ -3,6 +3,7 @@
  */
 
 #include "qs_api.h"
+#include <stddef.h>
 
 //---------------------------------------------------
 #include "qs_array.h"
@@ -16,6 +17,22 @@
 #include "qs_csv.h"
 #include "qs_sha1.h"
 #include "qs_ranking.h"
+#include "qs_datastore.h"
+
+#define API_QS_DB_MAX_OPEN_TABLES 64
+
+typedef struct API_QS_DB_OPEN_TABLE
+{
+	char name[46];
+	QS_DB_STORE store;
+	int is_open;
+} API_QS_DB_OPEN_TABLE;
+
+typedef struct API_QS_DB_INTERNAL
+{
+	QS_DB_CONTEXT database;
+	API_QS_DB_OPEN_TABLE tables[API_QS_DB_MAX_OPEN_TABLES];
+} API_QS_DB_INTERNAL;
 
 void api_qs_on_plain_recv(uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
 void api_qs_on_simple_recv(uint32_t payload_type, uint8_t* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
@@ -2786,6 +2803,277 @@ char* api_qs_ranking_get(QS_RANKING_CONTEXT* ranking_context, int32_t offset, in
 		return NULL;
 	}
 	return (char*)QS_GET_POINTER(destination, json_munit);
+}
+
+static QS_DB_CONTEXT* api_qs_db_get_context(QS_DB_API_CONTEXT* context)
+{
+	if(NULL == context || NULL == context->memory.memory || context->memid_db < 0){
+		return NULL;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory.memory;
+	return (QS_DB_CONTEXT*)qs_upointer(memory, context->memid_db);
+}
+
+static API_QS_DB_INTERNAL* api_qs_db_get_internal(QS_DB_API_CONTEXT* context)
+{
+	QS_DB_CONTEXT* db_context = api_qs_db_get_context(context);
+	if(NULL == db_context){
+		return NULL;
+	}
+	return (API_QS_DB_INTERNAL*)((uint8_t*)db_context - offsetof(API_QS_DB_INTERNAL, database));
+}
+
+static QS_DB_STORE* api_qs_db_find_open_table(API_QS_DB_INTERNAL* internal, const char* table)
+{
+	int i;
+	for(i = 0; i < API_QS_DB_MAX_OPEN_TABLES; i++){
+		if(internal->tables[i].is_open && 0 == strcmp(internal->tables[i].name, table)){
+			return &internal->tables[i].store;
+		}
+	}
+	return NULL;
+}
+
+int api_qs_db_init(QS_DB_API_CONTEXT* context)
+{
+	if(NULL == context){
+		return -1;
+	}
+	if(NULL != context->memory.memory){
+		return -1;
+	}
+	context->memory.memory = NULL;
+	context->memid_db = -1;
+	if(0 != api_qs_memory_alloc(&context->memory, SIZE_MBYTE * 16)){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory.memory;
+	int32_t memid_db = qs_create_memory_block(memory, sizeof(API_QS_DB_INTERNAL));
+	API_QS_DB_INTERNAL* internal = (API_QS_DB_INTERNAL*)qs_upointer(memory, memid_db);
+	QS_DB_CONTEXT* db_context = (internal == NULL) ? NULL : &internal->database;
+	if(NULL == db_context){
+		api_qs_memory_free(&context->memory);
+		context->memory.memory = NULL;
+		return -1;
+	}
+	memset(internal, 0, sizeof(*internal));
+	context->memid_db = memid_db;
+	return 0;
+}
+
+int api_qs_db_free(QS_DB_API_CONTEXT* context)
+{
+	if(NULL == context){
+		return -1;
+	}
+	QS_DB_CONTEXT* db_context = api_qs_db_get_context(context);
+	if(NULL == db_context){
+		return -1;
+	}
+	if(db_context->is_open){
+		int close_result = qs_db_close_database(db_context);
+		if(close_result != 0){
+			return close_result;
+		}
+	}
+	api_qs_memory_free(&context->memory);
+	context->memory.memory = NULL;
+	context->memid_db = -1;
+	return 0;
+}
+
+int api_qs_db_create_database(const char* base_dir, const char* database)
+{
+	return qs_db_create_database(base_dir, database);
+}
+
+int api_qs_db_drop_database(const char* base_dir, const char* database)
+{
+	return qs_db_drop_database(base_dir, database);
+}
+
+int api_qs_db_show_database(QS_MEMORY_CONTEXT* memory_context, QS_JSON_ELEMENT_ARRAY* array, const char* base_dir)
+{
+	if(NULL == memory_context || NULL == memory_context->memory || NULL == array || NULL == base_dir){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)memory_context->memory;
+	int32_t memid_array = qs_db_show_database(memory, base_dir);
+	if(memid_array < 0){
+		return -1;
+	}
+	array->memid_array = -1;
+	array->memory = memory;
+	array->memid_array = memid_array;
+	return 0;
+}
+
+int api_qs_db_open_database(QS_DB_API_CONTEXT* context, const char* base_dir, const char* database)
+{
+	QS_DB_CONTEXT* db_context = api_qs_db_get_context(context);
+	if(NULL == db_context){
+		return -1;
+	}
+	return qs_db_open_database(db_context, base_dir, database);
+}
+
+int api_qs_db_close_database(QS_DB_API_CONTEXT* context)
+{
+	API_QS_DB_INTERNAL* internal = api_qs_db_get_internal(context);
+	if(NULL == internal){
+		return -1;
+	}
+	return qs_db_close_database(&internal->database);
+}
+
+int api_qs_db_create_table(QS_DB_API_CONTEXT* context, const char* table, int capacity_mb)
+{
+	QS_DB_CONTEXT* db_context = api_qs_db_get_context(context);
+	return (db_context == NULL) ? -1 : qs_db_create_table(db_context, table, capacity_mb);
+}
+
+int api_qs_db_drop_table(QS_DB_API_CONTEXT* context, const char* table)
+{
+	QS_DB_CONTEXT* db_context = api_qs_db_get_context(context);
+	return (db_context == NULL) ? -1 : qs_db_drop_table(db_context, table);
+}
+
+int api_qs_db_show_table(QS_MEMORY_CONTEXT* memory_context, QS_DB_API_CONTEXT* context, QS_JSON_ELEMENT_ARRAY* array)
+{
+	QS_DB_CONTEXT* db_context = api_qs_db_get_context(context);
+	if(db_context == NULL || memory_context == NULL || memory_context->memory == NULL || array == NULL){
+		return -1;
+	}
+	QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)memory_context->memory;
+	int32_t memid_array = qs_db_show_table(memory, db_context);
+	if(memid_array < 0){
+		return -1;
+	}
+	array->memid_array = memid_array;
+	array->memory = memory;
+	return 0;
+}
+
+int api_qs_db_table_open(QS_DB_API_CONTEXT* context, const char* table)
+{
+	API_QS_DB_INTERNAL* internal = api_qs_db_get_internal(context);
+	if(internal == NULL || table == NULL){
+		return -1;
+	}
+	if(api_qs_db_find_open_table(internal, table) != NULL){
+		return -1;
+	}
+	int i;
+	for(i = 0; i < API_QS_DB_MAX_OPEN_TABLES; i++){
+		if(!internal->tables[i].is_open){
+			if(qs_db_open_table(&internal->database, table, 0, &internal->tables[i].store) != 0){
+				return -1;
+			}
+			strncpy(internal->tables[i].name, table, sizeof(internal->tables[i].name) - 1);
+			internal->tables[i].name[sizeof(internal->tables[i].name) - 1] = '\0';
+			internal->tables[i].is_open = 1;
+			return 0;
+		}
+	}
+	return -1;
+}
+
+int api_qs_db_table_close(QS_DB_API_CONTEXT* context, const char* table)
+{
+	API_QS_DB_INTERNAL* internal = api_qs_db_get_internal(context);
+	if(internal == NULL || table == NULL){
+		return -1;
+	}
+	int i;
+	for(i = 0; i < API_QS_DB_MAX_OPEN_TABLES; i++){
+		if(internal->tables[i].is_open && 0 == strcmp(internal->tables[i].name, table)){
+			qs_db_close_table(&internal->tables[i].store);
+			memset(&internal->tables[i], 0, sizeof(internal->tables[i]));
+			return 0;
+		}
+	}
+	return -1;
+}
+
+int api_qs_db_schema_define(QS_DB_API_CONTEXT* context, const char* table, const char* schema_json)
+{
+	QS_DB_CONTEXT* db_context = api_qs_db_get_context(context);
+	return (db_context == NULL) ? -1 : qs_db_schema_define(db_context, table, schema_json);
+}
+
+int api_qs_db_schema_get(QS_DB_API_CONTEXT* context, const char* table, char* out_buf, size_t out_size)
+{
+	QS_DB_CONTEXT* db_context = api_qs_db_get_context(context);
+	return (db_context == NULL) ? -1 : qs_db_schema_get(db_context, table, out_buf, out_size);
+}
+
+int api_qs_db_schema_validate(QS_MEMORY_CONTEXT* memory_context, QS_DB_API_CONTEXT* context, const char* table, const char* record_json)
+{
+	QS_DB_CONTEXT* db_context = api_qs_db_get_context(context);
+	if(db_context == NULL || memory_context == NULL || memory_context->memory == NULL){
+		return -1;
+	}
+	return qs_db_schema_validate((QS_MEMORY_POOL*)memory_context->memory, db_context, table, record_json);
+}
+
+int api_qs_db_record_insert(QS_DB_API_CONTEXT* context, const char* table, const char* id, const char* record_json)
+{
+	QS_DB_CONTEXT* db_context = api_qs_db_get_context(context);
+	return (db_context == NULL) ? -1 : qs_db_record_insert(db_context, table, id, record_json);
+}
+
+int api_qs_db_record_update(QS_DB_API_CONTEXT* context, const char* table, const char* id, const char* record_json)
+{
+	QS_DB_CONTEXT* db_context = api_qs_db_get_context(context);
+	return (db_context == NULL) ? -1 : qs_db_record_update(db_context, table, id, record_json);
+}
+
+int api_qs_db_record_delete(QS_DB_API_CONTEXT* context, const char* table, const char* id)
+{
+	QS_DB_CONTEXT* db_context = api_qs_db_get_context(context);
+	return (db_context == NULL) ? -1 : qs_db_record_delete(db_context, table, id);
+}
+
+int api_qs_db_record_get(QS_DB_API_CONTEXT* context, const char* table, const char* id, char* out_buf, size_t out_size)
+{
+	QS_DB_CONTEXT* db_context = api_qs_db_get_context(context);
+	return (db_context == NULL) ? -1 : qs_db_record_get(db_context, table, id, out_buf, out_size);
+}
+
+char* api_qs_db_record_list(QS_MEMORY_CONTEXT* memory_context, QS_DB_API_CONTEXT* context, const char* table, const char* filter_json, int scan_mode)
+{
+	QS_DB_CONTEXT* db_context = api_qs_db_get_context(context);
+	if(db_context == NULL || memory_context == NULL || memory_context->memory == NULL){
+		return NULL;
+	}
+	return qs_db_record_list((QS_MEMORY_POOL*)memory_context->memory, db_context, table, filter_json, scan_mode);
+}
+
+int api_qs_db_index_add(QS_DB_API_CONTEXT* context, const char* table, const char* field, const char* value, const char* record_id)
+{
+	QS_DB_CONTEXT* db_context = api_qs_db_get_context(context);
+	return (db_context == NULL) ? -1 : qs_db_index_add(db_context, table, field, value, record_id);
+}
+
+int api_qs_db_index_remove(QS_DB_API_CONTEXT* context, const char* table, const char* field, const char* value, const char* record_id)
+{
+	QS_DB_CONTEXT* db_context = api_qs_db_get_context(context);
+	return (db_context == NULL) ? -1 : qs_db_index_remove(db_context, table, field, value, record_id);
+}
+
+int api_qs_db_index_rebuild(QS_MEMORY_CONTEXT* memory_context, QS_DB_API_CONTEXT* context, const char* table, const char* indexed_fields_json)
+{
+	QS_DB_CONTEXT* db_context = api_qs_db_get_context(context);
+	if(db_context == NULL || memory_context == NULL || memory_context->memory == NULL){
+		return -1;
+	}
+	return qs_db_index_rebuild((QS_MEMORY_POOL*)memory_context->memory, db_context, table, indexed_fields_json);
+}
+
+int api_qs_db_next_id(QS_DB_API_CONTEXT* context, const char* table, const char* prefix, char* out_id, size_t out_size)
+{
+	QS_DB_CONTEXT* db_context = api_qs_db_get_context(context);
+	return (db_context == NULL) ? -1 : qs_db_next_id(db_context, table, prefix, out_id, out_size);
 }
 
 int api_qs_room_create(QS_SERVER_CONTEXT* context, const char* name, QS_MEMORY_CONTEXT* dest_memory, QS_JSON_ELEMENT_OBJECT* dest_object)

@@ -76,6 +76,42 @@ extern "C"{
 
 #define QS_EVENT_PARAMETER_TYPE_RECV 1
 #define QS_EVENT_PARAMETER_TYPE_CONNECTION 2
+#define QS_WEBSOCKET_MAX_MESSAGE_SIZE 65535
+
+#define QS_DB_CAPACITY_B1MB    1
+#define QS_DB_CAPACITY_B8MB    8
+#define QS_DB_CAPACITY_B16MB   16
+#define QS_DB_CAPACITY_B32MB   32
+#define QS_DB_CAPACITY_B64MB   64
+#define QS_DB_CAPACITY_B128MB  128
+#define QS_DB_CAPACITY_B256MB  256
+#define QS_DB_CAPACITY_B512MB  512
+#define QS_DB_CAPACITY_B1024MB 1024
+#define QS_DB_SCAN_FULL   0
+#define QS_DB_SCAN_INDEX  1
+
+typedef enum QS_WEBSOCKET_STATE
+{
+	QS_WEBSOCKET_STATE_CONNECTING = 0,
+	QS_WEBSOCKET_STATE_HANDSHAKING,
+	QS_WEBSOCKET_STATE_OPEN,
+	QS_WEBSOCKET_STATE_CLOSING,
+	QS_WEBSOCKET_STATE_CLOSED,
+	QS_WEBSOCKET_STATE_ERROR
+} QS_WEBSOCKET_STATE;
+
+typedef enum QS_WEBSOCKET_ERROR
+{
+	QS_WEBSOCKET_ERROR_NONE = 0,
+	QS_WEBSOCKET_ERROR_HANDSHAKE_SEND,
+	QS_WEBSOCKET_ERROR_HANDSHAKE_RESPONSE,
+	QS_WEBSOCKET_ERROR_HANDSHAKE_ACCEPT,
+	QS_WEBSOCKET_ERROR_RECEIVE_BUFFER,
+	QS_WEBSOCKET_ERROR_FRAME,
+	QS_WEBSOCKET_ERROR_SEND
+} QS_WEBSOCKET_ERROR;
+
+typedef struct QS_WEBSOCKET_CLIENT QS_WEBSOCKET_CLIENT;
 
 #ifndef _QS_SOCKET_ID_DEFINED_
 #define _QS_SOCKET_ID_DEFINED_
@@ -138,8 +174,6 @@ typedef struct QS_SERVER_CONTEXT
 	ssize_t ws_message_size;
 } QS_SERVER_CONTEXT;
 
-typedef struct QS_WEBSOCKET_CLIENT QS_WEBSOCKET_CLIENT;
-
 typedef struct QS_CLIENT_CONTEXT
 {
 	void* memory;
@@ -186,6 +220,12 @@ typedef struct QS_RANKING_CONTEXT
 	int32_t memid_ranking;
 	void* memory;
 } QS_RANKING_CONTEXT;
+
+typedef struct QS_DB_API_CONTEXT
+{
+	QS_MEMORY_CONTEXT memory;
+	int32_t memid_db;
+} QS_DB_API_CONTEXT;
 
 #ifdef __GNUC__
 #define QS_LOG_PRINTF_CHECK(fmt_index, arg_index) __attribute__((format(printf, fmt_index, arg_index)))
@@ -333,6 +373,13 @@ int api_qs_client_send(QS_CLIENT_CONTEXT* context, const char* payload, size_t p
 int api_qs_client_send_message(QS_CLIENT_CONTEXT* context,uint32_t payload_type, const char* payload, size_t payload_len);
 int api_qs_websocket_client_send(QS_CLIENT_CONTEXT* context, int is_binary, const void* payload, size_t payload_len);
 int api_qs_websocket_client_close(QS_CLIENT_CONTEXT* context);
+int api_qs_websocket_client_close_with_reason(QS_CLIENT_CONTEXT* context, uint16_t status_code, const char* reason);
+int api_qs_websocket_client_set_max_message_size(QS_CLIENT_CONTEXT* context, size_t max_message_size);
+size_t api_qs_websocket_client_get_max_message_size(QS_CLIENT_CONTEXT* context);
+QS_WEBSOCKET_STATE api_qs_websocket_client_get_state(QS_CLIENT_CONTEXT* context);
+QS_WEBSOCKET_ERROR api_qs_websocket_client_get_error(QS_CLIENT_CONTEXT* context);
+uint16_t api_qs_websocket_client_get_close_code(QS_CLIENT_CONTEXT* context);
+const char* api_qs_websocket_client_get_close_reason(QS_CLIENT_CONTEXT* context);
 uint8_t* api_qs_get_websocket_payload(QS_EVENT_PARAMETER params);
 size_t api_qs_get_websocket_payload_length(QS_EVENT_PARAMETER params);
 uint8_t api_qs_get_websocket_opcode(QS_EVENT_PARAMETER params);
@@ -371,6 +418,7 @@ ssize_t api_qs_get_ws_message_size(QS_EVENT_PARAMETER params);
 uint8_t api_qs_get_ws_opcode(QS_EVENT_PARAMETER params);
 int api_qs_send_ws_message(QS_EVENT_PARAMETER params,const char* message);
 int api_qs_send_ws_message_plane(QS_EVENT_PARAMETER params,const char* message);
+int api_qs_send_ws_text_by_connection_offset(QS_SERVER_CONTEXT* context,uint32_t connection_offset,const char* message);
 int api_qs_send_ws_binary(QS_EVENT_PARAMETER params,const void* data,size_t size);
 void api_qs_send_ws_binary_by_connection_offset(QS_SERVER_CONTEXT* context,uint32_t connection_offset,const void* data,size_t size);
 
@@ -431,6 +479,10 @@ int32_t api_qs_kvs_keys(QS_JSON_ELEMENT_ARRAY* array, QS_KVS_CONTEXT* kvs_contex
 int32_t api_qs_kvs_sorted_keys(QS_JSON_ELEMENT_ARRAY* array, QS_KVS_CONTEXT* kvs_context, int32_t is_sort_asc);
 int api_qs_persistence_kvs_memory_free(QS_KVS_CONTEXT* kvs_context);
 
+int api_qs_room_create(QS_SERVER_CONTEXT* context, const char* name, QS_MEMORY_CONTEXT* dest_memory, QS_JSON_ELEMENT_OBJECT* dest_object);
+int api_qs_room_list(QS_SERVER_CONTEXT* context, QS_MEMORY_CONTEXT* dest_memory, QS_JSON_ELEMENT_OBJECT* dest_object);
+int api_qs_room_join(QS_SERVER_CONTEXT* context, const char* room_id, const char* connection_id, QS_MEMORY_CONTEXT* dest_memory, QS_JSON_ELEMENT_OBJECT* dest_object);
+int api_qs_room_leave(QS_SERVER_CONTEXT* context, const char* room_id, const char* connection_id, QS_MEMORY_CONTEXT* dest_memory, QS_JSON_ELEMENT_OBJECT* dest_object);
 int api_qs_ranking_create(QS_MEMORY_CONTEXT* memory_context, QS_RANKING_CONTEXT* ranking_context, size_t size, int32_t key_size, int32_t get_max, int32_t refresh_size);
 int api_qs_ranking_entry(QS_RANKING_CONTEXT* ranking_context, const char* id);
 int api_qs_ranking_set_value(QS_RANKING_CONTEXT* ranking_context, const char* id, uint32_t value);
@@ -438,10 +490,31 @@ int api_qs_ranking_add_value(QS_RANKING_CONTEXT* ranking_context, const char* id
 int api_qs_ranking_sort(QS_RANKING_CONTEXT* ranking_context);
 char* api_qs_ranking_get(QS_RANKING_CONTEXT* ranking_context, int32_t offset, int32_t length, QS_MEMORY_CONTEXT* dest_memory);
 
-int api_qs_room_create(QS_SERVER_CONTEXT* context, const char* name, QS_MEMORY_CONTEXT* dest_memory, QS_JSON_ELEMENT_OBJECT* dest_object);
-int api_qs_room_list(QS_SERVER_CONTEXT* context, QS_MEMORY_CONTEXT* dest_memory, QS_JSON_ELEMENT_OBJECT* dest_object);
-int api_qs_room_join(QS_SERVER_CONTEXT* context, const char* room_id, const char* connection_id, QS_MEMORY_CONTEXT* dest_memory, QS_JSON_ELEMENT_OBJECT* dest_object);
-int api_qs_room_leave(QS_SERVER_CONTEXT* context, const char* room_id, const char* connection_id, QS_MEMORY_CONTEXT* dest_memory, QS_JSON_ELEMENT_OBJECT* dest_object);
+int api_qs_db_init(QS_DB_API_CONTEXT* context);
+int api_qs_db_free(QS_DB_API_CONTEXT* context);
+int api_qs_db_create_database(const char* base_dir, const char* database);
+int api_qs_db_drop_database(const char* base_dir, const char* database);
+int api_qs_db_show_database(QS_MEMORY_CONTEXT* memory_context, QS_JSON_ELEMENT_ARRAY* array, const char* base_dir);
+int api_qs_db_open_database(QS_DB_API_CONTEXT* context, const char* base_dir, const char* database);
+int api_qs_db_close_database(QS_DB_API_CONTEXT* context);
+int api_qs_db_create_table(QS_DB_API_CONTEXT* context, const char* table, int capacity_mb);
+int api_qs_db_drop_table(QS_DB_API_CONTEXT* context, const char* table);
+int api_qs_db_show_table(QS_MEMORY_CONTEXT* memory_context, QS_DB_API_CONTEXT* context, QS_JSON_ELEMENT_ARRAY* array);
+int api_qs_db_table_open(QS_DB_API_CONTEXT* context, const char* table);
+int api_qs_db_table_close(QS_DB_API_CONTEXT* context, const char* table);
+int api_qs_db_schema_define(QS_DB_API_CONTEXT* context, const char* table, const char* schema_json);
+int api_qs_db_schema_get(QS_DB_API_CONTEXT* context, const char* table, char* out_buf, size_t out_size);
+int api_qs_db_schema_validate(QS_MEMORY_CONTEXT* memory_context, QS_DB_API_CONTEXT* context, const char* table, const char* record_json);
+int api_qs_db_record_insert(QS_DB_API_CONTEXT* context, const char* table, const char* id, const char* record_json);
+int api_qs_db_record_update(QS_DB_API_CONTEXT* context, const char* table, const char* id, const char* record_json);
+int api_qs_db_record_delete(QS_DB_API_CONTEXT* context, const char* table, const char* id);
+int api_qs_db_record_get(QS_DB_API_CONTEXT* context, const char* table, const char* id, char* out_buf, size_t out_size);
+char* api_qs_db_record_list(QS_MEMORY_CONTEXT* memory_context, QS_DB_API_CONTEXT* context, const char* table, const char* filter_json, int scan_mode);
+int api_qs_db_index_add(QS_DB_API_CONTEXT* context, const char* table, const char* field, const char* value, const char* record_id);
+int api_qs_db_index_remove(QS_DB_API_CONTEXT* context, const char* table, const char* field, const char* value, const char* record_id);
+int api_qs_db_index_rebuild(QS_MEMORY_CONTEXT* memory_context, QS_DB_API_CONTEXT* context, const char* table, const char* indexed_fields_json);
+int api_qs_db_next_id(QS_DB_API_CONTEXT* context, const char* table, const char* prefix, char* out_id, size_t out_size);
+
 int api_qs_http_response_json(QS_EVENT_PARAMETER params, QS_JSON_ELEMENT_OBJECT* object, size_t buffer_size);
 int api_qs_http_response_raw_json(QS_EVENT_PARAMETER params, QS_MEMORY_CONTEXT* temporary_memory,char* json);
 
