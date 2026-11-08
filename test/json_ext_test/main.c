@@ -17,6 +17,7 @@
 #include <stdint.h>
 
 #include "qs_api.h"
+#include "qs_json.h"
 
 static int pass_count = 0;
 static int fail_count = 0;
@@ -254,6 +255,36 @@ int main(void)
         check("decoded arr length is 2", api_qs_array_get_length(&d_arr) == 2);
         int32_t* av = api_qs_array_get_integer(&d_arr, 1);
         check("decoded arr[1] == 2", av != NULL && *av == 2);
+    }
+
+    {
+        QS_MEMORY_POOL* pool = (QS_MEMORY_POOL*)memory_context.memory;
+        int32_t array = qs_create_array(pool, 4);
+        check("encoder boundary array created", array != -1);
+        check("encoder boundary escaped value added", qs_array_push_string(pool, &array, "\"\\\n") != -1);
+        int32_t encoded = qs_json_encode_array(pool, array, 11);
+        check("encoder escaped exact fit", encoded != -1 && strcmp((char*)QS_GET_POINTER(pool, encoded), "[\"\\\"\\\\\\n\"]") == 0);
+        check("encoder escaped one byte short", qs_json_encode_array(pool, array, 10) == -1);
+        check("encoder zero buffer rejected", qs_json_encode_array(pool, array, 0) == -1);
+
+        int32_t outer = qs_create_array(pool, 4);
+        check("encoder nested array added", qs_array_push(pool, &outer, ELEMENT_ARRAY, array) != -1);
+        encoded = qs_json_encode_array(pool, outer, 13);
+        check("encoder nested exact fit", encoded != -1 && strcmp((char*)QS_GET_POINTER(pool, encoded), "[[\"\\\"\\\\\\n\"]]") == 0);
+        check("encoder nested one byte short", qs_json_encode_array(pool, outer, 12) == -1);
+
+        int32_t root = qs_make_json_root(pool, array, ELEMENT_ARRAY);
+        int32_t buffer = qs_create_memory_block(pool, 8);
+        check("encoder existing buffer overflow", root != -1 && buffer != -1 &&
+              qs_json_encode_b(pool, (QS_NODE*)QS_GET_POINTER(pool, root), buffer) == -1);
+
+          QS_JSON_ELEMENT_OBJECT object;
+          api_qs_object_create(&memory_context, &object);
+          api_qs_object_push_string(&object, "\"", "\n");
+        char* object_json = api_qs_json_encode_object(&object, 12);
+          check_str("encoder object escaped exact fit", object_json, "{\"\\\"\":\"\\n\"}");
+        check("encoder object one byte short", api_qs_json_encode_object(&object, 11) == NULL);
+        check("encoder object reused after failure", api_qs_json_encode_object(&object, 12) != NULL);
     }
 
     api_qs_memory_free(&memory_context);
