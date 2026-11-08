@@ -441,7 +441,10 @@ static int cmd_use(CLI_STATE* st, int argc, char* argv[])
         return -1;
     }
     if (st->ctx.is_open) {
-        qs_db_close_database(&st->ctx);
+        if (qs_db_close_database(&st->ctx) != 0) {
+            fprintf(stderr, "ERROR: close current database failed (open table handle)\n");
+            return -1;
+        }
     }
     if (0 == qs_db_open_database(&st->ctx, st->base_dir, argv[1])) {
         printf("OK (database: %s)\n", argv[1]);
@@ -730,12 +733,13 @@ int main(int argc, char* argv[])
                 break;
             }
             if (rc != 0) {
-                qs_db_close_database(&st.ctx);
+                if (qs_db_close_database(&st.ctx) != 0) {
+                    fprintf(stderr, "ERROR: close database failed\n");
+                }
                 return 1;
             }
         }
-        qs_db_close_database(&st.ctx);
-        return 0;
+        return qs_db_close_database(&st.ctx) == 0 ? 0 : 1;
     }
 
     /* 対話モード */
@@ -752,6 +756,5 @@ int main(int argc, char* argv[])
             break;
         }
     }
-    qs_db_close_database(&st.ctx);
-    return 0;
+    return qs_db_close_database(&st.ctx) == 0 ? 0 : 1;
 }

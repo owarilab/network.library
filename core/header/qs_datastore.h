@@ -83,6 +83,9 @@ typedef struct QS_DB_STORE
  *   fork 後の子 process で継承した context を使用しないこと。
  *   context と table handle は open 中にコピー・移動しないこと。
  *   table は qs_db_open_table で必要時に QS_DB_STORE へオープンする。
+ *   公開 table handle が残る間の close_database は何もせず戻る。
+ *   close_database は 0=closed、1=table handle が残るため close 保留、-1=NULL context を返す。
+ *   全 handle を close してから close_database を再度呼び出すこと。
  */
 typedef struct QS_DB_CONTEXT
 {
@@ -109,7 +112,8 @@ int qs_db_drop_database(const char* base_dir, const char* database);
 int32_t qs_db_show_database(QS_MEMORY_POOL* _ppool, const char* base_dir);
 /* database/table 名は ASCII 英数字、'_'、'-' のみ・1〜45 byte。使用中 context の再 open は拒否。 */
 int qs_db_open_database(QS_DB_CONTEXT* ctx, const char* base_dir, const char* database);
-void qs_db_close_database(QS_DB_CONTEXT* ctx);
+/* 0=closed, 1=table handle が残るため close 保留, -1=NULL context。 */
+int qs_db_close_database(QS_DB_CONTEXT* ctx);
 
 /*
  * Table
@@ -125,7 +129,8 @@ int qs_db_create_table(QS_DB_CONTEXT* ctx, const char* table, int capacity_mb);
 int qs_db_drop_table(QS_DB_CONTEXT* ctx, const char* table);
 /* db_path 配下の table（*.db、system/schema/index を除く）名を _ppool 上の配列に格納し、配列 munit を返す。 */
 int32_t qs_db_show_table(QS_MEMORY_POOL* _ppool, QS_DB_CONTEXT* ctx);
-/* capacity_mb は互換性のため残るが、table 作成時に system.db へ記録した値を使用する。 */
+/* capacity_mb は互換性のため残るが、table 作成時に system.db へ記録した値を使用する。
+ * 失敗時 out_store は zero state（memory=NULL, is_open=0, owner=NULL）になる。 */
 int qs_db_open_table(QS_DB_CONTEXT* ctx, const char* table, int capacity_mb, QS_DB_STORE* out_store);
 void qs_db_close_table(QS_DB_STORE* store);
 

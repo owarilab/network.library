@@ -798,10 +798,16 @@ int qs_db_open_database(QS_DB_CONTEXT* ctx, const char* base_dir, const char* da
     return 0;
 }
 
-void qs_db_close_database(QS_DB_CONTEXT* ctx)
+int qs_db_close_database(QS_DB_CONTEXT* ctx)
 {
-    if (!ctx->is_open || ctx->open_table_count != 0) {
-        return;
+    if (ctx == NULL) {
+        return -1;
+    }
+    if (!ctx->is_open) {
+        return 0;
+    }
+    if (ctx->open_table_count != 0) {
+        return 1;
     }
     db_store_close(&ctx->system);
     db_store_close(&ctx->schema);
@@ -810,6 +816,7 @@ void qs_db_close_database(QS_DB_CONTEXT* ctx)
     closedir(ctx->lock_dir);
     ctx->lock_dir = NULL;
     db_open_registry_remove(ctx);
+    return 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -936,7 +943,11 @@ int32_t qs_db_show_table(QS_MEMORY_POOL* _ppool, QS_DB_CONTEXT* ctx)
 
 static int db_open_table_internal(QS_DB_CONTEXT* ctx, const char* table, int capacity_mb, QS_DB_STORE* out_store)
 {
-    if (!ctx->is_open || ctx->open_table_count != 0 || !db_valid_name(table) || out_store == NULL) {
+    if (out_store == NULL) {
+        return -1;
+    }
+    memset(out_store, 0, sizeof(*out_store));
+    if (ctx == NULL || !ctx->is_open || ctx->open_table_count != 0 || !db_valid_name(table)) {
         return -1;
     }
     char path[4352];
@@ -945,8 +956,6 @@ static int db_open_table_internal(QS_DB_CONTEXT* ctx, const char* table, int cap
     if (db_path_join(path, sizeof(path), ctx->db_path, file_name) != 0) {
         return -1;
     }
-    memset(out_store, 0, sizeof(*out_store));
-
     /*
      * system/schema/index は ctx が既に mmap している。
      * 同一ファイルを2つ目に mmap すると、共有ファイル内の QS_CACHE の
@@ -993,7 +1002,12 @@ static int db_open_table_internal(QS_DB_CONTEXT* ctx, const char* table, int cap
 
 int qs_db_open_table(QS_DB_CONTEXT* ctx, const char* table, int capacity_mb, QS_DB_STORE* out_store)
 {
+    if (out_store == NULL) {
+        return -1;
+    }
+    memset(out_store, 0, sizeof(*out_store));
     if (db_open_table_internal(ctx, table, capacity_mb, out_store) != 0) {
+        memset(out_store, 0, sizeof(*out_store));
         return -1;
     }
     out_store->owner = ctx;
