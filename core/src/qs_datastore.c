@@ -32,7 +32,7 @@
 #define QS_DB_SCRATCH_SIZE (SIZE_MBYTE * 2)
 #define QS_DB_OPEN_REGISTRY_SIZE 256
 #define QS_DB_CAPACITY_KEY_PREFIX "table:"
-#define QS_DB_MAX_NAME 46
+#define QS_DB_MAX_NAME 45
 
 static pthread_mutex_t db_open_registry_lock = PTHREAD_MUTEX_INITIALIZER;
 static char db_open_registry[QS_DB_OPEN_REGISTRY_SIZE][4352];
@@ -671,55 +671,70 @@ int qs_db_drop_database(const char* base_dir, const char* database)
 
 int32_t qs_db_show_database(QS_MEMORY_POOL* _ppool, const char* base_dir)
 {
-    /* qs_opendir は再帰的にファイルのフルパスを返す。system.db の親を DB とみなす。 */
-    char dir_path[4352];
-    snprintf(dir_path, sizeof(dir_path), "%s/", base_dir);
-    int32_t all = qs_opendir(_ppool, dir_path);
-    if (-1 == all) {
+    if (_ppool == NULL || base_dir == NULL) {
+        return -1;
+    }
+    char normalized[4352];
+    size_t base_len = strlen(base_dir);
+    while (base_len > 1 && base_dir[base_len - 1] == '/') {
+        base_len--;
+    }
+    if (base_len == 0 || base_len >= sizeof(normalized)) {
+        return -1;
+    }
+    memcpy(normalized, base_dir, base_len);
+    normalized[base_len] = '\0';
+    DIR* dir = opendir(normalized);
+    if (dir == NULL) {
         return -1;
     }
     int32_t result = qs_create_array(_ppool, 16);
     if (-1 == result) {
+        closedir(dir);
         return -1;
     }
-    size_t base_len = strlen(base_dir);
-    int32_t len = qs_array_length(_ppool, all);
-    int i;
-    for (i = 0; i < len; i++) {
-        QS_ARRAY_ELEMENT* elm = qs_array_get(_ppool, all, i);
-        if (elm == NULL || elm->id != ELEMENT_LITERAL_STR) {
+    int rc = 0;
+    struct dirent* entry;
+    errno = 0;
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
             continue;
         }
-        char* full = (char*)QS_GET_POINTER(_ppool, elm->memid_array_element_data);
-        if (strncmp(full, base_dir, base_len) != 0 || full[base_len] != '/') {
+        if (!db_valid_name(entry->d_name)) {
             continue;
         }
-        char* marker = strstr(full + base_len + 1, "/" QS_DB_SYSTEM_FILE);
-        if (marker == NULL || strcmp(marker, "/" QS_DB_SYSTEM_FILE) != 0) {
+        char path[4352];
+        char system_path[4352];
+        struct stat st;
+        if (db_path_join(path, sizeof(path), normalized, entry->d_name) != 0) {
+            rc = -1;
+            break;
+        }
+        if (lstat(path, &st) != 0) {
+            rc = -1;
+            break;
+        }
+        if (!S_ISDIR(st.st_mode)) {
             continue;
         }
-        char clean[256];
-        size_t name_len = (size_t)(marker - (full + base_len + 1));
-        if (name_len == 0 || name_len >= sizeof(clean)) {
-            continue;
+        if (db_path_join(system_path, sizeof(system_path), path, QS_DB_SYSTEM_FILE) != 0) {
+            rc = -1;
+            break;
         }
-        memcpy(clean, full + base_len + 1, name_len);
-        clean[name_len] = '\0';
-        int already_added = 0;
-        int j;
-        int32_t result_len = qs_array_length(_ppool, result);
-        for (j = 0; j < result_len; j++) {
-            QS_ARRAY_ELEMENT* added = qs_array_get(_ppool, result, j);
-            if (added != NULL && added->id == ELEMENT_LITERAL_STR &&
-                strcmp((char*)QS_GET_POINTER(_ppool, added->memid_array_element_data), clean) == 0) {
-                already_added = 1;
+        if (lstat(system_path, &st) == 0 && S_ISREG(st.st_mode)) {
+            if (-1 == qs_array_push_string(_ppool, &result, entry->d_name)) {
+                rc = -1;
                 break;
             }
+        } else if (errno != ENOENT) {
+            rc = -1;
+            break;
         }
-        if (!already_added) {
-            qs_array_push_string(_ppool, &result, clean);
-        }
+        errno = 0;
     }
+    if (rc == 0 && errno != 0) rc = -1;
+    closedir(dir);
+    if (rc != 0) return -1;
     return result;
 }
 
@@ -1560,7 +1575,8 @@ int qs_db_index_rebuild(QS_MEMORY_POOL* _ppool, QS_DB_CONTEXT* ctx, const char* 
 
 int qs_db_next_id(QS_DB_CONTEXT* ctx, const char* table, const char* prefix, char* out_id, size_t out_size)
 {
-    if (!ctx->is_open || !db_valid_name(table) || prefix == NULL || out_id == NULL || out_size == 0) {
+    if (ctx == NULL || !ctx->is_open || !db_valid_name(table) || prefix == NULL ||
+        prefix[0] == '\0' || out_id == NULL || out_size == 0) {
         return -1;
     }
     char counter_key[QS_DB_MAX_KEY];
@@ -1571,18 +1587,26 @@ int qs_db_next_id(QS_DB_CONTEXT* ctx, const char* table, const char* prefix, cha
     char* cur = db_store_get(&ctx->system, counter_key);
     int64_t count = 0;
     if (cur != NULL) {
-        count = atoll(cur);
+        char* end = NULL;
+        errno = 0;
+        long long parsed = strtoll(cur, &end, 10);
+        if (errno != 0 || end == cur || *end != '\0' || parsed < 0 || parsed == INT64_MAX) {
+            return -1;
+        }
+        count = (int64_t)parsed;
     }
     count++;
-    char num[32];
-    snprintf(num, sizeof(num), "%lld", (long long)count);
-    int rc = db_store_set(&ctx->system, counter_key, num);
-    if (rc != 0) {
+    char next_id[QS_DB_MAX_KEY];
+    n = snprintf(next_id, sizeof(next_id), "%s%lld", prefix, (long long)count);
+    if (n <= 0 || (size_t)n >= sizeof(next_id) || (size_t)n >= out_size) {
         return -1;
     }
-    n = snprintf(out_id, out_size, "%s%lld", prefix, (long long)count);
-    if (n <= 0 || (size_t)n >= out_size) {
+    char next_count[32];
+    int count_len = snprintf(next_count, sizeof(next_count), "%lld", (long long)count);
+    if (count_len <= 0 || (size_t)count_len >= sizeof(next_count) ||
+        db_store_set(&ctx->system, counter_key, next_count) != 0) {
         return -1;
     }
+    memcpy(out_id, next_id, (size_t)n + 1);
     return 0;
 }

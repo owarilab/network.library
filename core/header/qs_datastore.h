@@ -105,9 +105,9 @@ typedef struct QS_DB_CONTEXT
 int qs_db_create_database(const char* base_dir, const char* database);
 /* 許可された名前の .db 通常ファイル以外があれば削除前に失敗する。削除中の失敗は部分削除になり得る。 */
 int qs_db_drop_database(const char* base_dir, const char* database);
-/* base_dir 配下の database（ディレクトリ）名を _ppool 上の配列に格納し、配列 munit を返す。 */
+/* base_dir 直下の database（system.db を持つディレクトリ）名を _ppool 上の配列に格納する。末尾 '/' は許可。 */
 int32_t qs_db_show_database(QS_MEMORY_POOL* _ppool, const char* base_dir);
-/* 使用中の context は再 open を拒否し、既存の所有状態を保持する。 */
+/* database/table 名は ASCII 英数字、'_'、'-' のみ・1〜45 byte。使用中 context の再 open は拒否。 */
 int qs_db_open_database(QS_DB_CONTEXT* ctx, const char* base_dir, const char* database);
 void qs_db_close_database(QS_DB_CONTEXT* ctx);
 
@@ -180,6 +180,8 @@ int qs_db_index_rebuild(QS_MEMORY_POOL* _ppool, QS_DB_CONTEXT* ctx, const char* 
 /*
  * System（id 採番カウンタ）
  *   counter:{table} を system.db に保持し、prefix + 連番 の id を生成する。
+ *   prefix は空でない文字列とし、出力は 63 byte 以下。失敗時は counter を進めず out_id は変更しない。
+ *   同じ context の同時操作は呼び出し側で直列化すること。
  */
 int qs_db_next_id(QS_DB_CONTEXT* ctx, const char* table, const char* prefix, char* out_id, size_t out_size);
 
