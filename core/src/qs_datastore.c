@@ -323,7 +323,7 @@ static int db_capacity_params(int capacity_mb, size_t* p_cache, size_t* p_page, 
 {
     switch (capacity_mb) {
         case QS_DB_CAPACITY_B1MB:
-            *p_cache = 1; *p_page = SIZE_MBYTE * 980; *p_hash = 1000; *p_key = 64;
+            *p_cache = 1; *p_page = SIZE_KBYTE * 980; *p_hash = 1000; *p_key = 64;
             return 0;
         case QS_DB_CAPACITY_B8MB:
             *p_cache = 1; *p_page = SIZE_MBYTE * 8; *p_hash = 1000; *p_key = 64;

@@ -521,8 +521,8 @@ static void test_g2_table(const char* base_dir)
         struct stat store_stat;
     snprintf(path, sizeof(path), "%s/database1/table1.db", base_dir);
     check("2.1 table1.db exists", file_exists(path));
-        check("2.1 1MB legacy file size", stat(path, &store_stat) == 0 &&
-            (uintmax_t)store_stat.st_size == (uintmax_t)QS_ALIGNUP(SIZE_MBYTE * 980 + SIZE_KBYTE * 5 + 72, MEMORY_ALIGNMENT_SIZE_BIT_64) + 1);
+        check("2.1 980KB legacy file size", stat(path, &store_stat) == 0 &&
+            (uintmax_t)store_stat.st_size == (uintmax_t)QS_ALIGNUP(SIZE_KBYTE * 980 + SIZE_KBYTE * 5 + 72, MEMORY_ALIGNMENT_SIZE_BIT_64) + 1);
         snprintf(path, sizeof(path), "%s/database1/large.db", base_dir);
         check("2.1 8MB file size", stat(path, &store_stat) == 0 &&
             (uintmax_t)store_stat.st_size == (uintmax_t)QS_ALIGNUP(SIZE_MBYTE * 8 + SIZE_KBYTE * 5 + 72, MEMORY_ALIGNMENT_SIZE_BIT_64) + 1);

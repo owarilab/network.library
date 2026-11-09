@@ -36,7 +36,6 @@ extern "C"{
 #include "qs_array.h"
 #include "qs_json.h"
 
-/* 固定容量プロファイル。B1MB は既存 KVS との互換性のため約 980MiB の page 領域を使用する。 */
 #define QS_DB_CAPACITY_B1MB    1
 #define QS_DB_CAPACITY_B8MB    8
 #define QS_DB_CAPACITY_B16MB   16
