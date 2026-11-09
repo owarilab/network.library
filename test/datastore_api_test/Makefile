@@ -1,3 +1,4 @@
+PROGRAM = qs_datastore_api_test
 CC=gcc
 CFLAGS=-pthread -Wall -O0 -I ../../core/header
 LDFLAGS=
