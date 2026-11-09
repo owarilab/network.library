@@ -4,6 +4,7 @@
 
 #include "qs_api.h"
 #include <stddef.h>
+#include <stdio.h>
 
 //---------------------------------------------------
 #include "qs_array.h"
@@ -20,6 +21,10 @@
 #include "qs_datastore.h"
 
 #define API_QS_DB_MAX_OPEN_TABLES 64
+/* Automatic index update fetches the complete old record before an
+ * update/delete. Records larger than this are still written, but their
+ * index entries are not resynchronized (use api_qs_db_index_rebuild). */
+#define API_QS_DB_OLD_RECORD_BUF_SIZE SIZE_MBYTE
 
 typedef struct API_QS_DB_OPEN_TABLE
 {
@@ -2944,6 +2949,254 @@ static int api_qs_db_append_json_value(char** buffer, size_t* length, size_t* ca
 	return -1;
 }
 
+/*
+ * Collect field names with "is_index":1 from the table schema.
+ * The result is a NUL-terminated array in work_memory. NULL or an empty
+ * array means no indexed fields (no schema or no is_index flag).
+ * Returns 0 on success, -1 on schema/decode error.
+ */
+static int api_qs_db_collect_index_fields(QS_MEMORY_POOL* work_memory, const char* schema_json, char*** out_fields)
+{
+	int field_index;
+	if(out_fields == NULL){
+		*out_fields = NULL;
+		return (schema_json == NULL) ? 0 : -1;
+	}
+	*out_fields = NULL;
+	if(schema_json == NULL){
+		return 0;
+	}
+	int32_t schema_root = qs_json_decode_h(work_memory, schema_json, 8, 128);
+	if(schema_root < 0){
+		return -1;
+	}
+	QS_NODE* schema_node = qs_get_json_root(work_memory, schema_root);
+	if(schema_node == NULL || schema_node->id != ELEMENT_HASH){
+		return -1;
+	}
+	int32_t fields = qs_get_hash(work_memory, schema_node->element_munit, "fields");
+	if(fields < 0 || qs_get_hash_id(work_memory, schema_node->element_munit, "fields") != ELEMENT_ARRAY){
+		return 0;
+	}
+	int32_t field_count = qs_array_length(work_memory, fields);
+	if(field_count < 0){
+		return -1;
+	}
+	if(field_count == 0){
+		return 0;
+	}
+	char** names = (char**)calloc((size_t)field_count, sizeof(*names));
+	if(names == NULL){
+		return -1;
+	}
+	int32_t indexed_count = 0;
+	for(field_index = 0; field_index < field_count; field_index++){
+		QS_ARRAY_ELEMENT* element = qs_array_get(work_memory, fields, field_index);
+		if(element == NULL || element->id != ELEMENT_HASH){
+			continue;
+		}
+		int32_t field = element->memid_array_element_data;
+		char* name = qs_get_hash_string(work_memory, field, "name");
+		int32_t is_index = -1;
+		if(qs_get_hash_id(work_memory, field, "is_index") == ELEMENT_LITERAL_NUM){
+			int32_t* is_index_ptr = qs_get_hash_integer(work_memory, field, "is_index");
+			if(is_index_ptr != NULL){
+				is_index = *is_index_ptr;
+			}
+		}
+		if(name == NULL || is_index != 1){
+			continue;
+		}
+		if(strlen(name) >= QS_DB_INDEX_KEY_MAX){
+			continue;
+		}
+		names[indexed_count++] = (char*)name;
+	}
+	if(indexed_count == 0){
+		free(names);
+		return 0;
+	}
+	names[indexed_count] = NULL;
+	*out_fields = names;
+	return 0;
+}
+
+/*
+ * Extract the index value of a field from a decoded JSON object.
+ * The result is copied to the caller buffer (at most value_size bytes
+ * including NUL). String values are used as is; int32/int64 values are
+ * converted to canonical decimal strings (the JSON decoder stores them
+ * as ELEMENT_LITERAL_NUM / ELEMENT_LITERAL_NUM_64 /
+ * ELEMENT_LITERAL_NUM_U64; the notation matches db_record_match_int and
+ * qs_db_index_rebuild). Values that cannot become an index key (missing,
+ * empty, oversized, or containing a control character, '/' or '\\') are
+ * skipped so that record writes are never blocked by index content.
+ * Returns 0 when a value is available, -1 when it should be skipped.
+ */
+static int api_qs_db_index_value_of(QS_MEMORY_POOL* work_memory, int32_t record_hash, const char* field, char* value, size_t value_size)
+{
+	int32_t value_id;
+	if(record_hash < 0 || field == NULL || value == NULL || value_size == 0){
+		return -1;
+	}
+	value_id = qs_get_hash_id(work_memory, record_hash, field);
+	if(value_id == ELEMENT_LITERAL_STR){
+		char* str = qs_get_hash_string(work_memory, record_hash, field);
+		size_t str_length;
+		size_t i;
+		if(str == NULL){
+			return -1;
+		}
+		str_length = strlen(str);
+		if(str_length == 0 || str_length + 1 > value_size){
+			return -1;
+		}
+		for(i = 0; i < str_length; i++){
+			unsigned char c = (unsigned char)str[i];
+			if(c < 0x20 || c == '/' || c == '\\'){
+				return -1;
+			}
+		}
+		strncpy(value, str, value_size - 1);
+		value[value_size - 1] = '\0';
+		return 0;
+	}
+	if(value_id == ELEMENT_LITERAL_NUM){
+		int32_t* int_ptr = qs_get_hash_integer(work_memory, record_hash, field);
+		int number_length;
+		if(int_ptr == NULL){
+			return -1;
+		}
+		number_length = snprintf(value, value_size, "%d", *int_ptr);
+		return (number_length > 0 && (size_t)number_length < value_size) ? 0 : -1;
+	}
+	if(value_id == ELEMENT_LITERAL_NUM_64){
+		int64_t* big_int_ptr = qs_get_hash_big_integer(work_memory, record_hash, field);
+		int number_length;
+		if(big_int_ptr == NULL){
+			return -1;
+		}
+		number_length = snprintf(value, value_size, "%lld", (long long)*big_int_ptr);
+		return (number_length > 0 && (size_t)number_length < value_size) ? 0 : -1;
+	}
+	if(value_id == ELEMENT_LITERAL_NUM_U64){
+		uint64_t* unsigned_big_ptr = qs_get_hash_unsigned_big_integer(work_memory, record_hash, field);
+		int number_length;
+		if(unsigned_big_ptr == NULL){
+			return -1;
+		}
+		number_length = snprintf(value, value_size, "%llu", (unsigned long long)*unsigned_big_ptr);
+		return (number_length > 0 && (size_t)number_length < value_size) ? 0 : -1;
+	}
+	return -1;
+}
+
+/*
+ * Synchronize index entries for one record: add entries for indexed fields
+ * whose value is present in the record, and remove entries for indexed fields
+ * whose value is absent. Called after a successful write (old_json is NULL on
+ * insert) so the index reflects the stored state.
+ * Decode work happens in a temporary scratch pool that is released on return,
+ * so repeated CRUD calls do not accumulate memory in the context pool.
+ * Returns 0 when every applicable index operation succeeded.
+ */
+static int api_qs_db_sync_record_index(QS_DB_API_CONTEXT* context, const char* table, const char* id, const char* record_json, const char* old_json)
+{
+	if(context == NULL || table == NULL || id == NULL || record_json == NULL){
+		return -1;
+	}
+	QS_DB_CONTEXT* db_context = api_qs_db_get_context(context);
+	if(db_context == NULL || !db_context->is_open){
+		return -1;
+	}
+	QS_MEMORY_POOL* work_memory = NULL;
+	char* schema_json = NULL;
+	char** index_fields = NULL;
+	int result = -1;
+
+	if(0 == qs_initialize_memory_f64(&work_memory, SIZE_MBYTE * 16)){
+		return -1;
+	}
+	{
+		/* Same schema cache access as api_qs_db_prepare_record. */
+		QS_CACHE* schema_cache = (QS_CACHE*)QS_GET_POINTER(db_context->schema.memory, db_context->schema.cache_id);
+		QS_CACHE_PAGE schema_page;
+		qs_get_cache_page(schema_cache, &schema_page);
+		if(schema_page.memory != NULL && schema_page.hash_id >= 0){
+			int32_t schema_memid = qs_get_hash(schema_page.memory, schema_page.hash_id, table);
+			if(schema_memid >= 0){
+				schema_json = (char*)malloc(qs_usize(schema_page.memory, schema_memid));
+				if(schema_json == NULL){
+					goto cleanup;
+				}
+				strcpy(schema_json, (char*)QS_GET_POINTER(schema_page.memory, schema_memid));
+			}
+		}
+	}
+	if(api_qs_db_collect_index_fields(work_memory, schema_json, &index_fields) != 0){
+		/* A malformed schema must not block record writes. */
+		if(index_fields != NULL){
+			free(index_fields);
+			index_fields = NULL;
+		}
+	}
+	if(index_fields == NULL){
+		result = 0;
+		goto cleanup;
+	}
+	int32_t record_root = qs_json_decode_h(work_memory, record_json, 8, 128);
+	if(record_root < 0){
+		goto cleanup;
+	}
+	QS_NODE* record_node = qs_get_json_root(work_memory, record_root);
+	if(record_node == NULL || record_node->id != ELEMENT_HASH){
+		goto cleanup;
+	}
+	int32_t record_hash = record_node->element_munit;
+	int32_t old_hash = -1;
+	if(old_json != NULL){
+		int32_t old_root = qs_json_decode_h(work_memory, old_json, 8, 128);
+		if(old_root < 0){
+			goto cleanup;
+		}
+		QS_NODE* old_node = qs_get_json_root(work_memory, old_root);
+		if(old_node == NULL || old_node->id != ELEMENT_HASH){
+			goto cleanup;
+		}
+		old_hash = old_node->element_munit;
+	}
+	char value[QS_DB_INDEX_KEY_MAX];
+	char old_value[QS_DB_INDEX_KEY_MAX];
+	int field_index;
+	for(field_index = 0; index_fields[field_index] != NULL; field_index++){
+		const char* field = index_fields[field_index];
+		int has_new = (api_qs_db_index_value_of(work_memory, record_hash, field, value, sizeof(value)) == 0);
+		int has_old = (old_hash >= 0) && (api_qs_db_index_value_of(work_memory, old_hash, field, old_value, sizeof(old_value)) == 0);
+		if(has_old && (!has_new || 0 != strcmp(old_value, value))){
+			if(qs_db_index_remove(db_context, table, field, old_value, id) != 0){
+				goto cleanup;
+			}
+		}
+		if(has_new && (!has_old || 0 != strcmp(old_value, value))){
+			if(qs_db_index_add(db_context, table, field, value, id) != 0){
+				goto cleanup;
+			}
+		}
+	}
+	result = 0;
+cleanup:
+	if(work_memory != NULL){
+		qs_free(work_memory);
+	}
+	if(schema_json != NULL){
+		free(schema_json);
+	}
+	if(index_fields != NULL){
+		free(index_fields);
+	}
+	return result;
+}
+
 /* Apply defaults to absent fields, then validate the normalized record. */
 static int api_qs_db_prepare_record(QS_DB_CONTEXT* db_context, const char* table, const char* record_json, char** prepared_json)
 {
@@ -3080,6 +3333,15 @@ cleanup:
 	return result;
 }
 
+int api_qs_db_set_auto_index_update(QS_DB_API_CONTEXT* context, int32_t enable)
+{
+	if(NULL == context){
+		return -1;
+	}
+	context->auto_index_update = (enable != 0) ? 1 : 0;
+	return 0;
+}
+
 int api_qs_db_init(QS_DB_API_CONTEXT* context)
 {
 	if(NULL == context){
@@ -3090,6 +3352,7 @@ int api_qs_db_init(QS_DB_API_CONTEXT* context)
 	}
 	context->memory.memory = NULL;
 	context->memid_db = -1;
+	context->auto_index_update = 0;
 	if(0 != api_qs_memory_alloc(&context->memory, SIZE_MBYTE * 16)){
 		return -1;
 	}
@@ -3273,6 +3536,13 @@ int api_qs_db_record_insert(QS_DB_API_CONTEXT* context, const char* table, const
 		return -1;
 	}
 	int result = qs_db_record_insert(db_context, table, id, prepared_json);
+	/* The written record (or the input when no default was applied) is the
+	 * complete new state, so it is used as the index source. */
+	if(0 == result && context->auto_index_update == 1){
+		if(api_qs_db_sync_record_index(context, table, id, prepared_json, NULL) != 0){
+			result = -1;
+		}
+	}
 	if(prepared_json != record_json){
 		free(prepared_json);
 	}
@@ -3289,7 +3559,28 @@ int api_qs_db_record_update(QS_DB_API_CONTEXT* context, const char* table, const
 	if(api_qs_db_prepare_record(db_context, table, record_json, &prepared_json) != 0){
 		return -1;
 	}
+	int32_t old_memid = -1;
+	char* old_buffer = NULL;
+	int has_old = 0;
+	if(context->auto_index_update == 1 && context->memory.memory != NULL){
+		QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory.memory;
+		old_memid = qs_create_memory_block(memory, API_QS_DB_OLD_RECORD_BUF_SIZE);
+		if(old_memid >= 0){
+			old_buffer = (char*)QS_GET_POINTER(memory, old_memid);
+			if(0 == qs_db_record_get(db_context, table, id, old_buffer, API_QS_DB_OLD_RECORD_BUF_SIZE)){
+				has_old = 1;
+			}
+		}
+	}
 	int result = qs_db_record_update(db_context, table, id, prepared_json);
+	if(0 == result && context->auto_index_update == 1){
+		if(api_qs_db_sync_record_index(context, table, id, prepared_json, (has_old ? old_buffer : NULL)) != 0){
+			result = -1;
+		}
+	}
+	if(old_memid >= 0){
+		qs_free_memory_block((QS_MEMORY_POOL*)context->memory.memory, &old_memid);
+	}
 	if(prepared_json != record_json){
 		free(prepared_json);
 	}
@@ -3299,7 +3590,32 @@ int api_qs_db_record_update(QS_DB_API_CONTEXT* context, const char* table, const
 int api_qs_db_record_delete(QS_DB_API_CONTEXT* context, const char* table, const char* id)
 {
 	QS_DB_CONTEXT* db_context = api_qs_db_get_context(context);
-	return (db_context == NULL) ? -1 : qs_db_record_delete(db_context, table, id);
+	if(db_context == NULL || table == NULL || id == NULL){
+		return -1;
+	}
+	int32_t old_memid = -1;
+	char* old_buffer = NULL;
+	int has_old = 0;
+	if(context->auto_index_update == 1 && context->memory.memory != NULL){
+		QS_MEMORY_POOL* memory = (QS_MEMORY_POOL*)context->memory.memory;
+		old_memid = qs_create_memory_block(memory, API_QS_DB_OLD_RECORD_BUF_SIZE);
+		if(old_memid >= 0){
+			old_buffer = (char*)QS_GET_POINTER(memory, old_memid);
+			if(0 == qs_db_record_get(db_context, table, id, old_buffer, API_QS_DB_OLD_RECORD_BUF_SIZE)){
+				has_old = 1;
+			}
+		}
+	}
+	int result = qs_db_record_delete(db_context, table, id);
+	if(0 == result && context->auto_index_update == 1 && has_old){
+		if(api_qs_db_sync_record_index(context, table, id, "{}", old_buffer) != 0){
+			result = -1;
+		}
+	}
+	if(old_memid >= 0){
+		qs_free_memory_block((QS_MEMORY_POOL*)context->memory.memory, &old_memid);
+	}
+	return result;
 }
 
 int api_qs_db_record_get(QS_DB_API_CONTEXT* context, const char* table, const char* id, char* out_buf, size_t out_size)

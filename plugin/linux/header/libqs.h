@@ -225,6 +225,7 @@ typedef struct QS_DB_API_CONTEXT
 {
 	QS_MEMORY_CONTEXT memory;
 	int32_t memid_db;
+	int32_t auto_index_update; /* 1: レコード CRUD で index を自動更新する */
 } QS_DB_API_CONTEXT;
 
 #ifdef __GNUC__
@@ -492,6 +493,9 @@ char* api_qs_ranking_get(QS_RANKING_CONTEXT* ranking_context, int32_t offset, in
 
 int api_qs_db_init(QS_DB_API_CONTEXT* context);
 int api_qs_db_free(QS_DB_API_CONTEXT* context);
+/* Enable/disable automatic index updates in the record CRUD functions.
+ * Disabled by default. */
+int api_qs_db_set_auto_index_update(QS_DB_API_CONTEXT* context, int32_t enable);
 int api_qs_db_create_database(const char* base_dir, const char* database);
 int api_qs_db_drop_database(const char* base_dir, const char* database);
 int api_qs_db_show_database(QS_MEMORY_CONTEXT* memory_context, QS_JSON_ELEMENT_ARRAY* array, const char* base_dir);

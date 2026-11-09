@@ -36,6 +36,15 @@ extern "C"{
 #include "qs_array.h"
 #include "qs_json.h"
 
+/*
+ * インデックスキーの最大長（index.db のキー長）。
+ * キー形式: index:{table}:{field}:{value}
+ * 256MB 未満のテーブルは 64、256MB 以上は 128/256。
+ * qs_db_index_add / qs_db_index_remove は QS_DB_MAX_KEY に
+ * 従って 64 以下のキーのみ受ける（低レベルの既存制約）。
+ */
+#define QS_DB_INDEX_KEY_MAX    64
+
 #define QS_DB_CAPACITY_B1MB    1
 #define QS_DB_CAPACITY_B8MB    8
 #define QS_DB_CAPACITY_B16MB   16

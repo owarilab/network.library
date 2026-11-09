@@ -29,8 +29,8 @@
 #include <unistd.h>
 #endif
 
-/* 内部で使うキーの最大長（永続化 KVS の max_key_size と一致させる） */
-#define QS_DB_MAX_KEY 64
+/* 内部で使うキーの最大長（qs_datastore.h の QS_DB_INDEX_KEY_MAX と一致させる） */
+#define QS_DB_MAX_KEY QS_DB_INDEX_KEY_MAX
 /* record 操作時のデフォルト容量（MB） */
 #define QS_DB_DEFAULT_CAPACITY QS_DB_CAPACITY_B1MB
 /* スクラッチメモリサイズ（JSON decode/encode 用） */
@@ -656,13 +656,61 @@ static int db_index_remove_id(QS_DB_CONTEXT* ctx, const char* index_key, const c
     return rc;
 }
 
-/* レコードのフィールド値がフィルタ値と一致するか（string 一致、または配列に含む）。 */
+/*
+ * 整数フィールドのフィルタ照合。
+ * フィルタ値は常に文字列で、index と同一の正規10進表記
+ * （%d / %lld / %llu 出力と一致：先頭ゼロ禁止、負は先頭 '-'）のみ受理する。
+ * 由此 INDEX スキャンと FULL スキャンで同じ結果になる。
+ */
+static int db_record_match_int(QS_MEMORY_POOL* _ppool, int32_t record_hash, const char* field, const char* value, int32_t fid)
+{
+    size_t len = strlen(value);
+    size_t digit_start = (len > 0 && value[0] == '-') ? 1 : 0;
+    size_t i;
+    if (digit_start >= len) {
+        return 0;
+    }
+    if (value[digit_start] == '0' && (len - digit_start) > 1) {
+        return 0;
+    }
+    for (i = digit_start; i < len; i++) {
+        if (value[i] < '0' || value[i] > '9') {
+            return 0;
+        }
+    }
+    {
+        char* end = NULL;
+        errno = 0;
+        long long parsed = strtoll(value, &end, 10);
+        if (errno != 0 || end != value + len) {
+            return 0;
+        }
+        if (fid == ELEMENT_LITERAL_NUM) {
+            int32_t* int_ptr = qs_get_hash_integer(_ppool, record_hash, field);
+            return (int_ptr != NULL && (long long)*int_ptr == parsed) ? 1 : 0;
+        }
+        if (fid == ELEMENT_LITERAL_NUM_64) {
+            int64_t* big_int_ptr = qs_get_hash_big_integer(_ppool, record_hash, field);
+            return (big_int_ptr != NULL && (long long)*big_int_ptr == parsed) ? 1 : 0;
+        }
+        if (fid == ELEMENT_LITERAL_NUM_U64) {
+            uint64_t* unsigned_big_ptr = qs_get_hash_unsigned_big_integer(_ppool, record_hash, field);
+            return (unsigned_big_ptr != NULL && (long long)*unsigned_big_ptr == parsed) ? 1 : 0;
+        }
+        return 0;
+    }
+}
+
+/* レコードのフィールド値がフィルタ値と一致するか（string 一致、整数一致、または配列に含む）。 */
 static int db_record_match(QS_MEMORY_POOL* _ppool, int32_t record_hash, const char* field, const char* value)
 {
     int32_t fid = qs_get_hash_id(_ppool, record_hash, field);
     if (fid == ELEMENT_LITERAL_STR) {
         char* s = qs_get_hash_string(_ppool, record_hash, field);
         return (s != NULL && strcmp(s, value) == 0);
+    }
+    if (fid == ELEMENT_LITERAL_NUM || fid == ELEMENT_LITERAL_NUM_64 || fid == ELEMENT_LITERAL_NUM_U64) {
+        return db_record_match_int(_ppool, record_hash, field, value, fid);
     }
     if (fid == ELEMENT_ARRAY) {
         int32_t arr = qs_get_hash(_ppool, record_hash, field);
@@ -1708,6 +1756,40 @@ int qs_db_index_rebuild(QS_MEMORY_POOL* _ppool, QS_DB_CONTEXT* ctx, const char* 
                         db_store_close(&store);
                         return -1;
                     }
+                }
+            } else if (fid == ELEMENT_LITERAL_NUM || fid == ELEMENT_LITERAL_NUM_64 || fid == ELEMENT_LITERAL_NUM_U64) {
+                /* 数値フィールドは正規10進文字列として index する
+                 * （自動 index 更新 api_qs_db_sync_record_index と同一の形式、
+                 *  db_record_match_int と同じ表記規則） */
+                char value_buf[QS_DB_MAX_KEY];
+                int value_len;
+                if (fid == ELEMENT_LITERAL_NUM) {
+                    int32_t* int_ptr = qs_get_hash_integer(_ppool, rec, field);
+                    if (int_ptr == NULL) {
+                        continue;
+                    }
+                    value_len = snprintf(value_buf, sizeof(value_buf), "%d", *int_ptr);
+                } else if (fid == ELEMENT_LITERAL_NUM_64) {
+                    int64_t* big_int_ptr = qs_get_hash_big_integer(_ppool, rec, field);
+                    if (big_int_ptr == NULL) {
+                        continue;
+                    }
+                    value_len = snprintf(value_buf, sizeof(value_buf), "%lld", (long long)*big_int_ptr);
+                } else {
+                    uint64_t* big_int_ptr = qs_get_hash_unsigned_big_integer(_ppool, rec, field);
+                    if (big_int_ptr == NULL) {
+                        continue;
+                    }
+                    value_len = snprintf(value_buf, sizeof(value_buf), "%llu", (unsigned long long)*big_int_ptr);
+                }
+                if (value_len <= 0 || (size_t)value_len >= sizeof(value_buf)) {
+                    continue;
+                }
+                char index_key[QS_DB_MAX_KEY];
+                if (db_index_key(index_key, sizeof(index_key), table, field, value_buf) != 0 ||
+                    db_index_add_id(ctx, index_key, id) != 0) {
+                    db_store_close(&store);
+                    return -1;
                 }
             } else if (fid == ELEMENT_ARRAY) {
                 int32_t arr = qs_get_hash(_ppool, rec, field);

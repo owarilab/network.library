@@ -240,6 +240,7 @@ UNITY_INTERFACE_EXPORT char* UNITY_INTERFACE_API libqs_api_ranking_get(QS_RANKIN
 
 UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_init(QS_DB_API_CONTEXT* context);
 UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_free(QS_DB_API_CONTEXT* context);
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_set_auto_index_update(QS_DB_API_CONTEXT* context, int32_t enable);
 UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_create_database(const char* base_dir, const char* database);
 UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_drop_database(const char* base_dir, const char* database);
 UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_show_database(QS_MEMORY_CONTEXT* memory_context, QS_JSON_ELEMENT_ARRAY* array, const char* base_dir);

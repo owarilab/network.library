@@ -1077,6 +1077,11 @@ UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_free(QS_DB_API_CONTE
 	return api_qs_db_free(context);
 }
 
+UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_set_auto_index_update(QS_DB_API_CONTEXT* context, int32_t enable)
+{
+	return api_qs_db_set_auto_index_update(context, enable);
+}
+
 UNITY_INTERFACE_EXPORT int UNITY_INTERFACE_API libqs_api_db_create_database(const char* base_dir, const char* database)
 {
 	return api_qs_db_create_database(base_dir, database);

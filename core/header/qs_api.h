@@ -187,6 +187,7 @@ typedef struct QS_DB_API_CONTEXT
 {
 	QS_MEMORY_CONTEXT memory;
 	int32_t memid_db;
+	int32_t auto_index_update; /* 1: レコード CRUD で index を自動更新する */
 } QS_DB_API_CONTEXT;
 
 #ifdef __GNUC__
@@ -410,6 +411,10 @@ int api_qs_db_init(QS_DB_API_CONTEXT* context);
 /* Context is non-copyable while initialized. Free closes an open database first.
  * Returns 1 and retains context if table handles remain. */
 int api_qs_db_free(QS_DB_API_CONTEXT* context);
+/* Enable/disable automatic index updates in the record CRUD functions.
+ * Disabled by default. The flag does not affect direct index API calls
+ * (api_qs_db_index_add / api_qs_db_index_remove). */
+int api_qs_db_set_auto_index_update(QS_DB_API_CONTEXT* context, int32_t enable);
 int api_qs_db_create_database(const char* base_dir, const char* database);
 int api_qs_db_drop_database(const char* base_dir, const char* database);
 int api_qs_db_show_database(QS_MEMORY_CONTEXT* memory_context, QS_JSON_ELEMENT_ARRAY* array, const char* base_dir);
@@ -424,7 +429,11 @@ int api_qs_db_table_close(QS_DB_API_CONTEXT* context, const char* table);
 int api_qs_db_schema_define(QS_DB_API_CONTEXT* context, const char* table, const char* schema_json);
 int api_qs_db_schema_get(QS_DB_API_CONTEXT* context, const char* table, char* out_buf, size_t out_size);
 int api_qs_db_schema_validate(QS_MEMORY_CONTEXT* memory_context, QS_DB_API_CONTEXT* context, const char* table, const char* record_json);
-/* Insert/update validate records when a schema exists and apply defaults to absent fields. */
+/* Insert/update validate records when a schema exists and apply defaults to absent fields.
+ * When auto_index_update is enabled (api_qs_db_set_auto_index_update), fields with
+ * "is_index":1 in the schema are indexed automatically. Index entries are added or
+ * removed after the record write succeeds; a later index failure keeps the written
+ * record and returns -1 (use api_qs_db_index_rebuild to resynchronize). */
 int api_qs_db_record_insert(QS_DB_API_CONTEXT* context, const char* table, const char* id, const char* record_json);
 int api_qs_db_record_update(QS_DB_API_CONTEXT* context, const char* table, const char* id, const char* record_json);
 int api_qs_db_record_delete(QS_DB_API_CONTEXT* context, const char* table, const char* id);
