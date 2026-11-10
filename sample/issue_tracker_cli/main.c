@@ -24,6 +24,11 @@
 #define INDEX_JSON_BUFFER_SIZE (64 * 1024)
 #define MAX_SCHEMA_FIELDS 128
 #define MAX_ISSUE_STATUS_VALUES 64
+/* reindex 中、一時 index ストアのプール枯渇に対して行う
+ * compact 再試行の上限。compact が成功する限り進捗が保証されるため、
+ * この値を超える場合はストア自体に生データが収まらない等、
+ * 復旧不能な状態と判断して失敗とする。 */
+#define REINDEX_MAX_COMPACT_RETRIES 64
 
 typedef enum SCHEMA_FIELD_TYPE {
     SCHEMA_FIELD_TYPE_INT32 = 1,
@@ -75,6 +80,7 @@ static const STORE_CONFIG STORE_SYSTEM = {"system", "system.db", api_qs_kvs_crea
 static const STORE_CONFIG STORE_COMMENT = {"comment", "issue_comment.db", api_qs_kvs_create_b8mb_persistence};
 
 static int compact_store(const STORE_CONFIG* cfg, const char* base_dir);
+static int compact_store_path(int (*create_fn)(QS_KVS_CONTEXT*, const char*), const char* path, const char* label);
 static int command_issue_comment(int argc, char* argv[], APP_STORES* stores);
 static int comment_cascade_delete(APP_STORES* stores, const char* issue_id);
 static SCHEMA_FIELD_DEF* schema_find_field(SCHEMA_DEF* schema, const char* name);
@@ -2687,13 +2693,18 @@ static int copy_store_data(QS_KVS_CONTEXT* src, QS_KVS_CONTEXT* dst)
     return 0;
 }
 
-static int compact_store(const STORE_CONFIG* cfg, const char* base_dir)
+/*
+ * Compact the store file at an explicit path: copy all live entries into a
+ * fresh file and atomically swap it in. The path-based form exists so that
+ * reindex can recover its temporary index store, whose file name is not
+ * derived from base_dir (compact_store builds the path from STORE_CONFIG).
+ */
+static int compact_store_path(int (*create_fn)(QS_KVS_CONTEXT*, const char*), const char* path, const char* label)
 {
-    char path[4096];
     char tmp_path[4096];
     char bak_path[4096];
 
-    if (build_store_path(path, sizeof(path), base_dir, cfg->file_name) != 0) {
+    if (create_fn == NULL || path == NULL) {
         return -1;
     }
     if (!file_exists(path)) {
@@ -2712,11 +2723,11 @@ static int compact_store(const STORE_CONFIG* cfg, const char* base_dir)
 
     QS_KVS_CONTEXT src;
     QS_KVS_CONTEXT dst;
-    if (-1 == cfg->create_fn(&src, path)) {
+    if (-1 == create_fn(&src, path)) {
         fprintf(stderr, "error: failed to open source store: %s\n", path);
         return -1;
     }
-    if (-1 == cfg->create_fn(&dst, tmp_path)) {
+    if (-1 == create_fn(&dst, tmp_path)) {
         api_qs_persistence_kvs_memory_free(&src);
         fprintf(stderr, "error: failed to create temp store: %s\n", tmp_path);
         return -1;
@@ -2725,7 +2736,7 @@ static int compact_store(const STORE_CONFIG* cfg, const char* base_dir)
         api_qs_persistence_kvs_memory_free(&src);
         api_qs_persistence_kvs_memory_free(&dst);
         unlink(tmp_path);
-        fprintf(stderr, "error: failed to copy store data: %s\n", cfg->name);
+        fprintf(stderr, "error: failed to copy store data: %s\n", label);
         return -1;
     }
 
@@ -2746,6 +2757,15 @@ static int compact_store(const STORE_CONFIG* cfg, const char* base_dir)
     unlink(bak_path);
     printf("compacted: %s\n", path);
     return 0;
+}
+
+static int compact_store(const STORE_CONFIG* cfg, const char* base_dir)
+{
+    char path[4096];
+    if (build_store_path(path, sizeof(path), base_dir, cfg->file_name) != 0) {
+        return -1;
+    }
+    return compact_store_path(cfg->create_fn, path, cfg->name);
 }
 
 typedef struct INDEX_SCAN_DATA {
@@ -3276,11 +3296,38 @@ static int command_verify(int argc, char* argv[])
 }
 
 /*
+ * reindex 中の一時 index ストアの復旧。
+ * 一時ストアは 1 ページのみ（swap なし）の mmap プールで、同じ index キー
+ * （例: index:status:open）を連続更新すると、各更新で「新しい値用の
+ * やや大きいブロック」が新規割当てされ、解放された古いブロックは
+ * 将来の割当てより常に小さいため再利用されず、プールの大部分が
+ * 死んだブロックで埋まる。プール枯渇で api_qs_kvs_set が失敗したら、
+ * 通常の書き込みパス（kvs_set_with_compact_retry）と同じく compact して
+ * 生データだけを新しいファイルに書き直し、プールを回復する。
+ * compact の中ではファイルを rename するため、まず現在の
+ * stores->index のマッピングを閉じる（再オープンもこの関数で行う）。
+ */
+static int reindex_compact_temp_store(APP_STORES* stores, const char* temp_index_path)
+{
+    api_qs_persistence_kvs_memory_free(&stores->index);
+    stores->index.memory = NULL;
+    if (compact_store_path(STORE_INDEX.create_fn, temp_index_path, "index (reindex temp)") != 0) {
+        return -1;
+    }
+    if (-1 == STORE_INDEX.create_fn(&stores->index, temp_index_path)) {
+        fprintf(stderr, "error: failed to reopen temp index store: %s\n", temp_index_path);
+        return -1;
+    }
+    return 0;
+}
+
+/*
  * reindex 専用の index 追加処理。
  * 通常の index_add_id は kvs_set_with_compact_retry を通すが、
  * reindex では書き込み先が一時ストアのため、compact/reopen が
  * 元の issue_index.db を操作してしまう。
- * したがって api_qs_kvs_set を直接呼び、compact retry を行わない。
+ * したがって api_qs_kvs_set を直接呼び、compact retry は
+ * 呼び出し側（command_reindex が reindex_compact_temp_store で）行う。
  */
 static int reindex_add_id(QS_KVS_CONTEXT* index_store, const char* index_key, const char* issue_id)
 {
@@ -3454,13 +3501,30 @@ static int command_reindex(int argc, char* argv[])
         if (issue_json == NULL) {
             continue;
         }
-        if (reindex_apply_issue(&stores.index, key + strlen("issue:"), issue_json) != 0) {
+        int rc = reindex_apply_issue(&stores.index, key + strlen("issue:"), issue_json);
+        int compact_retries = 0;
+        while (rc != 0 && compact_retries < REINDEX_MAX_COMPACT_RETRIES) {
+            compact_retries++;
+            if (reindex_compact_temp_store(&stores, temp_index_path) != 0) {
+                break;
+            }
+            /* compact 後に同一 issue を再適用しても
+             * append_unique_string が重複を防ぐため安全 */
+            rc = reindex_apply_issue(&stores.index, key + strlen("issue:"), issue_json);
+        }
+        if (rc != 0) {
+            /* key は temp プール内のポインタなので、
+             * プール解放前にスタックにコピーする */
+            char failed_key[512];
+            snprintf(failed_key, sizeof(failed_key), "%s", key);
             api_qs_memory_free(&temp);
-            api_qs_persistence_kvs_memory_free(&stores.index);
+            if (stores.index.memory != NULL) {
+                api_qs_persistence_kvs_memory_free(&stores.index);
+            }
             unlink(temp_index_path);
             open_store_checked(&STORE_INDEX, base_dir, &stores.index);
             close_all_stores(&stores);
-            fprintf(stderr, "error: failed to rebuild index for issue: %s\n", key);
+            fprintf(stderr, "error: failed to rebuild index for issue: %s\n", failed_key);
             return EXIT_KVS;
         }
         issue_count++;
@@ -3510,14 +3574,29 @@ static int command_reindex(int argc, char* argv[])
         if (issue_id != NULL) {
             char index_key[1024];
             if (build_comment_index_key(index_key, sizeof(index_key), issue_id) == 0) {
-                if (reindex_add_id(&stores.index, index_key, key + 8) != 0) {
+                int rc = reindex_add_id(&stores.index, index_key, key + 8);
+                int compact_retries = 0;
+                while (rc != 0 && compact_retries < REINDEX_MAX_COMPACT_RETRIES) {
+                    compact_retries++;
+                    if (reindex_compact_temp_store(&stores, temp_index_path) != 0) {
+                        break;
+                    }
+                    rc = reindex_add_id(&stores.index, index_key, key + 8);
+                }
+                if (rc != 0) {
+                    /* key は temp プール内のポインタなので、
+                     * プール解放前にスタックにコピーする */
+                    char failed_key[512];
+                    snprintf(failed_key, sizeof(failed_key), "%s", key);
                     api_qs_memory_free(&cctx);
                     api_qs_memory_free(&temp);
-                    api_qs_persistence_kvs_memory_free(&stores.index);
+                    if (stores.index.memory != NULL) {
+                        api_qs_persistence_kvs_memory_free(&stores.index);
+                    }
                     unlink(temp_index_path);
                     open_store_checked(&STORE_INDEX, base_dir, &stores.index);
                     close_all_stores(&stores);
-                    fprintf(stderr, "error: failed to rebuild comment index for: %s\n", key);
+                    fprintf(stderr, "error: failed to rebuild comment index for: %s\n", failed_key);
                     return EXIT_KVS;
                 }
             }
