@@ -29,7 +29,7 @@
 - 永続化 KVS: [sample/persistence_cache/main.c](../../sample/persistence_cache/main.c)
 - Issue Tracker CLI 初期化: [sample/issue_tracker_cli/main.c](../../sample/issue_tracker_cli/main.c)
   - user/label/issue の CRUD・index 検索（`--scan index|full`）・issue コメント（`issue comment *`、`issue get --with-comments`）・verify/reindex/compaction
-  - 運用向けエラーコード表: [documents/16_issue_tracker_error_codes.md](../16_issue_tracker_error_codes.md)
+  - 運用向けエラーコード表: [issue_tracker_error_codes.md](issue_tracker_error_codes.md)
 
 ### DB（datastore）
 - DB CLI（低レベル `qs_db_*`）: [sample/db_cli/main.c](../../sample/db_cli/main.c)（13 章）
