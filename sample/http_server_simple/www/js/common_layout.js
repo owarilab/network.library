@@ -24,6 +24,7 @@
             '<a href="/index.html" data-path="/index.html">Top</a>' +
             '<a href="/wsock.html" data-path="/wsock.html">Room Sample</a>' +
             '<a href="/programing_document.html" data-path="/programing_document.html">Programming Doc</a>' +
+            '<a href="/keikibu.html" data-path="/keikibu.html">家計簿</a>' +
           '</nav>' +
         '</div>';
 

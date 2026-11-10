@@ -1,0 +1,325 @@
+/*
+ * keikibu.css
+ * 家計簿アプリ固有スタイル（common.css のダークテーマに準拠）
+ */
+
+:root {
+  color-scheme: dark;
+}
+
+/* ヘロー */
+.kb-hero {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  background: var(--surface-2);
+}
+.kb-hero h1 {
+  margin: 0;
+  font-size: 28px;
+}
+.kb-hero p {
+  margin: 10px 0 0;
+  color: var(--text-soft);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.kb-hero .badge {
+  display: inline-block;
+  margin: 10px 8px 0 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.5);
+  color: #bae6fd;
+}
+
+/* ボタン */
+.kb-btn {
+  border: 1px solid var(--border-main);
+  border-radius: 8px;
+  background: rgba(30, 41, 59, 0.6);
+  color: var(--text-main);
+  font-size: 13px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.kb-btn:hover {
+  border-color: #64748b;
+  background: rgba(51, 65, 85, 0.6);
+}
+.kb-btn-primary {
+  background: #0369a1;
+  border-color: #0284c7;
+}
+.kb-btn-primary:hover {
+  background: #0284c7;
+  border-color: #38bdf8;
+}
+.kb-btn-danger {
+  border-color: rgba(248, 113, 113, 0.5);
+  color: #fca5a5;
+}
+.kb-btn-danger:hover {
+  background: rgba(127, 29, 29, 0.4);
+  border-color: #f87171;
+}
+.kb-btn-sm {
+  padding: 3px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+}
+
+/* ツールバー */
+.kb-toolbar-card {
+  margin-top: 14px;
+}
+.kb-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+.kb-month-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.kb-month-label {
+  font-size: 18px;
+  font-weight: 700;
+  min-width: 130px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.kb-data-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* サマリー */
+.kb-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.kb-stat {
+  border: 1px solid var(--border-main);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  background: var(--surface-1);
+}
+.kb-stat .label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.kb-stat .value {
+  font-size: 20px;
+  font-weight: 700;
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.kb-stat .value.pos {
+  color: #4ade80;
+}
+.kb-stat .value.neg {
+  color: #f87171;
+}
+
+/* フォーム */
+.kb-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+.kb-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.kb-field label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.kb-field-wide {
+  grid-column: 1 / -1;
+}
+.kb-form input,
+.kb-form select {
+  background: #0f172a;
+  border: 1px solid var(--border-main);
+  border-radius: 8px;
+  color: var(--text-main);
+  font-size: 14px;
+  padding: 8px 10px;
+  width: 100%;
+}
+.kb-form input:focus,
+.kb-form select:focus {
+  outline: none;
+  border-color: #38bdf8;
+}
+.kb-form-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* チャート */
+.kb-charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 14px;
+}
+.kb-charts .card {
+  margin-top: 0;
+}
+.kb-wide {
+  grid-column: 1 / -1;
+}
+.kb-charts h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+  color: var(--text-soft);
+}
+.kb-canvas-wrap {
+  position: relative;
+}
+.kb-canvas {
+  display: block;
+  width: 100%;
+  height: 240px;
+}
+.kb-canvas-tall {
+  height: 260px;
+}
+@media (max-width: 900px) {
+  .kb-charts {
+    grid-template-columns: 1fr;
+  }
+  .kb-field-wide {
+    grid-column: auto;
+  }
+}
+
+/* 凡例 */
+.kb-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+.kb-legend-item {
+  display: inline-flex;
+  align-items: center;
+}
+.kb-legend .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin-right: 6px;
+  display: inline-block;
+}
+.kb-empty-inline {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* 表 */
+.kb-table-wrap {
+  overflow-x: auto;
+}
+.kb-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.kb-table th,
+.kb-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+  text-align: left;
+}
+.kb-table th {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.kb-table td.num,
+.kb-table th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.kb-table td.actions,
+.kb-table th.actions {
+  text-align: right;
+  white-space: nowrap;
+}
+.kb-table tfoot td {
+  border-bottom: none;
+  padding-top: 10px;
+}
+.kb-table tfoot .foot {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.kb-table .pos {
+  color: #4ade80;
+}
+.kb-table .neg {
+  color: #f87171;
+}
+.kb-table td.memo {
+  color: var(--text-soft);
+}
+.kb-table tr.kb-row-editing td {
+  background: rgba(56, 189, 248, 0.08);
+}
+.kb-empty {
+  padding: 22px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* バッジ */
+.kb-badge {
+  display: inline-block;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.kb-badge-income {
+  background: rgba(34, 197, 94, 0.14);
+  border: 1px solid rgba(34, 197, 94, 0.5);
+  color: #bbf7d0;
+}
+.kb-badge-expense {
+  background: rgba(244, 114, 182, 0.12);
+  border: 1px solid rgba(244, 114, 182, 0.5);
+  color: #fbcfe8;
+}
+
+/* ツールチップ */
+#kb-tooltip {
+  position: absolute;
+  display: none;
+  z-index: 50;
+  pointer-events: none;
+  background: rgba(2, 6, 23, 0.96);
+  border: 1px solid var(--border-main);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-main);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  max-width: 260px;
+}

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta http-equiv="Content-Style-Type" content="text/css">
+<meta http-equiv="Content-Script-Type" content="text/javascript">
+<title>家計簿 - Keikibu</title>
+<link rel="stylesheet" href="/css/common.css">
+<link rel="stylesheet" href="/css/keikibu.css">
+</head>
+<body class="page-dark">
+  <div id="site-header"></div>
+  <div class="container">
+
+    <div class="kb-hero">
+      <h1>家計簿</h1>
+      <p>
+        入出金の記録と、canvas による月別の可視化。<br>
+        データはこのブラウザの localStorage に保存されます。外部ライブラリは使用していません。
+      </p>
+      <span class="badge">localStorage 保存</span>
+      <span class="badge">Canvas グラフ</span>
+      <span class="badge">外部ライブラリなし</span>
+    </div>
+
+    <div class="card kb-toolbar-card">
+      <div class="kb-toolbar">
+        <div class="kb-month-nav">
+          <button id="month-prev" class="kb-btn" type="button" title="前月">&lsaquo;</button>
+          <span id="month-label" class="kb-month-label">-</span>
+          <button id="month-next" class="kb-btn" type="button" title="次月">&rsaquo;</button>
+          <button id="month-today" class="kb-btn" type="button">今月</button>
+        </div>
+        <div class="kb-data-actions">
+          <button id="btn-sample" class="kb-btn" type="button">サンプルデータ</button>
+          <button id="btn-export" class="kb-btn" type="button">エクスポート</button>
+          <button id="btn-import" class="kb-btn" type="button">インポート</button>
+          <button id="btn-clear" class="kb-btn kb-btn-danger" type="button">全消去</button>
+          <input type="file" id="import-file" accept="application/json,.json" style="display:none">
+        </div>
+      </div>
+    </div>
+
+    <div class="kb-summary">
+      <div class="kb-stat">
+        <div class="label">収入（今月）</div>
+        <div class="value pos" id="sum-income">¥0</div>
+      </div>
+      <div class="kb-stat">
+        <div class="label">支出（今月）</div>
+        <div class="value neg" id="sum-expense">¥0</div>
+      </div>
+      <div class="kb-stat">
+        <div class="label">残差（収入-支出）</div>
+        <div class="value" id="sum-balance">¥0</div>
+      </div>
+      <div class="kb-stat">
+        <div class="label">エントリ数（今月）</div>
+        <div class="value" id="sum-count">0</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <h3 style="margin-top:0">エントリを追加 / 編集</h3>
+      <form id="entry-form" class="kb-form" autocomplete="off">
+        <div class="kb-field">
+          <label for="f-date">日付</label>
+          <input type="date" id="f-date" required>
+        </div>
+        <div class="kb-field">
+          <label for="f-type">種類</label>
+          <select id="f-type">
+            <option value="expense">支出</option>
+            <option value="income">収入</option>
+          </select>
+        </div>
+        <div class="kb-field">
+          <label for="f-category">カテゴリ</label>
+          <select id="f-category"></select>
+        </div>
+        <div class="kb-field">
+          <label for="f-amount">金額（円）</label>
+          <input type="number" id="f-amount" min="1" step="1" inputmode="numeric" placeholder="例: 1500" required>
+        </div>
+        <div class="kb-field kb-field-wide">
+          <label for="f-memo">メモ</label>
+          <input type="text" id="f-memo" maxlength="60" placeholder="任意">
+        </div>
+        <div class="kb-form-actions">
+          <button type="submit" id="f-submit" class="kb-btn kb-btn-primary">追加する</button>
+          <button type="button" id="f-cancel" class="kb-btn" style="display:none">キャンセル</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="kb-charts">
+      <div class="card">
+        <h3>支出カテゴリ内訳（今月）</h3>
+        <div class="kb-canvas-wrap">
+          <canvas id="chart-donut" class="kb-canvas"></canvas>
+        </div>
+        <div id="donut-legend" class="kb-legend"></div>
+      </div>
+      <div class="card">
+        <h3>日別支出（今月）</h3>
+        <div class="kb-canvas-wrap">
+          <canvas id="chart-bar" class="kb-canvas"></canvas>
+        </div>
+        <p class="small" style="margin-bottom:0">ホバーで 1 日ずつ詳細を確認できます。</p>
+      </div>
+      <div class="card kb-wide">
+        <h3>直近 6 ヶ月の推移</h3>
+        <div class="kb-canvas-wrap">
+          <canvas id="chart-line" class="kb-canvas kb-canvas-tall"></canvas>
+        </div>
+        <div class="kb-legend">
+          <span class="kb-legend-item"><span class="dot" style="background:#34d399"></span>収入</span>
+          <span class="kb-legend-item"><span class="dot" style="background:#f472b6"></span>支出</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">エントリ一覧（<span id="table-month-label">-</span>）</h3>
+      <div class="kb-table-wrap">
+        <table class="kb-table">
+          <thead>
+            <tr>
+              <th>日付</th>
+              <th>種類</th>
+              <th>カテゴリ</th>
+              <th class="num">金額</th>
+              <th>メモ</th>
+              <th class="actions"></th>
+            </tr>
+          </thead>
+          <tbody id="entry-tbody"></tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3" class="foot">今月の計（収入 / 支出）</td>
+              <td class="num foot">
+                <span class="pos" id="table-foot-income">¥0</span> / <span class="neg" id="table-foot-expense">¥0</span>
+              </td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+  </div>
+  <div id="site-footer"></div>
+  <div id="kb-tooltip"></div>
+  <script src="/js/keikibu_chart.js"></script>
+  <script src="/js/keikibu.js"></script>
+  <script src="/js/common_layout.js"></script>
+</body>
+</html>
