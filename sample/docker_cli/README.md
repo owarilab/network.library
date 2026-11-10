@@ -1,10 +1,10 @@
 # docker_cli
 
 `sample/http_client` と同じ qs core + ssl モジュール（`QS_HTTP_CLIENT_CONTEXT`）のみで、
-Docker Engine API（plain HTTP / TCP）をコマンド引数から操作する CLI ツールのサンプルです。
+Docker Engine API（plain HTTP）をコマンド引数から操作する CLI ツールのサンプルです。
 
-- `core/`・`ssl/` のソースには変更を加えていません
-- 通信は plain HTTP（TCP）のみです（Unix ソケット・TLS は未対応）
+- 通信は plain HTTP です。Unix domain ソケット（既定）または TCP（`--host`/`--port`）から選択できます
+- TLS（mTLS 認証モード）は未対応
 
 ## ビルド
 
