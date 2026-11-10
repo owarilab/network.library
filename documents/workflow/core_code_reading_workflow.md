@@ -20,7 +20,7 @@
 ### 2-1. 全体構造を確認
 
 - [documents/README.md](../README.md)
-- [documents/01_core_overview.md](../01_core_overview.md)
+- [documents/development/core_development_guide.md](../development/core_development_guide.md)（1 章「コアライブラリ概要」）
 
 ### 2-2. `core` ディレクトリの責務を確認
 

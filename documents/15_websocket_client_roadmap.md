@@ -136,7 +136,7 @@ core の plain WebSocket client を、`ws://` の最小実装から、非同期�
 - [ ] frame encode/decode の unit test を追加する。
 - [ ] localhost echo server を使う protocol 統合テストを追加する。
 - [ ] `sample/websocket_client` を end-to-end room テストとして維持する。
-- [ ] [documents/07_api_server_client.md](07_api_server_client.md) に client API の利用例と制約を追記する。
+- [x] client API の利用例と制約を統合ガイド [development/core_development_guide.md](development/core_development_guide.md)（7 章・15 章）に反映する。（2026-11-10 完了。旧対象ファイル `documents/07_api_server_client.md` は削除済み）
 
 ### 完了条件
 
