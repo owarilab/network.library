@@ -75,6 +75,9 @@ typedef struct QS_HTTP_CLIENT_CONTEXT
 } QS_HTTP_CLIENT_CONTEXT;
 
 int qs_ssl_module_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char* server_host, int server_port, int is_ssl);
+/* Same as above but connects to a unix domain socket (path instead of host/port).
+ * Returns -1 on Windows (not supported). */
+int qs_ssl_module_http_client_connect_unix(QS_HTTP_CLIENT_CONTEXT* context, const char* path, int is_ssl);
 # ifdef QS_SSL_MODULE_ENABLED
 SSL_CTX* qs_ssl_module_http_client_ssl_create_context();
 SSL* qs_ssl_module_http_client_ssl_create(SSL_CTX* ctx, int sock);

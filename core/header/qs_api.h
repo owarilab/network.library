@@ -276,6 +276,10 @@ int32_t api_qs_csv_get_row_length(QS_CSV_CONTEXT* csv, int32_t line_pos);
 char* api_qs_csv_get_row(QS_CSV_CONTEXT* csv, int32_t line_pos, int32_t row_pos);
 
 int api_qs_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host, int port, int32_t server_type);
+/* Unix domain socket client (AF_UNIX). path is the socket path (e.g. /var/run/docker.sock).
+ * Returns 0 on success. -1..-6 have the same meaning as api_qs_client_init.
+ * -7: invalid path (NULL or >= 128 bytes). -8: not supported on this platform (e.g. Windows). */
+int api_qs_client_init_unix(QS_CLIENT_CONTEXT** ppcontext, const char* path, int32_t server_type);
 int api_qs_websocket_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host, int port, const char* path);
 int api_qs_client_get_socket(QS_CLIENT_CONTEXT* context);
 void api_qs_set_client_on_connect_event(QS_CLIENT_CONTEXT* context, QS_EVENT_FUNCTION on_connect );

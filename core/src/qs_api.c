@@ -722,6 +722,77 @@ int api_qs_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host, int port
 	client->application_data = (void*)context;
 	return 0;
 }
+int api_qs_client_init_unix(QS_CLIENT_CONTEXT** ppcontext, const char* path, int32_t server_type)
+{
+#if defined(__WINDOWS__)
+	(void)ppcontext;
+	(void)path;
+	(void)server_type;
+	fprintf(stderr, "api_qs_client_init_unix: not supported on Windows\n");
+	return -8;
+#else
+	if( path == NULL || path[0] == 0 || strlen( path ) >= 128 ){
+		return -7;
+	}
+	if( ( (*ppcontext) = ( QS_CLIENT_CONTEXT * )malloc( sizeof( QS_CLIENT_CONTEXT ) ) ) == NULL ){
+		return -1;
+	}
+	QS_CLIENT_CONTEXT* context = *ppcontext;
+	context->on_connect = NULL;
+	context->on_plain_event = NULL;
+	context->on_simple_event = NULL;
+	context->on_close = NULL;
+	context->websocket_mode = 0;
+	context->websocket_client = NULL;
+	context->on_websocket_event = NULL;
+	context->memory = NULL;
+	context->current_time = time(NULL);
+	context->update_time = 0;
+	QS_MEMORY_POOL* main_memory_pool = NULL;
+	size_t temporary_memory_size = SIZE_MBYTE * 8LLU;
+	size_t alloc_size = (SIZE_KBYTE * 700LLU) + temporary_memory_size;
+	if( qs_initialize_memory( &main_memory_pool, alloc_size, alloc_size, MEMORY_ALIGNMENT_SIZE_BIT_64, FIX_MUNIT_SIZE, 1, SIZE_KBYTE * 16 ) <= 0 ){
+		free(context); context=NULL;
+		return -2;
+	}
+	context->memory = (void*)main_memory_pool;
+	if( -1 == ( context->memid_temporary_memory = qs_create_mini_memory( main_memory_pool, temporary_memory_size ) ) ){
+		free(context); context=NULL;
+		return -3;
+	}
+	int32_t client_munit = qs_create_memory_block(main_memory_pool, sizeof(QS_SOCKET_OPTION));
+	if (client_munit == -1) {
+		free(context); context=NULL;
+		return -4;
+	}
+	/* socket path goes into the host buffer; port is unused (dummy "0") */
+	size_t maxconnection = 1;
+	QS_SOCKET_OPTION* client = (QS_SOCKET_OPTION*)QS_GET_POINTER(main_memory_pool, client_munit);
+	uint8_t protocol_type = PROTOCOL_PLAIN;
+	if(server_type==QS_SERVER_TYPE_SIMPLE){
+		protocol_type = PROTOCOL_SIMPLE;
+	}
+	if (-1 == qs_initialize_socket_option(client, (char*)path, "0", SOCKET_TYPE_CLIENT_TCP, SOCKET_MODE_CLIENT_NONBLOCKING, protocol_type, maxconnection, main_memory_pool, NULL)) {
+		free(context); context=NULL;
+		return -5;
+	}
+	client->inetflag |= INET_FLAG_BIT_UNIX;
+	set_on_connect_event(client, api_qs_client_on_connect );
+	if( server_type==QS_SERVER_TYPE_SIMPLE ){
+		set_on_payload_recv_event(client, api_qs_client_on_simple_recv );
+	}else{
+		set_on_plain_recv_event(client, api_qs_client_on_recv );
+	}
+	set_on_close_event(client, api_qs_client_on_close );
+	if (-1 == qs_socket(client)) {
+		free(context); context=NULL;
+		return -6;
+	}
+	context->memid_client = client_munit;
+	client->application_data = (void*)context;
+	return 0;
+#endif
+}
 int api_qs_websocket_client_init(QS_CLIENT_CONTEXT** ppcontext, const char* host, int port, const char* path)
 {
 	int ret = api_qs_client_init(ppcontext, host, port, QS_SERVER_TYPE_PLAIN);

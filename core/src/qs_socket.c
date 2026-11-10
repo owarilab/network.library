@@ -4,6 +4,10 @@
 
 #include "qs_socket.h"
 
+#if !defined(__WINDOWS__)
+#include <sys/un.h>
+#endif
+
 #define MAX_SOCKET_OPTIONS 64
 static QS_SOCKET_OPTION* s_socket_options[MAX_SOCKET_OPTIONS] = { NULL };
 
@@ -156,6 +160,35 @@ QS_SOCKET_OPTION* qs_create_tcp_client_plain(char* hostname, char* portnum)
 		return NULL;
 	}
 	return option;
+}
+
+QS_SOCKET_OPTION* qs_create_unix_client(const char* path)
+{
+#if defined(__WINDOWS__)
+	(void)path;
+	fprintf(stderr, "qs_create_unix_client: not supported on Windows\n");
+	return NULL;
+#else
+	QS_MEMORY_POOL* memory_pool = NULL;
+	QS_SOCKET_OPTION *option;
+	size_t maxconnection = 1;
+	if (path == NULL || path[0] == 0) {
+		return NULL;
+	}
+	if (qs_initialize_memory(&memory_pool, SIZE_MBYTE * 1, SIZE_MBYTE * 1, MEMORY_ALIGNMENT_SIZE_BIT_64, FIX_MUNIT_SIZE, 1, SIZE_KBYTE * 16) <= 0) {
+		return NULL;
+	}
+	int32_t option_munit = qs_create_memory_block(memory_pool, sizeof(QS_SOCKET_OPTION));
+	if (option_munit == -1) {
+		return NULL;
+	}
+	option = (QS_SOCKET_OPTION*)QS_GET_POINTER(memory_pool, option_munit);
+	if (0 != qs_initialize_socket_option(option, (char*)path, "0", SOCKET_TYPE_CLIENT_TCP, SOCKET_MODE_CLIENT_NONBLOCKING, PROTOCOL_PLAIN, maxconnection, memory_pool, NULL)) {
+		return NULL;
+	}
+	option->inetflag |= INET_FLAG_BIT_UNIX;
+	return option;
+#endif
 }
 
 QS_SOCKET_OPTION* qs_create_udp_client(char* hostname, char* portnum)
@@ -441,6 +474,7 @@ int qs_initialize_socket_option(
 	option->mmap_memory_pool = mmap_memory_pool;
 	option->application_data = NULL;
 	option->addr = NULL;
+	option->unix_addr_owned = 0;
 	option->client_connection_status = CLIENT_STATUS_DISCONNECT;
 
 	qs_logger_init(&option->log_access, QS_LOG_LEVEL_INFO);
@@ -1182,6 +1216,47 @@ QS_SOCKET_ID qs_client_socket( QS_SOCKET_OPTION *option )
 	struct addrinfo hints;
 	int errcode;
 
+#if !defined(__WINDOWS__)
+	/* Unix domain socket client: the socket path is stored in host_name_munit */
+	if( ( option->inetflag & INET_FLAG_BIT_UNIX ) != 0 ){
+		char* path = ( option->host_name_munit >= 0 ) ? (char *)qs_upointer( option->memory_pool, option->host_name_munit ) : NULL;
+		struct sockaddr_un* sun = NULL;
+		struct addrinfo* ai = NULL;
+		if( path == NULL || path[0] == 0 ){
+			printf( "unix socket client: empty path\n" );
+			return -1;
+		}
+		sun = (struct sockaddr_un *)calloc( 1, sizeof( struct sockaddr_un ) );
+		ai  = (struct addrinfo *)calloc( 1, sizeof( struct addrinfo ) );
+		if( sun == NULL || ai == NULL ){
+			if( sun != NULL ) free( sun );
+			if( ai != NULL ) free( ai );
+			return -1;
+		}
+		if( strlen( path ) >= sizeof( sun->sun_path ) ){
+			printf( "unix socket client: path too long: %s\n", path );
+			free( sun );
+			free( ai );
+			return -1;
+		}
+		sun->sun_family = AF_UNIX;
+		strncpy( sun->sun_path, path, sizeof( sun->sun_path ) - 1 );
+		ai->ai_family = AF_UNIX;
+		ai->ai_socktype = SOCK_STREAM;
+		ai->ai_addr = (struct sockaddr *)sun;
+		ai->ai_addrlen = sizeof( struct sockaddr_un );
+		option->addr = ai;
+		option->unix_addr_owned = 1;
+		if( ( sock = socket( AF_UNIX, SOCK_STREAM, 0 ) ) == -1 ){
+			(void) qs_error("socket(AF_UNIX)");
+			qs_free_addrinfo(option);
+			return -1;
+		}
+		option->client_connection_status = CLIENT_STATUS_CONNECTING;
+		return sock;
+	}
+#endif
+
 	char* hostname = (char *)qs_upointer( option->memory_pool,option->host_name_munit );
 	char* portnum = (char *)qs_upointer( option->memory_pool,option->port_num_munit );
 	memset( &hints, 0, sizeof( hints ) );
@@ -1512,7 +1587,15 @@ void qs_free_addrinfo(QS_SOCKET_OPTION* option)
 	if(option->addr==NULL){
 		return;
 	}
-	freeaddrinfo(option->addr);
+	if(option->unix_addr_owned != 0){
+		/* Hand-crafted addrinfo for AF_UNIX: free the sockaddr and the struct itself */
+		free(option->addr->ai_addr);
+		free(option->addr);
+		option->unix_addr_owned = 0;
+	}
+	else{
+		freeaddrinfo(option->addr);
+	}
 	option->addr = NULL;
 }
 

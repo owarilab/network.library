@@ -14,6 +14,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <unistd.h>
 #include <arpa/inet.h>
 
 #include "qs_api.h"
@@ -23,11 +24,14 @@
 #define DOCKER_CLI_JSON_MEMORY_SIZE (1024 * 1024 * 16)
 #define DOCKER_CLI_CREATE_BODY_SIZE (1024 * 64)
 #define DOCKER_CLI_ID_SIZE 256
+#define DOCKER_CLI_DEFAULT_SOCKET "/var/run/docker.sock"
 
 typedef struct DOCKER_CLI_CONTEXT
 {
     char host[DOCKER_CLI_HOST_SIZE];
     int port;
+    char unix_path[DOCKER_CLI_HOST_SIZE];
+    int use_unix;
     QS_HTTP_CLIENT_CONTEXT http;
     QS_MEMORY_CONTEXT json_memory;
 } DOCKER_CLI_CONTEXT;
@@ -39,8 +43,11 @@ static void print_usage(void)
     printf("  docker_cli [--host HOST] [--port PORT] <command> [args]\n");
     printf("\n");
     printf("Options:\n");
-    printf("  --host HOST   Docker Engine host (default: 127.0.0.1)\n");
-    printf("  --port PORT   Docker Engine port (default: 2375)\n");
+    printf("  --host HOST           Docker Engine host for TCP (default: 127.0.0.1)\n");
+    printf("  --port PORT           Docker Engine port for TCP (default: 2375)\n");
+    printf("  --unix-socket PATH    Connect via unix domain socket\n");
+    printf("                        (default: %s if it exists, otherwise TCP 127.0.0.1:2375)\n",
+           DOCKER_CLI_DEFAULT_SOCKET);
     printf("\n");
     printf("Commands:\n");
     printf("  version                  Show engine version info (GET /version)\n");
@@ -96,9 +103,17 @@ static int docker_request(DOCKER_CLI_CONTEXT* cli,
 
     QS_HTTP_CLIENT_CONTEXT* http = &cli->http;
 
-    if(0 != qs_ssl_module_http_client_connect(http, cli->host, cli->port, 0)){
-        fprintf(stderr, "docker_cli: connect to %s:%d failed\n", cli->host, cli->port);
-        return -1;
+    if(cli->use_unix){
+        if(0 != qs_ssl_module_http_client_connect_unix(http, cli->unix_path, 0)){
+            fprintf(stderr, "docker_cli: connect to unix:%s failed\n", cli->unix_path);
+            return -1;
+        }
+    }
+    else{
+        if(0 != qs_ssl_module_http_client_connect(http, cli->host, cli->port, 0)){
+            fprintf(stderr, "docker_cli: connect to %s:%d failed\n", cli->host, cli->port);
+            return -1;
+        }
     }
 
     char* request_buffer = qs_ssl_module_http_client_get_request_buffer(http);
@@ -108,25 +123,34 @@ static int docker_request(DOCKER_CLI_CONTEXT* cli,
         return -1;
     }
 
+    /* Host ヘッダ（Docker Engine は検証しないが、unix 時は localhost を使う） */
+    char host_header[DOCKER_CLI_HOST_SIZE + 16];
+    if(cli->use_unix){
+        snprintf(host_header, sizeof(host_header), "localhost");
+    }
+    else{
+        snprintf(host_header, sizeof(host_header), "%s:%d", cli->host, cli->port);
+    }
+
     if(body != NULL){
         snprintf(request_buffer, QS_HTTP_CLIENT_REQUEST_BUFFER_SIZE,
                  "%s %s HTTP/1.1\r\n"
-                 "Host: %s:%d\r\n"
+                 "Host: %s\r\n"
                  "Content-Type: application/json\r\n"
                  "Content-Length: %zu\r\n"
                  "Connection: close\r\n"
                  "\r\n"
                  "%s",
-                 method, path, cli->host, cli->port,
+                 method, path, host_header,
                  strlen(body), body);
     }
     else{
         snprintf(request_buffer, QS_HTTP_CLIENT_REQUEST_BUFFER_SIZE,
                  "%s %s HTTP/1.1\r\n"
-                 "Host: %s:%d\r\n"
+                 "Host: %s\r\n"
                  "Connection: close\r\n"
                  "\r\n",
-                 method, path, cli->host, cli->port);
+                 method, path, host_header);
     }
 
     while(1){
@@ -155,8 +179,13 @@ static int docker_request(DOCKER_CLI_CONTEXT* cli,
     int parsed = sscanf(header_buffer, "HTTP/%15s %d %255[^\r\n]",
                         http_version, out_status, status_message);
     if(parsed < 2){
-        fprintf(stderr, "docker_cli: no response from %s:%d (connection failed?)\n",
-                cli->host, cli->port);
+        if(cli->use_unix){
+            fprintf(stderr, "docker_cli: no response from unix:%s (connection failed?)\n", cli->unix_path);
+        }
+        else{
+            fprintf(stderr, "docker_cli: no response from %s:%d (connection failed?)\n",
+                    cli->host, cli->port);
+        }
         qs_ssl_module_http_client_dispose(http);
         return -1;
     }
@@ -728,14 +757,25 @@ int main(int argc, char** argv)
     snprintf(cli.host, sizeof(cli.host), "127.0.0.1");
     cli.port = 2375;
 
-    /* コマンド引数のパース（コマンド名より前にある --host / --port のみ） */
+    /* コマンド引数のパース（コマンド名より前にある --host / --port / --unix-socket のみ） */
+    int has_host_option = 0;
     int i = 1;
     for(; i < argc; i++){
         if(0 == strcmp(argv[i], "--host") && i + 1 < argc){
             snprintf(cli.host, sizeof(cli.host), "%s", argv[++i]);
+            has_host_option = 1;
         }
         else if(0 == strcmp(argv[i], "--port") && i + 1 < argc){
             cli.port = atoi(argv[++i]);
+            has_host_option = 1;
+        }
+        else if(0 == strcmp(argv[i], "--unix-socket") && i + 1 < argc){
+            if(strlen(argv[i + 1]) >= sizeof(cli.unix_path)){
+                fprintf(stderr, "docker_cli: unix socket path is too long\n");
+                return 1;
+            }
+            snprintf(cli.unix_path, sizeof(cli.unix_path), "%s", argv[++i]);
+            cli.use_unix = 1;
         }
         else if(0 == strcmp(argv[i], "-h") || 0 == strcmp(argv[i], "--help")){
             print_usage();
@@ -749,6 +789,15 @@ int main(int argc, char** argv)
         print_usage();
         return 1;
     }
+
+    /* エンドポイント解決: --unix-socket > --host/--port (TCP) > 既定（/var/run/docker.sock があれば Unix、なければ TCP） */
+    if(!cli.use_unix && !has_host_option){
+        if(0 == access(DOCKER_CLI_DEFAULT_SOCKET, F_OK)){
+            cli.use_unix = 1;
+            snprintf(cli.unix_path, sizeof(cli.unix_path), "%s", DOCKER_CLI_DEFAULT_SOCKET);
+        }
+    }
+
     const char* command = argv[i];
     i++;
 

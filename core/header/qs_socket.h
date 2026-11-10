@@ -41,6 +41,7 @@ typedef int QS_SOCKET_ID;
 // inetflags
 #define INET_FLAG_BIT_IPV6 0x00000001
 #define INET_FLAG_BIT_CONNECT_UDP 0x00000002
+#define INET_FLAG_BIT_UNIX 0x00000004	// unix domain socket client (path is stored in host_name_munit)
 
 // sokcet type
 #define SOCKET_TYPE_SERVER_TCP 1
@@ -225,6 +226,7 @@ typedef struct QS_SOCKET_OPTION
 	QS_LOGGER log_warning;                  // warning log
 	QS_LOGGER log_debug;                    // debug log
 	QS_LOGGER log_metrics;                  // metrics log
+	int32_t unix_addr_owned;                // 1: option->addr is a hand-crafted addrinfo for AF_UNIX (free() instead of freeaddrinfo())
 } QS_SOCKET_OPTION;
 
 QS_SOCKET_OPTION* qs_create_tcp_server(char* hostname, char* portnum);
@@ -233,6 +235,8 @@ QS_SOCKET_OPTION* qs_create_udp_server(char* hostname, char* portnum);
 QS_SOCKET_OPTION* qs_create_tcp_client(char* hostname, char* portnum);
 QS_SOCKET_OPTION* qs_create_tcp_client_plain(char* hostname, char* portnum);
 QS_SOCKET_OPTION* qs_create_udp_client(char* hostname, char* portnum);
+/* Unix domain socket client (path instead of host/port). Returns NULL on Windows. */
+QS_SOCKET_OPTION* qs_create_unix_client(const char* path);
 ssize_t qs_send_message(uint32_t payload_type, char* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
 ssize_t qs_send_message_broadcast(uint32_t payload_type, char* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);
 ssize_t qs_send_message_othercast(uint32_t payload_type, char* payload, size_t payload_len, QS_RECV_INFO *qs_recv_info);

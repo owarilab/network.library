@@ -310,11 +310,15 @@ SSL* qs_ssl_module_http_client_ssl_create(SSL_CTX* ctx, int sock)
 }
 #endif // QS_SSL_MODULE_ENABLED
 
-int qs_ssl_module_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char* server_host, int server_port, int is_ssl)
+/*
+ * Shared implementation for TCP and unix domain socket clients.
+ * is_unix: 0 = TCP (endpoint is host, port is used), 1 = unix socket (endpoint is the socket path)
+ */
+static int qs_ssl_module_http_client_connect_common(QS_HTTP_CLIENT_CONTEXT* context, int is_ssl, int is_unix, const char* endpoint, int port)
 {
     qs_ssl_module_http_client_dispose(context);
 
-    if(qs_ssl_module_http_client_alloc_transient_buffers(context, server_host, server_port) != 0){
+    if(qs_ssl_module_http_client_alloc_transient_buffers(context, endpoint, port) != 0){
         qs_ssl_module_http_client_dispose(context);
         return -1;
     }
@@ -336,10 +340,24 @@ int qs_ssl_module_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char
     context->waiting_for_chunk_trailer = 0;
 
     int error = 0;
-	if(0 != (error=api_qs_client_init(&context->client_context,server_host,server_port,QS_SERVER_TYPE_HTTP))){
-        printf("api_qs_client_init error:%d\n",error);
-    qs_ssl_module_http_client_dispose(context);
+    if(is_unix){
+#if !defined(__WINDOWS__)
+        if(0 != (error=api_qs_client_init_unix(&context->client_context,endpoint,QS_SERVER_TYPE_HTTP))){
+            printf("api_qs_client_init_unix error:%d\n",error);
+            qs_ssl_module_http_client_dispose(context);
+            return -1;
+        }
+#else
+        printf("unix domain socket client is not supported on Windows\n");
+        qs_ssl_module_http_client_dispose(context);
         return -1;
+#endif
+    }else{
+        if(0 != (error=api_qs_client_init(&context->client_context,endpoint,port,QS_SERVER_TYPE_HTTP))){
+            printf("api_qs_client_init error:%d\n",error);
+            qs_ssl_module_http_client_dispose(context);
+            return -1;
+        }
     }
 
     context->client_context->client_data = context;
@@ -377,6 +395,16 @@ int qs_ssl_module_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char
     }
 
     return 0;
+}
+
+int qs_ssl_module_http_client_connect(QS_HTTP_CLIENT_CONTEXT* context,const char* server_host, int server_port, int is_ssl)
+{
+    return qs_ssl_module_http_client_connect_common(context, is_ssl, 0, server_host, server_port);
+}
+
+int qs_ssl_module_http_client_connect_unix(QS_HTTP_CLIENT_CONTEXT* context, const char* path, int is_ssl)
+{
+    return qs_ssl_module_http_client_connect_common(context, is_ssl, 1, path, 0);
 }
 
 #ifdef QS_SSL_MODULE_ENABLED

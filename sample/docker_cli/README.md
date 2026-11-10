@@ -15,9 +15,18 @@ make
 
 ## 前提
 
-Docker Engine が TCP で plain HTTP 提供している必要があります。
+### 既定: Unix ソケット直結（設定不要）
 
-### 方法1: dockerd 側で TCP を有効にする（常設・推奨）
+`/var/run/docker.sock` が存在する環境では、**プロキシ・TCP 設定は一切不要**です。
+オプションを付けずに実行すると自動的に Unix ソケットが使われます。
+
+```bash
+$ ./qs_docker_cli version
+Version        29.1.3
+...
+```
+
+### 方法1: TCP で使う場合（リモート、または Unix ソケットが使えない場合）
 
 systemd 管理の環境（Ubuntu / WSL2 + systemd 等）では、
 `/etc/docker/daemon.json` に `hosts` を追加して再起動します
@@ -81,7 +90,10 @@ systemd を使わない環境では、起動時にフラグを付けるだけで
 dockerd -H tcp://127.0.0.1:2375 &
 ```
 
-### 方法2: 既存の Unix ソケットを TCP に中継する（デーモンを再起動したくない場合）
+### 方法2: 既存の Unix ソケットを TCP に中継する（`--host/--port` 指定で TCP 経由にしたい場合のみ）
+
+> 既定では Unix ソケット直結が使えるため、本サンプルで中継は不要です。
+> 参照のため残しています。
 
 `/var/run/docker.sock` を TCP にブリッジするプロキシを別途起動します。
 例（python3）:
@@ -110,11 +122,18 @@ socketserver.ThreadingTCPServer(("127.0.0.1", 2375), Handler).serve_forever()
 ## 使い方
 
 ```
-docker_cli [--host HOST] [--port PORT] <command> [args]
+docker_cli [--host HOST] [--port PORT] [--unix-socket PATH] <command> [args]
 
 共通オプション:
-  --host HOST   Docker Engine のホスト（既定: 127.0.0.1）
-  --port PORT   Docker Engine のポート（既定: 2375）
+  --host HOST           TCP 接続時の Docker Engine のホスト（既定: 127.0.0.1）
+  --port PORT           TCP 接続時の Docker Engine のポート（既定: 2375）
+  --unix-socket PATH    Unix domain ソケットで接続
+
+エンドポイント解決の優先順位:
+  1. --unix-socket PATH（明示指定）
+  2. --host / --port のいずれか指定時は TCP
+  3. 何も指定しない場合は /var/run/docker.sock が存在すれば Unix、
+     なければ TCP 127.0.0.1:2375
 
 コマンド:
   version                  エンジンのバージョン情報を表示（GET /version）
@@ -171,7 +190,9 @@ docker_cli: error: HTTP 404: No such container: no-such-container
 ## 実装のポイント
 
 - 通信は `sample/http_client` と同じワンショットパターン:
-  `qs_ssl_module_http_client_connect(host, port, is_ssl=0)` → リクエストバッファに HTTP リクエストを手組み →
+  TCP 時は `qs_ssl_module_http_client_connect(host, port, is_ssl=0)`、
+  Unix ソケット時は `qs_ssl_module_http_client_connect_unix(path, is_ssl=0)` →
+  リクエストバッファに HTTP リクエストを手組み →
   `update` / `sleep` を `QS_SSL_MODULE_PHASE_DISCONNECT` までループ → header/body を読む → `dispose`
 - 1 コマンド = 1 接続（`Connection: close`、keep-alive は不使用）
 - JSON 解析は `api_qs_json_decode_object`。Docker の配列レスポンス（`/containers/json` 等）は
@@ -185,8 +206,9 @@ docker_cli: error: HTTP 404: No such container: no-such-container
 
 - レスポンスボディは 4MB まで（`QS_HTTP_CLIENT_BODY_BUFFER_SIZE`）。
   大量のログ・一覧は切り詰められます
-- Unix ソケット（`/var/run/docker.sock`）への直接接続は非対応です
-  （core のソケット層が TCP のみのため）
+- Unix ソケット接続は `api_qs_client_init_unix`（core）+
+  `qs_ssl_module_http_client_connect_unix`（ssl モジュール）を使用します
+  （Windows では未サポートのため、`--unix-socket` 指定時はエラー終了します）
 - TLS（`tcp://...:2376` の mTLS 認証モード）は非対応です
 - コアライブラリのビルドオプション `__QS_DEBUG__`（`core/header/qs_core.h`）が有効なため、
   大きな JSON を解析する際に `resize token buffer, ...` のデバッグ行が stdout に出力されます
