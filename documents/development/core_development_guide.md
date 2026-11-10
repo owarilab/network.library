@@ -1080,14 +1080,14 @@ WebSocket 切断時に、サーバは以下を行います。
 
 #### 現在の制約
 
-[documents/15_websocket_client_roadmap.md](../15_websocket_client_roadmap.md) 未完了 Phase の一覧です。
+現時点（2026-11-10）で未実装の項目です。
 
-- **送信キューなし**（Phase 1 未着手）: 送信は `qs_send_all()` を直接呼び出すため、
+- **送信キューなし**: 送信は `qs_send_all()` を直接呼び出すため、
   大きなメッセージの送信は完了まで（busy-wait 形式で）呼び出し側をブロックする。
   大きなフレームを頻繁に送る利用場面では応答性に影響し得る
-- **callback の役割分離なし**（Phase 2 残）: `on_event` 1 つに全フレームが渡るため opcode で判別
-- **handshake の堅牢化未実施**（Phase 4 未着手）: handshake header の検証・timeout が最小限
-- **WSS 非対応**（Phase 6 未着手）: `ws://` のみ。TLS は transport 層分離後の後続項目
+- **callback の役割分離なし**: `on_event` 1 つに全フレームが渡るため opcode で判別
+- **handshake の堅牢化未実施**: handshake header の検証・timeout が最小限
+- **WSS 非対応**: `ws://` のみ。TLS は transport 層分離後の後続項目
 
 ### サーバ側: バイナリ・指定接続への送信
 
