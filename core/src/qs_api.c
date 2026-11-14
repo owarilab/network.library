@@ -1814,7 +1814,23 @@ int api_qs_send_ws_text_by_connection_offset(QS_SERVER_CONTEXT* context,uint32_t
 	buffer = QS_GET_POINTER(temporary_memory, message_buffer_munit);
 	sendlen = qs_make_websocket_msg(buffer, buffer_size, false, message, qs_strlen(message));
 	if (sendlen <= 0) return -1;
-	return qs_send_all(socket_params->acc, buffer, sendlen, 0) == -1 ? -1 : 0;
+	/* 送信失敗（qs_send_all の poll タイムアウト等）は接続をクローズする。
+	 * これにより読み取りを放棄した遅い対端は切断され、ストリームが凍結しない。
+	 * コア本来の切断手順（qs_recv_event / qs_server_update の recv エラー処理）に合わせる：
+	 *  1) qs_add_accept_pool: 接続の実 fd（child->id）を close して id=-1 にし、
+	 *     スロットを accept 待ちプールへ返却する（FIN 送信され対端にも切断が伝わる）。
+	 *  2) qs_close_socket_common(disconnect=0): close_callback（アプリの on_close）を
+	 *     発火し sockparam を解放する。
+	 * 注意: disconnect=1 は sockparam.acc（= 同一 fd）のみを close するため、
+	 * child->id が閉じ済み fd のまま残り、次回の qs_server_update で recv() が
+	 * EBADF（"recv: Bad file descriptor"）を踏んで誤って二重クローズ処理に入る。
+	 * disconnect=0 では fd が close されず ESTABLISHED のまま残るため不使用。 */
+	if (qs_send_all(socket_params->acc, buffer, sendlen, 0) == -1) {
+		qs_add_accept_pool(option, tinfo);
+		qs_close_socket_common(option, tinfo, 0);
+		return -1;
+	}
+	return 0;
 }
 int api_qs_send_ws_message_common(QS_SERVER_CONNECTION_INFO *tinfo,const char* message,int is_plane)
 {

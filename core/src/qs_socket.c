@@ -6,6 +6,9 @@
 
 #if !defined(__WINDOWS__)
 #include <sys/un.h>
+#include <sys/select.h>
+#include <poll.h>
+#include <errno.h>
 #endif
 
 #define MAX_SOCKET_OPTIONS 64
@@ -900,6 +903,45 @@ ssize_t qs_send_once(QS_SOCKET_ID soc, const char *buf, size_t size, int flag)
 	return -1;
 }
 
+/* qs_send_all: EAGAIN（送信ウィンドウ満杯）時に poll(POLLOUT) で書き込み可能を
+ * 有限時間待ちする。qs_sendto_all と異なり send() の失敗はすべて返却するが、
+ * 書き込み可能待ちと EINTR による中断のみ再試行する。
+ * QS_SEND_ALL_POLL_TIMEOUT_MS 内に書き込み可能にならなければ -1 を返す。
+ * 呼び出し側は -1 を受けて接続をクローズする運用（qs_api.c 等）。
+ * これにより読み取りを放棄した対端に対するビジーループ（send-EAGAIN の無限反復、
+ * サーバープロセス全体のハング）を防ぐ。 */
+#define QS_SEND_ALL_POLL_TIMEOUT_MS 3000
+static int qs_send_all_wait_writable(QS_SOCKET_ID soc)
+{
+#ifdef __WINDOWS__
+	struct pollfd pfd;
+	pfd.fd = soc;
+	pfd.events = POLLOUT;
+	pfd.revents = 0;
+	int ret = WSAPoll( &pfd, 1, QS_SEND_ALL_POLL_TIMEOUT_MS );
+	if( ret < 0 ){
+		return WSAGetLastError() == WSAEINTR ? 0 : -1;
+	}
+#else
+	struct pollfd pfd;
+	pfd.fd = soc;
+	pfd.events = POLLOUT;
+	pfd.revents = 0;
+	int ret = poll( &pfd, 1, QS_SEND_ALL_POLL_TIMEOUT_MS );
+	if( ret < 0 ){
+		return errno == EINTR ? 0 : -1;
+	}
+#endif
+	if( ret == 0 ){
+		return -1;
+	}
+	if( ( pfd.revents & POLLOUT ) == 0 ){
+		/* POLLERR / POLLHUP / POLLNVAL: 書き込み不可 */
+		return -1;
+	}
+	return 0;
+}
+
 ssize_t qs_send_all(QS_SOCKET_ID soc, char *buf, size_t size, int flag )
 {
 	int32_t len, lest;
@@ -922,20 +964,20 @@ ssize_t qs_send_all(QS_SOCKET_ID soc, char *buf, size_t size, int flag )
 		{
 #ifdef __WINDOWS__
 			int err = WSAGetLastError();
-			if (err != 0 && WSAGetLastError() != WSAEWOULDBLOCK /*&& WSAGetLastError() != WSA_INVALID_HANDLE*/) {
+			if (err != 0 && err != WSAEWOULDBLOCK /*&& err != WSA_INVALID_HANDLE*/) {
 				return (-1);
 			}
 #else
-			if (errno == 0) {
-				//qs_sleep(1);
-			}
-			//  && errno != EWOULDBLOCK
-			else if( errno != EAGAIN  ){
+			if (errno != 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
 				return (-1);
 			}
 #endif
-			else{
-				//qs_sleep(1);
+			/* 送り切り未了かつ一時的に書き込み不可：書き込み可能を有限待ち */
+			if (qs_send_all_wait_writable(soc) != 0) {
+#ifdef __QS_DEBUG__
+				printf( "qs_send_all: send timeout or socket error (peer not consuming?) %d/%zu\n", (int)(size - lest), size );
+#endif
+				return (-1);
 			}
 			len = 0;
 		}
