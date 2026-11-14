@@ -886,8 +886,11 @@ WebSocket 切断時に、サーバは以下を行います。
 ```
 
 **高レベル API のみ**: スキーマ定義済みの table では `record_insert` / `record_update` が
-型・`required`・`maxLength` を自動検証し、`default` 定義の欠落 field に値を補完して保存する
-（入力に明示された値は default で上書きしない）。スキーマ未定義の table は検証なしで保存。
+**先に** `default` 定義の欠落 field に値を補完し、**その後に**補完済みレコードへ型・`required`・`maxLength` を
+自動検証して保存する（入力に明示された値は default で上書きしない）。
+検証は補完後に行われるため、`default` を持つ field は `required: 1` でも入力省略で検証に落ちない。
+補完された field 名がスキーマ内に重複している場合は初回のみ適用される。
+スキーマ未定義の table は検証・補完なしで入力 JSON がそのまま保存される。
 
 ### レコード CRUD
 
@@ -907,9 +910,10 @@ WebSocket 切断時に、サーバは以下を行います。
 - 追加: `api_qs_db_index_add(context, table, field, value, record_id)`
 - 削除: `api_qs_db_index_remove(context, table, field, value, record_id)`
 - 再構築: `api_qs_db_index_rebuild(memory, context, table, indexed_fields_json)`
-  （`["field1","field2"]` 形式。失敗時は部分的な index が残り得るため、そのまます検索せず再構築する）
-- キー形式: `index:{table}:{field}:{value}`。キー全体 64 文字以下（`QS_DB_INDEX_KEY_MAX`）のみ受理。
-  空値・制御文字・`/`・`\` を含む値は index に載らない
+  （`["field1","field2"]` 形式。失敗時は部分的な index が残り得るため、そのまま検索せず再構築する）
+- キー形式: `index:{table}:{field}:{value}`。キー全体が **64 文字未満**（63 文字まで。
+  `QS_DB_MAX_KEY` = `QS_DB_INDEX_KEY_MAX` = 64）のみ受理。table / field / value / record_id も
+  個別に同じ制約（空でない・64 文字未満・制御文字・`/`・`\` 不可）に従う
 
 #### 自動 index 更新
 
@@ -919,9 +923,14 @@ WebSocket 切断時に、サーバは以下を行います。
   - insert → `index_add`
   - update → 旧レコードと比較し、変更分のみ `index_remove`（旧値）+ `index_add`（新値）
   - delete → 旧レコードの各フィールド `index_remove`
+- 同期対象は **default 補完後の保存 JSON**。`default` で補完された値も自動で index に載る
+- update/delete の差分計算は書き込み前に旧レコードを 1MiB バッファで取得して行う。
+  バッファ超過等で旧レコードが取得できない場合、update は旧値なしで同期するため旧値の
+  index エントリは除去されず、delete は同期自体を行わない（いずれもエラーにはならない。
+  誤った index エントリが残っても検索は実レコードで再照合されるため結果は誤らない）
 - 整数は正規 10 進文字列で index されるため、整数フィールドの検索も文字列フィルタ
   （`{"age":"30"}`）で INDEX/FULL どちらのモードでも一致する
-- **エラーセマンティクス**: レコード書き込み成功后に index 同期が失敗した場合は
+- **エラーセマンティクス**: レコード書き込み成功後に index 同期が失敗した場合は
   関数が **-1 を返す**（レコードは書き込まれたまま残る）。`api_qs_db_index_rebuild` で復旧する。
   古い index エントリが残っても検索結果は誤らない（`record_list` は候補を実レコードで再照合するため）。
   影響は容量・スキャン効率のみ
