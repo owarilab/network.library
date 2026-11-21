@@ -143,9 +143,27 @@ docker_cli [--host HOST] [--port PORT] [--unix-socket PATH] <command> [args]
   run IMAGE [CMD...]       コンテナ作成+起動（POST /containers/create → POST /containers/{id}/start）
   start <container>        コンテナ起動（POST /containers/{id}/start）
   stop <container>         コンテナ停止（POST /containers/{id}/stop）
+  restart <container>      コンテナ再起動（POST /containers/{id}/restart）
+  kill <container> [--signal NAME]  シグナル送信（既定: KILL、POST /containers/{id}/kill）
   rm <container> [--force] コンテナ削除（DELETE /containers/{id}）
   logs <container>         コンテナログ表示（GET /containers/{id}/logs?stdout=1&stderr=1）
+  top <container>          実行中プロセス一覧（GET /containers/{id}/top）
+  port <container>         ポートマッピング表示（GET /containers/{id}/json の NetworkSettings.Ports）
+  wait <container>         終了を待って終了コードを表示（POST /containers/{id}/wait）
+  stats <container>        リソース使用量の単発サンプル（GET /containers/{id}/stats?stream=false）
+  rmi <image> [--force]    イメージ削除（DELETE /images/{name}）
+  tag <SOURCE> <TARGET>    イメージにタグ付け（POST /images/{name}/tag）
+  history <image>          イメージ履歴（GET /images/{name}/history）
+  network ls               ネットワーク一覧（GET /networks）
+  volume ls                ボリューム一覧（GET /volumes）
+  prune <kind> [--filter key=value]
+                           images/containers/volumes を prune（POST .../prune）
 ```
+
+`prune` は破壊的操作です。`--filter` 付きで対象を絞ってください
+（例: `--filter label=team=a` でラベル付きのみに限定）。
+フィルタ値は `label=KEY=VALUE` の形でも使えます
+（Engine API の `filters` パラメータのリスト形式 `{"label":["KEY=VALUE"]}` に変換されます）。
 
 ## 動作例
 
@@ -183,6 +201,32 @@ removed: 2f9e4059
 
 $ ./qs_docker_cli logs no-such-container
 docker_cli: error: HTTP 404: No such container: no-such-container
+
+$ ./qs_docker_cli run alpine:3.21 sleep 300
+7a3f...
+$ ./qs_docker_cli top 7a3f...
+UID PID PPID C STIME TTY TIME CMD
+root 27561 27537 14 18:49 ? 00:00:00 sleep 300
+$ ./qs_docker_cli stats 7a3f...
+Memory:     812.00 KB / 49.01 GB
+CPU total:  0.020 s
+Net RX:     1.06 KB
+Net TX:     0.12 KB
+$ ./qs_docker_cli kill 7a3f...
+killed: 7a3f... (signal: KILL)
+$ ./qs_docker_cli wait 7a3f...
+exit code: 137
+$ ./qs_docker_cli rm 7a3f...
+removed: 7a3f...
+
+$ ./qs_docker_cli tag alpine:3.21 local/alpine-test:v1
+tagged: alpine:3.21 as local/alpine-test:v1
+$ ./qs_docker_cli history alpine:3.21
+IMAGE ID               SIZE CREATED BY
+6aeafe801b80        0.00 KB CMD ["/bin/sh"]
+<missing>           7.47 MB ADD alpine-minirootfs-3.21.6-x86_64.tar.gz / # buildkit
+$ ./qs_docker_cli rmi local/alpine-test:v1
+untagged: local/alpine-test:v1
 ```
 
 エラー（HTTP 400 以上）は Docker エラー JSON の `message` を表示し、非ゼロ終了します。
@@ -200,7 +244,15 @@ docker_cli: error: HTTP 404: No such container: no-such-container
 - 数値は JSON デコーダが int32 範囲なら int32、それ以外は uint64 として格納するため、
   getter も両方試す（`Size` / `MemTotal` など）
 - `logs` は Docker raw stream（8 バイトヘッダ + データのフレーム列）をデミュークスして表示する
-- パスに埋め込む ID・イメージ名は文字種を制限（英数字と `./:-_`）し、HTTP パスへの注入を防ぐ
+- `port` は Engine API に専用エンドポイントがないため `GET /containers/{id}/json`（inspect）を
+  使い `NetworkSettings.Ports` を整形する（system の `docker port` と同じ方式）
+- `stats` / `port` の動的キー（インターフェース名・ポート名）は
+  `api_qs_object_get_keys` で列挙して取得する
+- `prune --filter` は Engine API の `filters` パラメータ（URL エンコード済み JSON）を構築する。
+  形式は `{"key":["value"]}` のリスト形式（2 段形式 `{"label":{"k":["v"]}}` は 400 になる）。
+  レスポンスの再割当バイト数フィールドは `SpaceReclaimed`
+- パスに埋め込む ID・イメージ名は文字種を制限（英数字と `./:-_`）し、HTTP パスへの注入を防ぐ。
+  `prune --filter` の値も JSON を壊す文字（`" \ { } [ ]`）を含む場合は拒否する
 
 ## 注意事項
 
@@ -210,6 +262,16 @@ docker_cli: error: HTTP 404: No such container: no-such-container
   `qs_ssl_module_http_client_connect_unix`（ssl モジュール）を使用します
   （Windows では未サポートのため、`--unix-socket` 指定時はエラー終了します）
 - TLS（`tcp://...:2376` の mTLS 認証モード）は非対応です
+- `wait` はコンテナ終了までブロックし、**タイムアウトを持ちません**。
+  必要に応じてシェル側で `timeout 60 ./qs_docker_cli wait <id>` のようにしてください
+- WSL2 環境の既知の挙動: コンテナの PID 1 に `SIGTERM` が届かず
+  `kill --signal TERM` が無効になることがあります（`SIGKILL`（既定）は正常）。
+  system の `docker` CLI でも同じ挙動を確認しています
+- dockerd 29.1.3 では `volume prune` の label filter が一致しない場合があるため、
+  `prune volumes` のフィルタ付き実行は対象が絞れない点に注意してください
+  （`prune containers` の label filter は正常に動作します）
+- `exec` / `build` / `cp` / `attach` / `events` / `logs --follow` のような
+  ストリーミング・対話系エンドポイントは未対応です
 - コアライブラリのビルドオプション `__QS_DEBUG__`（`core/header/qs_core.h`）が有効なため、
   大きな JSON を解析する際に `resize token buffer, ...` のデバッグ行が stdout に出力されます
   （core 側の既存挙動。無効にする場合は該当定義を外して core を再ビルドしてください）

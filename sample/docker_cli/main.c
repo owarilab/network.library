@@ -57,8 +57,20 @@ static void print_usage(void)
     printf("  run IMAGE [CMD...]       Create and start a container\n");
     printf("  start <container>        Start a container\n");
     printf("  stop <container>         Stop a container\n");
+    printf("  restart <container>      Restart a container\n");
+    printf("  kill <container> [--signal NAME]  Send a signal (default: KILL)\n");
     printf("  rm <container> [--force] Remove a container\n");
     printf("  logs <container>         Show container logs\n");
+    printf("  top <container>          List processes in a container\n");
+    printf("  port <container>         List port mappings of a container\n");
+    printf("  wait <container>         Block until it stops, then print the exit code\n");
+    printf("  stats <container>        Show a one-shot resource usage sample\n");
+    printf("  rmi <image> [--force]    Remove an image\n");
+    printf("  tag <SOURCE> <TARGET>    Tag an image\n");
+    printf("  history <image>          Show the image history\n");
+    printf("  network ls               List networks (GET /networks)\n");
+    printf("  volume ls                List volumes (GET /volumes)\n");
+    printf("  prune <kind> [--filter key=value]  Prune images/containers/volumes\n");
 }
 
 /* HTTP パスに埋め込むトークン（コンテナ ID・名前・イメージ名）の文字種チェック */
@@ -267,6 +279,24 @@ static int docker_decode_array(DOCKER_CLI_CONTEXT* cli, const char* body, QS_JSO
     }
     free(wrapped);
     return ret;
+}
+
+/* 数値フィールドを uint64 として取得する。
+ * int32 範囲の値は ID_NUM（int32）として、それ以外は ID_NUM_U64 として格納されるため、
+ * 両方の取得関数にフォールバックする。取得できなければ -1 を返す */
+static int get_size_u64(QS_JSON_ELEMENT_OBJECT* object, const char* name, uint64_t* out)
+{
+    uint64_t* v = api_qs_object_get_unsigned_big_integer(object, name);
+    if(v != NULL){
+        *out = *v;
+        return 0;
+    }
+    int32_t* v32 = api_qs_object_get_integer(object, name);
+    if(v32 != NULL){
+        *out = (uint64_t)*v32;
+        return 0;
+    }
+    return -1;
 }
 
 static void print_human_size(uint64_t bytes, char* buf, size_t buf_size)
@@ -646,6 +676,59 @@ static int cmd_container_action(DOCKER_CLI_CONTEXT* cli, const char* action, con
 }
 
 /* ------------------------------------------------------------------ */
+/* kill: POST /containers/{id}/kill?signal=NAME                       */
+/* ------------------------------------------------------------------ */
+static int is_safe_signal_token(const char* signal)
+{
+    if(signal == NULL || *signal == 0){
+        return 0;
+    }
+    size_t len = strlen(signal);
+    if(len > 16){
+        return 0;
+    }
+    for(size_t i = 0; i < len; i++){
+        char c = signal[i];
+        if(!((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'))){
+            return 0;
+        }
+    }
+    return 1;
+}
+
+static int cmd_kill(DOCKER_CLI_CONTEXT* cli, const char* id, const char* signal)
+{
+    if(id == NULL || !is_safe_path_token(id)){
+        fprintf(stderr, "docker_cli: kill requires a valid container id/name\n");
+        return 1;
+    }
+    if(!is_safe_signal_token(signal)){
+        fprintf(stderr, "docker_cli: invalid signal: %s\n", signal);
+        return 1;
+    }
+
+    char path[DOCKER_CLI_ID_SIZE + 96];
+    snprintf(path, sizeof(path), "/containers/%s/kill?signal=%s", id, signal);
+
+    char* body = NULL;
+    size_t body_length = 0;
+    int status = 0;
+    if(0 != docker_request(cli, "POST", path, NULL, &body, &body_length, &status)){
+        return 1;
+    }
+    int ret = 0;
+    if(status == 204 || status == 304){
+        printf("killed: %s (signal: %s)\n", id, signal);
+    }
+    else{
+        docker_check_error(cli, status, body, body_length);
+        ret = 1;
+    }
+    free(body);
+    return ret;
+}
+
+/* ------------------------------------------------------------------ */
 /* rm: DELETE /containers/{id}                                       */
 /* ------------------------------------------------------------------ */
 static int cmd_rm(DOCKER_CLI_CONTEXT* cli, const char* id, int force)
@@ -671,6 +754,199 @@ static int cmd_rm(DOCKER_CLI_CONTEXT* cli, const char* id, int force)
     else{
         docker_check_error(cli, status, body, body_length);
         ret = 1;
+    }
+    free(body);
+    return ret;
+}
+
+/* ------------------------------------------------------------------ */
+/* rmi: DELETE /images/{name}                                         */
+/* ------------------------------------------------------------------ */
+static int cmd_rmi(DOCKER_CLI_CONTEXT* cli, const char* name, int force)
+{
+    if(name == NULL || !is_safe_path_token(name)){
+        fprintf(stderr, "docker_cli: rmi requires a valid image name\n");
+        return 1;
+    }
+
+    char path[DOCKER_CLI_HOST_SIZE + 32];
+    snprintf(path, sizeof(path), "/images/%s%s", name, force ? "?force=1" : "");
+
+    char* body = NULL;
+    size_t body_length = 0;
+    int status = 0;
+    if(0 != docker_request(cli, "DELETE", path, NULL, &body, &body_length, &status)){
+        return 1;
+    }
+    int ret = 0;
+    if(200 == status){
+        QS_JSON_ELEMENT_ARRAY array;
+        if(0 != docker_decode_array(cli, body, &array)){
+            fprintf(stderr, "docker_cli: failed to parse image delete response\n");
+            ret = 1;
+        }
+        else{
+            int32_t length = api_qs_array_get_length(&array);
+            for(int32_t i = 0; i < length; i++){
+                QS_JSON_ELEMENT_OBJECT entry;
+                if(0 != api_qs_array_get_object(&array, i, &entry)){
+                    continue;
+                }
+                char* untagged = api_qs_object_get_string(&entry, "Untagged");
+                if(untagged != NULL){
+                    printf("untagged: %s\n", untagged);
+                }
+                char* deleted = api_qs_object_get_string(&entry, "Deleted");
+                if(deleted != NULL){
+                    printf("deleted: %s\n", deleted);
+                }
+            }
+        }
+    }
+    else{
+        docker_check_error(cli, status, body, body_length);
+        ret = 1;
+    }
+    free(body);
+    return ret;
+}
+
+/* ------------------------------------------------------------------ */
+/* tag: POST /images/{name}/tag?repo=REPO&tag=TAG                     */
+/* ------------------------------------------------------------------ */
+static int cmd_tag(DOCKER_CLI_CONTEXT* cli, const char* source, const char* target)
+{
+    if(source == NULL || !is_safe_path_token(source)){
+        fprintf(stderr, "docker_cli: tag requires a valid source image\n");
+        return 1;
+    }
+    if(target == NULL || !is_safe_path_token(target)){
+        fprintf(stderr, "docker_cli: tag requires a valid target image (repo or repo:tag)\n");
+        return 1;
+    }
+
+    /* ターゲットを最後の '/' より後の ':' を境界に repo / tag に分割 */
+    char repo[DOCKER_CLI_HOST_SIZE];
+    char tag_name[128];
+    const char* colon = NULL;
+    const char* last_slash = strrchr(target, '/');
+    for(const char* p = target; *p != 0; p++){
+        if(*p == ':' && (last_slash == NULL || p > last_slash)){
+            colon = p;
+        }
+    }
+    if(colon != NULL){
+        size_t repo_len = (size_t)(colon - target);
+        if(repo_len >= sizeof(repo)){
+            fprintf(stderr, "docker_cli: target repo is too long\n");
+            return 1;
+        }
+        memcpy(repo, target, repo_len);
+        repo[repo_len] = 0;
+        snprintf(tag_name, sizeof(tag_name), "%s", colon + 1);
+    }
+    else{
+        snprintf(repo, sizeof(repo), "%s", target);
+        tag_name[0] = 0;
+    }
+
+    char path[DOCKER_CLI_HOST_SIZE * 2 + 128];
+    if(tag_name[0] != 0){
+        snprintf(path, sizeof(path), "/images/%s/tag?repo=%s&tag=%s", source, repo, tag_name);
+    }
+    else{
+        snprintf(path, sizeof(path), "/images/%s/tag?repo=%s", source, repo);
+    }
+
+    char* body = NULL;
+    size_t body_length = 0;
+    int status = 0;
+    if(0 != docker_request(cli, "POST", path, NULL, &body, &body_length, &status)){
+        return 1;
+    }
+    int ret = 0;
+    if(status == 201 || status == 204){
+        printf("tagged: %s as %s\n", source, target);
+    }
+    else{
+        docker_check_error(cli, status, body, body_length);
+        ret = 1;
+    }
+    free(body);
+    return ret;
+}
+
+/* ------------------------------------------------------------------ */
+/* history: GET /images/{name}/history                                */
+/* ------------------------------------------------------------------ */
+static int cmd_history(DOCKER_CLI_CONTEXT* cli, const char* name)
+{
+    if(name == NULL || !is_safe_path_token(name)){
+        fprintf(stderr, "docker_cli: history requires a valid image name\n");
+        return 1;
+    }
+
+    char path[DOCKER_CLI_HOST_SIZE + 32];
+    snprintf(path, sizeof(path), "/images/%s/history", name);
+
+    char* body = NULL;
+    size_t body_length = 0;
+    int status = 0;
+    if(0 != docker_request(cli, "GET", path, NULL, &body, &body_length, &status)){
+        return 1;
+    }
+    int ret = 0;
+    if(200 != status){
+        docker_check_error(cli, status, body, body_length);
+        ret = 1;
+    }
+    else{
+        QS_JSON_ELEMENT_ARRAY array;
+        if(0 != docker_decode_array(cli, body, &array)){
+            fprintf(stderr, "docker_cli: failed to parse image history response\n");
+            ret = 1;
+        }
+        else{
+            printf("%-14s %12s %s\n", "IMAGE ID", "SIZE", "CREATED BY");
+            int32_t length = api_qs_array_get_length(&array);
+            for(int32_t i = 0; i < length; i++){
+                QS_JSON_ELEMENT_OBJECT layer;
+                if(0 != api_qs_array_get_object(&array, i, &layer)){
+                    continue;
+                }
+                char* id = api_qs_object_get_string(&layer, "Id");
+                char id_buf[128] = "";
+                if(id != NULL){
+                    const char* sha = strstr(id, ":");
+                    snprintf(id_buf, sizeof(id_buf), "%s", sha != NULL ? sha + 1 : id);
+                    if(strlen(id_buf) > 12){
+                        id_buf[12] = 0;
+                    }
+                }
+                char size_buf[32] = "";
+                uint64_t* size64 = api_qs_object_get_unsigned_big_integer(&layer, "Size");
+                if(size64 != NULL){
+                    print_human_size(*size64, size_buf, sizeof(size_buf));
+                }
+                else{
+                    int32_t* size32 = api_qs_object_get_integer(&layer, "Size");
+                    if(size32 != NULL){
+                        if(*size32 >= 0){
+                            print_human_size((uint64_t)*size32, size_buf, sizeof(size_buf));
+                        }
+                        else{
+                            snprintf(size_buf, sizeof(size_buf), "%d", *size32);
+                        }
+                    }
+                }
+                char* created_by = api_qs_object_get_string(&layer, "CreatedBy");
+                char created_buf[128] = "";
+                if(created_by != NULL){
+                    snprintf(created_buf, sizeof(created_buf), "%.118s", created_by);
+                }
+                printf("%-14s %12s %s\n", id_buf, size_buf, created_buf);
+            }
+        }
     }
     free(body);
     return ret;
@@ -742,6 +1018,520 @@ static int cmd_logs(DOCKER_CLI_CONTEXT* cli, const char* id)
     }
     else{
         print_demuxed(body, body_length);
+    }
+    free(body);
+    return ret;
+}
+
+/* ------------------------------------------------------------------ */
+/* top: GET /containers/{id}/top                                      */
+/* ------------------------------------------------------------------ */
+static void print_string_array_line(QS_JSON_ELEMENT_ARRAY* array)
+{
+    int32_t length = api_qs_array_get_length(array);
+    for(int32_t i = 0; i < length; i++){
+        char* s = api_qs_array_get_string(array, i);
+        if(i > 0){
+            putchar(' ');
+        }
+        if(s != NULL){
+            fputs(s, stdout);
+        }
+    }
+    putchar('\n');
+}
+
+static int cmd_top(DOCKER_CLI_CONTEXT* cli, const char* id)
+{
+    if(id == NULL || !is_safe_path_token(id)){
+        fprintf(stderr, "docker_cli: top requires a valid container id/name\n");
+        return 1;
+    }
+
+    char path[DOCKER_CLI_ID_SIZE + 64];
+    snprintf(path, sizeof(path), "/containers/%s/top", id);
+
+    char* body = NULL;
+    size_t body_length = 0;
+    int status = 0;
+    if(0 != docker_request(cli, "GET", path, NULL, &body, &body_length, &status)){
+        return 1;
+    }
+    int ret = 0;
+    if(200 != status){
+        docker_check_error(cli, status, body, body_length);
+        ret = 1;
+    }
+    else{
+        json_reset(cli);
+        QS_JSON_ELEMENT_OBJECT object;
+        if(0 != api_qs_json_decode_object(&cli->json_memory, &object, body)){
+            fprintf(stderr, "docker_cli: failed to parse /top response\n");
+            ret = 1;
+        }
+        else{
+            QS_JSON_ELEMENT_ARRAY titles;
+            QS_JSON_ELEMENT_ARRAY processes;
+            if(0 == api_qs_object_get_array(&object, "Titles", &titles)){
+                print_string_array_line(&titles);
+            }
+            if(0 == api_qs_object_get_array(&object, "Processes", &processes)){
+                int32_t length = api_qs_array_get_length(&processes);
+                for(int32_t i = 0; i < length; i++){
+                    QS_JSON_ELEMENT_ARRAY process;
+                    if(0 != api_qs_array_get_array(&processes, i, &process)){
+                        continue;
+                    }
+                    print_string_array_line(&process);
+                }
+            }
+        }
+    }
+    free(body);
+    return ret;
+}
+
+/* ------------------------------------------------------------------ */
+/* port: GET /containers/{id}/json -> NetworkSettings.Ports            */
+/* （Engine API に専用の ports エンドポイントはないため inspect を使う） */
+/* ------------------------------------------------------------------ */
+static int cmd_port(DOCKER_CLI_CONTEXT* cli, const char* id)
+{
+    if(id == NULL || !is_safe_path_token(id)){
+        fprintf(stderr, "docker_cli: port requires a valid container id/name\n");
+        return 1;
+    }
+
+    char path[DOCKER_CLI_ID_SIZE + 64];
+    snprintf(path, sizeof(path), "/containers/%s/json", id);
+
+    char* body = NULL;
+    size_t body_length = 0;
+    int status = 0;
+    if(0 != docker_request(cli, "GET", path, NULL, &body, &body_length, &status)){
+        return 1;
+    }
+    int ret = 0;
+    if(200 != status){
+        docker_check_error(cli, status, body, body_length);
+        ret = 1;
+    }
+    else{
+        json_reset(cli);
+        QS_JSON_ELEMENT_OBJECT object;
+        if(0 != api_qs_json_decode_object(&cli->json_memory, &object, body)){
+            fprintf(stderr, "docker_cli: failed to parse container inspect response\n");
+            ret = 1;
+        }
+        else{
+            int count = 0;
+            QS_JSON_ELEMENT_OBJECT network_settings;
+            QS_JSON_ELEMENT_OBJECT ports;
+            if(0 == api_qs_object_get_object(&object, "NetworkSettings", &network_settings) &&
+               0 == api_qs_object_get_object(&network_settings, "Ports", &ports)){
+                QS_JSON_ELEMENT_ARRAY keys;
+                if(0 == api_qs_object_get_keys(&ports, &keys)){
+                    int32_t key_count = api_qs_array_get_length(&keys);
+                    for(int32_t i = 0; i < key_count; i++){
+                        char* key = api_qs_array_get_string(&keys, i);
+                        QS_JSON_ELEMENT_ARRAY bindings;
+                        if(key == NULL || 0 != api_qs_object_get_array(&ports, key, &bindings)){
+                            continue;
+                        }
+                        int32_t bind_count = api_qs_array_get_length(&bindings);
+                        for(int32_t j = 0; j < bind_count; j++){
+                            QS_JSON_ELEMENT_OBJECT binding;
+                            if(0 != api_qs_array_get_object(&bindings, j, &binding)){
+                                continue;
+                            }
+                            char* host_ip = api_qs_object_get_string(&binding, "HostIp");
+                            char* host_port = api_qs_object_get_string(&binding, "HostPort");
+                            printf("%s -> %s:%s\n", key,
+                                   host_ip != NULL ? host_ip : "?",
+                                   host_port != NULL ? host_port : "?");
+                            count++;
+                        }
+                    }
+                }
+            }
+            if(count == 0){
+                printf("(none)\n");
+            }
+        }
+    }
+    free(body);
+    return ret;
+}
+
+/* ------------------------------------------------------------------ */
+/* wait: POST /containers/{id}/wait                                   */
+/* ------------------------------------------------------------------ */
+static int cmd_wait(DOCKER_CLI_CONTEXT* cli, const char* id)
+{
+    if(id == NULL || !is_safe_path_token(id)){
+        fprintf(stderr, "docker_cli: wait requires a valid container id/name\n");
+        return 1;
+    }
+
+    char path[DOCKER_CLI_ID_SIZE + 64];
+    snprintf(path, sizeof(path), "/containers/%s/wait", id);
+
+    char* body = NULL;
+    size_t body_length = 0;
+    int status = 0;
+    if(0 != docker_request(cli, "POST", path, NULL, &body, &body_length, &status)){
+        return 1;
+    }
+    int ret = 0;
+    if(200 != status){
+        docker_check_error(cli, status, body, body_length);
+        ret = 1;
+    }
+    else{
+        json_reset(cli);
+        QS_JSON_ELEMENT_OBJECT object;
+        int32_t* code = NULL;
+        if(0 == api_qs_json_decode_object(&cli->json_memory, &object, body)){
+            code = api_qs_object_get_integer(&object, "StatusCode");
+        }
+        if(code != NULL){
+            printf("exit code: %d\n", *code);
+        }
+        else{
+            fprintf(stderr, "docker_cli: failed to parse /wait response\n");
+            ret = 1;
+        }
+    }
+    free(body);
+    return ret;
+}
+
+/* ------------------------------------------------------------------ */
+/* stats: GET /containers/{id}/stats?stream=false                     */
+/* ------------------------------------------------------------------ */
+static int cmd_stats(DOCKER_CLI_CONTEXT* cli, const char* id)
+{
+    if(id == NULL || !is_safe_path_token(id)){
+        fprintf(stderr, "docker_cli: stats requires a valid container id/name\n");
+        return 1;
+    }
+
+    char path[DOCKER_CLI_ID_SIZE + 64];
+    snprintf(path, sizeof(path), "/containers/%s/stats?stream=false", id);
+
+    char* body = NULL;
+    size_t body_length = 0;
+    int status = 0;
+    if(0 != docker_request(cli, "GET", path, NULL, &body, &body_length, &status)){
+        return 1;
+    }
+    int ret = 0;
+    if(200 != status){
+        docker_check_error(cli, status, body, body_length);
+        ret = 1;
+    }
+    else{
+        json_reset(cli);
+        QS_JSON_ELEMENT_OBJECT object;
+        if(0 != api_qs_json_decode_object(&cli->json_memory, &object, body)){
+            fprintf(stderr, "docker_cli: failed to parse /stats response\n");
+            ret = 1;
+        }
+        else{
+            int printed = 0;
+
+            QS_JSON_ELEMENT_OBJECT memory_stats;
+            if(0 == api_qs_object_get_object(&object, "memory_stats", &memory_stats)){
+                uint64_t usage = 0;
+                uint64_t limit = 0;
+                char usage_buf[32] = "";
+                char limit_buf[32] = "";
+                if(0 == get_size_u64(&memory_stats, "usage", &usage)){
+                    print_human_size(usage, usage_buf, sizeof(usage_buf));
+                }
+                if(0 == get_size_u64(&memory_stats, "limit", &limit) && limit > 0){
+                    print_human_size(limit, limit_buf, sizeof(limit_buf));
+                }
+                printf("Memory:     %s / %s\n", usage_buf, limit_buf);
+                printed = 1;
+            }
+
+            QS_JSON_ELEMENT_OBJECT cpu_stats;
+            if(0 == api_qs_object_get_object(&object, "cpu_stats", &cpu_stats)){
+                QS_JSON_ELEMENT_OBJECT cpu_usage;
+                if(0 == api_qs_object_get_object(&cpu_stats, "cpu_usage", &cpu_usage)){
+                    uint64_t total = 0;
+                    if(0 == get_size_u64(&cpu_usage, "total_usage", &total)){
+                        printf("CPU total:  %.3f s\n", (double)total / 1e9);
+                        printed = 1;
+                    }
+                }
+            }
+
+            QS_JSON_ELEMENT_OBJECT networks;
+            if(0 == api_qs_object_get_object(&object, "networks", &networks)){
+                QS_JSON_ELEMENT_ARRAY keys;
+                if(0 == api_qs_object_get_keys(&networks, &keys)){
+                    uint64_t rx = 0;
+                    uint64_t tx = 0;
+                    int have_rx = 0;
+                    int have_tx = 0;
+                    int32_t key_count = api_qs_array_get_length(&keys);
+                    for(int32_t i = 0; i < key_count; i++){
+                        char* key = api_qs_array_get_string(&keys, i);
+                        QS_JSON_ELEMENT_OBJECT net;
+                        if(key == NULL || 0 != api_qs_object_get_object(&networks, key, &net)){
+                            continue;
+                        }
+                        uint64_t net_v = 0;
+                        if(0 == get_size_u64(&net, "rx_bytes", &net_v)){
+                            rx += net_v;
+                            have_rx = 1;
+                        }
+                        if(0 == get_size_u64(&net, "tx_bytes", &net_v)){
+                            tx += net_v;
+                            have_tx = 1;
+                        }
+                    }
+                    char rx_buf[32] = "";
+                    char tx_buf[32] = "";
+                    if(have_rx){
+                        print_human_size(rx, rx_buf, sizeof(rx_buf));
+                        printf("Net RX:     %s\n", rx_buf);
+                        printed = 1;
+                    }
+                    if(have_tx){
+                        print_human_size(tx, tx_buf, sizeof(tx_buf));
+                        printf("Net TX:     %s\n", tx_buf);
+                        printed = 1;
+                    }
+                }
+            }
+
+            if(!printed){
+                fprintf(stderr, "docker_cli: failed to parse /stats response\n");
+                ret = 1;
+            }
+        }
+    }
+    free(body);
+    return ret;
+}
+
+/* ------------------------------------------------------------------ */
+/* network ls: GET /networks                                          */
+/* ------------------------------------------------------------------ */
+static int cmd_network_ls(DOCKER_CLI_CONTEXT* cli)
+{
+    char* body = NULL;
+    size_t body_length = 0;
+    int status = 0;
+
+    if(0 != docker_request(cli, "GET", "/networks", NULL, &body, &body_length, &status)){
+        return 1;
+    }
+    int ret = 0;
+    if(200 != status){
+        docker_check_error(cli, status, body, body_length);
+        ret = 1;
+    }
+    else{
+        QS_JSON_ELEMENT_ARRAY array;
+        if(0 != docker_decode_array(cli, body, &array)){
+            fprintf(stderr, "docker_cli: failed to parse /networks response\n");
+            ret = 1;
+        }
+        else{
+            printf("%-24s %-10s %-10s %s\n", "NAME", "DRIVER", "SCOPE", "NETWORK ID");
+            int count = 0;
+            int32_t length = api_qs_array_get_length(&array);
+            for(int32_t i = 0; i < length; i++){
+                QS_JSON_ELEMENT_OBJECT network;
+                if(0 != api_qs_array_get_object(&array, i, &network)){
+                    continue;
+                }
+                char* name = api_qs_object_get_string(&network, "Name");
+                char* driver = api_qs_object_get_string(&network, "Driver");
+                char* scope = api_qs_object_get_string(&network, "Scope");
+                char* id = api_qs_object_get_string(&network, "Id");
+                char id_buf[128] = "";
+                if(id != NULL && strlen(id) > 12){
+                    snprintf(id_buf, sizeof(id_buf), "%.12s", id);
+                }
+                printf("%-24s %-10s %-10s %s\n",
+                       name != NULL ? name : "",
+                       driver != NULL ? driver : "",
+                       scope != NULL ? scope : "",
+                       id_buf);
+                count++;
+            }
+            if(count == 0){
+                printf("(none)\n");
+            }
+        }
+    }
+    free(body);
+    return ret;
+}
+
+/* ------------------------------------------------------------------ */
+/* volume ls: GET /volumes                                            */
+/* ------------------------------------------------------------------ */
+static int cmd_volume_ls(DOCKER_CLI_CONTEXT* cli)
+{
+    char* body = NULL;
+    size_t body_length = 0;
+    int status = 0;
+
+    if(0 != docker_request(cli, "GET", "/volumes", NULL, &body, &body_length, &status)){
+        return 1;
+    }
+    int ret = 0;
+    if(200 != status){
+        docker_check_error(cli, status, body, body_length);
+        ret = 1;
+    }
+    else{
+        json_reset(cli);
+        QS_JSON_ELEMENT_OBJECT object;
+        if(0 != api_qs_json_decode_object(&cli->json_memory, &object, body)){
+            fprintf(stderr, "docker_cli: failed to parse /volumes response\n");
+            ret = 1;
+        }
+        else{
+            QS_JSON_ELEMENT_ARRAY volumes;
+            printf("%-32s %s\n", "NAME", "DRIVER");
+            int count = 0;
+            if(0 == api_qs_object_get_array(&object, "Volumes", &volumes)){
+                int32_t length = api_qs_array_get_length(&volumes);
+                for(int32_t i = 0; i < length; i++){
+                    QS_JSON_ELEMENT_OBJECT volume;
+                    if(0 != api_qs_array_get_object(&volumes, i, &volume)){
+                        continue;
+                    }
+                    char* name = api_qs_object_get_string(&volume, "Name");
+                    char* driver = api_qs_object_get_string(&volume, "Driver");
+                    printf("%-32s %s\n",
+                           name != NULL ? name : "",
+                           driver != NULL ? driver : "local");
+                    count++;
+                }
+            }
+            if(count == 0){
+                printf("(none)\n");
+            }
+        }
+    }
+    free(body);
+    return ret;
+}
+
+/* ------------------------------------------------------------------ */
+/* prune: POST /images|containers|volumes/prune [--filter key=value]  */
+/* ------------------------------------------------------------------ */
+static const char* url_encode_str(const char* src, char* dst, size_t dst_size)
+{
+    size_t o = 0;
+    for(const unsigned char* p = (const unsigned char*)src; *p != 0 && o + 3 < dst_size; p++){
+        char c = (char)*p;
+        if((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
+           c == '-' || c == '_' || c == '.' || c == '~'){
+            dst[o++] = c;
+        }
+        else{
+            o += (size_t)snprintf(dst + o, dst_size - o, "%%%02X", (unsigned int)*p);
+        }
+    }
+    dst[o] = 0;
+    return dst;
+}
+
+static int cmd_prune(DOCKER_CLI_CONTEXT* cli, const char* kind, const char* filter)
+{
+    const char* prune_path;
+    const char* deleted_key;
+    if(kind != NULL && 0 == strcmp(kind, "images")){
+        prune_path = "/images/prune";
+        deleted_key = "ImagesDeleted";
+    }
+    else if(kind != NULL && 0 == strcmp(kind, "containers")){
+        prune_path = "/containers/prune";
+        deleted_key = "ContainersDeleted";
+    }
+    else if(kind != NULL && 0 == strcmp(kind, "volumes")){
+        prune_path = "/volumes/prune";
+        deleted_key = "VolumesDeleted";
+    }
+    else{
+        fprintf(stderr, "docker_cli: prune kind must be one of: images, containers, volumes\n");
+        return 1;
+    }
+
+    char path[2048];
+    if(filter == NULL){
+        snprintf(path, sizeof(path), "%s", prune_path);
+    }
+    else{
+        /* フィルタ値が JSON を壊す文字を含んでいれば拒否 */
+        if(strpbrk(filter, "\"\\{}[]") != NULL){
+            fprintf(stderr, "docker_cli: invalid --filter value\n");
+            return 1;
+        }
+        if(strlen(filter) > 200){
+            fprintf(stderr, "docker_cli: --filter value is too long\n");
+            return 1;
+        }
+        /* Engine API の filters パラメータ: {"key":["value"]} のリスト形式。
+         * label は label=KEY=VALUE として値全体を渡す（2 段形式は 400 になる）。
+         * 例: --filter label=qs_test=1 -> {"label":["qs_test=1"]} */
+        char filter_json[512];
+        const char* eq = strchr(filter, '=');
+        if(eq == NULL || eq == filter){
+            fprintf(stderr, "docker_cli: --filter expects key=value\n");
+            return 1;
+        }
+        snprintf(filter_json, sizeof(filter_json),
+                 "{\"%.*s\":[\"%s\"]}", (int)(eq - filter), filter, eq + 1);
+        char encoded[1024];
+        url_encode_str(filter_json, encoded, sizeof(encoded));
+        snprintf(path, sizeof(path), "%s?filters=%s", prune_path, encoded);
+    }
+
+    char* body = NULL;
+    size_t body_length = 0;
+    int status = 0;
+    if(0 != docker_request(cli, "POST", path, NULL, &body, &body_length, &status)){
+        return 1;
+    }
+    int ret = 0;
+    if(200 != status){
+        docker_check_error(cli, status, body, body_length);
+        ret = 1;
+    }
+    else{
+        json_reset(cli);
+        QS_JSON_ELEMENT_OBJECT object;
+        if(0 != api_qs_json_decode_object(&cli->json_memory, &object, body)){
+            fprintf(stderr, "docker_cli: failed to parse /prune response\n");
+            ret = 1;
+        }
+        else{
+            QS_JSON_ELEMENT_ARRAY deleted;
+            int count = 0;
+            if(0 == api_qs_object_get_array(&object, deleted_key, &deleted)){
+                count = api_qs_array_get_length(&deleted);
+            }
+            uint64_t reclaimed = 0;
+            if(0 == get_size_u64(&object, "SpaceReclaimed", &reclaimed)){
+                char size_buf[32];
+                print_human_size(reclaimed, size_buf, sizeof(size_buf));
+                printf("Deleted: %d item(s)\n", count);
+                printf("Reclaimed: %s\n", size_buf);
+            }
+            else{
+                printf("Deleted: %d item(s)\n", count);
+            }
+        }
     }
     free(body);
     return ret;
@@ -827,6 +1617,25 @@ int main(int argc, char** argv)
     else if(0 == strcmp(command, "images")){
         ret = cmd_images(&cli);
     }
+    else if(0 == strcmp(command, "rmi")){
+        const char* name = NULL;
+        int force = 0;
+        for(; i < argc; i++){
+            if(0 == strcmp(argv[i], "--force")){
+                force = 1;
+            }
+            else if(name == NULL){
+                name = argv[i];
+            }
+        }
+        ret = cmd_rmi(&cli, name, force);
+    }
+    else if(0 == strcmp(command, "tag")){
+        ret = cmd_tag(&cli, i < argc ? argv[i] : NULL, i + 1 < argc ? argv[i + 1] : NULL);
+    }
+    else if(0 == strcmp(command, "history")){
+        ret = cmd_history(&cli, i < argc ? argv[i] : NULL);
+    }
     else if(0 == strcmp(command, "run")){
         ret = cmd_run(&cli, argc - i, &argv[i]);
     }
@@ -835,6 +1644,22 @@ int main(int argc, char** argv)
     }
     else if(0 == strcmp(command, "stop")){
         ret = cmd_container_action(&cli, "stop", i < argc ? argv[i] : NULL);
+    }
+    else if(0 == strcmp(command, "restart")){
+        ret = cmd_container_action(&cli, "restart", i < argc ? argv[i] : NULL);
+    }
+    else if(0 == strcmp(command, "kill")){
+        const char* id = NULL;
+        const char* signal_name = "KILL";
+        for(; i < argc; i++){
+            if(0 == strcmp(argv[i], "--signal") && i + 1 < argc){
+                signal_name = argv[++i];
+            }
+            else if(id == NULL){
+                id = argv[i];
+            }
+        }
+        ret = cmd_kill(&cli, id, signal_name);
     }
     else if(0 == strcmp(command, "rm")){
         int force = 0;
@@ -851,6 +1676,51 @@ int main(int argc, char** argv)
     }
     else if(0 == strcmp(command, "logs")){
         ret = cmd_logs(&cli, i < argc ? argv[i] : NULL);
+    }
+    else if(0 == strcmp(command, "top")){
+        ret = cmd_top(&cli, i < argc ? argv[i] : NULL);
+    }
+    else if(0 == strcmp(command, "port")){
+        ret = cmd_port(&cli, i < argc ? argv[i] : NULL);
+    }
+    else if(0 == strcmp(command, "wait")){
+        ret = cmd_wait(&cli, i < argc ? argv[i] : NULL);
+    }
+    else if(0 == strcmp(command, "stats")){
+        ret = cmd_stats(&cli, i < argc ? argv[i] : NULL);
+    }
+    else if(0 == strcmp(command, "network")){
+        const char* sub = (i < argc) ? argv[i] : NULL;
+        if(sub != NULL && 0 == strcmp(sub, "ls")){
+            ret = cmd_network_ls(&cli);
+        }
+        else{
+            fprintf(stderr, "docker_cli: network currently supports only 'ls'\n");
+            ret = 1;
+        }
+    }
+    else if(0 == strcmp(command, "volume")){
+        const char* sub = (i < argc) ? argv[i] : NULL;
+        if(sub != NULL && 0 == strcmp(sub, "ls")){
+            ret = cmd_volume_ls(&cli);
+        }
+        else{
+            fprintf(stderr, "docker_cli: volume currently supports only 'ls'\n");
+            ret = 1;
+        }
+    }
+    else if(0 == strcmp(command, "prune")){
+        const char* kind = NULL;
+        const char* filter = NULL;
+        for(; i < argc; i++){
+            if(0 == strcmp(argv[i], "--filter") && i + 1 < argc){
+                filter = argv[++i];
+            }
+            else if(kind == NULL){
+                kind = argv[i];
+            }
+        }
+        ret = cmd_prune(&cli, kind, filter);
     }
     else{
         fprintf(stderr, "docker_cli: unknown command: %s\n", command);
