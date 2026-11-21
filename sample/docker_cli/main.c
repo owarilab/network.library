@@ -32,6 +32,7 @@ typedef struct DOCKER_CLI_CONTEXT
     int port;
     char unix_path[DOCKER_CLI_HOST_SIZE];
     int use_unix;
+    int format_json; /* --format json: 対象コマンドは生 JSON を出力 */
     QS_HTTP_CLIENT_CONTEXT http;
     QS_MEMORY_CONTEXT json_memory;
 } DOCKER_CLI_CONTEXT;
@@ -48,15 +49,18 @@ static void print_usage(void)
     printf("  --unix-socket PATH    Connect via unix domain socket\n");
     printf("                        (default: %s if it exists, otherwise TCP 127.0.0.1:2375)\n",
            DOCKER_CLI_DEFAULT_SOCKET);
+    printf("  --format json         Print raw JSON responses (applies to: version, info, ps,\n");
+    printf("                        images, history, inspect, top, port, wait, stats,\n");
+    printf("                        network ls, volume ls, prune; ignored for other commands)\n");
     printf("\n");
     printf("Commands:\n");
     printf("  version                  Show engine version info (GET /version)\n");
     printf("  info                     Show engine info (GET /info)\n");
     printf("  ps [--all]               List containers (GET /containers/json)\n");
     printf("  images                   List images (GET /images/json)\n");
-    printf("  run IMAGE [CMD...]       Create and start a container\n");
+    printf("  run [-p HOSTPORT:PORT]... IMAGE [CMD...]  Create and start a container\n");
     printf("  start <container>        Start a container\n");
-    printf("  stop <container>         Stop a container\n");
+    printf("  stop <container> [-t SECONDS]  Stop a container (default timeout: 10)\n");
     printf("  restart <container>      Restart a container\n");
     printf("  kill <container> [--signal NAME]  Send a signal (default: KILL)\n");
     printf("  rm <container> [--force] Remove a container\n");
@@ -320,6 +324,189 @@ static void print_human_size(uint64_t bytes, char* buf, size_t buf_size)
     }
 }
 
+/* --format json モードならレスポンスボディをそのまま出力して 0、
+ * それ以外（通常のテーブル表示へフォールスルー）は -1 を返す */
+static int emit_json(DOCKER_CLI_CONTEXT* cli, const char* body, size_t body_length)
+{
+    if(!cli->format_json){
+        return -1;
+    }
+    if(body != NULL && body_length > 0){
+        fwrite(body, 1, body_length, stdout);
+        if(body[body_length - 1] != '\n'){
+            fputc('\n', stdout);
+        }
+    }
+    return 0;
+}
+
+/* 全文字が 16 進数（0-9 / a-f / A-F）であるかを判定する */
+static int is_hex_string(const char* s)
+{
+    if(s == NULL || *s == 0){
+        return 0;
+    }
+    for(const char* p = s; *p != 0; p++){
+        char c = *p;
+        if(!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))){
+            return 0;
+        }
+    }
+    return 1;
+}
+
+/*
+ * コンテナ参照を ID プレフィックスとして解決する
+ *
+ * 引数 ref: is_safe_path_token を通った文字列
+ * 全 hex かつ長さが 1〜63 なら GET /containers/json?all=1 で先頭一致を検索する
+ * （64 桁の全 ID・非 hex の名前はそのまま out にコピーする）
+ *
+ * @return 0: 解決OK（out には全 ID / 入力そのまま）
+ *         -1: 見つからず（または解決用リクエスト失敗）
+ *         -2: 曖昧（2 件以上一致）
+ */
+static int resolve_container_ref(DOCKER_CLI_CONTEXT* cli, const char* ref, char* out, size_t out_size)
+{
+    out[0] = 0;
+    size_t len = strlen(ref);
+    if(!(is_hex_string(ref) != 0 && len < 64)){
+        snprintf(out, out_size, "%s", ref);
+        return 0;
+    }
+
+    char* body = NULL;
+    size_t body_length = 0;
+    int status = 0;
+    if(0 != docker_request(cli, "GET", "/containers/json?all=1", NULL, &body, &body_length, &status)){
+        return -1;
+    }
+    int ret = -1;
+    if(200 == status){
+        QS_JSON_ELEMENT_ARRAY array;
+        if(0 == docker_decode_array(cli, body, &array)){
+            char match[DOCKER_CLI_ID_SIZE] = "";
+            int match_count = 0;
+            int32_t count = api_qs_array_get_length(&array);
+            for(int32_t i = 0; i < count; i++){
+                QS_JSON_ELEMENT_OBJECT container;
+                if(0 != api_qs_array_get_object(&array, i, &container)){
+                    continue;
+                }
+                char* id = api_qs_object_get_string(&container, "Id");
+                if(id != NULL && 0 == strncmp(id, ref, len)){
+                    if(match_count == 0){
+                        snprintf(match, sizeof(match), "%s", id);
+                    }
+                    match_count++;
+                }
+            }
+            if(match_count == 1){
+                snprintf(out, out_size, "%s", match);
+                ret = 0;
+            }
+            else if(match_count > 1){
+                ret = -2;
+            }
+        }
+    }
+    free(body);
+    return ret;
+}
+
+/*
+ * イメージ参照を ID プレフィックスとして解決する
+ *
+ * 全 hex かつ長さが 1〜63 なら GET /images/json で先頭一致を検索する
+ * （/images/json の Id は sha256:hex 形式なので hex 部分で一致させる）
+ *
+ * @return 0: 解決OK（out には sha256: 除去した hex ID / 入力そのまま）
+ *         -1: 見つからず（または解決用リクエスト失敗）
+ *         -2: 曖昧（2 件以上一致）
+ */
+static int resolve_image_ref(DOCKER_CLI_CONTEXT* cli, const char* ref, char* out, size_t out_size)
+{
+    out[0] = 0;
+    size_t len = strlen(ref);
+    if(!(is_hex_string(ref) != 0 && len < 64)){
+        snprintf(out, out_size, "%s", ref);
+        return 0;
+    }
+
+    char* body = NULL;
+    size_t body_length = 0;
+    int status = 0;
+    if(0 != docker_request(cli, "GET", "/images/json", NULL, &body, &body_length, &status)){
+        return -1;
+    }
+    int ret = -1;
+    if(200 == status){
+        QS_JSON_ELEMENT_ARRAY array;
+        if(0 == docker_decode_array(cli, body, &array)){
+            int match_count = 0;
+            int32_t count = api_qs_array_get_length(&array);
+            for(int32_t i = 0; i < count; i++){
+                QS_JSON_ELEMENT_OBJECT image;
+                if(0 != api_qs_array_get_object(&array, i, &image)){
+                    continue;
+                }
+                char* id = api_qs_object_get_string(&image, "Id");
+                if(id == NULL){
+                    continue;
+                }
+                const char* hex = strstr(id, ":");
+                hex = (hex != NULL) ? hex + 1 : id;
+                if(0 == strncmp(hex, ref, len)){
+                    if(match_count == 0){
+                        snprintf(out, out_size, "%s", hex);
+                    }
+                    match_count++;
+                }
+            }
+            if(match_count == 1){
+                ret = 0;
+            }
+            else if(match_count > 1){
+                ret = -2;
+            }
+        }
+    }
+    free(body);
+    return ret;
+}
+
+/* コンテナ参照を解決し、失敗時はエラーメッセージを表示して 1 を返す（inspect 以外用） */
+static int container_ref_resolved(DOCKER_CLI_CONTEXT* cli, const char* ref, char* out, size_t out_size)
+{
+    int rc = resolve_container_ref(cli, ref, out, out_size);
+    if(rc == 0){
+        return 0;
+    }
+    if(rc == -2){
+        fprintf(stderr, "docker_cli: error: ambiguous container prefix '%s'\n", ref);
+    }
+    else{
+        fprintf(stderr, "docker_cli: error: no container matches '%s'\n", ref);
+    }
+    return 1;
+}
+
+/* イメージ参照を解決し、失敗時はエラーメッセージを表示して 1 を返す */
+static int image_ref_resolved(DOCKER_CLI_CONTEXT* cli, const char* ref, char* out, size_t out_size)
+{
+    int rc = resolve_image_ref(cli, ref, out, out_size);
+    if(rc == 0){
+        return 0;
+    }
+    if(rc == -2){
+        fprintf(stderr, "docker_cli: error: ambiguous image prefix '%s'\n", ref);
+    }
+    else{
+        fprintf(stderr, "docker_cli: error: no image matches '%s'\n", ref);
+    }
+    return 1;
+}
+
 /* ------------------------------------------------------------------ */
 /* version: GET /version                                              */
 /* ------------------------------------------------------------------ */
@@ -336,6 +523,9 @@ static int cmd_version(DOCKER_CLI_CONTEXT* cli)
     if(200 != status){
         docker_check_error(cli, status, body, body_length);
         ret = 1;
+    }
+    else if(0 == emit_json(cli, body, body_length)){
+        /* --format json: 生 JSON を出力済み */
     }
     else{
         json_reset(cli);
@@ -374,6 +564,9 @@ static int cmd_info(DOCKER_CLI_CONTEXT* cli)
     if(200 != status){
         docker_check_error(cli, status, body, body_length);
         ret = 1;
+    }
+    else if(0 == emit_json(cli, body, body_length)){
+        /* --format json: 生 JSON を出力済み */
     }
     else{
         json_reset(cli);
@@ -440,6 +633,9 @@ static int cmd_ps(DOCKER_CLI_CONTEXT* cli, int all)
         docker_check_error(cli, status, body, body_length);
         ret = 1;
     }
+    else if(0 == emit_json(cli, body, body_length)){
+        /* --format json: 生 JSON を出力済み */
+    }
     else{
         QS_JSON_ELEMENT_ARRAY array;
         if(0 != docker_decode_array(cli, body, &array)){
@@ -498,6 +694,9 @@ static int cmd_images(DOCKER_CLI_CONTEXT* cli)
     if(200 != status){
         docker_check_error(cli, status, body, body_length);
         ret = 1;
+    }
+    else if(0 == emit_json(cli, body, body_length)){
+        /* --format json: 生 JSON を出力済み */
     }
     else{
         QS_JSON_ELEMENT_ARRAY array;
@@ -569,13 +768,109 @@ static int cmd_images(DOCKER_CLI_CONTEXT* cli)
 /* ------------------------------------------------------------------ */
 /* run: POST /containers/create + POST /containers/{id}/start        */
 /* ------------------------------------------------------------------ */
+#define RUN_PORT_MAX 16
+#define RUN_CMD_ARG_MAX 128
+
+typedef struct RUN_PORT_SPEC
+{
+    int host_port;
+    int container_port;
+} RUN_PORT_SPEC;
+
+/* 数値のみ 1〜65535 のポート番号をパースする（失敗 -1） */
+static int parse_port_number(const char* s, int* out)
+{
+    if(s == NULL || *s == 0){
+        return -1;
+    }
+    int value = 0;
+    for(const char* p = s; *p != 0; p++){
+        if(*p < '0' || *p > '9'){
+            return -1;
+        }
+        value = value * 10 + (*p - '0');
+        if(value > 65535){
+            return -1;
+        }
+    }
+    if(value < 1){
+        return -1;
+    }
+    *out = value;
+    return 0;
+}
+
 static int cmd_run(DOCKER_CLI_CONTEXT* cli, int argc, char** argv)
 {
     if(argc < 1){
         fprintf(stderr, "docker_cli: run requires an image name\n");
         return 1;
     }
-    const char* image = argv[0];
+
+    /* 引数パース: [-p HOSTPORT:PORT]... IMAGE [CMD...]
+     * （-p はイメージ名出现前のみ有効。以降はすべて CMD） */
+    RUN_PORT_SPEC port_specs[RUN_PORT_MAX];
+    int port_count = 0;
+    const char* image = NULL;
+    const char* cmd_args[RUN_CMD_ARG_MAX];
+    int cmd_count = 0;
+    for(int i = 0; i < argc; i++){
+        if(image == NULL && 0 == strcmp(argv[i], "-p") && i + 1 < argc){
+            i++;
+            const char* spec = argv[i];
+            const char* colon = strchr(spec, ':');
+            if(colon == NULL || colon == spec || colon[1] == 0){
+                fprintf(stderr, "docker_cli: invalid -p format: %s (expected HOSTPORT:PORT)\n", spec);
+                return 1;
+            }
+            char host_part[32];
+            size_t host_len = (size_t)(colon - spec);
+            if(host_len >= sizeof(host_part)){
+                fprintf(stderr, "docker_cli: -p host part is too long: %s\n", spec);
+                return 1;
+            }
+            memcpy(host_part, spec, host_len);
+            host_part[host_len] = 0;
+            int host_port = 0;
+            int container_port = 0;
+            if(0 != parse_port_number(host_part, &host_port) ||
+               0 != parse_port_number(colon + 1, &container_port)){
+                fprintf(stderr, "docker_cli: invalid port number in -p: %s (expected HOSTPORT:PORT, 1-65535)\n", spec);
+                return 1;
+            }
+            for(int j = 0; j < port_count; j++){
+                if(port_specs[j].container_port == container_port){
+                    fprintf(stderr, "docker_cli: duplicate -p for container port %d\n", container_port);
+                    return 1;
+                }
+            }
+            if(port_count >= RUN_PORT_MAX){
+                fprintf(stderr, "docker_cli: too many -p options (max %d)\n", RUN_PORT_MAX);
+                return 1;
+            }
+            port_specs[port_count].host_port = host_port;
+            port_specs[port_count].container_port = container_port;
+            port_count++;
+        }
+        else if(image == NULL && argv[i][0] == '-'){
+            fprintf(stderr, "docker_cli: unknown run option: %s\n", argv[i]);
+            return 1;
+        }
+        else if(image == NULL){
+            image = argv[i];
+        }
+        else{
+            if(cmd_count >= RUN_CMD_ARG_MAX){
+                fprintf(stderr, "docker_cli: too many run command arguments (max %d)\n", RUN_CMD_ARG_MAX);
+                return 1;
+            }
+            cmd_args[cmd_count++] = argv[i];
+        }
+    }
+    if(image == NULL){
+        fprintf(stderr, "docker_cli: run requires an image name\n");
+        return 1;
+    }
     if(!is_safe_path_token(image)){
         fprintf(stderr, "docker_cli: invalid image name: %s\n", image);
         return 1;
@@ -589,13 +884,53 @@ static int cmd_run(DOCKER_CLI_CONTEXT* cli, int argc, char** argv)
         return 1;
     }
     api_qs_object_push_string(&object, "Image", image);
-    if(argc > 1){
+    if(cmd_count > 0){
         QS_JSON_ELEMENT_ARRAY cmd_array;
         api_qs_array_create(&cli->json_memory, &cmd_array);
-        for(int i = 1; i < argc; i++){
-            api_qs_array_push_string(&cmd_array, argv[i]);
+        for(int i = 0; i < cmd_count; i++){
+            api_qs_array_push_string(&cmd_array, cmd_args[i]);
         }
         api_qs_object_push_array(&object, "Cmd", &cmd_array);
+    }
+    if(port_count > 0){
+        /* ExposedPorts:   {"80/tcp":{}}
+         * HostConfig.PortBindings: {"80/tcp":[{"HostIp":"","HostPort":"8080"}]}
+         * （上の Cmd 配列と同一パターン: 同一メモリプール内の参照で結合） */
+        QS_JSON_ELEMENT_OBJECT exposed_ports;
+        QS_JSON_ELEMENT_OBJECT host_config;
+        QS_JSON_ELEMENT_OBJECT port_bindings;
+        if(0 != api_qs_object_create(&cli->json_memory, &exposed_ports) ||
+           0 != api_qs_object_create(&cli->json_memory, &host_config) ||
+           0 != api_qs_object_create(&cli->json_memory, &port_bindings)){
+            fprintf(stderr, "docker_cli: memory alloc failed\n");
+            return 1;
+        }
+        for(int p = 0; p < port_count; p++){
+            char port_key[32];
+            snprintf(port_key, sizeof(port_key), "%d/tcp", port_specs[p].container_port);
+            QS_JSON_ELEMENT_OBJECT empty;
+            if(0 != api_qs_object_create(&cli->json_memory, &empty)){
+                fprintf(stderr, "docker_cli: memory alloc failed\n");
+                return 1;
+            }
+            api_qs_object_push_object(&exposed_ports, port_key, &empty);
+            QS_JSON_ELEMENT_ARRAY bindings;
+            QS_JSON_ELEMENT_OBJECT binding;
+            if(0 != api_qs_array_create(&cli->json_memory, &bindings) ||
+               0 != api_qs_object_create(&cli->json_memory, &binding)){
+                fprintf(stderr, "docker_cli: memory alloc failed\n");
+                return 1;
+            }
+            api_qs_object_push_string(&binding, "HostIp", "");
+            char host_port_str[16];
+            snprintf(host_port_str, sizeof(host_port_str), "%d", port_specs[p].host_port);
+            api_qs_object_push_string(&binding, "HostPort", host_port_str);
+            api_qs_array_push_object(&bindings, &binding);
+            api_qs_object_push_array(&port_bindings, port_key, &bindings);
+        }
+        api_qs_object_push_object(&object, "ExposedPorts", &exposed_ports);
+        api_qs_object_push_object(&host_config, "PortBindings", &port_bindings);
+        api_qs_object_push_object(&object, "HostConfig", &host_config);
     }
     char* create_body = api_qs_json_encode_object(&object, DOCKER_CLI_CREATE_BODY_SIZE);
     if(create_body == NULL){
@@ -652,18 +987,50 @@ static int cmd_run(DOCKER_CLI_CONTEXT* cli, int argc, char** argv)
     return ret;
 }
 
+/* 数値のみ 0〜3600 の stop タイムアウト（秒）をパースする（失敗 -1） */
+static int parse_stop_timeout(const char* s, int* out)
+{
+    if(s == NULL || *s == 0){
+        return -1;
+    }
+    int value = 0;
+    for(const char* p = s; *p != 0; p++){
+        if(*p < '0' || *p > '9'){
+            return -1;
+        }
+        value = value * 10 + (*p - '0');
+        if(value > 3600){
+            return -1;
+        }
+    }
+    *out = value;
+    return 0;
+}
+
 /* ------------------------------------------------------------------ */
 /* start / stop: POST /containers/{id}/start | stop                  */
+/* query: 任意のクエリサフィックス（例: "t=5"）。NULL でなし          */
 /* ------------------------------------------------------------------ */
-static int cmd_container_action(DOCKER_CLI_CONTEXT* cli, const char* action, const char* id)
+static int cmd_container_action(DOCKER_CLI_CONTEXT* cli, const char* action, const char* id, const char* query)
 {
     if(id == NULL || !is_safe_path_token(id)){
         fprintf(stderr, "docker_cli: %s requires a valid container id/name\n", action);
         return 1;
     }
 
-    char path[DOCKER_CLI_ID_SIZE + 64];
-    snprintf(path, sizeof(path), "/containers/%s/%s", id, action);
+    /* 短縮 ID 解決 */
+    char resolved[DOCKER_CLI_ID_SIZE];
+    if(0 != container_ref_resolved(cli, id, resolved, sizeof(resolved))){
+        return 1;
+    }
+
+    char path[DOCKER_CLI_ID_SIZE + 96];
+    if(query != NULL){
+        snprintf(path, sizeof(path), "/containers/%s/%s?%s", resolved, action, query);
+    }
+    else{
+        snprintf(path, sizeof(path), "/containers/%s/%s", resolved, action);
+    }
 
     char* body = NULL;
     size_t body_length = 0;
@@ -673,7 +1040,7 @@ static int cmd_container_action(DOCKER_CLI_CONTEXT* cli, const char* action, con
     }
     int ret = 0;
     if(status == 204 || status == 304){
-        printf("%s: %s\n", action, id);
+        printf("%s: %s\n", action, resolved);
     }
     else{
         docker_check_error(cli, status, body, body_length);
@@ -715,8 +1082,14 @@ static int cmd_kill(DOCKER_CLI_CONTEXT* cli, const char* id, const char* signal)
         return 1;
     }
 
+    /* 短縮 ID 解決 */
+    char resolved[DOCKER_CLI_ID_SIZE];
+    if(0 != container_ref_resolved(cli, id, resolved, sizeof(resolved))){
+        return 1;
+    }
+
     char path[DOCKER_CLI_ID_SIZE + 96];
-    snprintf(path, sizeof(path), "/containers/%s/kill?signal=%s", id, signal);
+    snprintf(path, sizeof(path), "/containers/%s/kill?signal=%s", resolved, signal);
 
     char* body = NULL;
     size_t body_length = 0;
@@ -726,7 +1099,7 @@ static int cmd_kill(DOCKER_CLI_CONTEXT* cli, const char* id, const char* signal)
     }
     int ret = 0;
     if(status == 204 || status == 304){
-        printf("killed: %s (signal: %s)\n", id, signal);
+        printf("killed: %s (signal: %s)\n", resolved, signal);
     }
     else{
         docker_check_error(cli, status, body, body_length);
@@ -746,8 +1119,14 @@ static int cmd_rm(DOCKER_CLI_CONTEXT* cli, const char* id, int force)
         return 1;
     }
 
+    /* 短縮 ID 解決 */
+    char resolved[DOCKER_CLI_ID_SIZE];
+    if(0 != container_ref_resolved(cli, id, resolved, sizeof(resolved))){
+        return 1;
+    }
+
     char path[DOCKER_CLI_ID_SIZE + 64];
-    snprintf(path, sizeof(path), "/containers/%s%s", id, force ? "?force=1" : "");
+    snprintf(path, sizeof(path), "/containers/%s%s", resolved, force ? "?force=1" : "");
 
     char* body = NULL;
     size_t body_length = 0;
@@ -777,8 +1156,14 @@ static int cmd_rmi(DOCKER_CLI_CONTEXT* cli, const char* name, int force)
         return 1;
     }
 
+    /* 短縮 ID 解決 */
+    char resolved[DOCKER_CLI_ID_SIZE];
+    if(0 != image_ref_resolved(cli, name, resolved, sizeof(resolved))){
+        return 1;
+    }
+
     char path[DOCKER_CLI_HOST_SIZE + 32];
-    snprintf(path, sizeof(path), "/images/%s%s", name, force ? "?force=1" : "");
+    snprintf(path, sizeof(path), "/images/%s%s", resolved, force ? "?force=1" : "");
 
     char* body = NULL;
     size_t body_length = 0;
@@ -901,8 +1286,14 @@ static int cmd_history(DOCKER_CLI_CONTEXT* cli, const char* name)
         return 1;
     }
 
+    /* 短縮 ID 解決 */
+    char resolved[DOCKER_CLI_ID_SIZE];
+    if(0 != image_ref_resolved(cli, name, resolved, sizeof(resolved))){
+        return 1;
+    }
+
     char path[DOCKER_CLI_HOST_SIZE + 32];
-    snprintf(path, sizeof(path), "/images/%s/history", name);
+    snprintf(path, sizeof(path), "/images/%s/history", resolved);
 
     char* body = NULL;
     size_t body_length = 0;
@@ -914,6 +1305,9 @@ static int cmd_history(DOCKER_CLI_CONTEXT* cli, const char* name)
     if(200 != status){
         docker_check_error(cli, status, body, body_length);
         ret = 1;
+    }
+    else if(0 == emit_json(cli, body, body_length)){
+        /* --format json: 生 JSON を出力済み */
     }
     else{
         QS_JSON_ELEMENT_ARRAY array;
@@ -1293,6 +1687,42 @@ static void print_image_inspect(DOCKER_CLI_CONTEXT* cli, const char* body)
     }
 }
 
+/* inspect の直接表示（解決済み ID に対して 1 リクエスト + 表示）
+ * is_container: 1 = /containers/{ref}/json, 0 = /images/{ref}/json */
+static int inspect_display(DOCKER_CLI_CONTEXT* cli, const char* ref, int is_container)
+{
+    char path[DOCKER_CLI_HOST_SIZE + 32];
+    if(is_container){
+        snprintf(path, sizeof(path), "/containers/%s/json", ref);
+    }
+    else{
+        snprintf(path, sizeof(path), "/images/%s/json", ref);
+    }
+    char* body = NULL;
+    size_t body_length = 0;
+    int status = 0;
+    if(0 != docker_request(cli, "GET", path, NULL, &body, &body_length, &status)){
+        return 1;
+    }
+    int ret = 0;
+    if(status == 200){
+        if(-1 == emit_json(cli, body, body_length)){
+            if(is_container){
+                print_container_inspect(cli, body);
+            }
+            else{
+                print_image_inspect(cli, body);
+            }
+        }
+    }
+    else{
+        docker_check_error(cli, status, body, body_length);
+        ret = 1;
+    }
+    free(body);
+    return ret;
+}
+
 static int cmd_inspect(DOCKER_CLI_CONTEXT* cli, const char* name)
 {
     if(name == NULL || !is_safe_path_token(name)){
@@ -1300,7 +1730,43 @@ static int cmd_inspect(DOCKER_CLI_CONTEXT* cli, const char* name)
         return 1;
     }
 
-    /* container を先に試し、404 のときだけ image にフォールスルー */
+    /* ID 短縮形解決（全 hex かつ長さ 1〜63 のときのみ）。
+     * container 解決: 0 ならそのまま inspect / -1 なら image 側へフォールスルー / -2 は即エラー。
+     * image 解決:     0 なら image inspect / -1 は両方見つからずエラー / -2 は即エラー */
+    int direct_container = 0;
+    int direct_image = 0;
+    char container_ref[DOCKER_CLI_ID_SIZE] = "";
+    char image_ref[DOCKER_CLI_ID_SIZE] = "";
+    if(is_hex_string(name) != 0 && strlen(name) < 64){
+        int container_rc = resolve_container_ref(cli, name, container_ref, sizeof(container_ref));
+        if(container_rc == -2){
+            fprintf(stderr, "docker_cli: error: ambiguous container prefix '%s'\n", name);
+            return 1;
+        }
+        int image_rc = resolve_image_ref(cli, name, image_ref, sizeof(image_ref));
+        if(image_rc == -2){
+            fprintf(stderr, "docker_cli: error: ambiguous image prefix '%s'\n", name);
+            return 1;
+        }
+        if(container_rc == 0){
+            direct_container = 1;
+        }
+        else if(image_rc == 0){
+            direct_image = 1;
+        }
+        else{
+            fprintf(stderr, "docker_cli: error: no container or image matches '%s'\n", name);
+            return 1;
+        }
+    }
+    if(direct_container){
+        return inspect_display(cli, container_ref, 1);
+    }
+    if(direct_image){
+        return inspect_display(cli, image_ref, 0);
+    }
+
+    /* 非 hex・64 桁全 ID: 従来のロジック（container を先に試し、404 のときだけ image） */
     char path[DOCKER_CLI_HOST_SIZE + 32];
     snprintf(path, sizeof(path), "/containers/%s/json", name);
     char* body = NULL;
@@ -1310,7 +1776,9 @@ static int cmd_inspect(DOCKER_CLI_CONTEXT* cli, const char* name)
         return 1;
     }
     if(status == 200){
-        print_container_inspect(cli, body);
+        if(-1 == emit_json(cli, body, body_length)){
+            print_container_inspect(cli, body);
+        }
         free(body);
         return 0;
     }
@@ -1331,7 +1799,9 @@ static int cmd_inspect(DOCKER_CLI_CONTEXT* cli, const char* name)
     }
     int ret = 0;
     if(status == 200){
-        print_image_inspect(cli, body);
+        if(-1 == emit_json(cli, body, body_length)){
+            print_image_inspect(cli, body);
+        }
     }
     else if(status == 404){
         /* 両方 404: container 側のメッセージを表示 */
@@ -1504,6 +1974,13 @@ static int cmd_exec(DOCKER_CLI_CONTEXT* cli, int argc, char** argv)
         return 1;
     }
 
+    /* 短縮 ID 解決 */
+    char resolved[DOCKER_CLI_ID_SIZE];
+    if(0 != container_ref_resolved(cli, id, resolved, sizeof(resolved))){
+        return 1;
+    }
+    id = resolved;
+
     /* 引数から -t を除いた残りを CMD とする */
     int tty = 0;
     const char* cmd_args[64];
@@ -1671,8 +2148,14 @@ static int cmd_logs(DOCKER_CLI_CONTEXT* cli, const char* id)
         return 1;
     }
 
+    /* 短縮 ID 解決 */
+    char resolved[DOCKER_CLI_ID_SIZE];
+    if(0 != container_ref_resolved(cli, id, resolved, sizeof(resolved))){
+        return 1;
+    }
+
     char path[DOCKER_CLI_ID_SIZE + 64];
-    snprintf(path, sizeof(path), "/containers/%s/logs?stdout=1&stderr=1", id);
+    snprintf(path, sizeof(path), "/containers/%s/logs?stdout=1&stderr=1", resolved);
 
     char* body = NULL;
     size_t body_length = 0;
@@ -1717,8 +2200,14 @@ static int cmd_top(DOCKER_CLI_CONTEXT* cli, const char* id)
         return 1;
     }
 
+    /* 短縮 ID 解決 */
+    char resolved[DOCKER_CLI_ID_SIZE];
+    if(0 != container_ref_resolved(cli, id, resolved, sizeof(resolved))){
+        return 1;
+    }
+
     char path[DOCKER_CLI_ID_SIZE + 64];
-    snprintf(path, sizeof(path), "/containers/%s/top", id);
+    snprintf(path, sizeof(path), "/containers/%s/top", resolved);
 
     char* body = NULL;
     size_t body_length = 0;
@@ -1730,6 +2219,9 @@ static int cmd_top(DOCKER_CLI_CONTEXT* cli, const char* id)
     if(200 != status){
         docker_check_error(cli, status, body, body_length);
         ret = 1;
+    }
+    else if(0 == emit_json(cli, body, body_length)){
+        /* --format json: 生 JSON を出力済み */
     }
     else{
         json_reset(cli);
@@ -1771,8 +2263,14 @@ static int cmd_port(DOCKER_CLI_CONTEXT* cli, const char* id)
         return 1;
     }
 
+    /* 短縮 ID 解決 */
+    char resolved[DOCKER_CLI_ID_SIZE];
+    if(0 != container_ref_resolved(cli, id, resolved, sizeof(resolved))){
+        return 1;
+    }
+
     char path[DOCKER_CLI_ID_SIZE + 64];
-    snprintf(path, sizeof(path), "/containers/%s/json", id);
+    snprintf(path, sizeof(path), "/containers/%s/json", resolved);
 
     char* body = NULL;
     size_t body_length = 0;
@@ -1784,6 +2282,9 @@ static int cmd_port(DOCKER_CLI_CONTEXT* cli, const char* id)
     if(200 != status){
         docker_check_error(cli, status, body, body_length);
         ret = 1;
+    }
+    else if(0 == emit_json(cli, body, body_length)){
+        /* --format json: 生 JSON を出力済み */
     }
     else{
         json_reset(cli);
@@ -1842,8 +2343,14 @@ static int cmd_wait(DOCKER_CLI_CONTEXT* cli, const char* id)
         return 1;
     }
 
+    /* 短縮 ID 解決 */
+    char resolved[DOCKER_CLI_ID_SIZE];
+    if(0 != container_ref_resolved(cli, id, resolved, sizeof(resolved))){
+        return 1;
+    }
+
     char path[DOCKER_CLI_ID_SIZE + 64];
-    snprintf(path, sizeof(path), "/containers/%s/wait", id);
+    snprintf(path, sizeof(path), "/containers/%s/wait", resolved);
 
     char* body = NULL;
     size_t body_length = 0;
@@ -1855,6 +2362,9 @@ static int cmd_wait(DOCKER_CLI_CONTEXT* cli, const char* id)
     if(200 != status){
         docker_check_error(cli, status, body, body_length);
         ret = 1;
+    }
+    else if(0 == emit_json(cli, body, body_length)){
+        /* --format json: 生 JSON を出力済み */
     }
     else{
         json_reset(cli);
@@ -1885,8 +2395,14 @@ static int cmd_stats(DOCKER_CLI_CONTEXT* cli, const char* id)
         return 1;
     }
 
+    /* 短縮 ID 解決 */
+    char resolved[DOCKER_CLI_ID_SIZE];
+    if(0 != container_ref_resolved(cli, id, resolved, sizeof(resolved))){
+        return 1;
+    }
+
     char path[DOCKER_CLI_ID_SIZE + 64];
-    snprintf(path, sizeof(path), "/containers/%s/stats?stream=false", id);
+    snprintf(path, sizeof(path), "/containers/%s/stats?stream=false", resolved);
 
     char* body = NULL;
     size_t body_length = 0;
@@ -1898,6 +2414,9 @@ static int cmd_stats(DOCKER_CLI_CONTEXT* cli, const char* id)
     if(200 != status){
         docker_check_error(cli, status, body, body_length);
         ret = 1;
+    }
+    else if(0 == emit_json(cli, body, body_length)){
+        /* --format json: 生 JSON を出力済み */
     }
     else{
         json_reset(cli);
@@ -2004,6 +2523,9 @@ static int cmd_network_ls(DOCKER_CLI_CONTEXT* cli)
         docker_check_error(cli, status, body, body_length);
         ret = 1;
     }
+    else if(0 == emit_json(cli, body, body_length)){
+        /* --format json: 生 JSON を出力済み */
+    }
     else{
         QS_JSON_ELEMENT_ARRAY array;
         if(0 != docker_decode_array(cli, body, &array)){
@@ -2059,6 +2581,9 @@ static int cmd_volume_ls(DOCKER_CLI_CONTEXT* cli)
     if(200 != status){
         docker_check_error(cli, status, body, body_length);
         ret = 1;
+    }
+    else if(0 == emit_json(cli, body, body_length)){
+        /* --format json: 生 JSON を出力済み */
     }
     else{
         json_reset(cli);
@@ -2177,6 +2702,9 @@ static int cmd_prune(DOCKER_CLI_CONTEXT* cli, const char* kind, const char* filt
         docker_check_error(cli, status, body, body_length);
         ret = 1;
     }
+    else if(0 == emit_json(cli, body, body_length)){
+        /* --format json: 生 JSON を出力済み */
+    }
     else{
         json_reset(cli);
         QS_JSON_ELEMENT_OBJECT object;
@@ -2235,6 +2763,14 @@ int main(int argc, char** argv)
             }
             snprintf(cli.unix_path, sizeof(cli.unix_path), "%s", argv[++i]);
             cli.use_unix = 1;
+        }
+        else if(0 == strcmp(argv[i], "--format") && i + 1 < argc){
+            if(0 != strcmp(argv[i + 1], "json")){
+                fprintf(stderr, "docker_cli: --format currently supports only 'json'\n");
+                return 1;
+            }
+            cli.format_json = 1;
+            i++;
         }
         else if(0 == strcmp(argv[i], "-h") || 0 == strcmp(argv[i], "--help")){
             print_usage();
@@ -2315,13 +2851,40 @@ int main(int argc, char** argv)
         ret = cmd_run(&cli, argc - i, &argv[i]);
     }
     else if(0 == strcmp(command, "start")){
-        ret = cmd_container_action(&cli, "start", i < argc ? argv[i] : NULL);
+        ret = cmd_container_action(&cli, "start", i < argc ? argv[i] : NULL, NULL);
     }
     else if(0 == strcmp(command, "stop")){
-        ret = cmd_container_action(&cli, "stop", i < argc ? argv[i] : NULL);
+        const char* id = NULL;
+        const char* time_value = NULL;
+        for(; i < argc; i++){
+            if(0 == strcmp(argv[i], "-t") && i + 1 < argc){
+                time_value = argv[++i];
+            }
+            else if(id == NULL){
+                id = argv[i];
+            }
+        }
+        char suffix[32];
+        const char* suffix_ptr = NULL;
+        int stop_ret = 0;
+        if(time_value != NULL){
+            int timeout_sec = 0;
+            if(0 != parse_stop_timeout(time_value, &timeout_sec)){
+                fprintf(stderr, "docker_cli: invalid -t value: %s (expected integer 0-3600)\n", time_value);
+                stop_ret = 1;
+            }
+            else{
+                snprintf(suffix, sizeof(suffix), "t=%d", timeout_sec);
+                suffix_ptr = suffix;
+            }
+        }
+        if(0 == stop_ret){
+            stop_ret = cmd_container_action(&cli, "stop", id, suffix_ptr);
+        }
+        ret = stop_ret;
     }
     else if(0 == strcmp(command, "restart")){
-        ret = cmd_container_action(&cli, "restart", i < argc ? argv[i] : NULL);
+        ret = cmd_container_action(&cli, "restart", i < argc ? argv[i] : NULL, NULL);
     }
     else if(0 == strcmp(command, "kill")){
         const char* id = NULL;

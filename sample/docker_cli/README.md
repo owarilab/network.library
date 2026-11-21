@@ -122,12 +122,16 @@ socketserver.ThreadingTCPServer(("127.0.0.1", 2375), Handler).serve_forever()
 ## 使い方
 
 ```
-docker_cli [--host HOST] [--port PORT] [--unix-socket PATH] <command> [args]
+docker_cli [--host HOST] [--port PORT] [--unix-socket PATH] [--format json] <command> [args]
 
 共通オプション:
   --host HOST           TCP 接続時の Docker Engine のホスト（既定: 127.0.0.1）
   --port PORT           TCP 接続時の Docker Engine のポート（既定: 2375）
   --unix-socket PATH    Unix domain ソケットで接続
+  --format json         対象コマンドのレスポンスをそのまま（生 JSON）で表示
+                        （対象: version / info / ps / images / history / inspect /
+                         top / port / wait / stats / network ls / volume ls / prune。
+                         その他のコマンドでは無視される）
 
 エンドポイント解決の優先順位:
   1. --unix-socket PATH（明示指定）
@@ -140,9 +144,10 @@ docker_cli [--host HOST] [--port PORT] [--unix-socket PATH] <command> [args]
   info                     エンジン情報を表示（GET /info）
   ps [--all]               コンテナ一覧（GET /containers/json）
   images                   イメージ一覧（GET /images/json）
-  run IMAGE [CMD...]       コンテナ作成+起動（POST /containers/create → POST /containers/{id}/start）
+  run [-p HOSTPORT:PORT]... IMAGE [CMD...]
+                           コンテナ作成+起動（POST /containers/create → POST /containers/{id}/start）
   start <container>        コンテナ起動（POST /containers/{id}/start）
-  stop <container>         コンテナ停止（POST /containers/{id}/stop）
+  stop <container> [-t SECONDS]  コンテナ停止（POST /containers/{id}/stop?t=N、既定 10）
   restart <container>      コンテナ再起動（POST /containers/{id}/restart）
   kill <container> [--signal NAME]  シグナル送信（既定: KILL、POST /containers/{id}/kill）
   rm <container> [--force] コンテナ削除（DELETE /containers/{id}）
@@ -169,6 +174,17 @@ docker_cli [--host HOST] [--port PORT] [--unix-socket PATH] <command> [args]
 （例: `--filter label=team=a` でラベル付きのみに限定）。
 フィルタ値は `label=KEY=VALUE` の形でも使えます
 （Engine API の `filters` パラメータのリスト形式 `{"label":["KEY=VALUE"]}` に変換されます）。
+
+`<container>` / `<image>` には短縮 ID（全 hex の先頭 1〜63 文字）も使えます（system の `docker` と同じ挙動）。
+短縮 ID は `GET /containers/json?all=1` / `GET /images/json` で先頭一致を解決します:
+
+- 1 件一致: 全 ID に解決してそのまま処理
+- 0 件一致 / 2 件以上（曖昧）: エラー終了
+- 非 hex の名前・64 桁の全 ID: 解決なしでそのまま渡す（従来の 404 経路を維持）
+- `inspect` のみ: container 側が見つからなければ image 側の解決にフォールスルーする
+  （例: イメージの短縮 ID で `inspect` できる）。曖昧（2 件以上）の場合は即エラー
+- 対象: container 系（start/stop/restart/kill/rm/logs/top/port/wait/stats/exec）、
+  image 系（rmi/history）、inspect。`pull` / `tag` / `run` は対象外（リモート参照のため）
 
 ## 動作例
 
@@ -278,6 +294,30 @@ Pulling from library/alpine
 pulling: 17a39c0ba978
 Digest: sha256:6baf43584bcb78...
 Status: Downloaded newer image for alpine:3.19
+
+$ ./qs_docker_cli run -p 18435:80 alpine:3.21 sleep 300
+212bb7aae0fb...
+$ ./qs_docker_cli port 212bb7aa
+80/tcp -> 0.0.0.0:18435
+80/tcp -> :::18435
+$ ./qs_docker_cli stop 212bb7aa -t 5
+stop: 212bb7aae0fb...
+$ ./qs_docker_cli rm 212bb7aa
+removed: 212bb7aa
+
+$ ./qs_docker_cli --format json version | python3 -m json.tool
+{
+    "Platform": {
+        "Name": ""
+    },
+    "Version": "29.1.3",
+    "ApiVersion": "1.52",
+    ...
+}
+$ ./qs_docker_cli --format json inspect e50d940e | python3 -c "import json,sys; print(json.load(sys.stdin)['Id'])"
+sha256:e50d940e9d2c...
+$ ./qs_docker_cli logs aaaaaaaa11
+docker_cli: error: no container matches 'aaaaaaaa11'
 ```
 
 エラー（HTTP 400 以上）は Docker エラー JSON の `message` を表示し、非ゼロ終了します。
@@ -311,6 +351,18 @@ Status: Downloaded newer image for alpine:3.19
   リクエストボディは **JSON ビルダにブール値 push が無い**ため
   `snprintf` + `api_qs_json_escape`（core 既存 API）で手組みする。
   出力は `logs` と同じ `print_demuxed` を共用（Tty:false のときのみ）
+- `--format json` は `emit_json` ヘルパーで成功時のレスポンスボディをそのまま出力し、
+  通常のテーブル表示をスキップする（pretty print しないため `jq` / `python3 -m json.tool`
+  に直接パイプできる）。対象外の 204 / テキスト系コマンドでは単に無視される
+- ID 短縮形解決は `is_hex_string` + `resolve_container_ref` / `resolve_image_ref`。
+  全 hex かつ 1〜63 桁の引数だけ解決対象（64 桁の全 ID・非 hex の名前はパススルー）。
+  解決に `ps --all` / `images` のリクエストを 1 件追加する（ワンショット構成では起動コスト増のみ）
+- `run -p` は既存の JSON ビルダ（`api_qs_object_push_object` / `api_qs_object_push_array` /
+  `api_qs_array_push_object`、`cmd_run` の Cmd 配列と同一パターン）で
+  `ExposedPorts` + `HostConfig.PortBindings` を create リクエストボディに追加する
+  （ホスト IP 指定・ポート範囲はスコープ外。競合時は Engine が 400 を返す）
+- `stop -t N` は `cmd_container_action` の任意クエリサフィックス引数として
+  `?t=N` を付与する（start / restart は NULL を渡す）
 - パスに埋め込む ID・イメージ名は文字種を制限（英数字と `./:-_`）し、HTTP パスへの注入を防ぐ。
   `prune --filter` の値も JSON を壊す文字（`" \ { } [ ]`）を含む場合は拒否する
 
@@ -331,6 +383,12 @@ Status: Downloaded newer image for alpine:3.19
   （`/exec/{id}/resize`）を非対応としています
 - `pull` はローカルに新しいイメージを作成します（既存データは削除しません）。
   進捗行の表示は層ごとに 1 行のサマリーです
+- 短縮 ID を渡すと、コマンドごとに一覧取得リクエストが 1 件増えます
+  （ワンショット構成の起動コストに含めてください）
+- `run -p` は `-p` を 16 件まで、形式は `HOSTPORT:PORT` のみ（ホスト IP 指定・
+  ポート範囲・プロトコル指定は非対応）
+- `--format json` は対象外の 11 コマンド（run/start/stop/restart/kill/rm/logs/pull/exec/tag/rmi）
+  では無視されます（エラーにはなりません）
 - WSL2 環境の既知の挙動: コンテナの PID 1 に `SIGTERM` が届かず
   `kill --signal TERM` が無効になることがあります（`SIGKILL`（既定）は正常）。
   system の `docker` CLI でも同じ挙動を確認しています
