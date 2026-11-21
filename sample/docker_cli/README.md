@@ -196,16 +196,16 @@ MinAPIVersion  1.44
 GoVersion      go1.24.4
 Os             linux
 Arch           amd64
-KernelVersion  6.18.33.2-microsoft-standard-WSL2
+KernelVersion  5.15.0-91-generic
 
 $ ./qs_docker_cli ps --all
 CONTAINER ID   IMAGE                        NAME                     STATUS
-111973a01dff   python-skeleton-app          python-skeleton-app-1    Exited (0) 3 months ago
+111973a01dff   nginx:latest                 nginx                    Exited (0) 3 months ago
 ...
 
 $ ./qs_docker_cli images
 IMAGE ID       TAGS                             SIZE
-9ab6d30d9c82   ghcr.io/berriai/litellm:v1.106.6 1.21 GB
+9ab6d30d9c82   nginx:latest                     187 MB
 ...
 
 $ ./qs_docker_cli run alpine:3.21 echo hello
@@ -266,7 +266,7 @@ $ ./qs_docker_cli run alpine:3.21 sleep 300
 ed2fca2ed3ad...
 $ ./qs_docker_cli inspect ed2fca2ed3ad
 ID           ed2fca2ed3ad
-Name         /qs_cli_exec_1
+Name         /eager_raman_1
 Image        sha256:6aeafe801b80...
 Created      2026-11-21T12:33:22.123456789Z
 State:      running (pid: 58144)
@@ -389,14 +389,5 @@ docker_cli: error: no container matches 'aaaaaaaa11'
   ポート範囲・プロトコル指定は非対応）
 - `--format json` は対象外の 11 コマンド（run/start/stop/restart/kill/rm/logs/pull/exec/tag/rmi）
   では無視されます（エラーにはなりません）
-- WSL2 環境の既知の挙動: コンテナの PID 1 に `SIGTERM` が届かず
-  `kill --signal TERM` が無効になることがあります（`SIGKILL`（既定）は正常）。
-  system の `docker` CLI でも同じ挙動を確認しています
-- dockerd 29.1.3 では `volume prune` の label filter が一致しない場合があるため、
-  `prune volumes` のフィルタ付き実行は対象が絞れない点に注意してください
-  （`prune containers` の label filter は正常に動作します）
-- `exec` / `build` / `cp` / `attach` / `events` / `logs --follow` のような
+- `build` / `cp` / `attach` / `events` / `logs --follow` のような
   ストリーミング・対話系エンドポイントは未対応です
-- コアライブラリのビルドオプション `__QS_DEBUG__`（`core/header/qs_core.h`）が有効なため、
-  大きな JSON を解析する際に `resize token buffer, ...` のデバッグ行が stdout に出力されます
-  （core 側の既存挙動。無効にする場合は該当定義を外して core を再ビルドしてください）
