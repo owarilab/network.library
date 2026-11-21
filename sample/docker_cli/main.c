@@ -68,6 +68,10 @@ static void print_usage(void)
     printf("  rmi <image> [--force]    Remove an image\n");
     printf("  tag <SOURCE> <TARGET>    Tag an image\n");
     printf("  history <image>          Show the image history\n");
+    printf("  inspect <CONTAINER|IMAGE>  Inspect a container or image\n");
+    printf("  pull IMAGE[:TAG]          Pull an image (POST /images/create)\n");
+    printf("  exec <container> [CMD...]  Run a command in a container (add -t for TTY).\n");
+    printf("                            The CLI exit code is the command's exit code\n");
     printf("  network ls               List networks (GET /networks)\n");
     printf("  volume ls                List volumes (GET /volumes)\n");
     printf("  prune <kind> [--filter key=value]  Prune images/containers/volumes\n");
@@ -91,6 +95,10 @@ static int is_safe_path_token(const char* token)
     }
     return 1;
 }
+
+/* Docker raw stream（8 バイトヘッダ + データのフレーム列）をデミュークスして表示
+ * （logs / exec で共用。定義は後述） */
+static void print_demuxed(const char* body, size_t length);
 
 /*
  * HTTP リクエストを実行してレスポンスを待つ（ワンショット）
@@ -811,6 +819,34 @@ static int cmd_rmi(DOCKER_CLI_CONTEXT* cli, const char* name, int force)
     return ret;
 }
 
+/*
+ * イメージ参照を repo / tag に分割する（最後の '/' より後の ':' を境界）
+ * tag が無い場合は tag_buf は空文字列
+ */
+static void split_image_ref(const char* reference, char* repo_buf, size_t repo_size, char* tag_buf, size_t tag_size)
+{
+    const char* colon = NULL;
+    const char* last_slash = strrchr(reference, '/');
+    for(const char* p = reference; *p != 0; p++){
+        if(*p == ':' && (last_slash == NULL || p > last_slash)){
+            colon = p;
+        }
+    }
+    if(colon != NULL){
+        size_t repo_len = (size_t)(colon - reference);
+        if(repo_len >= repo_size){
+            repo_len = repo_size - 1;
+        }
+        memcpy(repo_buf, reference, repo_len);
+        repo_buf[repo_len] = 0;
+        snprintf(tag_buf, tag_size, "%s", colon + 1);
+    }
+    else{
+        snprintf(repo_buf, repo_size, "%s", reference);
+        tag_buf[0] = 0;
+    }
+}
+
 /* ------------------------------------------------------------------ */
 /* tag: POST /images/{name}/tag?repo=REPO&tag=TAG                     */
 /* ------------------------------------------------------------------ */
@@ -825,30 +861,9 @@ static int cmd_tag(DOCKER_CLI_CONTEXT* cli, const char* source, const char* targ
         return 1;
     }
 
-    /* ターゲットを最後の '/' より後の ':' を境界に repo / tag に分割 */
     char repo[DOCKER_CLI_HOST_SIZE];
     char tag_name[128];
-    const char* colon = NULL;
-    const char* last_slash = strrchr(target, '/');
-    for(const char* p = target; *p != 0; p++){
-        if(*p == ':' && (last_slash == NULL || p > last_slash)){
-            colon = p;
-        }
-    }
-    if(colon != NULL){
-        size_t repo_len = (size_t)(colon - target);
-        if(repo_len >= sizeof(repo)){
-            fprintf(stderr, "docker_cli: target repo is too long\n");
-            return 1;
-        }
-        memcpy(repo, target, repo_len);
-        repo[repo_len] = 0;
-        snprintf(tag_name, sizeof(tag_name), "%s", colon + 1);
-    }
-    else{
-        snprintf(repo, sizeof(repo), "%s", target);
-        tag_name[0] = 0;
-    }
+    split_image_ref(target, repo, sizeof(repo), tag_name, sizeof(tag_name));
 
     char path[DOCKER_CLI_HOST_SIZE * 2 + 128];
     if(tag_name[0] != 0){
@@ -947,6 +962,660 @@ static int cmd_history(DOCKER_CLI_CONTEXT* cli, const char* name)
                 printf("%-14s %12s %s\n", id_buf, size_buf, created_buf);
             }
         }
+    }
+    free(body);
+    return ret;
+}
+
+/* ------------------------------------------------------------------ */
+/* inspect: GET /containers/{id}/json（404 時は /images/{name}/json）  */
+/* ------------------------------------------------------------------ */
+static void join_string_array(QS_JSON_ELEMENT_ARRAY* array, char* buf, size_t buf_size)
+{
+    buf[0] = 0;
+    if(array == NULL){
+        return;
+    }
+    int32_t length = api_qs_array_get_length(array);
+    for(int32_t i = 0; i < length; i++){
+        char* s = api_qs_array_get_string(array, i);
+        if(s == NULL){
+            continue;
+        }
+        strncat(buf, (strlen(buf) > 0) ? " " : "", buf_size - strlen(buf) - 1);
+        strncat(buf, s, buf_size - strlen(buf) - 1);
+    }
+}
+
+static void print_string_array_lines(QS_JSON_ELEMENT_ARRAY* array)
+{
+    int32_t length = (array != NULL) ? api_qs_array_get_length(array) : 0;
+    if(length == 0){
+        printf("  (none)\n");
+        return;
+    }
+    for(int32_t i = 0; i < length; i++){
+        char* s = api_qs_array_get_string(array, i);
+        printf("  %s\n", s != NULL ? s : "");
+    }
+}
+
+static void print_label_object(QS_JSON_ELEMENT_OBJECT* labels)
+{
+    QS_JSON_ELEMENT_ARRAY keys;
+    int32_t count = 0;
+    if(0 == api_qs_object_get_keys(labels, &keys)){
+        count = api_qs_array_get_length(&keys);
+    }
+    if(count == 0){
+        printf("  (none)\n");
+        return;
+    }
+    for(int32_t i = 0; i < count; i++){
+        char* key = api_qs_array_get_string(&keys, i);
+        if(key == NULL){
+            continue;
+        }
+        char* value = api_qs_object_get_string(labels, key);
+        printf("  %s=%s\n", key, value != NULL ? value : "");
+    }
+}
+
+static void print_short_id(QS_JSON_ELEMENT_OBJECT* object, const char* field, const char* label)
+{
+    char* id = api_qs_object_get_string(object, field);
+    char id_buf[128] = "";
+    if(id != NULL){
+        const char* sha = strstr(id, ":");
+        snprintf(id_buf, sizeof(id_buf), "%s", sha != NULL ? sha + 1 : id);
+        if(strlen(id_buf) > 12){
+            id_buf[12] = 0;
+        }
+    }
+    printf("%-12s %s\n", label, id_buf);
+}
+
+static void print_container_inspect(DOCKER_CLI_CONTEXT* cli, const char* body)
+{
+    json_reset(cli);
+    QS_JSON_ELEMENT_OBJECT root;
+    if(0 != api_qs_json_decode_object(&cli->json_memory, &root, body)){
+        fprintf(stderr, "docker_cli: failed to parse container inspect response\n");
+        return;
+    }
+
+    print_short_id(&root, "Id", "ID");
+    const char* scalar_keys[] = {"Name", "Image", "Created"};
+    for(size_t i = 0; i < sizeof(scalar_keys) / sizeof(scalar_keys[0]); i++){
+        char* value = api_qs_object_get_string(&root, scalar_keys[i]);
+        if(value != NULL){
+            printf("%-12s %s\n", scalar_keys[i], value);
+        }
+    }
+
+    QS_JSON_ELEMENT_OBJECT state;
+    if(0 == api_qs_object_get_object(&root, "State", &state)){
+        char* status = api_qs_object_get_string(&state, "Status");
+        int32_t* exit_code = api_qs_object_get_integer(&state, "ExitCode");
+        int32_t* pid = api_qs_object_get_integer(&state, "Pid");
+        printf("State:      %s", status != NULL ? status : "?");
+        if(exit_code != NULL && *exit_code != 0){
+            printf(" (exit code: %d)", *exit_code);
+        }
+        if(pid != NULL && *pid > 0){
+            printf(" (pid: %d)", *pid);
+        }
+        printf("\n");
+        const char* state_keys[] = {"StartedAt", "FinishedAt"};
+        for(size_t i = 0; i < sizeof(state_keys) / sizeof(state_keys[0]); i++){
+            char* value = api_qs_object_get_string(&state, state_keys[i]);
+            /* Go のゼロ時間（0001-01-01T00:00:00Z）は未設定なのでスキップ */
+            if(value != NULL && value[0] != 0 && 0 != strncmp(value, "0001-01-01", 10)){
+                printf("%-12s %s\n", state_keys[i], value);
+            }
+        }
+    }
+
+    QS_JSON_ELEMENT_OBJECT config;
+    if(0 == api_qs_object_get_object(&root, "Config", &config)){
+        QS_JSON_ELEMENT_ARRAY cmd_array;
+        char cmd_buf[512] = "";
+        if(0 == api_qs_object_get_array(&config, "Cmd", &cmd_array)){
+            join_string_array(&cmd_array, cmd_buf, sizeof(cmd_buf));
+            printf("%-12s %s\n", "Cmd", cmd_buf);
+        }
+        printf("Env:\n");
+        QS_JSON_ELEMENT_ARRAY env_array;
+        if(0 == api_qs_object_get_array(&config, "Env", &env_array)){
+            print_string_array_lines(&env_array);
+        }
+        else{
+            printf("  (none)\n");
+        }
+        char* working_dir = api_qs_object_get_string(&config, "WorkingDir");
+        if(working_dir != NULL && working_dir[0] != 0){
+            printf("%-12s %s\n", "WorkingDir", working_dir);
+        }
+        QS_JSON_ELEMENT_OBJECT labels;
+        if(0 == api_qs_object_get_object(&config, "Labels", &labels)){
+            printf("Labels:\n");
+            print_label_object(&labels);
+        }
+    }
+
+    QS_JSON_ELEMENT_OBJECT host_config;
+    if(0 == api_qs_object_get_object(&root, "HostConfig", &host_config)){
+        char* network_mode = api_qs_object_get_string(&host_config, "NetworkMode");
+        if(network_mode != NULL){
+            printf("%-12s %s\n", "Network", network_mode);
+        }
+        QS_JSON_ELEMENT_OBJECT restart_policy;
+        if(0 == api_qs_object_get_object(&host_config, "RestartPolicy", &restart_policy)){
+            char* policy = api_qs_object_get_string(&restart_policy, "Name");
+            if(policy != NULL){
+                printf("%-12s %s\n", "Restart", policy);
+            }
+        }
+        uint64_t memory = 0;
+        if(0 == get_size_u64(&host_config, "Memory", &memory) && memory > 0){
+            char size_buf[32];
+            print_human_size(memory, size_buf, sizeof(size_buf));
+            printf("%-12s %s\n", "Memory", size_buf);
+        }
+    }
+
+    printf("Mounts:\n");
+    QS_JSON_ELEMENT_ARRAY mounts;
+    if(0 == api_qs_object_get_array(&root, "Mounts", &mounts)){
+        int32_t length = api_qs_array_get_length(&mounts);
+        if(length == 0){
+            printf("  (none)\n");
+        }
+        for(int32_t i = 0; i < length; i++){
+            QS_JSON_ELEMENT_OBJECT mount;
+            if(0 != api_qs_array_get_object(&mounts, i, &mount)){
+                continue;
+            }
+            char* type = api_qs_object_get_string(&mount, "Type");
+            char* source = api_qs_object_get_string(&mount, "Source");
+            char* destination = api_qs_object_get_string(&mount, "Destination");
+            int32_t* rw = api_qs_object_get_integer(&mount, "RW");
+            printf("  %s: %s -> %s (%s)\n",
+                   type != NULL ? type : "?",
+                   source != NULL ? source : "?",
+                   destination != NULL ? destination : "?",
+                   (rw != NULL && *rw != 0) ? "rw" : "ro");
+        }
+    }
+    else{
+        printf("  (none)\n");
+    }
+
+    QS_JSON_ELEMENT_OBJECT network_settings;
+    if(0 == api_qs_object_get_object(&root, "NetworkSettings", &network_settings)){
+        QS_JSON_ELEMENT_OBJECT ports;
+        printf("Ports:\n");
+        if(0 == api_qs_object_get_object(&network_settings, "Ports", &ports)){
+            QS_JSON_ELEMENT_ARRAY keys;
+            int count = 0;
+            if(0 == api_qs_object_get_keys(&ports, &keys)){
+                int32_t key_count = api_qs_array_get_length(&keys);
+                for(int32_t i = 0; i < key_count; i++){
+                    char* key = api_qs_array_get_string(&keys, i);
+                    QS_JSON_ELEMENT_ARRAY bindings;
+                    if(key == NULL || 0 != api_qs_object_get_array(&ports, key, &bindings)){
+                        continue;
+                    }
+                    int32_t bind_count = api_qs_array_get_length(&bindings);
+                    for(int32_t j = 0; j < bind_count; j++){
+                        QS_JSON_ELEMENT_OBJECT binding;
+                        if(0 != api_qs_array_get_object(&bindings, j, &binding)){
+                            continue;
+                        }
+                        char* host_ip = api_qs_object_get_string(&binding, "HostIp");
+                        char* host_port = api_qs_object_get_string(&binding, "HostPort");
+                        printf("  %s -> %s:%s\n", key,
+                               host_ip != NULL ? host_ip : "?",
+                               host_port != NULL ? host_port : "?");
+                        count++;
+                    }
+                }
+            }
+            if(count == 0){
+                printf("  (none)\n");
+            }
+        }
+        else{
+            printf("  (none)\n");
+        }
+
+        QS_JSON_ELEMENT_OBJECT networks;
+        if(0 == api_qs_object_get_object(&network_settings, "Networks", &networks)){
+            printf("IP:\n");
+            QS_JSON_ELEMENT_ARRAY keys;
+            int count = 0;
+            if(0 == api_qs_object_get_keys(&networks, &keys)){
+                int32_t key_count = api_qs_array_get_length(&keys);
+                for(int32_t i = 0; i < key_count; i++){
+                    char* key = api_qs_array_get_string(&keys, i);
+                    QS_JSON_ELEMENT_OBJECT net;
+                    if(key == NULL || 0 != api_qs_object_get_object(&networks, key, &net)){
+                        continue;
+                    }
+                    char* ip = api_qs_object_get_string(&net, "IPAddress");
+                    if(ip == NULL || ip[0] == 0){
+                        continue;
+                    }
+                    printf("  %s: %s\n", key, ip);
+                    count++;
+                }
+            }
+            if(count == 0){
+                printf("  (none)\n");
+            }
+        }
+    }
+}
+
+static void print_image_inspect(DOCKER_CLI_CONTEXT* cli, const char* body)
+{
+    json_reset(cli);
+    QS_JSON_ELEMENT_OBJECT root;
+    if(0 != api_qs_json_decode_object(&cli->json_memory, &root, body)){
+        fprintf(stderr, "docker_cli: failed to parse image inspect response\n");
+        return;
+    }
+
+    print_short_id(&root, "Id", "ID");
+
+    QS_JSON_ELEMENT_ARRAY repo_tags;
+    char tags_buf[512] = "";
+    if(0 == api_qs_object_get_array(&root, "RepoTags", &repo_tags)){
+        join_string_array(&repo_tags, tags_buf, sizeof(tags_buf));
+        printf("%-12s %s\n", "Tags", tags_buf[0] != 0 ? tags_buf : "<none>");
+    }
+    QS_JSON_ELEMENT_ARRAY repo_digests;
+    char digests_buf[512] = "";
+    if(0 == api_qs_object_get_array(&root, "RepoDigests", &repo_digests)){
+        join_string_array(&repo_digests, digests_buf, sizeof(digests_buf));
+        if(digests_buf[0] != 0){
+            printf("%-12s %s\n", "Digests", digests_buf);
+        }
+    }
+    char* created = api_qs_object_get_string(&root, "Created");
+    if(created != NULL){
+        printf("%-12s %s\n", "Created", created);
+    }
+    uint64_t size = 0;
+    if(0 == get_size_u64(&root, "Size", &size)){
+        char size_buf[32];
+        print_human_size(size, size_buf, sizeof(size_buf));
+        printf("%-12s %s\n", "Size", size_buf);
+    }
+    const char* scalar_keys[] = {"Architecture", "Os"};
+    for(size_t i = 0; i < sizeof(scalar_keys) / sizeof(scalar_keys[0]); i++){
+        char* value = api_qs_object_get_string(&root, scalar_keys[i]);
+        if(value != NULL){
+            printf("%-12s %s\n", scalar_keys[i], value);
+        }
+    }
+
+    QS_JSON_ELEMENT_OBJECT config;
+    if(0 == api_qs_object_get_object(&root, "Config", &config)){
+        QS_JSON_ELEMENT_ARRAY cmd_array;
+        char cmd_buf[512] = "";
+        if(0 == api_qs_object_get_array(&config, "Cmd", &cmd_array)){
+            join_string_array(&cmd_array, cmd_buf, sizeof(cmd_buf));
+            printf("%-12s %s\n", "Cmd", cmd_buf);
+        }
+        printf("Env:\n");
+        QS_JSON_ELEMENT_ARRAY env_array;
+        if(0 == api_qs_object_get_array(&config, "Env", &env_array)){
+            print_string_array_lines(&env_array);
+        }
+        else{
+            printf("  (none)\n");
+        }
+        char* working_dir = api_qs_object_get_string(&config, "WorkingDir");
+        if(working_dir != NULL && working_dir[0] != 0){
+            printf("%-12s %s\n", "WorkingDir", working_dir);
+        }
+        QS_JSON_ELEMENT_OBJECT exposed_ports;
+        if(0 == api_qs_object_get_object(&config, "ExposedPorts", &exposed_ports)){
+            printf("ExposedPorts:\n");
+            print_label_object(&exposed_ports);
+        }
+        QS_JSON_ELEMENT_OBJECT labels;
+        if(0 == api_qs_object_get_object(&config, "Labels", &labels)){
+            printf("Labels:\n");
+            print_label_object(&labels);
+        }
+    }
+}
+
+static int cmd_inspect(DOCKER_CLI_CONTEXT* cli, const char* name)
+{
+    if(name == NULL || !is_safe_path_token(name)){
+        fprintf(stderr, "docker_cli: inspect requires a valid container/image name\n");
+        return 1;
+    }
+
+    /* container を先に試し、404 のときだけ image にフォールスルー */
+    char path[DOCKER_CLI_HOST_SIZE + 32];
+    snprintf(path, sizeof(path), "/containers/%s/json", name);
+    char* body = NULL;
+    size_t body_length = 0;
+    int status = 0;
+    if(0 != docker_request(cli, "GET", path, NULL, &body, &body_length, &status)){
+        return 1;
+    }
+    if(status == 200){
+        print_container_inspect(cli, body);
+        free(body);
+        return 0;
+    }
+    if(status != 404){
+        docker_check_error(cli, status, body, body_length);
+        free(body);
+        return 1;
+    }
+
+    char* container_error_body = body;
+    size_t container_error_body_length = body_length;
+    body = NULL;
+
+    snprintf(path, sizeof(path), "/images/%s/json", name);
+    if(0 != docker_request(cli, "GET", path, NULL, &body, &body_length, &status)){
+        free(container_error_body);
+        return 1;
+    }
+    int ret = 0;
+    if(status == 200){
+        print_image_inspect(cli, body);
+    }
+    else if(status == 404){
+        /* 両方 404: container 側のメッセージを表示 */
+        docker_check_error(cli, 404, container_error_body, container_error_body_length);
+        ret = 1;
+    }
+    else{
+        docker_check_error(cli, status, body, body_length);
+        ret = 1;
+    }
+    free(body);
+    free(container_error_body);
+    return ret;
+}
+
+/* ------------------------------------------------------------------ */
+/* pull: POST /images/create?fromImage=NAME&tag=TAG                   */
+/* レスポンスは JSON オブジェクトの行ストリーム（pull 完了で close）     */
+/* ------------------------------------------------------------------ */
+#define PULL_SEEN_LAYER_MAX 64
+static char s_pull_seen_layers[PULL_SEEN_LAYER_MAX][19];
+static size_t s_pull_seen_layer_count = 0;
+
+static void pull_reset_seen_layers(void)
+{
+    s_pull_seen_layer_count = 0;
+}
+
+static int pull_mark_layer_seen(const char* layer_id)
+{
+    char short_id[19] = "";
+    const char* sha = strstr(layer_id, ":");
+    snprintf(short_id, sizeof(short_id), "%s", sha != NULL ? sha + 1 : layer_id);
+    if(strlen(short_id) > 12){
+        short_id[12] = 0;
+    }
+    for(size_t i = 0; i < s_pull_seen_layer_count; i++){
+        if(0 == strcmp(s_pull_seen_layers[i], short_id)){
+            return 0;
+        }
+    }
+    if(s_pull_seen_layer_count < PULL_SEEN_LAYER_MAX){
+        snprintf(s_pull_seen_layers[s_pull_seen_layer_count], sizeof(s_pull_seen_layers[0]), "%s", short_id);
+        s_pull_seen_layer_count++;
+    }
+    return 1;
+}
+
+static int cmd_pull(DOCKER_CLI_CONTEXT* cli, const char* reference)
+{
+    if(reference == NULL || !is_safe_path_token(reference)){
+        fprintf(stderr, "docker_cli: pull requires a valid image reference\n");
+        return 1;
+    }
+
+    char repo[DOCKER_CLI_HOST_SIZE];
+    char tag[128];
+    split_image_ref(reference, repo, sizeof(repo), tag, sizeof(tag));
+
+    char path[DOCKER_CLI_HOST_SIZE + 192];
+    if(tag[0] != 0){
+        snprintf(path, sizeof(path), "/images/create?fromImage=%s&tag=%s", repo, tag);
+    }
+    else{
+        snprintf(path, sizeof(path), "/images/create?fromImage=%s", repo);
+    }
+
+    pull_reset_seen_layers();
+
+    char* body = NULL;
+    size_t body_length = 0;
+    int status = 0;
+    if(0 != docker_request(cli, "POST", path, NULL, &body, &body_length, &status)){
+        return 1;
+    }
+    int ret = 0;
+    if(200 != status){
+        docker_check_error(cli, status, body, body_length);
+        ret = 1;
+    }
+    else{
+        /* 行ごとに JSON オブジェクトをパースして表示（進捗行は層ごとに 1 回だけ） */
+        if(body == NULL || body[0] == 0){
+            printf("pulled: %s\n", reference);
+        }
+        else{
+            size_t offset = 0;
+            while(offset < body_length){
+                /* 行末の '\n' を探す（無い場合は行末） */
+                size_t line_end = offset;
+                while(line_end < body_length && body[line_end] != '\n'){
+                    line_end++;
+                }
+                size_t line_len = line_end - offset;
+                if(line_len > 0){
+                    char line[2048];
+                    size_t copy = line_len < sizeof(line) - 1 ? line_len : sizeof(line) - 1;
+                    memcpy(line, body + offset, copy);
+                    line[copy] = 0;
+                    /* NUL 混入（切り詰められた不完全行）はデコード不能なのでスキップ */
+                    if(memchr(line, 0, copy) == NULL){
+                        json_reset(cli);
+                        QS_JSON_ELEMENT_OBJECT item;
+                        if(0 == api_qs_json_decode_object(&cli->json_memory, &item, line)){
+                            char* status_str = api_qs_object_get_string(&item, "status");
+                            char* id = api_qs_object_get_string(&item, "id");
+                            /* 進捗行は progress（文字列）または progressDetail（オブジェクト）を持つ
+                             * dockerd 29 系は progressDetail 形式のため両方判定する */
+                            int is_progress = (api_qs_object_exist(&item, "progress") != 0) ||
+                                              (api_qs_object_exist(&item, "progressDetail") != 0);
+                            if(status_str != NULL){
+                                if(is_progress){
+                                    if(id != NULL && pull_mark_layer_seen(id)){
+                                        printf("pulling: %s\n", id);
+                                    }
+                                }
+                                else if(0 != strcmp(status_str, "Waiting")){
+                                    printf("%s\n", status_str);
+                                }
+                            }
+                        }
+                    }
+                }
+                offset = line_end + 1;
+            }
+        }
+    }
+    free(body);
+    return ret;
+}
+
+/* ------------------------------------------------------------------ */
+/* exec: POST /containers/{id}/exec -> POST /exec/{id}/start          */
+/*        -> GET /exec/{id}/json（終了コードを CLI 終了コードとして返す） */
+/* ------------------------------------------------------------------ */
+/*
+ * JSON 文字列列を生成する（要素は api_qs_json_escape でエスケープ）
+ * 例: ["sh","-c","echo hi"]
+ */
+static int build_json_string_array(const char* const* items, int count, char* buf, size_t buf_size)
+{
+    size_t offset = 0;
+    offset += (size_t)snprintf(buf + offset, buf_size - offset, "[");
+    for(int i = 0; i < count; i++){
+        char escaped[1024];
+        if(api_qs_json_escape(items[i], escaped, sizeof(escaped)) != 0){
+            return -1;
+        }
+        if(i > 0){
+            offset += (size_t)snprintf(buf + offset, buf_size - offset, ",");
+        }
+        offset += (size_t)snprintf(buf + offset, buf_size - offset, "\"%s\"", escaped);
+        if(offset >= buf_size){
+            return -1;
+        }
+    }
+    offset += (size_t)snprintf(buf + offset, buf_size - offset, "]");
+    return (offset < buf_size) ? 0 : -1;
+}
+
+static int cmd_exec(DOCKER_CLI_CONTEXT* cli, int argc, char** argv)
+{
+    if(argc < 1){
+        fprintf(stderr, "docker_cli: exec requires a container id/name\n");
+        return 1;
+    }
+    const char* id = argv[0];
+    if(!is_safe_path_token(id)){
+        fprintf(stderr, "docker_cli: exec requires a valid container id/name\n");
+        return 1;
+    }
+
+    /* 引数から -t を除いた残りを CMD とする */
+    int tty = 0;
+    const char* cmd_args[64];
+    int cmd_count = 0;
+    for(int i = 1; i < argc; i++){
+        if(0 == strcmp(argv[i], "-t")){
+            tty = 1;
+        }
+        else if(cmd_count < (int)(sizeof(cmd_args) / sizeof(cmd_args[0]))){
+            cmd_args[cmd_count++] = argv[i];
+        }
+        else{
+            fprintf(stderr, "docker_cli: too many exec arguments (max %d)\n",
+                    (int)(sizeof(cmd_args) / sizeof(cmd_args[0])));
+            return 1;
+        }
+    }
+    if(cmd_count == 0){
+        fprintf(stderr, "docker_cli: exec requires a command to run\n");
+        return 1;
+    }
+
+    /* create リクエストボディ（JSON ビルダにブール値 push が無いため手組み） */
+    char cmd_json[4096];
+    if(0 != build_json_string_array(cmd_args, cmd_count, cmd_json, sizeof(cmd_json))){
+        fprintf(stderr, "docker_cli: failed to build exec command JSON\n");
+        return 1;
+    }
+    char create_body[DOCKER_CLI_ID_SIZE + 4352];
+    snprintf(create_body, sizeof(create_body),
+             "{\"AttachStdout\":true,\"AttachStderr\":true,\"Tty\":%s,\"Cmd\":%s}",
+             tty ? "true" : "false", cmd_json);
+
+    char path[DOCKER_CLI_ID_SIZE + 64];
+    snprintf(path, sizeof(path), "/containers/%s/exec", id);
+    char* body = NULL;
+    size_t body_length = 0;
+    int status = 0;
+    if(0 != docker_request(cli, "POST", path, create_body, &body, &body_length, &status)){
+        return 1;
+    }
+    int ret = 1;
+    char exec_id[DOCKER_CLI_ID_SIZE] = "";
+    if(status == 201){
+        json_reset(cli);
+        QS_JSON_ELEMENT_OBJECT create_result;
+        if(0 == api_qs_json_decode_object(&cli->json_memory, &create_result, body)){
+            char* new_id = api_qs_object_get_string(&create_result, "Id");
+            if(new_id != NULL && is_safe_path_token(new_id)){
+                snprintf(exec_id, sizeof(exec_id), "%s", new_id);
+            }
+        }
+        if(exec_id[0] == 0){
+            fprintf(stderr, "docker_cli: failed to parse exec id from create response\n");
+        }
+        else{
+            /* start */
+            char start_path[DOCKER_CLI_ID_SIZE + 48];
+            char start_body[64];
+            snprintf(start_body, sizeof(start_body),
+                     "{\"Detach\":false,\"Tty\":%s}", tty ? "true" : "false");
+            snprintf(start_path, sizeof(start_path), "/exec/%s/start", exec_id);
+            char* start_body_buf = NULL;
+            size_t start_body_length = 0;
+            int start_status = 0;
+            if(0 != docker_request(cli, "POST", start_path, start_body, &start_body_buf, &start_body_length, &start_status)){
+                ret = 1;
+            }
+            else if(200 != start_status){
+                docker_check_error(cli, start_status, start_body_buf, start_body_length);
+                ret = 1;
+            }
+            else{
+                if(tty){
+                    /* TTY モードはフレームなしの raw 出力 */
+                    if(start_body_buf != NULL && start_body_length > 0){
+                        fwrite(start_body_buf, 1, start_body_length, stdout);
+                    }
+                }
+                else{
+                    print_demuxed(start_body_buf, start_body_length);
+                }
+                /* exec の終了コードを CLI 終了コードとして返す */
+                char json_path[DOCKER_CLI_ID_SIZE + 48];
+                char* json_body = NULL;
+                size_t json_body_length = 0;
+                int json_status = 0;
+                snprintf(json_path, sizeof(json_path), "/exec/%s/json", exec_id);
+                if(0 == docker_request(cli, "GET", json_path, NULL, &json_body, &json_body_length, &json_status)){
+                    if(200 == json_status){
+                        json_reset(cli);
+                        QS_JSON_ELEMENT_OBJECT exec_info;
+                        if(0 == api_qs_json_decode_object(&cli->json_memory, &exec_info, json_body)){
+                            int32_t* exit_code = api_qs_object_get_integer(&exec_info, "ExitCode");
+                            if(exit_code != NULL){
+                                ret = *exit_code;
+                            }
+                        }
+                    }
+                    else{
+                        /* 終了コード取得失敗は警告にとどめる（出力はすでに表示済み） */
+                        fprintf(stderr, "docker_cli: warning: failed to get exec exit code\n");
+                    }
+                    free(json_body);
+                }
+            }
+            free(start_body_buf);
+        }
+    }
+    else{
+        docker_check_error(cli, status, body, body_length);
+        ret = 1;
     }
     free(body);
     return ret;
@@ -1636,6 +2305,12 @@ int main(int argc, char** argv)
     else if(0 == strcmp(command, "history")){
         ret = cmd_history(&cli, i < argc ? argv[i] : NULL);
     }
+    else if(0 == strcmp(command, "inspect")){
+        ret = cmd_inspect(&cli, i < argc ? argv[i] : NULL);
+    }
+    else if(0 == strcmp(command, "pull")){
+        ret = cmd_pull(&cli, i < argc ? argv[i] : NULL);
+    }
     else if(0 == strcmp(command, "run")){
         ret = cmd_run(&cli, argc - i, &argv[i]);
     }
@@ -1676,6 +2351,9 @@ int main(int argc, char** argv)
     }
     else if(0 == strcmp(command, "logs")){
         ret = cmd_logs(&cli, i < argc ? argv[i] : NULL);
+    }
+    else if(0 == strcmp(command, "exec")){
+        ret = cmd_exec(&cli, argc - i, &argv[i]);
     }
     else if(0 == strcmp(command, "top")){
         ret = cmd_top(&cli, i < argc ? argv[i] : NULL);

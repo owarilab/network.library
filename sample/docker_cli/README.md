@@ -154,6 +154,11 @@ docker_cli [--host HOST] [--port PORT] [--unix-socket PATH] <command> [args]
   rmi <image> [--force]    イメージ削除（DELETE /images/{name}）
   tag <SOURCE> <TARGET>    イメージにタグ付け（POST /images/{name}/tag）
   history <image>          イメージ履歴（GET /images/{name}/history）
+  inspect <CONTAINER|IMAGE>  コンテナまたはイメージの詳細表示
+                             （container 優先、404 時は image）
+  pull IMAGE[:TAG]          イメージをプル（POST /images/create）
+  exec <container> [CMD...] コンテナ内でコマンド実行 [-t]
+                             CLI の終了コードは実行コマンドの終了コードになる
   network ls               ネットワーク一覧（GET /networks）
   volume ls                ボリューム一覧（GET /volumes）
   prune <kind> [--filter key=value]
@@ -227,6 +232,52 @@ IMAGE ID               SIZE CREATED BY
 <missing>           7.47 MB ADD alpine-minirootfs-3.21.6-x86_64.tar.gz / # buildkit
 $ ./qs_docker_cli rmi local/alpine-test:v1
 untagged: local/alpine-test:v1
+
+$ ./qs_docker_cli inspect alpine:3.21
+ID           6aeafe801b80
+Tags         alpine:3.21
+Digests      alpine@sha256:c3f8e73fdb79...
+Created      2026-01-28T01:18:43.127739215Z
+Size         7.47 MB
+Architecture amd64
+Os           linux
+Cmd          /bin/sh
+Env:
+  PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+WorkingDir   /
+
+$ ./qs_docker_cli run alpine:3.21 sleep 300
+ed2fca2ed3ad...
+$ ./qs_docker_cli inspect ed2fca2ed3ad
+ID           ed2fca2ed3ad
+Name         /qs_cli_exec_1
+Image        sha256:6aeafe801b80...
+Created      2026-11-21T12:33:22.123456789Z
+State:      running (pid: 58144)
+StartedAt    2026-11-21T12:33:22.234567890Z
+Cmd          sleep 300
+...
+Network      bridge
+Restart      no
+Mounts:
+  (none)
+Ports:
+  (none)
+IP:
+  bridge: 172.17.0.2
+
+$ ./qs_docker_cli exec ed2fca2ed3ad sh -c "echo hello; echo to-stderr >&2; exit 7"
+hello
+to-stderr
+# （このコマンドの終了コードは 7）
+$ ./qs_docker_cli exec ed2fca2ed3ad -t echo tty-mode
+tty-mode
+
+$ ./qs_docker_cli pull alpine:3.19
+Pulling from library/alpine
+pulling: 17a39c0ba978
+Digest: sha256:6baf43584bcb78...
+Status: Downloaded newer image for alpine:3.19
 ```
 
 エラー（HTTP 400 以上）は Docker エラー JSON の `message` を表示し、非ゼロ終了します。
@@ -251,6 +302,15 @@ untagged: local/alpine-test:v1
 - `prune --filter` は Engine API の `filters` パラメータ（URL エンコード済み JSON）を構築する。
   形式は `{"key":["value"]}` のリスト形式（2 段形式 `{"label":{"k":["v"]}}` は 400 になる）。
   レスポンスの再割当バイト数フィールドは `SpaceReclaimed`
+- `inspect` は container inspect を試し、**404 のときだけ image inspect にフォールスルー**する
+  （system の `docker inspect` と同じ解決順序）。表示は選択フィールドのサマリー
+- `pull` のレスポンスは JSON オブジェクトの行ストリーム。進捗行は
+  `progress` / `progressDetail` フィールドの有無で判定し、層 ID ごとに 1 行だけ
+  `pulling: <id12>` を表示してノイズを抑制する（dockerd 29 系は `progressDetail` 形式）
+- `exec` は 3 リクエスト（exec 作成 → start → 終了コード取得）。
+  リクエストボディは **JSON ビルダにブール値 push が無い**ため
+  `snprintf` + `api_qs_json_escape`（core 既存 API）で手組みする。
+  出力は `logs` と同じ `print_demuxed` を共用（Tty:false のときのみ）
 - パスに埋め込む ID・イメージ名は文字種を制限（英数字と `./:-_`）し、HTTP パスへの注入を防ぐ。
   `prune --filter` の値も JSON を壊す文字（`" \ { } [ ]`）を含む場合は拒否する
 
@@ -264,6 +324,13 @@ untagged: local/alpine-test:v1
 - TLS（`tcp://...:2376` の mTLS 認証モード）は非対応です
 - `wait` はコンテナ終了までブロックし、**タイムアウトを持ちません**。
   必要に応じてシェル側で `timeout 60 ./qs_docker_cli wait <id>` のようにしてください
+- `exec` の CLI 終了コードは **実行コマンドの終了コード**になります
+  （system の `docker exec` と同じ。0/1 規則からの例外。
+  例: `exec <c> sh -c "exit 7"` → 終了コード 7）
+- `exec` は `-d`（detach）・stdin（`AttachStdin`）・TTY サイズ指定
+  （`/exec/{id}/resize`）を非対応としています
+- `pull` はローカルに新しいイメージを作成します（既存データは削除しません）。
+  進捗行の表示は層ごとに 1 行のサマリーです
 - WSL2 環境の既知の挙動: コンテナの PID 1 に `SIGTERM` が届かず
   `kill --signal TERM` が無効になることがあります（`SIGKILL`（既定）は正常）。
   system の `docker` CLI でも同じ挙動を確認しています
