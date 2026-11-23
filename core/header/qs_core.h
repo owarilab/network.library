@@ -132,7 +132,6 @@ extern "C"{
 #define QS_SYSTEM_OK 0
 
 // build option
-#define __QS_DEBUG__
 #ifndef __QS_DEBUG__
 #define __QS_RELEASE__
 #endif
